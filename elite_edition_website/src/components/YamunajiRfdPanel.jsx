@@ -30,14 +30,70 @@ import {
   Sparkles,
   Calendar,
   ClipboardList,
-  Boxes
+  Boxes,
+  Settings,
+  Edit2,
+  Sliders,
+  RotateCcw
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
 
 const STORAGE_GRAY_KEY = 'yamunaji_gray_lots_data';
 const STORAGE_MILL_CHALLAN_KEY = 'yamunaji_mill_challans_data';
 const STORAGE_RFD_KEY = 'yamunaji_rfd_lots_data';
-const STORAGE_LEDGER_KEY = 'yamunaji_rfd_ledger_data';
+const STORAGE_CONFIGS_KEY = 'yamunaji_master_configurations';
+
+// ==========================================
+// DEFAULT MASTER CONFIGURATIONS (SURAT TEXTILES)
+// ==========================================
+const DEFAULT_CONFIGS = {
+  weavers: [
+    'Maruti Weaving Works',
+    'Harikrishna Textiles',
+    'Shivam Loom Industries',
+    'Radha Krishna Weaving',
+    'Shreeji Textiles',
+    'Gopi Loom Mills',
+    'Omkar Weavers',
+    'Pooja Textiles (Katargam)'
+  ],
+  qualities: [
+    'Pure Viscose Rayon 14kg',
+    'Pure Modal Satin 60s',
+    'Cotton 60x60 Cambric',
+    'Organza Viscose Gold Weave',
+    'Chanderi Silk 50gm',
+    'Pure Linen Slub 60s',
+    'Viscose Crepe 80gm',
+    'Georgette 60gm Pure',
+    'Heavy Cotton Twill 200 GSM',
+    'Dola Silk Heavy 80gm',
+    'Tissue Silk Zari'
+  ],
+  pannas: [
+    '44"',
+    '48"',
+    '50"',
+    '54"',
+    '58"',
+    '60"'
+  ],
+  mills: [
+    'Shree Radhe Bleaching & Dyeing Processors',
+    'Vrundavan Mills Pvt Ltd',
+    'Ganesh Textile Processors',
+    'Shree Ambika Processing Mill',
+    'Bhagwati Dyeing House',
+    'Navkar Processing Mills'
+  ],
+  processes: [
+    'RFD Bleaching, Scouring & Heat Setting',
+    'Mercerizing & RFD Bleaching',
+    'Soft Finish & Wash RFD',
+    'High Tensile Heat Setting',
+    'Bio Wash & Zero Shrinkage Finish'
+  ]
+};
 
 // ==========================================
 // SEED DATA FOR GRAY FABRIC
@@ -135,7 +191,7 @@ const SEED_MILL_CHALLANS = [
     fabricQuality: 'Pure Viscose Rayon 14kg',
     totalTps: 5,
     totalMeters: 512.0,
-    status: 'At Mill', // At Mill, Received as RFD
+    status: 'At Mill',
     tps: [
       { srNo: 1, lotNumber: 'GRAY-2026-001', tpNo: '101', tpMtr: 102.5 },
       { srNo: 2, lotNumber: 'GRAY-2026-001', tpNo: '102', tpMtr: 101.0 },
@@ -184,11 +240,33 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // Master Screen Mode: 'gray' (Gray Fabric) or 'rfd' (RFD Fabric)
   const [screenMode, setScreenMode] = useState('gray');
 
-  // Sub-tabs for Gray: 'weaver_inward' (Weaver Inward & Gray Stock) or 'mill_outward' (Outward Challans to Mill)
+  // Sub-tabs for Gray: 'weaver_inward' or 'mill_outward'
   const [graySubTab, setGraySubTab] = useState('weaver_inward');
 
-  // Sub-tabs for RFD: 'rfd_inventory' or 'rfd_inward'
-  const [rfdSubTab, setRfdSubTab] = useState('rfd_inventory');
+  // Master Configuration State (Weavers, Qualities, Pannas, Mills, Processes)
+  const [configs, setConfigs] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CONFIGS_KEY);
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p && typeof p === 'object') {
+          return {
+            weavers: Array.isArray(p.weavers) && p.weavers.length > 0 ? p.weavers : DEFAULT_CONFIGS.weavers,
+            qualities: Array.isArray(p.qualities) && p.qualities.length > 0 ? p.qualities : DEFAULT_CONFIGS.qualities,
+            pannas: Array.isArray(p.pannas) && p.pannas.length > 0 ? p.pannas : DEFAULT_CONFIGS.pannas,
+            mills: Array.isArray(p.mills) && p.mills.length > 0 ? p.mills : DEFAULT_CONFIGS.mills,
+            processes: Array.isArray(p.processes) && p.processes.length > 0 ? p.processes : DEFAULT_CONFIGS.processes
+          };
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_CONFIGS;
+  });
+
+  // Save Configs on Change
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(configs)); } catch (e) {}
+  }, [configs]);
 
   // Data States
   const [grayLots, setGrayLots] = useState(() => {
@@ -228,6 +306,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsActiveTab, setSettingsActiveTab] = useState('weavers'); // 'weavers' | 'qualities' | 'pannas' | 'mills' | 'processes'
+  const [newSettingInput, setNewSettingInput] = useState('');
+  const [editingItemIndex, setEditingItemIndex] = useState(null);
+  const [editingItemValue, setEditingItemValue] = useState('');
+
   const [showWeaverInwardModal, setShowWeaverInwardModal] = useState(false);
   const [showMillChallanModal, setShowMillChallanModal] = useState(false);
   const [showPrintChallanModal, setShowPrintChallanModal] = useState(null);
@@ -239,8 +323,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     inwardDate: new Date().toISOString().split('T')[0],
     weaverParty: '',
     weaverChallanNo: '',
-    fabricQuality: 'Pure Viscose Rayon 14kg',
-    panna: '44"',
+    fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
+    panna: configs.pannas[0] || '44"',
     ratePerMeter: 45,
     rackLocation: 'Gray Rack G-01',
     remarks: '',
@@ -257,15 +341,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [millChallanForm, setMillChallanForm] = useState({
     challanNo: '',
     challanDate: new Date().toISOString().split('T')[0],
-    millParty: 'Shree Radhe Bleaching & Dyeing Processors',
+    millParty: configs.mills[0] || 'Shree Radhe Bleaching & Dyeing Processors',
     vehicleNo: '',
     driverName: '',
-    processRequired: 'RFD Bleaching, Scouring & Heat Setting',
+    processRequired: configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting',
     selectedTpKeys: {}, // key: "lotId__tpIndex" -> boolean
     notes: ''
   });
 
-  // Sync to LocalStorage
+  // Sync Data to LocalStorage
   useEffect(() => {
     try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(grayLots)); } catch (e) {}
   }, [grayLots]);
@@ -315,13 +399,81 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   }, [rfdLots]);
 
   // ==========================================
+  // MASTER CONFIGURATION HANDLERS
+  // ==========================================
+  const handleAddMasterSetting = (e) => {
+    e.preventDefault();
+    const val = newSettingInput.trim();
+    if (!val) return;
+    const currentList = configs[settingsActiveTab] || [];
+    if (currentList.some(item => item.toLowerCase() === val.toLowerCase())) {
+      triggerEliteAlert(`"${val}" is already present in ${settingsActiveTab}!`, 'Duplicate Item');
+      return;
+    }
+    setConfigs(prev => ({
+      ...prev,
+      [settingsActiveTab]: [...(prev[settingsActiveTab] || []), val]
+    }));
+    setNewSettingInput('');
+  };
+
+  const handleStartEditMasterSetting = (index, value) => {
+    setEditingItemIndex(index);
+    setEditingItemValue(value);
+  };
+
+  const handleSaveEditMasterSetting = (index) => {
+    const val = editingItemValue.trim();
+    if (!val) return;
+    setConfigs(prev => {
+      const updated = [...prev[settingsActiveTab]];
+      updated[index] = val;
+      return { ...prev, [settingsActiveTab]: updated };
+    });
+    setEditingItemIndex(null);
+    setEditingItemValue('');
+  };
+
+  const handleDeleteMasterSetting = (index, item) => {
+    triggerEliteConfirm(
+      `Are you sure you want to remove "${item}" from master list?`,
+      () => {
+        setConfigs(prev => ({
+          ...prev,
+          [settingsActiveTab]: prev[settingsActiveTab].filter((_, idx) => idx !== index)
+        }));
+      },
+      null,
+      'Delete Master Item',
+      'Delete',
+      'Cancel'
+    );
+  };
+
+  const handleResetMasterTabDefaults = () => {
+    triggerEliteConfirm(
+      `Reset all ${settingsActiveTab} back to standard Surat factory defaults?`,
+      () => {
+        setConfigs(prev => ({
+          ...prev,
+          [settingsActiveTab]: DEFAULT_CONFIGS[settingsActiveTab]
+        }));
+        triggerEliteAlert(`Reset ${settingsActiveTab} to default values.`, 'Reset Complete');
+      },
+      null,
+      'Reset Defaults',
+      'Reset',
+      'Cancel'
+    );
+  };
+
+  // ==========================================
   // WEAVER INWARD FORM TP ROW HELPERS
   // ==========================================
   const handleTpChange = (index, field, value) => {
     setWeaverForm(prev => {
       const updated = [...prev.tps];
       if (field === 'tpMtr') {
-        // Sanitize decimal input
         const clean = value.replace(/[^0-9.]/g, '');
         const parts = clean.split('.');
         const validVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
@@ -361,13 +513,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const handleRemoveTpRow = (index) => {
     setWeaverForm(prev => {
       const filtered = prev.tps.filter((_, idx) => idx !== index);
-      // Re-index Sr. No
       const reIndexed = filtered.map((item, idx) => ({ ...item, srNo: idx + 1 }));
       return { ...prev, tps: reIndexed };
     });
   };
 
-  // Keyboard navigation: pressing Enter on a TP Meter input adds or focuses next row
   const handleTpKeyDown = (e, index) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -381,7 +531,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     }
   };
 
-  // Computed Totals for Weaver Form
   const weaverFormSummary = useMemo(() => {
     let totalMtrs = 0;
     let filledTps = 0;
@@ -399,7 +548,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     };
   }, [weaverForm.tps]);
 
-  // Submit Weaver Inward
   const handleSaveWeaverInward = (e) => {
     e.preventDefault();
     if (!weaverForm.weaverParty.trim()) {
@@ -453,8 +601,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       inwardDate: new Date().toISOString().split('T')[0],
       weaverParty: '',
       weaverChallanNo: '',
-      fabricQuality: 'Pure Viscose Rayon 14kg',
-      panna: '44"',
+      fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
+      panna: configs.pannas[0] || '44"',
       ratePerMeter: 45,
       rackLocation: 'Gray Rack G-01',
       remarks: '',
@@ -473,7 +621,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // ==========================================
   // MILL OUTWARD CHALLAN HELPERS
   // ==========================================
-  // List of all Available Gray TPs across lots that are currently 'In Stock'
   const availableGrayTps = useMemo(() => {
     const list = [];
     grayLots.forEach(lot => {
@@ -496,7 +643,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return list;
   }, [grayLots]);
 
-  // Selected TPs in Mill Challan form
   const selectedMillTps = useMemo(() => {
     return availableGrayTps.filter(t => {
       const key = `${t.lotId}__${t.tpIndex}`;
@@ -519,19 +665,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     }));
   };
 
-  const handleSelectAllTpsForLot = (lotId) => {
-    setMillChallanForm(prev => {
-      const updated = { ...prev.selectedTpKeys };
-      const lotTps = availableGrayTps.filter(t => t.lotId === lotId);
-      const allSelected = lotTps.every(t => updated[`${lotId}__${t.tpIndex}`]);
-      lotTps.forEach(t => {
-        updated[`${lotId}__${t.tpIndex}`] = !allSelected;
-      });
-      return { ...prev, selectedTpKeys: updated };
-    });
-  };
-
-  // Submit Mill Outward Challan
   const handleCreateMillChallan = (e) => {
     e.preventDefault();
     if (!millChallanForm.millParty.trim()) {
@@ -568,7 +701,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       notes: millChallanForm.notes.trim()
     };
 
-    // Update Gray Lots state to mark TPs as "Sent to Mill"
     setGrayLots(prev => prev.map(lot => {
       let lotHasSent = false;
       let additionalSentMtrs = 0;
@@ -603,14 +735,13 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setMillChallans(prev => [newChallan, ...prev]);
     setShowMillChallanModal(false);
 
-    // Reset Form
     setMillChallanForm({
       challanNo: '',
       challanDate: new Date().toISOString().split('T')[0],
-      millParty: 'Shree Radhe Bleaching & Dyeing Processors',
+      millParty: configs.mills[0] || 'Shree Radhe Bleaching & Dyeing Processors',
       vehicleNo: '',
       driverName: '',
-      processRequired: 'RFD Bleaching, Scouring & Heat Setting',
+      processRequired: configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting',
       selectedTpKeys: {},
       notes: ''
     });
@@ -675,62 +806,88 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           </div>
         </div>
 
-        {/* Primary Screen Mode Switcher: Gray Fabric vs. RFD Fabric */}
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            background: '#ffffff',
-            borderRadius: '10px',
-            padding: '4px',
-            border: '1px solid #cbd5e1',
-            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-            gap: '4px'
-          }}
-        >
+        {/* Master Action Controls: Settings + Mode Switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* ⚙️ SETTINGS BUTTON */}
           <button
-            onClick={() => setScreenMode('gray')}
-            type="button"
+            onClick={() => setShowSettingsModal(true)}
+            className="btn-secondary"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
               padding: '6px 14px',
-              borderRadius: '7px',
-              border: 'none',
-              background: screenMode === 'gray' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
-              color: screenMode === 'gray' ? '#ffffff' : '#475569',
-              fontWeight: screenMode === 'gray' ? 800 : 600,
+              borderRadius: '8px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#0f172a',
+              fontWeight: 800,
               fontSize: '0.82rem',
               cursor: 'pointer',
-              boxShadow: screenMode === 'gray' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
-              transition: 'all 0.15s ease'
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
             }}
+            title="Configure Weaver Names, Fabric Qualities, Panna Widths & Mills"
           >
-            <Boxes size={15} /> Gray Fabric (ગ્રે કાપડ)
+            <Settings size={15} color="#0284c7" /> Settings (માસ્ટર સેટિંગ્સ)
           </button>
 
-          <button
-            onClick={() => setScreenMode('rfd')}
-            type="button"
+          {/* Primary Screen Mode Switcher: Gray Fabric vs. RFD Fabric */}
+          <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '7px',
-              border: 'none',
-              background: screenMode === 'rfd' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
-              color: screenMode === 'rfd' ? '#ffffff' : '#475569',
-              fontWeight: screenMode === 'rfd' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              boxShadow: screenMode === 'rfd' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
-              transition: 'all 0.15s ease'
+              background: '#ffffff',
+              borderRadius: '10px',
+              padding: '4px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+              gap: '4px'
             }}
           >
-            <Layers size={15} /> RFD Fabric (તૈયાર RFD)
-          </button>
+            <button
+              onClick={() => setScreenMode('gray')}
+              type="button"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '7px',
+                border: 'none',
+                background: screenMode === 'gray' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
+                color: screenMode === 'gray' ? '#ffffff' : '#475569',
+                fontWeight: screenMode === 'gray' ? 800 : 600,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                boxShadow: screenMode === 'gray' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Boxes size={15} /> Gray Fabric (ગ્રે કાપડ)
+            </button>
+
+            <button
+              onClick={() => setScreenMode('rfd')}
+              type="button"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '7px',
+                border: 'none',
+                background: screenMode === 'rfd' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
+                color: screenMode === 'rfd' ? '#ffffff' : '#475569',
+                fontWeight: screenMode === 'rfd' ? 800 : 600,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                boxShadow: screenMode === 'rfd' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Layers size={15} /> RFD Fabric (તૈયાર RFD)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1255,6 +1412,281 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       )}
 
       {/* ======================================================== */}
+      {/* ⚙️ MODAL: MASTER CONFIGURATION SETTINGS                  */}
+      {/* ======================================================== */}
+      {showSettingsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: 680,
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Settings size={22} color="#0284c7" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                    Yamunaji Master Configuration Settings (માસ્ટર સેટિંગ્સ)
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Configure dropdown values for Weaver Names, Fabric Qualities, Panna Widths, Processing Mills & Process Types.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowSettingsModal(false); setEditingItemIndex(null); }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Sub Tabs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => { setSettingsActiveTab('weavers'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: settingsActiveTab === 'weavers' ? 800 : 600,
+                  background: settingsActiveTab === 'weavers' ? '#0ea5e9' : 'transparent',
+                  color: settingsActiveTab === 'weavers' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                🧵 Weavers ({configs.weavers?.length || 0})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setSettingsActiveTab('qualities'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: settingsActiveTab === 'qualities' ? 800 : 600,
+                  background: settingsActiveTab === 'qualities' ? '#0ea5e9' : 'transparent',
+                  color: settingsActiveTab === 'qualities' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                🥻 Fabric Qualities ({configs.qualities?.length || 0})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setSettingsActiveTab('pannas'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: settingsActiveTab === 'pannas' ? 800 : 600,
+                  background: settingsActiveTab === 'pannas' ? '#0ea5e9' : 'transparent',
+                  color: settingsActiveTab === 'pannas' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                📏 Panna / Widths ({configs.pannas?.length || 0})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setSettingsActiveTab('mills'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: settingsActiveTab === 'mills' ? 800 : 600,
+                  background: settingsActiveTab === 'mills' ? '#0ea5e9' : 'transparent',
+                  color: settingsActiveTab === 'mills' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                🏭 Processing Mills ({configs.mills?.length || 0})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setSettingsActiveTab('processes'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: settingsActiveTab === 'processes' ? 800 : 600,
+                  background: settingsActiveTab === 'processes' ? '#0ea5e9' : 'transparent',
+                  color: settingsActiveTab === 'processes' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                ⚙️ Process Types ({configs.processes?.length || 0})
+              </button>
+            </div>
+
+            {/* Quick Add Bar */}
+            <form onSubmit={handleAddMasterSetting} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                required
+                placeholder={
+                  settingsActiveTab === 'weavers' ? 'Enter Weaver / Loom Owner name (e.g. Balaji Weaving)...' :
+                  settingsActiveTab === 'qualities' ? 'Enter Fabric Quality (e.g. Cotton 60x60, Modal Satin)...' :
+                  settingsActiveTab === 'pannas' ? 'Enter Panna / Width (e.g. 52", 64")...' :
+                  settingsActiveTab === 'mills' ? 'Enter Processing Mill name...' :
+                  'Enter Process Type (e.g. RFD Bleaching)...'
+                }
+                value={newSettingInput}
+                onChange={(e) => setNewSettingInput(e.target.value)}
+                className="input-field"
+                style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+              />
+              <button
+                type="submit"
+                className="btn-primary"
+                style={{ height: '36px', padding: '0 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: 'none' }}
+              >
+                <Plus size={15} /> Add to Master
+              </button>
+            </form>
+
+            {/* Items List */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.5rem', maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {(configs[settingsActiveTab] || []).length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                  No items configured for {settingsActiveTab}. Add a new value above.
+                </div>
+              ) : (
+                (configs[settingsActiveTab] || []).map((item, idx) => {
+                  const isEditing = editingItemIndex === idx;
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '7px 12px',
+                        borderRadius: 6,
+                        background: '#f8fafc',
+                        border: '1px solid #f1f5f9'
+                      }}
+                    >
+                      {isEditing ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, marginRight: '10px' }}>
+                          <input
+                            type="text"
+                            value={editingItemValue}
+                            onChange={(e) => setEditingItemValue(e.target.value)}
+                            className="input-field"
+                            style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditMasterSetting(idx)}
+                            className="btn-primary"
+                            style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingItemIndex(null)}
+                            className="btn-secondary"
+                            style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
+                          {item}
+                        </span>
+                      )}
+
+                      {!isEditing && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditMasterSetting(idx, item)}
+                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 3 }}
+                            title="Edit / Rename"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMasterSetting(idx, item)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 3 }}
+                            title="Delete"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer with Reset Defaults */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+              <button
+                type="button"
+                onClick={handleResetMasterTabDefaults}
+                className="btn-secondary"
+                style={{ fontSize: '0.76rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #fde68a' }}
+              >
+                <RotateCcw size={13} /> Restore Default {settingsActiveTab}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setShowSettingsModal(false); setEditingItemIndex(null); }}
+                className="btn-primary"
+                style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem' }}
+              >
+                Done / Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
       {/* ➕ MODAL 1: WEAVER GRAY INWARD WITH TP DETAILS TABLE     */}
       {/* ======================================================== */}
       {showWeaverInwardModal && (
@@ -1275,7 +1707,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 720,
+              maxWidth: 740,
               maxHeight: '92vh',
               overflowY: 'auto',
               background: '#ffffff',
@@ -1298,7 +1730,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     + Inward Gray Fabric from Weaver (વિવર આવક)
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Enter weaver details and add individual TP Numbers & TP Meters. Press Enter to add next row.
+                    Select weaver & quality from masters. Enter individual TP Numbers & TP Meters. Press Enter to add next row.
                   </span>
                 </div>
               </div>
@@ -1343,20 +1775,36 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
 
+              {/* Weaver Party & Challan */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Weaver / Loom Owner Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Maruti Weaving, Harikrishna Textiles"
-                    value={weaverForm.weaverParty}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverParty: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                      Weaver / Loom Owner Name *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsActiveTab('weavers'); setShowSettingsModal(true); }}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ⚙️ Manage Weavers
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <input
+                      type="text"
+                      required
+                      list="weavers-master-datalist"
+                      placeholder="Select or enter weaver name..."
+                      value={weaverForm.weaverParty}
+                      onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverParty: e.target.value }))}
+                      className="input-field"
+                      style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                    />
+                    <datalist id="weavers-master-datalist">
+                      {(configs.weavers || []).map(w => <option key={w} value={w} />)}
+                    </datalist>
+                  </div>
                 </div>
 
                 <div>
@@ -1374,41 +1822,55 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' }}>
+              {/* Fabric Quality & Panna from Master Settings */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Fabric Quality *
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                      Fabric Quality *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsActiveTab('qualities'); setShowSettingsModal(true); }}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ⚙️ Manage Qualities
+                    </button>
+                  </div>
                   <select
                     value={weaverForm.fabricQuality}
                     onChange={(e) => setWeaverForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
                     className="input-field"
                     style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   >
-                    <option value="Pure Viscose Rayon 14kg">Pure Viscose Rayon 14kg</option>
-                    <option value="Pure Modal Satin 60s">Pure Modal Satin 60s</option>
-                    <option value="Cotton 60x60 Cambric">Cotton 60x60 Cambric</option>
-                    <option value="Organza Viscose Gold Weave">Organza Viscose Gold Weave</option>
-                    <option value="Chanderi Silk 50gm">Chanderi Silk 50gm</option>
-                    <option value="Pure Linen Slub 60s">Pure Linen Slub 60s</option>
-                    <option value="Viscose Crepe 80gm">Viscose Crepe 80gm</option>
+                    {(configs.qualities || []).map(q => (
+                      <option key={q} value={q}>{q}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Panna / Width *
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                      Panna / Width *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsActiveTab('pannas'); setShowSettingsModal(true); }}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ⚙️ Manage Panna
+                    </button>
+                  </div>
                   <select
                     value={weaverForm.panna}
                     onChange={(e) => setWeaverForm(prev => ({ ...prev, panna: e.target.value }))}
                     className="input-field"
                     style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   >
-                    <option value='44"'>44 inches</option>
-                    <option value='48"'>48 inches</option>
-                    <option value='54"'>54 inches</option>
-                    <option value='58"'>58 inches</option>
+                    {(configs.pannas || []).map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1646,18 +2108,31 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Processing / Dyeing Mill Name *
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                      Processing / Dyeing Mill Name *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsActiveTab('mills'); setShowSettingsModal(true); }}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ⚙️ Manage Mills
+                    </button>
+                  </div>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Shree Radhe Bleaching & Dyeing, Vrundavan Mills"
+                    list="mills-master-datalist"
+                    placeholder="Select or enter processing mill name..."
                     value={millChallanForm.millParty}
                     onChange={(e) => setMillChallanForm(prev => ({ ...prev, millParty: e.target.value }))}
                     className="input-field"
                     style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
+                  <datalist id="mills-master-datalist">
+                    {(configs.mills || []).map(m => <option key={m} value={m} />)}
+                  </datalist>
                 </div>
 
                 <div>
@@ -1676,17 +2151,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                  Process Instructions for Mill
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                    Process Instructions for Mill
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsActiveTab('processes'); setShowSettingsModal(true); }}
+                    style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    ⚙️ Manage Processes
+                  </button>
+                </div>
                 <input
                   type="text"
+                  list="processes-master-datalist"
                   placeholder="e.g. RFD Bleaching, Scouring, Mercerizing & Heat Setting"
                   value={millChallanForm.processRequired}
                   onChange={(e) => setMillChallanForm(prev => ({ ...prev, processRequired: e.target.value }))}
                   className="input-field"
                   style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                 />
+                <datalist id="processes-master-datalist">
+                  {(configs.processes || []).map(p => <option key={p} value={p} />)}
+                </datalist>
               </div>
 
               {/* 📦 SELECT TP PIECES TO SEND TO MILL */}
@@ -1735,7 +2223,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={() => {}} // handled by row click
+                                  onChange={() => {}}
                                 />
                               </td>
                               <td style={{ padding: '6px 8px', fontWeight: 700, color: '#0284c7' }}>
