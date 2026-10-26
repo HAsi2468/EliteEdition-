@@ -2644,6 +2644,12 @@ export const api = {
     });
   },
 
+  async clearCommunicationMessages(groupId) {
+    return request(`/communication/groups/${groupId}/clear`, {
+      method: 'POST',
+    });
+  },
+
   async forceReloadAllUsers() {
     return request('/communication/force-reload-all', {
       method: 'POST',

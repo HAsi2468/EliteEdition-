@@ -140,7 +140,11 @@ router.post('/upload', (req, res, next) => {
     }
 
     // Full multi-language / Unicode support (Gujarati, Hindi, Arabic, Chinese, Emoji, Mac UTF-8)
-    const cleanOriginalName = decodeUnicodeFileName(req.file.originalname);
+    let cleanOriginalName = decodeUnicodeFileName(req.file.originalname);
+    if (!cleanOriginalName || cleanOriginalName.toLowerCase() === 'blob' || cleanOriginalName.toLowerCase() === 'blob.blob' || cleanOriginalName.toLowerCase().startsWith('blob.')) {
+      const fallbackExt = path.extname(req.file.originalname) || (req.file.mimetype ? '.' + (req.file.mimetype.split('/')[1] || 'png') : '.png');
+      cleanOriginalName = `image-${Date.now()}${fallbackExt}`;
+    }
     req.file.originalname = cleanOriginalName;
 
     const fileExt = path.extname(cleanOriginalName || '').toLowerCase();

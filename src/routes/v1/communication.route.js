@@ -12,6 +12,7 @@ router.get('/groups', communicationController.getGroups);
 router.post('/groups', communicationController.createGroup);
 router.patch('/groups/:groupId', requireGroupAccess, communicationController.updateGroup);
 router.delete('/groups/:groupId', requireGroupAccess, communicationController.deleteGroup);
+router.post('/groups/:groupId/clear', requireGroupAccess, communicationController.clearGroupMessages);
 router.post('/groups/sync', requireAdmin, communicationController.syncGroups);
 
 // 3. Message Access & Membership (Protected by Group Access Guard)

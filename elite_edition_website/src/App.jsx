@@ -2027,18 +2027,23 @@ export default function App() {
       {/* Notifications permission bar - minimal */}
       {isAuthenticated && notificationPerm === 'denied' && !permSnoozedSession && (
         <div style={{
+          position: 'fixed',
+          bottom: '16px',
+          left: '16px',
+          maxWidth: '440px',
           background: 'var(--danger-bg, #fef2f2)',
-          borderBottom: '1px solid var(--danger-border, #fecaca)',
+          border: '1px solid var(--danger-border, #fecaca)',
+          borderRadius: '10px',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
           color: 'var(--danger-text, #991b1b)',
-          padding: '8px 16px',
+          padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           fontSize: 'var(--font-size-meta, 0.75rem)',
-          gap: '8px',
+          gap: '12px',
           flexWrap: 'wrap',
-          zIndex: 9999,
-          position: 'relative'
+          zIndex: 1100
         }}>
           <span>Notifications are blocked. Please enable them in browser settings for alerts.</span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

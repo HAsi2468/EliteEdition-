@@ -54,12 +54,13 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
+export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilter, onClearGroupFilter }) {
   const { socket } = useSocket() || {};
   const [tasks, setTasks] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('kanban'); // 'kanban' | 'list' | 'calendar' | 'timeline' | 'leaderboard' | 'timesheets'
+  const [activeView, setActiveView] = useState('kanban');
+  const [dayTasksModal, setDayTasksModal] = useState(null); // 'kanban' | 'list' | 'calendar' | 'timeline' | 'leaderboard' | 'timesheets'
 
   const myId = String(currentUser?._id || currentUser?.id || '');
   const myName = currentUser?.name || currentUser?.username || 'Staff';
@@ -485,12 +486,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         loadedUsers = usersRes;
       }
 
-      // Filter out system non-human accounts from assignees
+      // Filter out system non-human accounts & QA test users from assignees
       const SYSTEM_EXCLUDED_ACCOUNTS = ['general', 'eliteac', 'system', 'bot', 'admin auto'];
       loadedUsers = loadedUsers.filter((u) => {
         const username = (u.username || '').toLowerCase().trim();
         const name = (u.name || '').toLowerCase().trim();
-        return !SYSTEM_EXCLUDED_ACCOUNTS.includes(username) && !SYSTEM_EXCLUDED_ACCOUNTS.includes(name);
+        const email = (u.email || '').toLowerCase().trim();
+        if (SYSTEM_EXCLUDED_ACCOUNTS.includes(username) || SYSTEM_EXCLUDED_ACCOUNTS.includes(name)) return false;
+        if (name.startsWith('test') || username.startsWith('test') || email.includes('test-load') || email.includes('qa-bot') || email.includes('testbot')) return false;
+        if (name.includes('bot') || username.includes('bot')) return false;
+        return true;
       });
 
       // Ensure currentUser is always included in allUsers so their data can be filtered
@@ -1053,6 +1058,26 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   // Filter tasks logic based on TaskOPad Scope, Priority, Status, Assignee, Search
   const filteredTasks = visibleTasks.filter((t) => {
+    // Filter by groupFilter (when opened from "Group Tasks & Kanban")
+    if (groupFilter) {
+      const gDept = (groupFilter.department || '').trim().toLowerCase();
+      const gName = (groupFilter.name || '').trim().toLowerCase();
+      const gId = String(groupFilter.groupId || '');
+      const memberIds = new Set((groupFilter.members || []).map(String));
+
+      const tDept = (t.department || '').trim().toLowerCase();
+      const tOriginRoom = String(t.originRoomId || '');
+
+      const matchesOrigin = tOriginRoom && tOriginRoom === gId;
+      const matchesDept = (gDept && tDept === gDept) || (gName && tDept === gName);
+      const matchesMember = (t.assignees || []).some((a) => memberIds.has(getNormalizedId(a))) ||
+                            memberIds.has(getNormalizedId(t.createdBy));
+
+      if (!matchesOrigin && !matchesDept && !matchesMember) {
+        return false;
+      }
+    }
+
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
 
@@ -2156,10 +2181,52 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               className="task-btn-primary"
             >
               <Plus size={15} />
-              <span>+ Create Task</span>
+              <span>Create Task</span>
             </button>
           </div>
         </div>
+
+        {/* Group Filter Active Banner */}
+        {groupFilter && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            border: '1px solid #bfdbfe',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            margin: '0 0 6px 0',
+            fontSize: '0.78rem',
+            color: '#1e40af',
+            fontWeight: 700
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Layers size={14} color="#2563eb" />
+              <span>Filtered by Group: <strong>{groupFilter.name}</strong> ({filteredTasks.length} tasks)</span>
+            </div>
+            {onClearGroupFilter && (
+              <button
+                type="button"
+                onClick={onClearGroupFilter}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  fontWeight: 800,
+                  fontSize: '0.74rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <X size={12} />
+                <span>Clear Filter</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Row 2: Search + Filters */}
         <div className="task-header-row-bottom">
@@ -2168,7 +2235,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             <Search size={14} className="task-search-icon" />
             <input
               type="text"
-              placeholder="Search tasks, project @JC-1004, client..."
+              placeholder="Search tasks, title, member, client or project..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="task-search-input"
@@ -3605,7 +3672,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
                     {/* Task Chips for Day */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', overflowY: 'auto', flex: 1 }}>
-                      {dayTasks.map((t) => {
+                      {dayTasks.slice(0, 2).map((t) => {
                         const pri = getPriorityBadge(t.priority);
                         const isDone = t.status === 'Done';
                         return (
@@ -3642,6 +3709,27 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           </div>
                         );
                       })}
+                      {dayTasks.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => setDayTasksModal({ date: cell.date, tasks: dayTasks })}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '4px',
+                            color: '#2563eb',
+                            fontSize: '0.66rem',
+                            fontWeight: 800,
+                            padding: '2px 4px',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            marginTop: '2px'
+                          }}
+                          title="View all tasks on this date"
+                        >
+                          +{dayTasks.length - 2} more
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -3813,26 +3901,39 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               const staffStats = allUsers.map((user) => {
                 const uId = String(user._id);
                 const userTasks = tasks.filter((t) =>
-                  (t.assignees || []).some((a) => String(typeof a === 'object' ? (a._id || a.id) : a) === uId)
+                  (t.assignees || []).some((a) => {
+                    const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
+                    if (aId === uId) return true;
+                    if (typeof a === 'object' && a.name && user.name && a.name.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+                    return false;
+                  })
                 );
                 const completed = userTasks.filter((t) => t.status === 'Done');
 
                 let totalLoggedHours = 0;
                 tasks.forEach((t) => {
                   (t.timeLogs || []).forEach((log) => {
-                    if (String(log.userId) === uId || log.userName === user.name) {
+                    if (String(log.userId) === uId || (log.userName && user.name && log.userName.trim().toLowerCase() === user.name.trim().toLowerCase())) {
                       totalLoggedHours += (log.hours || 0);
                     }
                   });
                 });
 
+                const overdueUnfinished = userTasks.filter((t) => isTaskOverdue(t)).length;
+
                 const onTimeCount = completed.filter((t) => {
                   if (!t.dueDate) return true;
-                  return new Date(t.updatedAt || t.createdAt) <= new Date(t.dueDate);
+                  const due = new Date(t.dueDate).setHours(23, 59, 59, 999);
+                  const finishedAt = new Date(t.updatedAt || t.createdAt).getTime();
+                  return finishedAt <= due;
                 }).length;
 
-                const onTimeRate = completed.length > 0 ? Math.round((onTimeCount / completed.length) * 100) : 100;
-                const score = (completed.length * 15) + (totalLoggedHours * 3) + Math.round(onTimeRate * 0.5);
+                const totalEvaluated = completed.length + overdueUnfinished;
+                const onTimeRate = totalEvaluated > 0
+                  ? Math.max(0, Math.min(100, Math.round((onTimeCount / totalEvaluated) * 100)))
+                  : 0;
+
+                const score = (completed.length * 15) + (totalLoggedHours * 3) + Math.round(onTimeRate * 0.5) - (overdueUnfinished * 5);
 
                 return {
                   user,
@@ -4652,7 +4753,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              style={{ cursor: 'pointer' }}
+                              aria-label={`Assign to ${u.name || u.username}`}
+                              title={`Assign to ${u.name || u.username}`}
+                            />
                             <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || u.username}</span>
                           </div>
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
@@ -4793,21 +4901,48 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 )}
               </div>
 
+            </form>
+
+            {/* Pinned Sticky Footer with Cancel & Submit */}
+            <div style={{
+              padding: '0.85rem 1.4rem',
+              borderTop: '1px solid var(--border-light, #e2e8f0)',
+              background: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
               <button
-                type="submit"
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="btn-secondary"
+                style={{
+                  padding: '0.55rem 1.1rem',
+                  fontSize: '0.84rem',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateTaskSubmit}
                 disabled={creating}
                 className="btn-primary"
                 style={{
-                  marginTop: '0.5rem',
-                  padding: '0.65rem',
-                  fontSize: '0.85rem',
+                  padding: '0.55rem 1.3rem',
+                  fontSize: '0.84rem',
                   borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
                   cursor: creating ? 'not-allowed' : 'pointer',
-                  opacity: creating ? 0.75 : 1
+                  opacity: creating ? 0.75 : 1,
+                  fontWeight: 700
                 }}
               >
                 {creating ? (
@@ -4819,7 +4954,75 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   'Create & Assign Task'
                 )}
               </button>
-            </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CALENDAR DAY TASKS POPOVER MODAL ── */}
+      {dayTasksModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setDayTasksModal(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '0.9rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar size={16} color="#2563eb" />
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Tasks for {dayTasksModal.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ({dayTasksModal.tasks.length})
+                </h4>
+              </div>
+              <button
+                onClick={() => setDayTasksModal(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+                aria-label="Close day tasks modal"
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: '0.8rem 1.2rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {dayTasksModal.tasks.map((t) => {
+                const pri = getPriorityBadge(t.priority);
+                const isDone = t.status === 'Done';
+                return (
+                  <div
+                    key={t._id}
+                    onClick={() => {
+                      setDayTasksModal(null);
+                      setSelectedTask(t);
+                    }}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: isDone ? '#f0fdf4' : '#ffffff',
+                      border: `1px solid ${isDone ? '#86efac' : '#e2e8f0'}`,
+                      borderLeft: `4px solid ${isDone ? '#16a34a' : pri.color}`,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.title}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {t.status} • {t.priority}
+                      </div>
+                    </div>
+                    <ChevronRight size={14} color="#94a3b8" />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -5810,9 +6013,62 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Assigned To</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Assigned To ({(selectedTask.assignees || []).length})</label>
+                  
+                  {/* Top Assigned Members Tag Row */}
+                  {(selectedTask.assignees || []).length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                      {(selectedTask.assignees || []).map((a, idx) => {
+                        const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
+                        const matchedUser = allUsers.find((u) => String(u._id) === aId);
+                        const aName = (typeof a === 'object' ? a.name : null) || matchedUser?.name || matchedUser?.username || 'Member';
+                        return (
+                          <span
+                            key={idx}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              color: '#1d4ed8',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '12px'
+                            }}
+                          >
+                            <span>👤 {aName}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const currentIds = (selectedTask.assignees || []).map((cur) => String(typeof cur === 'object' ? (cur._id || cur.id) : cur));
+                                const updated = currentIds.filter((id) => id !== aId);
+                                handleUpdateAssignees(selectedTask, updated);
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                              aria-label={`Unassign ${aName}`}
+                              title={`Unassign ${aName}`}
+                            >
+                              <X size={11} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="task-assignee-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto' }}>
-                    {allUsers.map((u) => {
+                    {[...allUsers].sort((a, b) => {
+                      const aAss = (selectedTask.assignees || []).some(
+                        (cur) => String(typeof cur === 'object' ? (cur._id || cur.id) : cur) === String(a._id)
+                      );
+                      const bAss = (selectedTask.assignees || []).some(
+                        (cur) => String(typeof cur === 'object' ? (cur._id || cur.id) : cur) === String(b._id)
+                      );
+                      return bAss - aAss;
+                    }).map((u) => {
                       const isAssigned = (selectedTask.assignees || []).some(
                         (a) => String(typeof a === 'object' ? (a._id || a.id) : a) === String(u._id)
                       );
@@ -5836,7 +6092,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             minHeight: '36px'
                           }}
                         >
-                          <input type="checkbox" checked={isAssigned} onChange={() => {}} />
+                          <input
+                            type="checkbox"
+                            checked={isAssigned}
+                            onChange={() => {}}
+                            aria-label={`Assign to ${u.name || u.username}`}
+                            title={`Assign to ${u.name || u.username}`}
+                          />
                           <span style={{ fontSize: '0.78rem', fontWeight: isAssigned ? 700 : 500, color: isAssigned ? '#2563eb' : 'var(--text-primary)' }}>
                             {u.name || u.username}
                           </span>

@@ -103,13 +103,20 @@ async function getUsers(req) {
 
 	const offset = getOffset(page, limit);
 
-	const usersList = await db.user.find({}, { password: 0 })
+	const userFilter = {
+		name: { $not: /^TEST/i },
+		username: { $not: /^TEST/i },
+		email: { $not: /test-load|qa-bot|testbot/i },
+		isTest: { $ne: true }
+	};
+
+	const usersList = await db.user.find(userFilter, { password: 0 })
 		.sort({ name: 1, created_date_time: -1, modified_date_time: -1 })
 		.skip(offset)
 		.limit(limit)
 		.lean();
 
-	const count = await db.user.countDocuments({});
+	const count = await db.user.countDocuments(userFilter);
 
 	return {
 		rows: usersList.map((u) => ({ ...u, id: u._id.toString() })),

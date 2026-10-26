@@ -212,9 +212,10 @@
   gap: 8px !important;
   flex-wrap: nowrap !important;
   overflow-x: auto !important;
-  padding-top: 4px !important;
+  padding: 6px 0 !important;
   border-top: 1px solid #f1f5f9 !important;
   scrollbar-width: thin !important;
+  min-height: 40px !important;
 }
 
 /* Search Box */
@@ -223,6 +224,8 @@
   flex: 1 1 240px !important;
   min-width: 180px !important;
   max-width: 480px !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
 .task-search-icon {
@@ -236,7 +239,8 @@
 
 .task-search-input {
   width: 100% !important;
-  height: 32px !important;
+  height: 34px !important;
+  line-height: 34px !important;
   padding-left: 28px !important;
   padding-right: 26px !important;
   font-size: 0.78rem !important;
@@ -247,6 +251,7 @@
   outline: none !important;
   box-sizing: border-box !important;
   transition: all 0.15s ease !important;
+  vertical-align: middle !important;
 }
 
 .task-search-input:focus {
@@ -342,10 +347,11 @@
 }
 
 .task-select {
-  height: 32px !important;
-  font-size: 0.75rem !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  font-size: 0.76rem !important;
   font-weight: 600 !important;
-  padding: 0 8px !important;
+  padding: 0 10px !important;
   border-radius: 8px !important;
   border: 1px solid #e2e8f0 !important;
   background: #ffffff !important;
@@ -353,6 +359,7 @@
   outline: none !important;
   cursor: pointer !important;
   box-sizing: border-box !important;
+  vertical-align: middle !important;
 }
 
 .task-select:focus {

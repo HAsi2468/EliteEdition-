@@ -404,17 +404,27 @@ export default function EmojiPickerPopover({
   const categoryHeadersRef = useRef({});
   const searchInputRef = useRef(null);
 
-  // Focus search on open
+  // Focus search on open and listen for Escape key
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
         if (searchInputRef.current) searchInputRef.current.focus();
       }, 50);
+
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose?.();
+        }
+      };
+      window.addEventListener('keydown', handleEscape, true);
+      return () => window.removeEventListener('keydown', handleEscape, true);
     } else {
       setSearchQuery('');
       setHoveredEmoji(null);
     }
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   // Handle emoji selection + save to recent
   const handlePickEmoji = (char, name) => {

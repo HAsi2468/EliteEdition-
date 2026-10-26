@@ -257,9 +257,10 @@ const getGroupMessages = async (req, res) => {
         req.headers['x-is-admin'] === 'true'
       );
 
+      const isDirectRoom = room.type === 'direct' || room.permissionScope === 'direct_msg';
       if (!isMember) {
-        if (room.type === 'direct' && !isSuperOrAdmin) {
-          // Do NOT allow non-members to view private 1-on-1 direct rooms
+        if (isDirectRoom) {
+          // Strictly prevent non-members from viewing private 1-on-1 direct rooms, even if admin!
           return res.status(403).json({ success: false, message: 'Access denied to direct message conversation' });
         }
         if (room.isPrivate && !isSuperOrAdmin) {
@@ -985,20 +986,31 @@ const getUsersForDM = async (req, res) => {
 
     if (!dmUsersCache || (now - dmUsersCacheTime > 120000)) {
       if (!dmUsersInFlightPromise) {
-        dmUsersInFlightPromise = User.find({})
+        dmUsersInFlightPromise = User.find({
+          name: { $not: /^TEST/i },
+          username: { $not: /^TEST/i },
+          email: { $not: /test-load|qa-bot|testbot/i },
+          isTest: { $ne: true }
+        })
           .select('_id name username email role department avatarUrl')
           .maxTimeMS(3000)
           .lean()
           .then((users) => {
             if (Array.isArray(users)) {
               // Strip massive base64 URIs to keep payload lightweight (< 25 KB)
-              users = users.map((u) => {
-                let safeAvatar = u.avatarUrl;
-                if (safeAvatar && typeof safeAvatar === 'string' && safeAvatar.length > 2048 && safeAvatar.startsWith('data:')) {
-                  safeAvatar = '';
-                }
-                return { ...u, avatarUrl: safeAvatar };
-              });
+              users = users
+                .filter((u) => {
+                  const n = (u.name || '').toLowerCase();
+                  const e = (u.email || '').toLowerCase();
+                  return !n.startsWith('test') && !n.includes('bot') && !e.includes('test-load');
+                })
+                .map((u) => {
+                  let safeAvatar = u.avatarUrl;
+                  if (safeAvatar && typeof safeAvatar === 'string' && safeAvatar.length > 2048 && safeAvatar.startsWith('data:')) {
+                    safeAvatar = '';
+                  }
+                  return { ...u, avatarUrl: safeAvatar };
+                });
               users.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
               dmUsersCache = users;
               dmUsersCacheTime = Date.now();
@@ -1132,11 +1144,12 @@ const searchMessages = async (req, res) => {
     } else if (isSuperOrAdmin) {
       if (userMembers.length > 0) {
         roomQuery.$or = [
-          { type: { $ne: 'direct' } },
+          { type: { $ne: 'direct' }, permissionScope: { $ne: 'direct_msg' } },
           { members: { $in: userMembers } }
         ];
       } else {
         roomQuery.type = { $ne: 'direct' };
+        roomQuery.permissionScope = { $ne: 'direct_msg' };
       }
     } else if (userMembers.length > 0) {
       roomQuery.members = { $in: userMembers };
@@ -1149,8 +1162,20 @@ const searchMessages = async (req, res) => {
       roomQuery._id = new mongoose.Types.ObjectId(targetRoomId);
     }
 
-    const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type').lean();
-    const accessibleRoomIds = accessibleRooms.map(r => r._id);
+    const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type permissionScope members').lean();
+    const accessibleRoomIds = accessibleRooms
+      .filter((r) => {
+        const isDirect = r.type === 'direct' || r.permissionScope === 'direct_msg';
+        if (isDirect) {
+          if (!userStrId) return false;
+          return (r.members || []).some((m) => {
+            const mid = String(m && (m._id || m.id || m));
+            return mid === userStrId;
+          });
+        }
+        return true;
+      })
+      .map((r) => r._id);
 
     if (accessibleRoomIds.length === 0) {
       return res.status(200).json({ success: true, results: [], data: [], page: 1, limit: 20, total: 0, hasMore: false });
@@ -1507,9 +1532,11 @@ const deleteGroup = async (req, res) => {
       req.user.isAdmin === true ||
       req.user.isMainAdmin === true
     );
-    const isCreator = req.user && room.createdBy && String(room.createdBy) === String(req.user._id);
+    const isMember = req.user && (
+      (room.type === 'direct' && room.members?.some(m => String(m) === String(req.user._id)))
+    );
 
-    if (!isSuperOrAdmin && !isCreator) {
+    if (!isSuperOrAdmin && !isCreator && !isMember) {
       return res.status(403).json({
         success: false,
         message: 'Only group creators or administrators can delete this group'
@@ -1534,6 +1561,51 @@ const deleteGroup = async (req, res) => {
   } catch (error) {
     console.error('Error deleting group:', error);
     res.status(500).json({ success: false, message: 'Failed to delete group', error: error.message });
+  }
+};
+
+const clearGroupMessages = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+
+    const room = await ChatRoom.findById(groupId);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true
+    );
+    const isCreator = req.user && room.createdBy && String(room.createdBy) === String(req.user._id);
+    const isMember = req.user && room.members?.some(m => String(m) === String(req.user._id));
+
+    if (!isSuperOrAdmin && !isCreator && !isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to clear messages in this chat'
+      });
+    }
+
+    await ChatMessage.deleteMany({ roomId: groupId });
+    room.lastMessage = null;
+    await room.save();
+
+    if (groupMessagesCache) {
+      groupMessagesCache.delete(String(groupId));
+    }
+
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(String(groupId)).emit('chat-cleared', { roomId: groupId });
+    }
+
+    res.json({ success: true, message: 'Chat messages cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing chat messages:', error);
+    res.status(500).json({ success: false, message: 'Failed to clear chat', error: error.message });
   }
 };
 
@@ -1942,6 +2014,7 @@ module.exports = {
   createGroup,
   updateGroup,
   deleteGroup,
+  clearGroupMessages,
   deleteMessage,
   editMessage,
   searchMessages,

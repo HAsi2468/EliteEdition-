@@ -4,6 +4,51 @@ import { ToolResultDispatcher } from "./ToolResultDispatcher";
 import { streamAgentChat } from "./streamService";
 import { useVoiceRecognition, SUPPORTED_VOICE_LANGUAGES } from "./useVoiceRecognition";
 
+function renderMarkdownContent(text) {
+  if (!text || typeof text !== 'string') return text;
+  const lines = text.split('\n');
+  return lines.map((line, lIdx) => {
+    const isBullet = line.trim().startsWith('- ') || line.trim().startsWith('* ');
+    const lineText = isBullet ? line.trim().slice(2) : line;
+
+    const parts = [];
+    const regex = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(lineText)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(lineText.substring(lastIndex, match.index));
+      }
+      const token = match[0];
+      if (token.startsWith('**') && token.endsWith('**')) {
+        parts.push(<strong key={match.index}>{token.slice(2, -2)}</strong>);
+      } else if (token.startsWith('*') && token.endsWith('*')) {
+        parts.push(<em key={match.index}>{token.slice(1, -1)}</em>);
+      }
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < lineText.length) {
+      parts.push(lineText.substring(lastIndex));
+    }
+
+    if (isBullet) {
+      return (
+        <div key={lIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginLeft: '6px', marginY: '2px' }}>
+          <span style={{ color: '#2563eb', fontWeight: 900 }}>•</span>
+          <span>{parts}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div key={lIdx} style={{ minHeight: lineText.trim() === '' ? '0.6em' : 'auto' }}>
+        {parts.length > 0 ? parts : ' '}
+      </div>
+    );
+  });
+}
+
 export function ChatContainer({ onClose }) {
   const [messages, setMessages] = useState([
     {
@@ -187,6 +232,8 @@ export function ChatContainer({ onClose }) {
           {onClose && (
             <button
               onClick={onClose}
+              aria-label="Close Copilot"
+              title="Close Copilot"
               style={{
                 background: 'none',
                 border: 'none',
@@ -194,7 +241,6 @@ export function ChatContainer({ onClose }) {
                 cursor: 'pointer',
                 color: '#64748b'
               }}
-              title="Close Copilot"
             >
               ✕
             </button>
@@ -248,7 +294,7 @@ export function ChatContainer({ onClose }) {
                   borderBottomLeftRadius: msg.role === 'user' ? '14px' : '3px'
                 }}
               >
-                {msg.content}
+                {typeof msg.content === 'string' ? renderMarkdownContent(msg.content) : msg.content}
               </div>
             )}
 

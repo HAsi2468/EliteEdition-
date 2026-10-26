@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom';
 import { api, getBaseUrl, getAccessToken, authFetch } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import socketManager from '../services/socketManager';
-import TaskManagerPanel from './TaskManagerPanel';
-import JobCardPdfModal from './JobCardPdfModal';
+const TaskManagerPanel = React.lazy(() => import('./TaskManagerPanel'));
+const JobCardPdfModal = React.lazy(() => import('./JobCardPdfModal'));
 import ErrorBoundary from './common/ErrorBoundary';
 import ToolResultDispatcher from './cards/ToolResultDispatcher';
 import ChatContainer from './cards/ChatContainer';
@@ -60,6 +60,7 @@ import {
   PlusCircle,
   Sliders,
   Trash2,
+  Eraser,
   CheckSquare,
   Mic,
   Square,
@@ -93,6 +94,15 @@ import {
   Settings,
   Camera
 } from 'lucide-react';
+
+function formatChatPreviewSnippet(text) {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text;
+  cleaned = cleaned.replace(/https?:\/\/(www\.)?([^\s/]+)[^\s]*/gi, (match, p1, domain) => `🔗 ${domain}`);
+  cleaned = cleaned.replace(/[*_`~]/g, '');
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
 
 function formatFileSize(bytes) {
   if (!bytes || isNaN(bytes)) return '';
@@ -511,6 +521,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [rosterTab, setRosterTab] = useState('all'); // 'all' | 'groups' | 'direct'
   const [phoenixFilter, setPhoenixFilter] = useState('all'); // 'all' | 'read' | 'unread'
   const [isUrgent, setIsUrgent] = useState(false);
+  const [taskGroupFilter, setTaskGroupFilter] = useState(null);
+  const [showDesktopAttachMenu, setShowDesktopAttachMenu] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [attachmentViewer, setAttachmentViewer] = useState(null);
   const [viewerZoom, setViewerZoom] = useState(1);
@@ -532,6 +544,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, []);
   const [showInRoomSearch, setShowInRoomSearch] = useState(false);
   const [inRoomQuery, setInRoomQuery] = useState('');
+  useEffect(() => {
+    setShowInRoomSearch(false);
+    setInRoomQuery('');
+  }, [activeGroup?._id]);
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [chatSoundMuted, setChatSoundMuted] = useState(() => typeof localStorage !== 'undefined' ? localStorage.getItem('elite_chat_sound_muted') === 'true' : false);
   const [playingAudioId, setPlayingAudioId] = useState(null);
@@ -609,7 +625,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         localMatches.forEach((m) => combinedMap.set(String(m._id), m));
         serverMatches.forEach((m) => {
           const rawRoomId = typeof m.roomId === 'object' ? (m.roomId?._id || m.roomId?.id) : (m.roomId || m.conversationId);
-          const hasRoomAccess = isSuperAdmin || (groups || []).some((g) => String(g._id) === String(rawRoomId));
+          const hasRoomAccess = (groups || []).some((g) => String(g._id) === String(rawRoomId));
           if (hasRoomAccess) {
             combinedMap.set(String(m._id), m);
           }
@@ -938,6 +954,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     const handleEscapeDismiss = (e) => {
       if (e.key === 'Escape') {
+        if (showCopilotModal) {
+          e.preventDefault();
+          setShowCopilotModal(false);
+          return;
+        }
         if (showEmojiPicker) {
           e.preventDefault();
           setShowEmojiPicker(false);
@@ -979,7 +1000,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     window.addEventListener('keydown', handleEscapeDismiss);
     return () => window.removeEventListener('keydown', handleEscapeDismiss);
   }, [
-    showEmojiPicker, mentionQuery, activeMsgMenuId, deleteTargetMsg,
+    showCopilotModal, showEmojiPicker, mentionQuery, activeMsgMenuId, deleteTargetMsg,
     showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
     showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
     showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
@@ -2438,7 +2459,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     setActiveGroup(targetGroup);
     setShowInRoomSearch(false);
-    setInRoomSearchQuery('');
+    setInRoomQuery('');
     if (typeof localStorage !== 'undefined' && targetGroup._id) {
       localStorage.setItem('elite_active_chat_room_id', targetGroup._id);
     }
@@ -2551,7 +2572,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             const matched = res.data.find((g) => String(g._id) === String(savedRoomId));
             if (matched) return matched;
           }
-          return res.data.length > 0 ? res.data[0] : null;
+          // Do not auto-open any conversation on fresh load so unread badges are preserved
+          return null;
         });
       }
     } catch (err) {
@@ -2663,7 +2685,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleDeleteGroup = async (groupToDelete) => {
     if (!groupToDelete) return;
-    const confirmName = groupToDelete.type === 'direct' ? 'this private DM' : `group "${groupToDelete.name}"`;
+    const confirmName = groupToDelete.type === 'direct' ? 'this private chat' : `group "${groupToDelete.name}"`;
     if (!window.confirm(`Are you sure you want to delete ${confirmName}? It will be removed permanently.`)) return;
 
     try {
@@ -2676,7 +2698,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         }
       }
     } catch (err) {
-      alert('Failed to delete group: ' + err.message);
+      alert('Failed to delete chat: ' + err.message);
+    }
+  };
+
+  const handleClearChat = async (groupToClear) => {
+    if (!groupToClear) return;
+    const confirmName = groupToClear.type === 'direct' ? 'this private conversation' : `group "${groupToClear.name}"`;
+    if (!window.confirm(`Are you sure you want to clear all messages in ${confirmName}? Message history will be permanently cleared.`)) return;
+
+    try {
+      const res = await api.clearCommunicationMessages(groupToClear._id);
+      if (res.success) {
+        setMessages([]);
+      }
+    } catch (err) {
+      alert('Failed to clear chat: ' + err.message);
     }
   };
 
@@ -4922,7 +4959,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             <div />
           </div>
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-            <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+            <React.Suspense fallback={<ChatStreamSkeleton />}>
+              <TaskManagerPanel
+                currentUser={currentUser}
+                onNavigateTab={onNavigateTab}
+                groupFilter={taskGroupFilter}
+                onClearGroupFilter={() => setTaskGroupFilter(null)}
+              />
+            </React.Suspense>
           </div>
         </div>
       ) : (
@@ -5193,9 +5237,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 : group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged'
                                 : group.lastMessage.attachment
                                   ? (group.lastMessage.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(group.lastMessage.attachment.fileName || group.lastMessage.attachment.fileUrl || '')
-                                      ? (group.lastMessage.content && !group.lastMessage.content.startsWith('Attached ') && group.lastMessage.content.toLowerCase() !== 'attached blob' ? `📷 ${group.lastMessage.content}` : '📷 Photo')
-                                      : (group.lastMessage.content && !group.lastMessage.content.startsWith('Attached ') ? `📎 ${group.lastMessage.content}` : `📎 ${group.lastMessage.attachment.fileName || 'Attachment'}`))
-                                  : group.lastMessage.content)
+                                      ? (group.lastMessage.content && !group.lastMessage.content.startsWith('Attached ') && group.lastMessage.content.toLowerCase() !== 'attached blob' ? `📷 ${formatChatPreviewSnippet(group.lastMessage.content)}` : '📷 Photo')
+                                      : (group.lastMessage.content && !group.lastMessage.content.startsWith('Attached ') ? `📎 ${formatChatPreviewSnippet(group.lastMessage.content)}` : `📎 ${group.lastMessage.attachment.fileName || 'Attachment'}`))
+                                  : formatChatPreviewSnippet(group.lastMessage.content))
                             : (isVirtual ? 'Tap to start a new chat' : (isDirect ? 'Direct conversation' : (group.description || 'Channel conversation')))}
                         </p>
 
@@ -5292,7 +5336,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           
           {rosterTab === 'tasks' ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-              <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+              <React.Suspense fallback={<ChatStreamSkeleton />}>
+                <TaskManagerPanel
+                  currentUser={currentUser}
+                  onNavigateTab={onNavigateTab}
+                  groupFilter={taskGroupFilter}
+                  onClearGroupFilter={() => setTaskGroupFilter(null)}
+                />
+              </React.Suspense>
             </div>
           ) : activeGroup ? (
             <>
@@ -5679,7 +5730,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                                     <button
                                       type="button"
-                                      onClick={() => { setShowDesktopHeaderMenu(false); setMainTab('task'); }}
+                                      onClick={() => {
+                                        setShowDesktopHeaderMenu(false);
+                                        setTaskGroupFilter({
+                                          groupId: activeGroup._id,
+                                          name: activeGroup.name,
+                                          department: activeGroup.department,
+                                          members: activeGroup.members?.map(m => typeof m === 'object' ? (m._id || m.id) : m) || []
+                                        });
+                                        setMainTab('task');
+                                      }}
                                       style={{
                                         display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
                                         background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
@@ -5738,10 +5798,50 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   <span>Export Chat Log</span>
                                 </button>
 
-                                {/* Admin Delete */}
-                                {currentUser?.role === 'admin' && (
+                                {/* Direct Chat or Admin Delete / Clear Options */}
+                                {isDirect ? (
                                   <>
                                     <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleClearChat(activeGroup); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: '#d97706', cursor: 'pointer', fontWeight: 600
+                                      }}
+                                    >
+                                      <Eraser size={14} color="#d97706" />
+                                      <span>Clear Chat</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700
+                                      }}
+                                    >
+                                      <Trash2 size={14} color="#dc2626" />
+                                      <span>Delete Chat</span>
+                                    </button>
+                                  </>
+                                ) : currentUser?.role === 'admin' ? (
+                                  <>
+                                    <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleClearChat(activeGroup); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: '#d97706', cursor: 'pointer', fontWeight: 600
+                                      }}
+                                    >
+                                      <Eraser size={14} color="#d97706" />
+                                      <span>Clear Chat</span>
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
@@ -5755,7 +5855,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       <span>Delete Group</span>
                                     </button>
                                   </>
-                                )}
+                                ) : null}
                               </div>
                             </>
                           )}
@@ -6475,7 +6575,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis'
                                 }}>
-                                  {typeof msg.replyTo === 'object' ? (msg.replyTo.content || (msg.replyTo.attachment ? '📎 Attachment' : '')) : ''}
+                                  {typeof msg.replyTo === 'object' ? (
+                                    (() => {
+                                      const rContent = msg.replyTo.content?.trim();
+                                      const rAtt = msg.replyTo.attachment;
+                                      if (rContent && !rContent.toLowerCase().includes('blob') && !rContent.toLowerCase().startsWith('attached blob')) {
+                                        return rContent;
+                                      }
+                                      if (rAtt) {
+                                        if (rAtt.fileType === 'image' || (rAtt.fileName && /\.(jpg|jpeg|png|gif|webp)$/i.test(rAtt.fileName))) return '📷 Photo';
+                                        if (rAtt.fileType === 'audio') return '🎙️ Voice Note';
+                                        const cleanName = rAtt.fileName && !rAtt.fileName.toLowerCase().includes('blob') ? rAtt.fileName : 'Attachment';
+                                        return `📎 ${cleanName}`;
+                                      }
+                                      return rContent || 'Message';
+                                    })()
+                                  ) : ''}
                                 </div>
                               </div>
                             )}
@@ -6825,41 +6940,61 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   if (isImg) {
                                     return (
                                       <div
-                                        style={{
-                                          position: 'relative',
-                                          borderRadius: '8px',
-                                          overflow: 'hidden',
-                                          cursor: 'zoom-in',
-                                          lineHeight: 0
-                                        }}
-                                        onClick={() => {
-                                          setViewerZoom(1);
-                                          setViewerRotation(0);
-                                          setAttachmentViewer({
-                                            url: msg.attachment.fileUrl,
-                                            fileName: fileNameDisplay,
-                                            fileType: 'image',
-                                            fileSize: msg.attachment.fileSize,
-                                            senderName: msg.senderId?.name || msg.senderName,
-                                            createdAt: msg.createdAt
-                                          });
-                                        }}
-                                        title="Click to view full image"
-                                      >
-                                        <img
-                                          src={msg.attachment.fileUrl}
-                                          alt={fileNameDisplay}
                                           style={{
-                                            width: '100%',
-                                            maxWidth: '380px',
-                                            maxHeight: '340px',
+                                            position: 'relative',
                                             borderRadius: '8px',
+                                            overflow: 'hidden',
                                             cursor: 'zoom-in',
-                                            objectFit: 'cover',
-                                            display: 'block'
+                                            lineHeight: 0,
+                                            minWidth: '200px',
+                                            minHeight: '140px',
+                                            background: 'var(--bg-th, rgba(0,0,0,0.04))',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
                                           }}
-                                        />
-                                      </div>
+                                          onClick={() => {
+                                            setViewerZoom(1);
+                                            setViewerRotation(0);
+                                            setAttachmentViewer({
+                                              url: msg.attachment.fileUrl,
+                                              fileName: fileNameDisplay,
+                                              fileType: 'image',
+                                              fileSize: msg.attachment.fileSize,
+                                              senderName: msg.senderId?.name || msg.senderName,
+                                              createdAt: msg.createdAt
+                                            });
+                                          }}
+                                          title="Click to view full image"
+                                        >
+                                          <img
+                                            src={msg.attachment.fileUrl}
+                                            alt={fileNameDisplay}
+                                            loading="lazy"
+                                            onError={(e) => {
+                                              console.warn('Image failed to load:', msg.attachment.fileUrl);
+                                              e.currentTarget.style.display = 'none';
+                                              if (e.currentTarget.nextElementSibling) {
+                                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                                              }
+                                            }}
+                                            style={{
+                                              width: '100%',
+                                              minWidth: '200px',
+                                              minHeight: '140px',
+                                              maxWidth: '380px',
+                                              maxHeight: '340px',
+                                              borderRadius: '8px',
+                                              cursor: 'zoom-in',
+                                              objectFit: 'cover',
+                                              display: 'block'
+                                            }}
+                                          />
+                                          <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', gap: '6px', color: 'var(--text-muted)' }}>
+                                            <ImageIcon size={28} />
+                                            <span style={{ fontSize: '0.74rem' }}>{fileNameDisplay || 'Photo'}</span>
+                                          </div>
+                                        </div>
                                     );
                                   }
 
@@ -7221,7 +7356,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     <Reply size={14} color="#2563eb" style={{ flexShrink: 0 }} />
                     <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <span style={{ fontWeight: 800 }}>Replying to {typeof replyToMessage.senderId === 'object' ? (replyToMessage.senderId.name || replyToMessage.senderId.username) : 'Staff'}: </span>
-                      <span style={{ opacity: 0.9 }}>{replyToMessage.content?.substring(0, 80)}</span>
+                      <span style={{ opacity: 0.9 }}>{(() => {
+                        const rContent = replyToMessage.content?.trim();
+                        const rAtt = replyToMessage.attachment;
+                        if (rContent && !rContent.toLowerCase().includes('blob') && !rContent.toLowerCase().startsWith('attached blob')) {
+                          return rContent.substring(0, 80);
+                        }
+                        if (rAtt) {
+                          if (rAtt.fileType === 'image' || (rAtt.fileName && /\.(jpg|jpeg|png|gif|webp)$/i.test(rAtt.fileName))) return '📷 Photo';
+                          if (rAtt.fileType === 'audio') return '🎙️ Voice Note';
+                          const cleanName = rAtt.fileName && !rAtt.fileName.toLowerCase().includes('blob') ? rAtt.fileName : 'Attachment';
+                          return `📎 ${cleanName}`;
+                        }
+                        return (rContent || 'Message').substring(0, 80);
+                      })()}</span>
                     </div>
                   </div>
                   <button onClick={() => setReplyToMessage(null)} aria-label="Cancel reply" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderRadius: '4px', flexShrink: 0 }}>
@@ -7739,18 +7887,127 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       {/* On desktop: direct paperclip and emoji buttons */}
                       {!isMobileScreen && (
                         <>
-                          <button
-                            type="button"
-                            className="phoenix-toolbar-icon"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*');
-                            }}
-                            title="Attach File (PDF, Image, Document)"
-                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, background: 'none', border: 'none' }}
-                          >
-                            <Paperclip size={16} />
-                          </button>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              className="phoenix-toolbar-icon"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setShowDesktopAttachMenu(!showDesktopAttachMenu);
+                              }}
+                              title="Attach Files, Tasks, or Records"
+                              style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, background: showDesktopAttachMenu ? 'rgba(37,99,235,0.1)' : 'none', border: 'none', borderRadius: '6px' }}
+                            >
+                              <Paperclip size={16} color={showDesktopAttachMenu ? '#2563eb' : 'currentColor'} />
+                            </button>
+
+                            {showDesktopAttachMenu && (
+                              <>
+                                <div
+                                  onClick={() => setShowDesktopAttachMenu(false)}
+                                  style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
+                                />
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 'calc(100% + 8px)',
+                                    left: 0,
+                                    background: 'var(--bg-card, #ffffff)',
+                                    border: '1px solid var(--border-light, #e2e8f0)',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+                                    zIndex: 9999,
+                                    padding: '6px',
+                                    minWidth: '220px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px',
+                                    animation: 'fadeIn 0.15s ease'
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDesktopAttachMenu(false);
+                                      openFileDialog('image/*');
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                    }}
+                                  >
+                                    <ImageIcon size={15} color="#2563eb" />
+                                    <span>Photos & Media</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDesktopAttachMenu(false);
+                                      openFileDialog('.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip');
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                    }}
+                                  >
+                                    <FileText size={15} color="#8b5cf6" />
+                                    <span>Document / PDF</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDesktopAttachMenu(false);
+                                      setShowPollModal(true);
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                    }}
+                                  >
+                                    <BarChart2 size={15} color="#059669" />
+                                    <span>Create Poll</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDesktopAttachMenu(false);
+                                      handleOpenTaskModalFromChat();
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                    }}
+                                  >
+                                    <CheckSquare size={15} color="#10b981" />
+                                    <span>Create Task</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDesktopAttachMenu(false);
+                                      handleOpenShareModal('jobcard');
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                    }}
+                                  >
+                                    <Share2 size={15} color="#9333ea" />
+                                    <span>Quick Share Record</span>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
 
                           <div style={{ position: 'relative' }}>
                             <button
@@ -8649,16 +8906,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
       {/* ── JOB CARD PDF VIEW MODAL ── */}
       {pdfPreviewCard && (
-        <JobCardPdfModal
-          card={pdfPreviewCard}
-          loading={pdfPreviewLoading}
-          error={pdfPreviewError}
-          onClose={() => setPdfPreviewCard(null)}
-          onNavigateToJobCards={onNavigateTab ? () => {
-            setPdfPreviewCard(null);
-            onNavigateTab('jobcards');
-          } : null}
-        />
+        <React.Suspense fallback={null}>
+          <JobCardPdfModal
+            card={pdfPreviewCard}
+            loading={pdfPreviewLoading}
+            error={pdfPreviewError}
+            onClose={() => setPdfPreviewCard(null)}
+            onNavigateToJobCards={onNavigateTab ? () => {
+              setPdfPreviewCard(null);
+              onNavigateTab('jobcards');
+            } : null}
+          />
+        </React.Suspense>
       )}
 
       {/* ── QUICK SHARE RECORD CARDS MODAL ── */}
@@ -8868,7 +9127,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Folder size={18} color="#2563eb" />
                 <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  Cloudflare R2 Media & Document Gallery — {activeGroup.name}
+                  Shared Media & Documents — {activeGroup.name}
                 </h3>
               </div>
               <button onClick={() => setShowGalleryModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
@@ -10194,6 +10453,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             style={{
               width: '100%',
               maxWidth: 500,
+              minHeight: '520px',
+              height: '520px',
               maxHeight: '90vh',
               borderRadius: '20px',
               overflow: 'hidden',

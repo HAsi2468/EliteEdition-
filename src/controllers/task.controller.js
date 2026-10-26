@@ -47,17 +47,25 @@ const getTasks = async (req, res) => {
       query.createdBy = mongoose.Types.ObjectId.isValid(createdBy) ? new mongoose.Types.ObjectId(createdBy) : createdBy;
     }
 
-    const andConditions = [];
+    // Exclude test tasks from all live lists
+    andConditions.push({
+      title: { $not: /^TEST/i },
+      name: { $not: /^TEST/i },
+      isTest: { $ne: true }
+    });
 
     if (search && search.trim()) {
       const term = search.trim();
+      const cleanTerm = term.replace(/^@/, '').trim();
       andConditions.push({
         $or: [
           { title: { $regex: term, $options: 'i' } },
           { description: { $regex: term, $options: 'i' } },
           { projectRef: { $regex: term, $options: 'i' } },
+          { projectRef: { $regex: cleanTerm, $options: 'i' } },
           { clientName: { $regex: term, $options: 'i' } },
           { lotNo: { $regex: term, $options: 'i' } },
+          { department: { $regex: term, $options: 'i' } }
         ]
       });
     }
@@ -643,16 +651,18 @@ const stopTimer = async (req, res) => {
     const endTime = new Date();
     const startTime = new Date(timer.startTime);
     const durationMs = Math.max(0, endTime - startTime);
-    const durationMinutes = Math.round(durationMs / (1000 * 60));
-    const hours = parseFloat((durationMinutes / 60).toFixed(2));
+    const exactMinutes = durationMs / (1000 * 60);
+    const durationMinutes = Math.max(1, Math.round(exactMinutes));
+    const calculatedHours = durationMs / (1000 * 60 * 60);
+    const hours = parseFloat(Math.max(0.01, calculatedHours).toFixed(2));
 
     // Remove active timer entry
     task.liveTimers.splice(activeTimerIndex, 1);
 
-    // If timer stopped in under 15 seconds or resulted in 0 hours, discard without logging a 0h entry
-    if (durationMs < 15000 || hours <= 0) {
+    // Only discard if timer was clicked and immediately stopped under 2 seconds
+    if (durationMs < 2000) {
       await task.save();
-      return res.json({ success: true, data: task, loggedHours: 0, discarded: true, message: 'Timer discarded (less than 15s elapsed)' });
+      return res.json({ success: true, data: task, loggedHours: 0, discarded: true, message: 'Timer discarded (accidental click under 2s)' });
     }
 
     // Save time log

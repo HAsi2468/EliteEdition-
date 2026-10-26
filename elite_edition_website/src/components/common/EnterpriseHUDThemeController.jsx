@@ -80,6 +80,13 @@ export function EnterpriseHUDThemeController({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          // If stored in old dangerous top-right position covering header controls, move to bottom right
+          if (parsed.y < 120 && parsed.x > window.innerWidth - 450) {
+            return {
+              x: Math.max(12, window.innerWidth - 300),
+              y: Math.max(12, window.innerHeight - 80)
+            };
+          }
           // Guard against old positions that were cut off on the right
           const maxX = Math.max(12, window.innerWidth - 280);
           const maxY = Math.max(12, window.innerHeight - 56);
@@ -91,10 +98,10 @@ export function EnterpriseHUDThemeController({
       }
     } catch (e) {}
 
-    // Default: Clean top-right under header, with safe margin from right edge
+    // Default: Clean bottom-right with safe margin from edges
     return {
-      x: Math.max(12, window.innerWidth - 350),
-      y: 68
+      x: Math.max(12, window.innerWidth - 300),
+      y: Math.max(12, window.innerHeight - 80)
     };
   });
 
