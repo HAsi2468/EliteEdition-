@@ -2923,6 +2923,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                     {/* Task Cards Container */}
                     <div
                       className="task-kanban-cards-stream"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverColId !== col.id) setDragOverColId(col.id);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverColId(null);
+                        const droppedTaskId = e.dataTransfer.getData('text/plain') || draggingTaskId;
+                        setDraggingTaskId(null);
+                        if (!droppedTaskId) return;
+                        const targetTask = tasks.find(x => getTaskId(x) === droppedTaskId);
+                        if (targetTask && (targetTask.status || '').trim().toLowerCase() !== col.id.toLowerCase()) {
+                          handleStatusChange(targetTask, col.id);
+                        }
+                      }}
                       style={{
                         flex: 1,
                         minHeight: 0,
