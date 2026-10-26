@@ -2858,10 +2858,29 @@ export const api = {
     });
   },
 
+  async deleteTaskChecklistItem(id, itemId) {
+    return request(`/tasks/${id}/checklist/${itemId}`, {
+      method: 'DELETE'
+    });
+  },
+
   async addTaskComment(id, commentData) {
     return request(`/tasks/${id}/comments`, {
       method: 'POST',
       body: JSON.stringify(commentData)
+    });
+  },
+
+  async editTaskComment(id, commentId, commentData) {
+    return request(`/tasks/${id}/comments/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(commentData)
+    });
+  },
+
+  async deleteTaskComment(id, commentId) {
+    return request(`/tasks/${id}/comments/${commentId}`, {
+      method: 'DELETE'
     });
   },
 

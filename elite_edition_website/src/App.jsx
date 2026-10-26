@@ -381,7 +381,7 @@ export default function App() {
   const [showPermHelpModal, setShowPermHelpModal] = useState(false);
   const [permSnoozedSession, setPermSnoozedSession] = useState(() => {
     try {
-      return sessionStorage.getItem('elite_perm_snoozed_session') === 'true';
+      return localStorage.getItem('elite_perm_snoozed') === 'true' || sessionStorage.getItem('elite_perm_snoozed_session') === 'true';
     } catch {
       return false;
     }
@@ -2045,7 +2045,10 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                try { sessionStorage.setItem('elite_perm_snoozed_session', 'true'); } catch (e) {}
+                try {
+                  sessionStorage.setItem('elite_perm_snoozed_session', 'true');
+                  localStorage.setItem('elite_perm_snoozed', 'true');
+                } catch (e) {}
                 setPermSnoozedSession(true);
               }}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted, #64748b)', cursor: 'pointer', fontSize: 'var(--font-size-meta, 0.75rem)' }}

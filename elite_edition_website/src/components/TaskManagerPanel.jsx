@@ -204,6 +204,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [editEstHours, setEditEstHours] = useState('');
   const [editAssigneeIds, setEditAssigneeIds] = useState([]);
   const [editStaffSearch, setEditStaffSearch] = useState('');
+  const [editIsRecurring, setEditIsRecurring] = useState(false);
+  const [editRecurrenceFreq, setEditRecurrenceFreq] = useState('daily');
+
+  // Kanban Drag and Drop state
+  const [draggingTaskId, setDraggingTaskId] = useState(null);
+  const [dragOverColId, setDragOverColId] = useState(null);
+
+  // Comment edit state
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+
+  // List View Column Sorting state
+  const [listSortField, setListSortField] = useState('createdAt');
+  const [listSortAsc, setListSortAsc] = useState(false);
 
   // Feature 5: Voice-to-Task Creation state
   const [isListening, setIsListening] = useState(false);
@@ -320,6 +334,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     { id: 'Done', label: 'Done', color: '#16a34a', bg: '#f0fdf4' },
   ];
 
+  const getTaskId = (t) => {
+    if (!t) return '';
+    if (typeof t === 'string') return t;
+    return String(t._id?.$oid || t._id || t.id || '');
+  };
+
   const isTaskAssignedToMe = (t) => {
     const myName = (currentUser?.name || '').toLowerCase().trim();
     const myUsername = (currentUser?.username || '').toLowerCase().trim();
@@ -367,25 +387,29 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
     const handleTaskCreated = (newTask) => {
       if (!isTaskVisible(newTask)) return;
+      const nId = getTaskId(newTask);
+      if (!nId) return;
       setTasks((prev) => {
-        if (prev.some((t) => String(t._id) === String(newTask._id))) return prev;
+        if (prev.some((t) => getTaskId(t) === nId)) return prev;
         return [newTask, ...prev];
       });
     };
 
     const handleTaskUpdated = (updatedTask) => {
+      const uId = getTaskId(updatedTask);
+      if (!uId) return;
       setTasks((prev) => {
         if (!isTaskVisible(updatedTask)) {
-          return prev.filter((t) => String(t._id) !== String(updatedTask._id));
+          return prev.filter((t) => getTaskId(t) !== uId);
         }
-        const exists = prev.some((t) => String(t._id) === String(updatedTask._id));
+        const exists = prev.some((t) => getTaskId(t) === uId);
         if (exists) {
-          return prev.map((t) => (String(t._id) === String(updatedTask._id) ? updatedTask : t));
+          return prev.map((t) => (getTaskId(t) === uId ? updatedTask : t));
         }
         return [updatedTask, ...prev];
       });
       setSelectedTask((prev) => {
-        if (prev && String(prev._id) === String(updatedTask._id)) {
+        if (prev && getTaskId(prev) === uId) {
           return isTaskVisible(updatedTask) ? updatedTask : null;
         }
         return prev;
@@ -393,9 +417,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     };
 
     const handleTaskDeleted = (deletedData) => {
-      const delId = deletedData._id || deletedData.taskId;
-      setTasks((prev) => prev.filter((t) => String(t._id) !== String(delId)));
-      setSelectedTask((prev) => (prev && String(prev._id) === String(delId) ? null : prev));
+      const delId = String(deletedData?._id || deletedData?.taskId || deletedData || '');
+      if (!delId) return;
+      setTasks((prev) => prev.filter((t) => getTaskId(t) !== delId));
+      setSelectedTask((prev) => (prev && getTaskId(prev) === delId ? null : prev));
     };
 
     socket.on('task-created', handleTaskCreated);
@@ -534,6 +559,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setEditClientName(task.clientName || '');
     setEditLotNo(task.lotNo || task.lotNumber || '');
     setEditAssigneeIds((task.assignees || []).map((a) => String(typeof a === 'object' ? (a._id || a.id) : a)));
+    setEditIsRecurring(Boolean(task.recurrence?.isRecurring));
+    setEditRecurrenceFreq(task.recurrence?.frequency || 'daily');
     setEditStaffSearch('');
     setShowEditModal(true);
   };
@@ -556,7 +583,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     e.preventDefault();
     if (!editingTask) return;
     if (!editTitle.trim()) {
-      alert('Please enter a task title.');
+      triggerEliteAlert('Validation', 'Please enter a task title.', 'warning');
+      return;
+    }
+    if (editTitle.trim().length > 200) {
+      triggerEliteAlert('Validation', 'Task title cannot exceed 200 characters.', 'warning');
+      return;
+    }
+    const numEstHours = parseFloat(editEstHours) || 0;
+    if (numEstHours < 0 || numEstHours > 1000) {
+      triggerEliteAlert('Validation', 'Estimated hours must be between 0 and 1,000.', 'warning');
       return;
     }
 
@@ -571,24 +607,27 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         clientName: editClientName.trim(),
         lotNo: editLotNo.trim(),
         dueDate: editDueDate || null,
-        estimatedHours: parseFloat(editEstHours) || 0,
+        estimatedHours: numEstHours,
         assignees: editAssigneeIds,
+        recurrence: editIsRecurring ? { isRecurring: true, frequency: editRecurrenceFreq } : { isRecurring: false },
         userId: myId,
         userName: myName
       };
 
-      const res = await api.updateTask(editingTask._id, updates);
+      const res = await api.updateTask(getTaskId(editingTask), updates);
       if (res.success && res.data) {
         const updated = res.data;
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(updated._id) ? updated : t)));
-        if (selectedTask && String(selectedTask._id) === String(updated._id)) {
+        const upId = getTaskId(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        if (selectedTask && getTaskId(selectedTask) === upId) {
           setSelectedTask(updated);
         }
         setShowEditModal(false);
         setEditingTask(null);
+        triggerEliteAlert('Success', 'Task updated successfully!', 'success');
       }
     } catch (err) {
-      alert('Failed to update task: ' + err.message);
+      triggerEliteAlert('Update Error', 'Failed to update task: ' + err.message, 'error');
     } finally {
       setEditingUpdating(false);
     }
@@ -692,6 +731,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       triggerEliteAlert('Validation', 'Please enter a task title.', 'warning');
       return;
     }
+    if (newTitle.trim().length > 200) {
+      triggerEliteAlert('Validation', 'Task title cannot exceed 200 characters.', 'warning');
+      return;
+    }
+    const numEstHours = parseFloat(newEstHours) || 0;
+    if (numEstHours < 0 || numEstHours > 1000) {
+      triggerEliteAlert('Validation', 'Estimated hours must be between 0 and 1,000.', 'warning');
+      return;
+    }
 
     setCreating(true);
     try {
@@ -704,7 +752,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         clientName: newClientName.trim(),
         lotNo: newLotNo.trim(),
         dueDate: newDueDate || undefined,
-        estimatedHours: parseFloat(newEstHours) || 0,
+        estimatedHours: numEstHours,
         assignees: selectedAssigneeIds && selectedAssigneeIds.length > 0 ? selectedAssigneeIds : (myId ? [myId] : []),
         attachments: newAttachments,
         createdBy: myId || undefined,
@@ -716,8 +764,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
       if (res && (res.success || res.data)) {
         const createdTask = res.data || res;
+        const createdId = getTaskId(createdTask);
         setTasks((prev) => {
-          const exists = prev.some((t) => String(t._id || t.id) === String(createdTask._id || createdTask.id));
+          const exists = prev.some((t) => getTaskId(t) === createdId);
           if (exists) return prev;
           return [createdTask, ...prev];
         });
@@ -752,62 +801,74 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   };
 
   const handleStatusChange = async (task, newStatusVal) => {
+    const tId = getTaskId(task);
+    if (!tId) return;
     try {
-      const res = await api.updateTask(task._id, {
+      const res = await api.updateTask(tId, {
         status: newStatusVal,
         userId: myId,
         userName: myName
       });
 
       if (res.success && res.data) {
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(task._id) ? res.data : t)));
-        if (selectedTask && String(selectedTask._id) === String(task._id)) {
-          setSelectedTask(res.data);
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        if (selectedTask && getTaskId(selectedTask) === upId) {
+          setSelectedTask(updated);
         }
       }
     } catch (err) {
-      alert('Cannot change status: ' + err.message);
+      triggerEliteAlert('Status Change Error', err.message || 'Cannot change status', 'error');
     }
   };
 
   const handleUpdateAssignees = async (task, newAssigneeIds) => {
+    const tId = getTaskId(task);
+    if (!tId) return;
     try {
-      const res = await api.updateTask(task._id, {
+      const res = await api.updateTask(tId, {
         assignees: newAssigneeIds,
         userId: myId,
         userName: myName
       });
 
       if (res.success && res.data) {
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(task._id) ? res.data : t)));
-        if (selectedTask && String(selectedTask._id) === String(task._id)) {
-          setSelectedTask(res.data);
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        if (selectedTask && getTaskId(selectedTask) === upId) {
+          setSelectedTask(updated);
         }
       }
     } catch (err) {
-      alert('Failed to update task assignees: ' + err.message);
+      triggerEliteAlert('Error', 'Failed to update task assignees: ' + err.message, 'error');
     }
   };
 
   const handleStartTimer = async (taskId, e) => {
     if (e) e.stopPropagation();
+    const tId = String(taskId);
     try {
-      const res = await api.startTaskTimer(taskId, myId);
+      const res = await api.startTaskTimer(tId, myId);
       if (res.success && res.data) {
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(taskId) ? res.data : t)));
-        if (selectedTask && String(selectedTask._id) === String(taskId)) {
-          setSelectedTask(res.data);
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        if (selectedTask && getTaskId(selectedTask) === upId) {
+          setSelectedTask(updated);
         }
       }
     } catch (err) {
-      alert('Failed to start timer: ' + err.message);
+      triggerEliteAlert('Timer Error', 'Failed to start timer: ' + err.message, 'error');
     }
   };
 
   const handleStopTimer = async (taskId, e) => {
     if (e) e.stopPropagation();
+    const tId = String(taskId);
     try {
-      const res = await api.stopTaskTimer(taskId, {
+      const res = await api.stopTaskTimer(tId, {
         userId: myId,
         userName: myName,
         description: timerLogDesc.trim() || 'Work session',
@@ -815,15 +876,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       });
 
       if (res.success && res.data) {
+        const updated = res.data;
+        const upId = getTaskId(updated);
         setTimerLogDesc('');
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(taskId) ? res.data : t)));
-        if (selectedTask && String(selectedTask._id) === String(taskId)) {
-          setSelectedTask(res.data);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        if (selectedTask && getTaskId(selectedTask) === upId) {
+          setSelectedTask(updated);
         }
-        alert(`Timer stopped! Logged ${res.loggedHours || 0} hours.`);
+        if (res.discarded) {
+          triggerEliteAlert('Timer Info', 'Timer was active under 15 seconds — work session discarded without 0h entry.', 'info');
+        } else {
+          triggerEliteAlert('Work Logged', `Timer stopped! Logged ${res.loggedHours || 0} hours.`, 'success');
+        }
       }
     } catch (err) {
-      alert('Failed to stop timer: ' + err.message);
+      triggerEliteAlert('Timer Error', 'Failed to stop timer: ' + err.message, 'error');
     }
   };
 
@@ -832,29 +899,48 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     if (!selectedTask || !newChecklistText.trim()) return;
 
     try {
-      const res = await api.addTaskChecklistItem(selectedTask._id, {
+      const res = await api.addTaskChecklistItem(getTaskId(selectedTask), {
         text: newChecklistText.trim()
       });
       if (res.success && res.data) {
-        setSelectedTask(res.data);
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(selectedTask._id) ? res.data : t)));
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
         setNewChecklistText('');
       }
     } catch (err) {
-      alert('Failed to add checklist item: ' + err.message);
+      triggerEliteAlert('Checklist Error', 'Failed to add checklist item: ' + err.message, 'error');
     }
   };
 
   const handleToggleChecklist = async (itemId, currentCompleted) => {
     if (!selectedTask) return;
     try {
-      const res = await api.toggleTaskChecklistItem(selectedTask._id, itemId, !currentCompleted);
+      const res = await api.toggleTaskChecklistItem(getTaskId(selectedTask), itemId, !currentCompleted);
       if (res.success && res.data) {
-        setSelectedTask(res.data);
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(selectedTask._id) ? res.data : t)));
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
       }
     } catch (err) {
       console.error('Failed to toggle checklist item:', err);
+    }
+  };
+
+  const handleDeleteChecklist = async (itemId) => {
+    if (!selectedTask) return;
+    try {
+      const res = await api.deleteTaskChecklistItem(getTaskId(selectedTask), itemId);
+      if (res.success && res.data) {
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+      }
+    } catch (err) {
+      triggerEliteAlert('Checklist Error', 'Failed to delete checklist item: ' + err.message, 'error');
     }
   };
 
@@ -863,18 +949,52 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     if (!selectedTask || !newCommentText.trim()) return;
 
     try {
-      const res = await api.addTaskComment(selectedTask._id, {
+      const res = await api.addTaskComment(getTaskId(selectedTask), {
         text: newCommentText.trim(),
         userId: myId,
         senderName: myName
       });
       if (res.success && res.data) {
-        setSelectedTask(res.data);
-        setTasks((prev) => prev.map((t) => (String(t._id) === String(selectedTask._id) ? res.data : t)));
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
         setNewCommentText('');
       }
     } catch (err) {
-      alert('Failed to add comment: ' + err.message);
+      triggerEliteAlert('Comment Error', 'Failed to add comment: ' + err.message, 'error');
+    }
+  };
+
+  const handleEditComment = async (commentId, text) => {
+    if (!selectedTask || !text || !text.trim()) return;
+    try {
+      const res = await api.editTaskComment(getTaskId(selectedTask), commentId, { text: text.trim() });
+      if (res.success && res.data) {
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        setEditingCommentId(null);
+        setEditingCommentText('');
+      }
+    } catch (err) {
+      triggerEliteAlert('Comment Error', 'Failed to edit comment: ' + err.message, 'error');
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!selectedTask) return;
+    try {
+      const res = await api.deleteTaskComment(getTaskId(selectedTask), commentId);
+      if (res.success && res.data) {
+        const updated = res.data;
+        const upId = getTaskId(updated);
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+      }
+    } catch (err) {
+      triggerEliteAlert('Comment Error', 'Failed to delete comment: ' + err.message, 'error');
     }
   };
 
@@ -889,15 +1009,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     });
     if (!confirmed) return;
 
+    const targetId = String(taskId);
+    // Optimistic immediate UI removal to prevent lingering and duplicate clicks
+    const backupTasks = tasks;
+    setTasks((prev) => prev.filter((t) => getTaskId(t) !== targetId));
+    if (selectedTask && getTaskId(selectedTask) === targetId) {
+      setSelectedTask(null);
+    }
+
     try {
-      const res = await api.deleteTask(taskId);
-      if (res.success) {
-        setTasks((prev) => prev.filter((t) => String(t._id) !== String(taskId)));
-        if (selectedTask && String(selectedTask._id) === String(taskId)) {
-          setSelectedTask(null);
-        }
+      const res = await api.deleteTask(targetId);
+      if (!res.success) {
+        setTasks(backupTasks);
+        triggerEliteAlert('Error', 'Failed to delete task: ' + (res.message || 'Unknown error'), 'error');
       }
     } catch (err) {
+      setTasks(backupTasks);
       triggerEliteAlert('Error', 'Failed to delete task: ' + err.message, 'error');
     }
   };
@@ -931,7 +1058,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
     // Filter by Member / Assignee
     if (assigneeFilter === 'me') {
-      if (!isTaskAssignedToMe(t) && !isTaskCreatedByMe(t)) return false;
+      if (!isTaskAssignedToMe(t)) return false;
     } else if (assigneeFilter !== 'all') {
       const targetId = String(assigneeFilter);
       const isAssigned = (t.assignees || []).some((a) => {
@@ -977,14 +1104,32 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
     const term = searchQuery.toLowerCase().trim();
     if (!term) return true;
+    const cleanTerm = term.startsWith('@') ? term.slice(1).trim() : term;
 
-    return (
-      (t.title || '').toLowerCase().includes(term) ||
-      (t.description || '').toLowerCase().includes(term) ||
-      (t.projectRef || '').toLowerCase().includes(term) ||
-      (t.clientName || '').toLowerCase().includes(term) ||
-      (t.lotNo || '').toLowerCase().includes(term)
+    const titleMatch = (t.title || '').toLowerCase().includes(term) || (cleanTerm && (t.title || '').toLowerCase().includes(cleanTerm));
+    const descMatch = (t.description || '').toLowerCase().includes(term) || (cleanTerm && (t.description || '').toLowerCase().includes(cleanTerm));
+    const refMatch = (t.projectRef || '').toLowerCase().includes(term) || (cleanTerm && (t.projectRef || '').toLowerCase().includes(cleanTerm));
+    const clientMatch = (t.clientName || '').toLowerCase().includes(term) || (cleanTerm && (t.clientName || '').toLowerCase().includes(cleanTerm));
+    const lotMatch = (t.lotNo || t.lotNumber || '').toLowerCase().includes(term) || (cleanTerm && (t.lotNo || t.lotNumber || '').toLowerCase().includes(cleanTerm));
+
+    const assigneeMatch = (t.assignees || []).some((a) => {
+      const aName = typeof a === 'object' ? (a.name || a.username || '') : String(a);
+      return aName.toLowerCase().includes(term) || (cleanTerm && aName.toLowerCase().includes(cleanTerm));
+    });
+
+    const creatorMatch = t.createdBy && (
+      (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username || '') : String(t.createdBy)).toLowerCase().includes(term) ||
+      (cleanTerm && (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username || '') : String(t.createdBy)).toLowerCase().includes(cleanTerm))
     );
+
+    const commentsMatch = (t.comments || []).some((c) =>
+      (c.text || '').toLowerCase().includes(term) ||
+      (cleanTerm && (c.text || '').toLowerCase().includes(cleanTerm)) ||
+      (c.senderName || '').toLowerCase().includes(term) ||
+      (cleanTerm && (c.senderName || '').toLowerCase().includes(cleanTerm))
+    );
+
+    return titleMatch || descMatch || refMatch || clientMatch || lotMatch || assigneeMatch || creatorMatch || commentsMatch;
   });
 
   // Task Management PDF Report Generator & Export Handler
@@ -1041,7 +1186,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     const inProgressCount = tasksToExport.filter((t) => t.status === 'In Progress').length;
     const inReviewCount = tasksToExport.filter((t) => t.status === 'In Review').length;
     const pendingCount = tasksToExport.filter((t) => t.status === 'To Do' || t.status === 'Backlog').length;
-    const overdueCount = tasksToExport.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done').length;
+    const overdueCount = tasksToExport.filter((t) => isTaskOverdue(t)).length;
     const totalEstHours = tasksToExport.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
     const totalLoggedHours = tasksToExport.reduce((sum, t) => sum + (t.timeLogs || []).reduce((s, l) => s + (Number(l.hours) || 0), 0), 0);
 
@@ -1224,7 +1369,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             ${tasksToExport.map((t, idx) => {
               const pri = priorityColors[t.priority] || priorityColors.medium;
               const sta = statusColors[t.status] || { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' };
-              const isTaskOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+              const taskIsOverdue = isTaskOverdue(t);
               const assigneesStr = (t.assignees || []).map((a) => (typeof a === 'object' ? (a.name || a.username) : 'Staff')).join(', ') || 'Unassigned';
               const checkTotal = (t.checklist || []).length;
               const checkDone = (t.checklist || []).filter((c) => c.completed).length;
@@ -1303,10 +1448,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     </span>
                   </td>
                   <td style="text-align: center;">
-                    <div style="font-weight: 700; font-size: 8px; color: ${isTaskOverdue ? '#dc2626' : '#1e293b'};">
+                    <div style="font-weight: 700; font-size: 8px; color: ${taskIsOverdue ? '#dc2626' : '#1e293b'};">
                       ${dueStr}
                     </div>
-                    ${isTaskOverdue ? `<span class="badge badge-overdue" style="font-size: 6.5px; margin-top: 1px;">OVERDUE</span>` : ''}
+                    ${taskIsOverdue ? `<span class="badge badge-overdue" style="font-size: 6.5px; margin-top: 1px;">OVERDUE</span>` : ''}
                   </td>
                   <td style="text-align: center; font-size: 8px;">
                     ${(Number(logged) > 0 || Number(t.estimatedHours) > 0)
@@ -2613,7 +2758,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 <span className="task-mobile-col-count">{filteredTasks.length}</span>
               </button>
               {KANBAN_COLUMNS.map((col) => {
-                const count = filteredTasks.filter(t => t.status === col.id).length;
+                const count = filteredTasks.filter(t => (t.status || '').trim().toLowerCase() === col.id.toLowerCase()).length;
                 return (
                   <button
                     key={col.id}
@@ -2645,22 +2790,43 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               }}
             >
               {(mobileKanbanCol === 'all' ? KANBAN_COLUMNS : KANBAN_COLUMNS.filter(c => c.id === mobileKanbanCol)).map((col) => {
-                const colTasks = filteredTasks.filter((t) => t.status === col.id);
+                const colTasks = filteredTasks.filter((t) => (t.status || '').trim().toLowerCase() === col.id.toLowerCase());
 
                 return (
                   <div
                     key={col.id}
                     className="kanban-col-snap task-kanban-col"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverColId !== col.id) setDragOverColId(col.id);
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget.contains(e.relatedTarget)) return;
+                      if (dragOverColId === col.id) setDragOverColId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverColId(null);
+                      const droppedTaskId = e.dataTransfer.getData('text/plain') || draggingTaskId;
+                      setDraggingTaskId(null);
+                      if (!droppedTaskId) return;
+                      const targetTask = tasks.find(x => getTaskId(x) === droppedTaskId);
+                      if (targetTask && (targetTask.status || '').trim().toLowerCase() !== col.id.toLowerCase()) {
+                        handleStatusChange(targetTask, col.id);
+                      }
+                    }}
                     style={{
-                      background: '#f8fafc',
-                      border: '1px solid var(--border-light)',
+                      background: dragOverColId === col.id ? `${col.color}0d` : '#f8fafc',
+                      border: dragOverColId === col.id ? `2px dashed ${col.color}` : '1px solid var(--border-light)',
                       borderRadius: '12px',
                       display: 'flex',
                       flexDirection: 'column',
                       height: '100%',
                       minHeight: 0,
                       maxHeight: '100%',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      transition: 'border 0.2s ease, background 0.2s ease'
                     }}
                   >
                     {/* Column Header */}
@@ -2717,12 +2883,28 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           const assigneeFullName = typeof firstAssignee === 'object' ? (firstAssignee.name || firstAssignee.username || 'Staff') : (firstAssignee || 'Staff');
                           const avStyle = getAvatarStyle(assigneeFullName);
                           const nextMap = { 'Backlog': 'To Do', 'To Do': 'In Progress', 'In Progress': 'In Review', 'In Review': 'Done' };
+                          const taskId = getTaskId(t) || t._id;
 
                           return (
                             <div
-                              key={t._id}
+                              key={taskId}
+                              draggable={true}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', taskId);
+                                e.dataTransfer.effectAllowed = 'move';
+                                setDraggingTaskId(taskId);
+                              }}
+                              onDragEnd={() => {
+                                setDraggingTaskId(null);
+                                setDragOverColId(null);
+                              }}
                               onClick={() => setSelectedTask(t)}
                               className={`task-card ${isOverdue ? 'overdue' : ''}`}
+                              style={{
+                                cursor: 'grab',
+                                opacity: draggingTaskId === taskId ? 0.45 : 1,
+                                transition: 'transform 0.15s, box-shadow 0.15s, opacity 0.15s'
+                              }}
                             >
                               {/* 1. Header: Priority Badge, Overdue Tag, Attachments, and Actions */}
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
@@ -3057,15 +3239,80 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             <table className="task-list-table">
               <thead>
                 <tr>
-                  <th>Task Title</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Due Date</th>
+                  <th
+                    onClick={() => {
+                      if (listSortField === 'title') {
+                        setListSortAsc(!listSortAsc);
+                      } else {
+                        setListSortField('title');
+                        setListSortAsc(true);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by Title"
+                  >
+                    Task Title {listSortField === 'title' ? (listSortAsc ? '▲' : '▼') : ''}
+                  </th>
+                  <th
+                    onClick={() => {
+                      if (listSortField === 'status') {
+                        setListSortAsc(!listSortAsc);
+                      } else {
+                        setListSortField('status');
+                        setListSortAsc(true);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by Status"
+                  >
+                    Status {listSortField === 'status' ? (listSortAsc ? '▲' : '▼') : ''}
+                  </th>
+                  <th
+                    onClick={() => {
+                      if (listSortField === 'priority') {
+                        setListSortAsc(!listSortAsc);
+                      } else {
+                        setListSortField('priority');
+                        setListSortAsc(true);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by Priority"
+                  >
+                    Priority {listSortField === 'priority' ? (listSortAsc ? '▲' : '▼') : ''}
+                  </th>
+                  <th
+                    onClick={() => {
+                      if (listSortField === 'dueDate') {
+                        setListSortAsc(!listSortAsc);
+                      } else {
+                        setListSortField('dueDate');
+                        setListSortAsc(true);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by Due Date"
+                  >
+                    Due Date {listSortField === 'dueDate' ? (listSortAsc ? '▲' : '▼') : ''}
+                  </th>
                   <th>Subtasks</th>
                   <th>Assigned To</th>
                   <th>Assigned By</th>
                   <th>Project Ref</th>
-                  <th>Hours Logged</th>
+                  <th
+                    onClick={() => {
+                      if (listSortField === 'hours') {
+                        setListSortAsc(!listSortAsc);
+                      } else {
+                        setListSortField('hours');
+                        setListSortAsc(true);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Sort by Logged Hours"
+                  >
+                    Hours Logged {listSortField === 'hours' ? (listSortAsc ? '▲' : '▼') : ''}
+                  </th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -3077,7 +3324,32 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     </td>
                   </tr>
                 ) : (
-                  filteredTasks.map((t) => {
+                  [...filteredTasks].sort((a, b) => {
+                    let valA, valB;
+                    if (listSortField === 'title') {
+                      valA = (a.title || '').toLowerCase();
+                      valB = (b.title || '').toLowerCase();
+                      return listSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    } else if (listSortField === 'status') {
+                      valA = (a.status || '').toLowerCase();
+                      valB = (b.status || '').toLowerCase();
+                      return listSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    } else if (listSortField === 'priority') {
+                      const pOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+                      valA = pOrder[a.priority] || 0;
+                      valB = pOrder[b.priority] || 0;
+                      return listSortAsc ? valA - valB : valB - valA;
+                    } else if (listSortField === 'dueDate') {
+                      valA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+                      valB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+                      return listSortAsc ? valA - valB : valB - valA;
+                    } else if (listSortField === 'hours') {
+                      valA = (a.timeLogs || []).reduce((s, l) => s + (l.hours || 0), 0);
+                      valB = (b.timeLogs || []).reduce((s, l) => s + (l.hours || 0), 0);
+                      return listSortAsc ? valA - valB : valB - valA;
+                    }
+                    return 0;
+                  }).map((t) => {
                     const pri = getPriorityBadge(t.priority);
                     const assignerName = getAssignerName(t);
                     const isOverdue = isTaskOverdue(t);
@@ -3087,7 +3359,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
                     return (
                       <tr
-                        key={t._id}
+                        key={getTaskId(t) || t._id}
                         onClick={() => setSelectedTask(t)}
                         className="task-list-row"
                       >
@@ -3153,13 +3425,24 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>-</span>
                           )}
                         </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                            {(t.assignees || []).map((a) => (
-                              <span key={a._id || a} style={{ fontSize: '0.65rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>
+                        <td style={{ maxWidth: 220, verticalAlign: 'top' }}>
+                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {(t.assignees || []).slice(0, 3).map((a, aIdx) => (
+                              <span key={a._id || a.id || aIdx} style={{ fontSize: '0.65rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                                 {typeof a === 'object' ? (a.name || a.username) : 'Staff'}
                               </span>
                             ))}
+                            {(t.assignees || []).length > 3 && (
+                              <span
+                                title={(t.assignees || []).map(a => typeof a === 'object' ? (a.name || a.username) : 'Staff').join(', ')}
+                                style={{ fontSize: '0.62rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '1px 5px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              >
+                                +{(t.assignees || []).length - 3} more
+                              </span>
+                            )}
+                            {(!t.assignees || t.assignees.length === 0) && (
+                              <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Unassigned</span>
+                            )}
                           </div>
                         </td>
                         <td style={{ fontWeight: 700, color: '#475569' }}>
@@ -3184,7 +3467,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                               <Edit2 size={13} />
                             </button>
                             <button
-                              onClick={(e) => handleDeleteTask(t._id, e)}
+                              onClick={(e) => handleDeleteTask(getTaskId(t) || t._id, e)}
                               style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#ef4444', cursor: 'pointer', padding: '3px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
                               title="Delete Task"
                             >
@@ -4809,6 +5092,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
               </div>
 
+              {/* Client Name */}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  Client Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Acme Corp / Retail Client"
+                  value={editClientName}
+                  onChange={(e) => setEditClientName(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                />
+              </div>
+
               {/* Project Ref, Lot No & Est Hours */}
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: '0.65rem' }}>
                 <div>
@@ -4843,12 +5140,45 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     type="number"
                     step="0.5"
                     min="0"
+                    max="1000"
                     placeholder="e.g. 2.0"
                     value={editEstHours}
                     onChange={(e) => setEditEstHours(e.target.value)}
                     style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
                   />
                 </div>
+              </div>
+
+              {/* Automated Recurring Task Setup */}
+              <div style={{ background: '#fcf5ff', padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid #e9d5ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="editRecurringTaskToggle"
+                    checked={editIsRecurring}
+                    onChange={(e) => setEditIsRecurring(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <label htmlFor="editRecurringTaskToggle" style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6b21a8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Repeat size={14} color="#7c3aed" />
+                    <span>🔄 Automated Recurring Task Schedule</span>
+                  </label>
+                </div>
+
+                {editIsRecurring && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed' }}>Repeat Frequency:</span>
+                    <select
+                      value={editRecurrenceFreq}
+                      onChange={(e) => setEditRecurrenceFreq(e.target.value)}
+                      style={{ fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid #ddd6fe', background: '#ffffff', color: '#6b21a8', cursor: 'pointer' }}
+                    >
+                      <option value="daily">📅 Daily (Every Morning)</option>
+                      <option value="weekly">📅 Weekly (Every Monday)</option>
+                      <option value="monthly">📅 Monthly (1st of Month)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Submit / Cancel Buttons */}
@@ -5009,11 +5339,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.6rem' }}>
                     {(selectedTask.checklist || []).map((item) => (
-                      <div key={item._id} onClick={() => handleToggleChecklist(item._id, item.completed)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.65rem', borderRadius: '6px', background: '#f8fafc', border: '1px solid var(--border-light)', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={item.completed} onChange={() => {}} style={{ cursor: 'pointer' }} />
-                        <span style={{ fontSize: '0.8rem', textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                          {item.text}
-                        </span>
+                      <div key={item._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.45rem 0.65rem', borderRadius: '6px', background: '#f8fafc', border: '1px solid var(--border-light)' }}>
+                        <div onClick={() => handleToggleChecklist(item._id, item.completed)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                          <input type="checkbox" checked={item.completed} onChange={() => {}} style={{ cursor: 'pointer', flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.8rem', textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'var(--text-muted)' : 'var(--text-primary)', wordBreak: 'break-word' }}>
+                            {item.text}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteChecklist(item._id); }}
+                          title="Delete checklist item"
+                          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -5200,12 +5542,70 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   </h4>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.6rem', maxHeight: 200, overflowY: 'auto' }}>
-                    {(selectedTask.comments || []).map((c, idx) => (
-                      <div key={idx} style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid var(--border-light)' }}>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563eb' }}>{c.senderName || 'Staff'}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', marginTop: '2px' }}>{c.text}</div>
-                      </div>
-                    ))}
+                    {(selectedTask.comments || []).map((c, idx) => {
+                      const commentId = c._id || idx;
+                      const isEditing = editingCommentId === commentId;
+                      const canModify = isMasterAdmin || String(c.user || c.userId) === String(myId) || (c.senderName && (c.senderName || '').toLowerCase() === (myName || '').toLowerCase());
+
+                      return (
+                        <div key={commentId} style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid var(--border-light)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563eb' }}>{c.senderName || 'Staff'}</div>
+                            {canModify && !isEditing && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCommentId(commentId);
+                                    setEditingCommentText(c.text || '');
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '1px 3px' }}
+                                  title="Edit comment"
+                                >
+                                  <Edit2 size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteComment(commentId)}
+                                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '1px 3px' }}
+                                  title="Delete comment"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {isEditing ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                              <input
+                                type="text"
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                                style={{ width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-light)', background: '#fff', boxSizing: 'border-box' }}
+                              />
+                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCommentId(null)}
+                                  style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditComment(commentId, editingCommentText)}
+                                  style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', marginTop: '2px', wordBreak: 'break-word' }}>{c.text}</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '0.4rem' }}>

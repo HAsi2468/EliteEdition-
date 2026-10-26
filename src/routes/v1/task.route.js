@@ -15,7 +15,11 @@ router.post('/:id/timelogs', taskController.addManualTimeLog);
 
 router.post('/:id/checklist', taskController.addChecklistItem);
 router.put('/:id/checklist/:itemId', taskController.toggleChecklistItem);
+router.delete('/:id/checklist/:itemId', taskController.deleteChecklistItem);
+
 router.post('/:id/comments', taskController.addComment);
+router.put('/:id/comments/:commentId', taskController.editComment);
+router.delete('/:id/comments/:commentId', taskController.deleteComment);
 
 // Attachments (stored in Cloudflare R2)
 router.post('/:id/attachments', taskController.addAttachment);

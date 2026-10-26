@@ -41,6 +41,17 @@ export function ChatContainer({ onClose }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, currentStatus]);
 
+  // Close modal when Escape key is pressed
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose?.();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const handleSend = async (messageText) => {
     const textToSend = messageText || input;
     if (!textToSend.trim() || isSending) return;

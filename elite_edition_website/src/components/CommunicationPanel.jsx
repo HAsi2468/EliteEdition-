@@ -2437,6 +2437,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
 
     setActiveGroup(targetGroup);
+    setShowInRoomSearch(false);
+    setInRoomSearchQuery('');
     if (typeof localStorage !== 'undefined' && targetGroup._id) {
       localStorage.setItem('elite_active_chat_room_id', targetGroup._id);
     }
@@ -8929,6 +8931,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       const isImg = att.fileType === 'image';
                       const isAudio = m.type === 'audio-voice' || att.fileType === 'audio';
 
+                      const rawName = att.fileName || att.originalName || '';
+                      const fromUrl = (typeof att.fileUrl === 'string' ? decodeURIComponent(att.fileUrl.split('/').pop().split('?')[0]) : '');
+                      let cleanFileName = rawName;
+                      if (!cleanFileName || cleanFileName.toLowerCase() === 'blob' || cleanFileName.toLowerCase() === 'blob.blob' || cleanFileName.startsWith('blob:') || cleanFileName.toLowerCase() === 'image') {
+                        cleanFileName = (fromUrl && !fromUrl.startsWith('blob')) ? fromUrl : (isImg ? 'Photo' : isAudio ? 'Voice Note' : 'Attachment');
+                      }
+
                       return (
                         <div
                           key={m._id}
@@ -8944,13 +8953,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           {isImg ? (
                             <img
                               src={att.fileUrl}
-                              alt={att.fileName}
+                              alt={cleanFileName}
                               onClick={() => {
                                 setViewerZoom(1);
                                 setViewerRotation(0);
                                 setAttachmentViewer({
                                   url: att.fileUrl,
-                                  fileName: att.fileName || 'Photo',
+                                  fileName: cleanFileName,
                                   fileType: 'image',
                                   fileSize: att.fileSize,
                                   senderName: m.senderId?.name || 'Staff',
@@ -8963,13 +8972,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <div
                               onClick={() => {
                                 if (isAudio) return;
-                                const isPdf = att.fileType === 'pdf' || att.fileName?.toLowerCase().endsWith('.pdf');
-                                const isSheet = ['xlsx', 'xls', 'csv'].some((ext) => att.fileName?.toLowerCase().endsWith(ext));
+                                const isPdf = att.fileType === 'pdf' || cleanFileName.toLowerCase().endsWith('.pdf');
+                                const isSheet = ['xlsx', 'xls', 'csv'].some((ext) => cleanFileName.toLowerCase().endsWith(ext));
                                 setViewerZoom(1);
                                 setViewerRotation(0);
                                 setAttachmentViewer({
                                   url: att.fileUrl,
-                                  fileName: att.fileName || 'Document',
+                                  fileName: cleanFileName,
                                   fileType: isPdf ? 'pdf' : isSheet ? 'spreadsheet' : 'document',
                                   fileSize: att.fileSize,
                                   senderName: m.senderId?.name || 'Staff',
@@ -8989,15 +8998,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             >
                               {isAudio ? <Volume2 size={28} color="#2563eb" /> : <FileText size={28} color="#64748b" />}
                               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px', textAlign: 'center', wordBreak: 'break-all' }}>
-                                {att.fileName || 'File'}
+                                {cleanFileName}
                               </span>
                             </div>
                           )}
 
                           <div style={{ padding: '0.5rem 0.65rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <div>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {att.fileName}
+                              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cleanFileName}>
+                                {cleanFileName}
                               </div>
                               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                                 Shared by: {m.senderId?.name || 'Staff'} · {formatDateLabel(m.createdAt)}
@@ -9009,13 +9018,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const isPdf = att.fileType === 'pdf' || att.fileName?.toLowerCase().endsWith('.pdf');
-                                    const isSheet = ['xlsx', 'xls', 'csv'].some((ext) => att.fileName?.toLowerCase().endsWith(ext));
+                                    const isPdf = att.fileType === 'pdf' || cleanFileName.toLowerCase().endsWith('.pdf');
+                                    const isSheet = ['xlsx', 'xls', 'csv'].some((ext) => cleanFileName.toLowerCase().endsWith(ext));
                                     setViewerZoom(1);
                                     setViewerRotation(0);
                                     setAttachmentViewer({
                                       url: att.fileUrl,
-                                      fileName: att.fileName || (isImg ? 'Photo' : 'Document'),
+                                      fileName: cleanFileName,
                                       fileType: isImg ? 'image' : isPdf ? 'pdf' : isSheet ? 'spreadsheet' : 'document',
                                       fileSize: att.fileSize,
                                       senderName: m.senderId?.name || 'Staff',
@@ -9040,7 +9049,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               )}
                               <a
                                 href={att.fileUrl}
-                                download={att.fileName}
+                                download={cleanFileName}
                                 className="btn-primary"
                                 style={{ flex: 1, padding: '0.25rem', fontSize: '0.68rem', textAlign: 'center', textDecoration: 'none', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                               >

@@ -197,6 +197,15 @@ const createTask = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Task title is required' });
     }
 
+    if (title.trim().length > 200) {
+      return res.status(400).json({ success: false, message: 'Task title cannot exceed 200 characters.' });
+    }
+
+    const numEstHours = Number(estimatedHours) || 0;
+    if (numEstHours < 0 || numEstHours > 1000) {
+      return res.status(400).json({ success: false, message: 'Estimated hours must be between 0 and 1,000.' });
+    }
+
     // Robustly determine and validate creatorId
     if (!req.user || (!req.user._id && !req.user.id)) {
       return res.status(401).json({
@@ -270,11 +279,11 @@ const createTask = async (req, res) => {
       }
     }
 
-    // Prevent rapid double-click duplicate task creation (within 60 seconds)
+    // Prevent rapid double-click duplicate task creation (within 3 seconds)
     const duplicateQuery = {
       title: title.trim(),
       department,
-      createdAt: { $gte: new Date(Date.now() - 60000) }
+      createdAt: { $gte: new Date(Date.now() - 3000) }
     };
     if (creatorId) duplicateQuery.createdBy = creatorId;
 
@@ -284,8 +293,10 @@ const createTask = async (req, res) => {
       .populate('attachments.uploadedBy', 'name email');
 
     if (recentDuplicate) {
-      console.warn(`[TaskController] Duplicate task suppressed within 60s debounce: "${title.trim()}"`);
-      return res.status(200).json({ success: true, data: recentDuplicate, isDuplicate: true });
+      return res.status(409).json({
+        success: false,
+        message: 'A task with this title was just created moments ago. If this was intentional, please wait 3 seconds.'
+      });
     }
 
     const task = await Task.create({
@@ -450,11 +461,21 @@ const updateTask = async (req, res) => {
     }
 
     // Sanitize dates and hours
+    if ('title' in updates && updates.title) {
+      if (updates.title.trim().length > 200) {
+        return res.status(400).json({ success: false, message: 'Task title cannot exceed 200 characters.' });
+      }
+      updates.title = updates.title.trim();
+    }
     if ('dueDate' in updates) {
       updates.dueDate = updates.dueDate ? new Date(updates.dueDate) : null;
     }
     if ('estimatedHours' in updates) {
-      updates.estimatedHours = Number(updates.estimatedHours) || 0;
+      const parsedHours = Number(updates.estimatedHours) || 0;
+      if (parsedHours < 0 || parsedHours > 1000) {
+        return res.status(400).json({ success: false, message: 'Estimated hours must be between 0 and 1,000.' });
+      }
+      updates.estimatedHours = parsedHours;
     }
 
     // Apply updates
@@ -533,7 +554,8 @@ const deleteTask = async (req, res) => {
     const { id } = req.params;
     const task = await Task.findByIdAndDelete(id);
     if (!task) {
-      return res.status(404).json({ success: false, message: 'Task not found' });
+      // Idempotent: Deleting an already-deleted or non-existent task is considered success
+      return res.status(200).json({ success: true, message: 'Task already deleted', taskId: id });
     }
 
     // Broadcast real-time deletion
@@ -626,6 +648,12 @@ const stopTimer = async (req, res) => {
 
     // Remove active timer entry
     task.liveTimers.splice(activeTimerIndex, 1);
+
+    // If timer stopped in under 15 seconds or resulted in 0 hours, discard without logging a 0h entry
+    if (durationMs < 15000 || hours <= 0) {
+      await task.save();
+      return res.json({ success: true, data: task, loggedHours: 0, discarded: true, message: 'Timer discarded (less than 15s elapsed)' });
+    }
 
     // Save time log
     if (!task.timeLogs) task.timeLogs = [];
@@ -892,13 +920,94 @@ const deleteAttachment = async (req, res) => {
 };
 
 /**
+ * Delete Checklist Item
+ */
+const deleteChecklistItem = async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    task.checklist = (task.checklist || []).filter(c => String(c._id) !== String(itemId));
+    await task.save();
+    res.json({ success: true, data: task });
+  } catch (error) {
+    console.error('Error deleting checklist item:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete checklist item', error: error.message });
+  }
+};
+
+/**
+ * Edit Comment in Task Thread
+ */
+const editComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'Comment text is required' });
+    }
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    const comment = (task.comments || []).id(commentId);
+    if (!comment) {
+      return res.status(404).json({ success: false, message: 'Comment not found' });
+    }
+
+    comment.text = text.trim();
+    comment.editedAt = new Date();
+    await task.save();
+
+    res.json({ success: true, data: task });
+  } catch (error) {
+    console.error('Error editing comment:', error);
+    res.status(500).json({ success: false, message: 'Failed to edit comment', error: error.message });
+  }
+};
+
+/**
+ * Delete Comment from Task Thread
+ */
+const deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    task.comments = (task.comments || []).filter(c => String(c._id) !== String(commentId));
+    await task.save();
+
+    res.json({ success: true, data: task });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete comment', error: error.message });
+  }
+};
+
+/**
  * Check for tasks that have passed their due date without being marked as 'Done'
  */
 const checkOverdueTasks = async (io) => {
   try {
+    // In IST (Asia/Kolkata), today is only overdue after 23:59:59 IST.
+    // Tasks due today are NOT overdue until tomorrow starts.
     const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + istOffset);
+    const todayISTString = istNow.toISOString().split('T')[0];
+    const startOfTodayIST = new Date(`${todayISTString}T00:00:00.000+05:30`);
+
     const overdueTasks = await Task.find({
-      dueDate: { $ne: null, $lt: now },
+      dueDate: { $ne: null, $lt: startOfTodayIST },
       status: { $ne: 'Done' },
       overdueNotified: { $ne: true }
     })
@@ -913,7 +1022,7 @@ const checkOverdueTasks = async (io) => {
       task.overdueNotified = true;
       await task.save();
 
-      const dueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'due date';
+      const dueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }) : 'due date';
       const desc = `🚨 **OVERDUE TASK ALERT**: Task "${task.title}" was due on ${dueDateStr} and is NOT finished!`;
 
       await publishActivity({
@@ -960,7 +1069,10 @@ module.exports = {
   addManualTimeLog,
   addChecklistItem,
   toggleChecklistItem,
+  deleteChecklistItem,
   addComment,
+  editComment,
+  deleteComment,
   addAttachment,
   deleteAttachment,
   checkOverdueTasks
