@@ -2210,20 +2210,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
 
               <div className="table-container" style={{ overflowX: 'auto' }}>
-                <div style={{ padding: '7px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Sparkles size={14} style={{ color: '#0284c7' }} />
-                    <span><strong>Interactive:</strong> Click any challan row below to expand and view all received delivery challans from the mill.</span>
-                  </div>
-                  {expandedChallanIds.length > 0 && (
-                    <button
-                      onClick={() => setExpandedChallanIds([])}
-                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
-                    >
-                      Collapse All
-                    </button>
-                  )}
-                </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase' }}>
@@ -2263,59 +2249,34 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             transition: 'background 0.15s ease'
                           }}
                           className="hover-row"
-                          title="Click row to expand / collapse received delivery challans from mill"
                         >
                           <td style={{ padding: '10px 12px', fontWeight: 800, color: '#059669', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                              <span
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <ChevronDown
+                                size={15}
                                 style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: isExpanded ? '#e0f2fe' : '#f1f5f9',
-                                  color: isExpanded ? '#0284c7' : '#64748b',
-                                  transition: 'transform 0.2s ease, background 0.2s ease',
-                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                                  color: isExpanded ? '#0284c7' : '#94a3b8',
+                                  transition: 'transform 0.2s ease',
+                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                  flexShrink: 0
                                 }}
-                              >
-                                <ChevronDown size={14} />
-                              </span>
+                              />
                               <span>{ch.challanNo}</span>
-                              {chRfdLots.length > 0 ? (
+                              {chRfdLots.length > 0 && (
                                 <span
                                   style={{
                                     display: 'inline-block',
-                                    marginLeft: '4px',
+                                    marginLeft: '3px',
                                     padding: '1px 6px',
-                                    fontSize: '0.66rem',
+                                    fontSize: '0.68rem',
                                     fontWeight: 800,
                                     borderRadius: '999px',
                                     background: '#dcfce7',
                                     color: '#15803d',
                                     border: '1px solid #bbf7d0'
                                   }}
-                                  title={`${chRfdLots.length} received delivery challan(s) from mill`}
                                 >
                                   {chRfdLots.length} Recv
-                                </span>
-                              ) : (
-                                <span
-                                  style={{
-                                    display: 'inline-block',
-                                    marginLeft: '4px',
-                                    padding: '1px 6px',
-                                    fontSize: '0.66rem',
-                                    fontWeight: 600,
-                                    borderRadius: '999px',
-                                    background: '#f1f5f9',
-                                    color: '#94a3b8'
-                                  }}
-                                  title="No deliveries received yet"
-                                >
-                                  0 Recv
                                 </span>
                               )}
                             </div>
@@ -2772,21 +2733,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                 ) : (
                                   <div
                                     style={{
-                                      padding: '1.5rem',
+                                      padding: '1.25rem',
                                       textAlign: 'center',
-                                      border: '2px dashed #cbd5e1',
+                                      border: '1px dashed #cbd5e1',
                                       borderRadius: 8,
                                       background: '#ffffff'
                                     }}
                                   >
-                                    <div style={{ color: '#0284c7', marginBottom: 6 }}>
-                                      <PackageCheck size={28} style={{ opacity: 0.8 }} />
-                                    </div>
-                                    <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>
-                                      No received delivery recorded yet for Challan #{ch.challanNo}
-                                    </div>
-                                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: 12 }}>
-                                      When the processing mill ({ch.millParty}) delivers back processed RFD fabric, record it against this outward challan.
+                                    <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#475569', marginBottom: 8 }}>
+                                      No delivery received from mill yet for Challan #{ch.challanNo}
                                     </div>
                                     <button
                                       onClick={(e) => {
@@ -2795,8 +2750,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                       }}
                                       className="btn-primary"
                                       style={{
-                                        padding: '6px 14px',
-                                        fontSize: '0.76rem',
+                                        padding: '5px 12px',
+                                        fontSize: '0.74rem',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '5px',
@@ -2806,7 +2761,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                         fontWeight: 700
                                       }}
                                     >
-                                      <PlusCircle size={14} /> + Record Received Challan / Delivery
+                                      <PlusCircle size={13} /> + Record Received Delivery
                                     </button>
                                   </div>
                                 )}
