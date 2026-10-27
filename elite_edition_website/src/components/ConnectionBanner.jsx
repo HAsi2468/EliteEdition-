@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import socketManager from '../services/socketManager';
 import { isAuthenticated } from '../services/api';
+import { lifecycleManager } from '../services/resilientLifecycleManager';
 
 /**
  * Non-Intrusive Real-Time Connection Banner
@@ -95,7 +96,7 @@ export function ConnectionBanner() {
     if (isReconnecting) {
       timer = setTimeout(() => {
         setShowReconnectingPill(true);
-      }, 4500);
+      }, 7000);
     } else {
       setShowReconnectingPill(false);
     }

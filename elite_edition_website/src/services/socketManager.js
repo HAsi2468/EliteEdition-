@@ -122,9 +122,9 @@ class SocketManager {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 30000,
+      reconnectionDelayMax: 10000,
       randomizationFactor: 0.5,
-      timeout: 40000,
+      timeout: 30000,
       upgrade: true,
       rememberUpgrade: true,
     });
@@ -325,53 +325,27 @@ class SocketManager {
   }
 
   // ============================================================================
-  // 1. CLOUDFLARE 100-SECOND TIMEOUT PREVENTION (25s Heartbeat)
+  // 1. CLOUDFLARE & NAT PROXY IDLE PREVENTION (25s Heartbeat)
   // ============================================================================
 
   _startCloudflareHeartbeat() {
     this._stopCloudflareHeartbeat();
     this.consecutiveMissedHeartbeats = 0;
 
+    // Periodic heartbeat keeps intermediate NAT firewalls, routers, and proxies active during long idle periods.
+    // NOTE: Socket.IO Engine.IO natively handles protocol-level transport health (pingInterval / pingTimeout).
+    // We NEVER forcefully disconnect a connected socket due to throttled background tab timers.
     this.heartbeatTimer = setInterval(() => {
       if (!this.socket || !this.socket.connected) {
         return;
       }
 
-      let ackReceived = false;
-      const timeoutId = setTimeout(() => {
-        if (!ackReceived) {
-          this.consecutiveMissedHeartbeats++;
-          console.warn(
-            `[SocketManager] Missed Cloudflare heartbeat (${this.consecutiveMissedHeartbeats}/3).`
-          );
-
-          if (this.consecutiveMissedHeartbeats >= 3) {
-            console.error(
-              '[SocketManager] 3 consecutive heartbeats missed! Declaring connection degraded & cycling socket.'
-            );
-            this._setStatus('reconnecting');
-            this.forceCycleConnection();
-          }
-        }
-      }, this.HEARTBEAT_TIMEOUT_MS);
-
       try {
-        if (!this.socket || !this.socket.connected) {
-          clearTimeout(timeoutId);
-          return;
-        }
-        // Ping with 'ping-heartbeat' or fallback to 'ping-health'
         this.socket.emit('ping-heartbeat', { clientTime: Date.now() }, () => {
-          ackReceived = true;
-          clearTimeout(timeoutId);
           this.consecutiveMissedHeartbeats = 0;
         });
       } catch (err) {
-        clearTimeout(timeoutId);
-        this.consecutiveMissedHeartbeats++;
-        if (this.consecutiveMissedHeartbeats >= 3) {
-          this.forceCycleConnection();
-        }
+        // Safe catch - Socket.IO native engine manages connection state
       }
     }, this.HEARTBEAT_INTERVAL_MS);
   }
@@ -384,10 +358,14 @@ class SocketManager {
   }
 
   /**
-   * Forcefully closes and reconnects the socket with exponential backoff & jitter
+   * Reconnects the socket with exponential backoff & jitter when disconnected
    */
   forceCycleConnection() {
     this._stopCloudflareHeartbeat();
+    // Never kill an already connected and healthy socket
+    if (this.socket && this.socket.connected) {
+      return;
+    }
     this.reconnectAttempt++;
 
     const delay = this._calculateBackoff(this.reconnectAttempt);

@@ -21,9 +21,9 @@ const eventBus = require('./services/eventBus.service');
 
 // Initialize Socket.io with production-grade stability, long-lived heartbeat, and compression
 const io = new Server(server, {
-  pingTimeout: 30000,   // 30s timeout allows background tabs and network jitter to stay alive without dropping
-  pingInterval: 25000,  // Heartbeat check every 25s
-  connectTimeout: 20000,
+  pingTimeout: 60000,   // 60s timeout allows background tabs and network jitter to stay alive without dropping
+  pingInterval: 20000,  // Heartbeat check every 20s keeps proxies, NAT routers, and connections active
+  connectTimeout: 30000,
   transports: ['websocket', 'polling'],
   perMessageDeflate: {
     threshold: 1024     // Enable compression for payloads above 1KB
