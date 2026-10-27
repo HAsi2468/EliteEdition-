@@ -1,6 +1,6 @@
 const express = require('express');
 const taskController = require('../../controllers/task.controller');
-const { redisIdempotencyMiddleware } = require('../../middlewares/redisIdempotency.middleware');
+const redisIdempotencyMiddleware = require('../../middlewares/redisIdempotency.middleware');
 
 const router = express.Router();
 const taskMutationIdempotency = redisIdempotencyMiddleware({ action: 'TASK_MUTATION', required: false });

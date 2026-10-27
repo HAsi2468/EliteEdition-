@@ -93,6 +93,7 @@ const tokenRefreshLimiter = rateLimit({
 	standardHeaders: true,
 	legacyHeaders: false,
 	skipSuccessfulRequests: true,
+	validate: { keyGeneratorIpFallback: false },
 	keyGenerator: (req) => {
 		const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 		return `refresh:${getClientSubnet(ip)}`;
