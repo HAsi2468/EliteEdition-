@@ -405,6 +405,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     fabricQuality: '',
     graySentMeters: '',
     receivedRfdMeters: '',
+    shortagePercent: '', // User enters shortage in %
     shortageMeters: '',
     receivedRollsCount: '',
     isChallanClosed: true, // true = 0 mtr left at mill; false = partial receipt
@@ -1339,6 +1340,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         fabricQuality: challan.fabricQuality || '',
         graySentMeters: String(currentAtMill > 0 ? currentAtMill : sentMtr),
         receivedRfdMeters: '',
+        shortagePercent: '',
         shortageMeters: '',
         receivedRollsCount: String(challan.totalTps || ''),
         isChallanClosed: true,
@@ -1354,6 +1356,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         fabricQuality: '',
         graySentMeters: '',
         receivedRfdMeters: '',
+        shortagePercent: '',
         shortageMeters: '',
         receivedRollsCount: '',
         isChallanClosed: true,
@@ -1373,6 +1376,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         fabricQuality: '',
         graySentMeters: '',
         receivedRfdMeters: '',
+        shortagePercent: '',
         shortageMeters: '',
         receivedRollsCount: '',
         notes: ''
@@ -1401,6 +1405,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       fabricQuality: ch.fabricQuality || '',
       graySentMeters: String(currentAtMill > 0 ? currentAtMill : sentMtr),
       receivedRfdMeters: '',
+      shortagePercent: '',
       shortageMeters: '',
       receivedRollsCount: String(ch.totalTps || ''),
       isChallanClosed: true,
@@ -1427,18 +1432,26 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       return;
     }
 
-    // Shortage calculations
+    // Shortage calculations (percentage-based)
+    let shortagePct = parseFloat(inwardRfdForm.shortagePercent);
     let shortageMtr = parseFloat(inwardRfdForm.shortageMeters);
-    if (isNaN(shortageMtr)) {
-      shortageMtr = graySent > receivedRfd ? parseFloat((graySent - receivedRfd).toFixed(2)) : 0;
-    }
 
-    const shortagePct = graySent > 0 ? parseFloat(((shortageMtr / graySent) * 100).toFixed(2)) : 0;
+    if (!isNaN(shortagePct) && graySent > 0) {
+      shortageMtr = parseFloat(((graySent * shortagePct) / 100).toFixed(1));
+    } else if (!isNaN(shortageMtr) && graySent > 0) {
+      shortagePct = parseFloat(((shortageMtr / graySent) * 100).toFixed(2));
+    } else if (graySent > 0 && receivedRfd > 0 && graySent > receivedRfd) {
+      shortageMtr = parseFloat((graySent - receivedRfd).toFixed(1));
+      shortagePct = parseFloat(((shortageMtr / graySent) * 100).toFixed(2));
+    } else {
+      shortageMtr = 0;
+      shortagePct = 0;
+    }
 
     // Remaining at mill for this challan
     const stillAtMill = inwardRfdForm.isChallanClosed
       ? 0
-      : Math.max(0, parseFloat((graySent - (receivedRfd + shortageMtr)).toFixed(2)));
+      : Math.max(0, parseFloat((graySent - (receivedRfd + shortageMtr)).toFixed(1)));
 
     const lotNumber = inwardRfdForm.lotNumber.trim() || `YJ-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`;
 
@@ -1506,15 +1519,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // ==========================================
   const handleOpenEditRfdLot = (lot) => {
     setEditingRfdLot(lot);
+    const graySent = lot.graySentMeters || 0;
+    const lossMtr = lot.shrinkageLossMeters || 0;
+    const pct = lot.shrinkagePercent || (graySent > 0 ? parseFloat(((lossMtr / graySent) * 100).toFixed(2)) : 0);
     setEditRfdLotForm({
       lotNumber: lot.lotNumber || '',
       inwardDate: lot.inwardDate || '',
       millParty: lot.millParty || '',
       millChallanNo: lot.millChallanNo || '',
       fabricQuality: lot.fabricQuality || '',
-      graySentMeters: lot.graySentMeters || 0,
+      graySentMeters: graySent,
       receivedRfdMeters: lot.receivedRfdMeters || 0,
-      shortageMeters: lot.shrinkageLossMeters || 0,
+      shortagePercent: pct,
+      shortageMeters: lossMtr,
       stillAtMillMeters: lot.stillAtMillMeters || 0,
       receivedRollsCount: lot.receivedRollsCount || 1,
       status: lot.status || 'In Stock',
@@ -1530,11 +1547,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       if (l.id === editingRfdLot.id) {
         const graySent = parseFloat(editRfdLotForm.graySentMeters) || 0;
         const receivedRfd = parseFloat(editRfdLotForm.receivedRfdMeters) || 0;
+        let shortagePct = parseFloat(editRfdLotForm.shortagePercent);
         let shortageMtr = parseFloat(editRfdLotForm.shortageMeters);
-        if (isNaN(shortageMtr)) {
-          shortageMtr = graySent > receivedRfd ? parseFloat((graySent - receivedRfd).toFixed(2)) : 0;
+
+        if (!isNaN(shortagePct) && graySent > 0) {
+          shortageMtr = parseFloat(((graySent * shortagePct) / 100).toFixed(1));
+        } else if (!isNaN(shortageMtr) && graySent > 0) {
+          shortagePct = parseFloat(((shortageMtr / graySent) * 100).toFixed(2));
+        } else {
+          shortageMtr = 0;
+          shortagePct = 0;
         }
-        const shrinkagePercent = graySent > 0 ? parseFloat(((shortageMtr / graySent) * 100).toFixed(1)) : 0;
+
         const stillAtMill = parseFloat(editRfdLotForm.stillAtMillMeters) || 0;
 
         return {
@@ -1543,7 +1567,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           graySentMeters: graySent,
           receivedRfdMeters: receivedRfd,
           shrinkageLossMeters: shortageMtr,
-          shrinkagePercent,
+          shrinkagePercent: shortagePct,
           stillAtMillMeters: stillAtMill
         };
       }
@@ -5640,11 +5664,23 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       {showInwardRfdModal && (() => {
         const modalGraySent = parseFloat(inwardRfdForm.graySentMeters) || 0;
         const modalReceivedRfd = parseFloat(inwardRfdForm.receivedRfdMeters) || 0;
-        const modalShortageInput = parseFloat(inwardRfdForm.shortageMeters);
-        const modalShortageMtr = !isNaN(modalShortageInput)
-          ? modalShortageInput
-          : (modalGraySent > modalReceivedRfd ? parseFloat((modalGraySent - modalReceivedRfd).toFixed(1)) : 0);
-        const modalShortagePct = modalGraySent > 0 ? parseFloat(((modalShortageMtr / modalGraySent) * 100).toFixed(1)) : 0;
+        const inputShortagePct = parseFloat(inwardRfdForm.shortagePercent);
+        const inputShortageMtr = parseFloat(inwardRfdForm.shortageMeters);
+
+        let modalShortagePct = 0;
+        let modalShortageMtr = 0;
+
+        if (!isNaN(inputShortagePct)) {
+          modalShortagePct = inputShortagePct;
+          modalShortageMtr = modalGraySent > 0 ? parseFloat(((modalGraySent * inputShortagePct) / 100).toFixed(1)) : 0;
+        } else if (!isNaN(inputShortageMtr)) {
+          modalShortageMtr = inputShortageMtr;
+          modalShortagePct = modalGraySent > 0 ? parseFloat(((inputShortageMtr / modalGraySent) * 100).toFixed(2)) : 0;
+        } else if (modalReceivedRfd > 0 && modalGraySent > modalReceivedRfd) {
+          modalShortageMtr = parseFloat((modalGraySent - modalReceivedRfd).toFixed(1));
+          modalShortagePct = parseFloat(((modalShortageMtr / modalGraySent) * 100).toFixed(2));
+        }
+
         const modalStillAtMill = inwardRfdForm.isChallanClosed
           ? 0
           : Math.max(0, parseFloat((modalGraySent - (modalReceivedRfd + modalShortageMtr)).toFixed(1)));
@@ -5874,9 +5910,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         step="0.1"
                         className="input-field"
                         value={inwardRfdForm.receivedRfdMeters}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, receivedRfdMeters: e.target.value })}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const recVal = parseFloat(val);
+                          let newShortagePct = inwardRfdForm.shortagePercent;
+                          let newShortageMtr = inwardRfdForm.shortageMeters;
+                          if (!isNaN(recVal) && recVal > 0 && modalGraySent > 0) {
+                            const diff = Math.max(0, modalGraySent - recVal);
+                            newShortageMtr = String(parseFloat(diff.toFixed(1)));
+                            newShortagePct = String(parseFloat(((diff / modalGraySent) * 100).toFixed(2)));
+                          }
+                          setInwardRfdForm(prev => ({
+                            ...prev,
+                            receivedRfdMeters: val,
+                            shortageMeters: newShortageMtr,
+                            shortagePercent: newShortagePct
+                          }));
+                        }}
                         required
-                        placeholder="e.g. 4850.0"
+                        placeholder="e.g. 87.0"
                         style={{
                           width: '100%',
                           padding: '0.5rem 0.7rem',
@@ -5895,15 +5947,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a' }}>
-                          Mill Shortage / Loss (Mtr)
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>
+                          Mill Shortage / Loss (%)
                         </label>
                         {modalGraySent > 0 && modalReceivedRfd > 0 && (
                           <button
                             type="button"
                             onClick={() => {
-                              const autoDiff = Math.max(0, modalGraySent - modalReceivedRfd);
-                              setInwardRfdForm(p => ({ ...p, shortageMeters: String(autoDiff.toFixed(1)) }));
+                              const diff = Math.max(0, modalGraySent - modalReceivedRfd);
+                              const pct = modalGraySent > 0 ? parseFloat(((diff / modalGraySent) * 100).toFixed(2)) : 0;
+                              setInwardRfdForm(p => ({
+                                ...p,
+                                shortagePercent: String(pct),
+                                shortageMeters: String(diff.toFixed(1))
+                              }));
                             }}
                             style={{
                               background: 'none',
@@ -5916,24 +5973,56 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               textDecoration: 'underline'
                             }}
                           >
-                            ⚡ Auto-Calculate
+                            ⚡ Auto from Received Mtr
                           </button>
                         )}
                       </div>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="input-field"
-                        value={inwardRfdForm.shortageMeters}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, shortageMeters: e.target.value })}
-                        placeholder={modalGraySent > modalReceivedRfd ? String((modalGraySent - modalReceivedRfd).toFixed(1)) : '0.0'}
-                        style={{ width: '100%', padding: '0.5rem 0.7rem', fontSize: '0.9rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: 6, background: '#ffffff' }}
-                      />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 4 }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isHighShortage ? '#dc2626' : '#d97706' }}>
-                          Shortage: {modalShortageMtr} Mtr ({modalShortagePct}%)
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-field"
+                          value={inwardRfdForm.shortagePercent}
+                          onChange={e => {
+                            const pctVal = e.target.value;
+                            const pct = parseFloat(pctVal);
+                            let newLossMtr = '';
+                            let newRecMtr = inwardRfdForm.receivedRfdMeters;
+                            if (!isNaN(pct) && modalGraySent > 0) {
+                              const loss = parseFloat(((modalGraySent * pct) / 100).toFixed(1));
+                              newLossMtr = String(loss);
+                              if (!newRecMtr || parseFloat(newRecMtr) <= 0) {
+                                newRecMtr = String(Math.max(0, parseFloat((modalGraySent - loss).toFixed(1))));
+                              }
+                            }
+                            setInwardRfdForm(prev => ({
+                              ...prev,
+                              shortagePercent: pctVal,
+                              shortageMeters: newLossMtr,
+                              receivedRfdMeters: newRecMtr
+                            }));
+                          }}
+                          placeholder="e.g. 4.4"
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 2rem 0.5rem 0.7rem',
+                            fontSize: '0.95rem',
+                            fontWeight: 800,
+                            border: isHighShortage ? '2px solid #ef4444' : '2px solid #cbd5e1',
+                            borderRadius: 6,
+                            background: '#ffffff',
+                            color: '#0f172a'
+                          }}
+                        />
+                        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#64748b', fontSize: '0.9rem' }}>
+                          %
                         </span>
-                        {isHighShortage && (
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isHighShortage ? '#dc2626' : '#d97706' }}>
+                          Loss: {modalShortageMtr} Mtr ({modalShortagePct}%)
+                        </span>
+                        {isHighShortage && modalShortagePct > 0 && (
                           <span style={{ fontSize: '0.66rem', background: '#fee2e2', color: '#b91c1c', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
                             🚨 High Shortage
                           </span>
@@ -6364,16 +6453,34 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#d97706', marginBottom: 3 }}>
-                    Mill Shortage Loss (Mtr)
+                    Mill Shortage Loss (%)
                   </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="input-field"
-                    value={editRfdLotForm.shortageMeters}
-                    onChange={e => setEditRfdLotForm({ ...editRfdLotForm, shortageMeters: e.target.value })}
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input-field"
+                      value={editRfdLotForm.shortagePercent}
+                      onChange={e => {
+                        const pctVal = e.target.value;
+                        const pct = parseFloat(pctVal);
+                        const graySent = parseFloat(editRfdLotForm.graySentMeters) || 0;
+                        const loss = (!isNaN(pct) && graySent > 0) ? parseFloat(((graySent * pct) / 100).toFixed(1)) : 0;
+                        setEditRfdLotForm({
+                          ...editRfdLotForm,
+                          shortagePercent: pctVal,
+                          shortageMeters: String(loss)
+                        });
+                      }}
+                      style={{ width: '100%', padding: '0.45rem 1.6rem 0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                    />
+                    <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>
+                      %
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2, display: 'block' }}>
+                    Loss: {parseFloat(editRfdLotForm.shortageMeters) || 0} Mtr
+                  </span>
                 </div>
 
                 <div>
