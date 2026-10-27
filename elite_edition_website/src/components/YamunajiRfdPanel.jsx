@@ -386,6 +386,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [editRfdLotForm, setEditRfdLotForm] = useState(null);
   const [viewingRfdTpsLot, setViewingRfdTpsLot] = useState(null);
 
+  // Accordion expansion state for Mill Outward Challans
+  const [expandedChallanIds, setExpandedChallanIds] = useState([]);
+  const toggleExpandChallan = (challanId) => {
+    setExpandedChallanIds(prev =>
+      prev.includes(challanId) ? prev.filter(id => id !== challanId) : [...prev, challanId]
+    );
+  };
+
   // Inward RFD Lot Modal & Total Meter / Shortage / Mill Balance tracking
   const [showInwardRfdModal, setShowInwardRfdModal] = useState(false);
   const [inwardRfdForm, setInwardRfdForm] = useState({
@@ -2202,6 +2210,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
 
               <div className="table-container" style={{ overflowX: 'auto' }}>
+                <div style={{ padding: '7px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={14} style={{ color: '#0284c7' }} />
+                    <span><strong>Interactive:</strong> Click any challan row below to expand and view all received delivery challans from the mill.</span>
+                  </div>
+                  {expandedChallanIds.length > 0 && (
+                    <button
+                      onClick={() => setExpandedChallanIds([])}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                    >
+                      Collapse All
+                    </button>
+                  )}
+                </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase' }}>
@@ -2227,97 +2249,204 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       const stillAtMill = isClosed ? 0 : Math.max(0, parseFloat((sentMtr - (chReceivedMtrs + chShortageMtrs)).toFixed(1)));
                       const isPartiallyReceived = chReceivedMtrs > 0 && stillAtMill > 0;
                       const isFullyReceived = isClosed || (chReceivedMtrs > 0 && stillAtMill === 0);
+                      const isExpanded = expandedChallanIds.includes(ch.id);
 
                       return (
-                      <tr key={ch.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
-                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#059669' }}>
-                          {ch.challanNo}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
-                          {ch.challanDate}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {ch.millParty}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
-                          {ch.fabricQuality || 'Gray Fabric'}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
-                          {sentMtr.toFixed(1)} Mtr
-                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>
-                            {ch.totalTps} TPs
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0284c7' }}>
-                          {chReceivedMtrs > 0 ? `${chReceivedMtrs.toFixed(1)} Mtr` : '0.0 Mtr'}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          {chShortageMtrs > 0 ? (
-                            <span style={{ color: '#d97706', fontWeight: 700 }}>
-                              -{chShortageMtrs.toFixed(1)} Mtr
-                              <span style={{ fontSize: '0.7rem', display: 'block', color: '#b45309' }}>
-                                ({sentMtr > 0 ? ((chShortageMtrs / sentMtr) * 100).toFixed(1) : 0}%)
+                      <React.Fragment key={ch.id}>
+                        <tr
+                          onClick={() => toggleExpandChallan(ch.id)}
+                          style={{
+                            borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9',
+                            background: isExpanded ? '#f0f9ff' : undefined,
+                            borderLeft: isExpanded ? '3px solid #0284c7' : '3px solid transparent',
+                            cursor: 'pointer',
+                            transition: 'background 0.15s ease'
+                          }}
+                          className="hover-row"
+                          title="Click row to expand / collapse received delivery challans from mill"
+                        >
+                          <td style={{ padding: '10px 12px', fontWeight: 800, color: '#059669', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '4px',
+                                  background: isExpanded ? '#e0f2fe' : '#f1f5f9',
+                                  color: isExpanded ? '#0284c7' : '#64748b',
+                                  transition: 'transform 0.2s ease, background 0.2s ease',
+                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                                }}
+                              >
+                                <ChevronDown size={14} />
                               </span>
+                              <span>{ch.challanNo}</span>
+                              {chRfdLots.length > 0 ? (
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    marginLeft: '4px',
+                                    padding: '1px 6px',
+                                    fontSize: '0.66rem',
+                                    fontWeight: 800,
+                                    borderRadius: '999px',
+                                    background: '#dcfce7',
+                                    color: '#15803d',
+                                    border: '1px solid #bbf7d0'
+                                  }}
+                                  title={`${chRfdLots.length} received delivery challan(s) from mill`}
+                                >
+                                  {chRfdLots.length} Recv
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    marginLeft: '4px',
+                                    padding: '1px 6px',
+                                    fontSize: '0.66rem',
+                                    fontWeight: 600,
+                                    borderRadius: '999px',
+                                    background: '#f1f5f9',
+                                    color: '#94a3b8'
+                                  }}
+                                  title="No deliveries received yet"
+                                >
+                                  0 Recv
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
+                            {ch.challanDate}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {ch.millParty}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
+                            {ch.fabricQuality || 'Gray Fabric'}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
+                            {sentMtr.toFixed(1)} Mtr
+                            <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>
+                              {ch.totalTps} TPs
                             </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>0.0 Mtr</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          {stillAtMill > 0 ? (
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0284c7' }}>
+                            {chReceivedMtrs > 0 ? `${chReceivedMtrs.toFixed(1)} Mtr` : '0.0 Mtr'}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {chShortageMtrs > 0 ? (
+                              <span style={{ color: '#d97706', fontWeight: 700 }}>
+                                -{chShortageMtrs.toFixed(1)} Mtr
+                                <span style={{ fontSize: '0.7rem', display: 'block', color: '#b45309' }}>
+                                  ({sentMtr > 0 ? ((chShortageMtrs / sentMtr) * 100).toFixed(1) : 0}%)
+                                </span>
+                              </span>
+                            ) : (
+                              <span style={{ color: '#94a3b8' }}>0.0 Mtr</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {stillAtMill > 0 ? (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '3px 8px',
+                                  borderRadius: '5px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  background: '#fffbeb',
+                                  color: '#b45309',
+                                  border: '1px solid #fde68a'
+                                }}
+                              >
+                                {stillAtMill.toFixed(1)} Mtr
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '3px 8px',
+                                  borderRadius: '5px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  background: '#f0fdf4',
+                                  color: '#16a34a',
+                                  border: '1px solid #bbf7d0'
+                                }}
+                              >
+                                0.0 Mtr (Clear)
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
                             <span
                               style={{
-                                display: 'inline-block',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
                                 padding: '3px 8px',
                                 borderRadius: '5px',
-                                fontSize: '0.78rem',
-                                fontWeight: 800,
-                                background: '#fffbeb',
-                                color: '#b45309',
-                                border: '1px solid #fde68a'
+                                background: isFullyReceived ? '#dcfce7' : isPartiallyReceived ? '#e0f2fe' : '#fef3c7',
+                                color: isFullyReceived ? '#15803d' : isPartiallyReceived ? '#0369a1' : '#b45309',
+                                border: `1px solid ${isFullyReceived ? '#bbf7d0' : isPartiallyReceived ? '#bae6fd' : '#fde68a'}`
                               }}
                             >
-                              {stillAtMill.toFixed(1)} Mtr
+                              {isFullyReceived ? 'Fully Received' : isPartiallyReceived ? 'Partially Received' : 'At Mill (Pending)'}
                             </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '3px 8px',
-                                borderRadius: '5px',
-                                fontSize: '0.74rem',
-                                fontWeight: 800,
-                                background: '#f0fdf4',
-                                color: '#16a34a',
-                                border: '1px solid #bbf7d0'
-                              }}
-                            >
-                              0.0 Mtr (Clear)
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span
-                            style={{
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              padding: '3px 8px',
-                              borderRadius: '5px',
-                              background: isFullyReceived ? '#dcfce7' : isPartiallyReceived ? '#e0f2fe' : '#fef3c7',
-                              color: isFullyReceived ? '#15803d' : isPartiallyReceived ? '#0369a1' : '#b45309',
-                              border: `1px solid ${isFullyReceived ? '#bbf7d0' : isPartiallyReceived ? '#bae6fd' : '#fde68a'}`
-                            }}
-                          >
-                            {isFullyReceived ? 'Fully Received' : isPartiallyReceived ? 'Partially Received' : 'At Mill (Pending)'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                            {!isFullyReceived && (
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                              {!isFullyReceived && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenInwardRfdModal(ch);
+                                  }}
+                                  className="btn-secondary"
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '0.74rem',
+                                    height: '28px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: '#ecfdf5',
+                                    color: '#059669',
+                                    border: '1px solid #a7f3d0',
+                                    fontWeight: 700
+                                  }}
+                                  title="Inward RFD meters back from this Mill Challan"
+                                >
+                                  <PackageCheck size={13} /> Receive RFD
+                                </button>
+                              )}
                               <button
-                                onClick={() => {
-                                  setScreenMode('rfd');
-                                  handleOpenInwardRfdModal(ch);
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowPrintChallanModal(ch);
+                                }}
+                                className="btn-primary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '0.74rem',
+                                  height: '28px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#0ea5e9'
+                                }}
+                                title="Print / Save PDF (2 Copies A4)"
+                              >
+                                <Printer size={13} /> Print
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditMillChallan(ch);
                                 }}
                                 className="btn-secondary"
                                 style={{
@@ -2327,71 +2456,365 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  background: '#ecfdf5',
-                                  color: '#059669',
-                                  border: '1px solid #a7f3d0',
-                                  fontWeight: 700
+                                  background: '#f8fafc',
+                                  color: '#0f172a',
+                                  border: '1px solid #cbd5e1'
                                 }}
-                                title="Inward RFD meters back from this Mill Challan"
+                                title="Edit Challan"
                               >
-                                <PackageCheck size={13} /> Receive RFD
+                                <Edit2 size={13} /> Edit
                               </button>
-                            )}
-                            <button
-                              onClick={() => setShowPrintChallanModal(ch)}
-                              className="btn-primary"
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteMillChallan(ch);
+                                }}
+                                className="btn-secondary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '0.74rem',
+                                  height: '28px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#fef2f2',
+                                  color: '#dc2626',
+                                  border: '1px solid #fecaca'
+                                }}
+                                title="Delete Challan"
+                              >
+                                <Trash2 size={13} /> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* 🔽 EXPANDED SUB-ROW: DISPLAY RECEIVED CHALLANS FROM MILL */}
+                        {isExpanded && (
+                          <tr key={`${ch.id}-expanded`} style={{ background: '#f8fafc' }}>
+                            <td
+                              colSpan={10}
                               style={{
-                                padding: '3px 8px',
-                                fontSize: '0.74rem',
-                                height: '28px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: '#0ea5e9'
+                                padding: '0',
+                                borderBottom: '2px solid #cbd5e1',
+                                borderLeft: '3px solid #0284c7'
                               }}
-                              title="Print / Save PDF (2 Copies A4)"
                             >
-                              <Printer size={13} /> Print
-                            </button>
-                            <button
-                              onClick={() => handleOpenEditMillChallan(ch)}
-                              className="btn-secondary"
-                              style={{
-                                padding: '3px 8px',
-                                fontSize: '0.74rem',
-                                height: '28px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: '#f8fafc',
-                                color: '#0f172a',
-                                border: '1px solid #cbd5e1'
-                              }}
-                              title="Edit Challan"
-                            >
-                              <Edit2 size={13} /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteMillChallan(ch)}
-                              className="btn-secondary"
-                              style={{
-                                padding: '3px 8px',
-                                fontSize: '0.74rem',
-                                height: '28px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: '#fef2f2',
-                                color: '#dc2626',
-                                border: '1px solid #fecaca'
-                              }}
-                              title="Delete Challan"
-                            >
-                              <Trash2 size={13} /> Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                              <div
+                                style={{
+                                  padding: '16px 20px',
+                                  background: 'linear-gradient(180deg, #f0f9ff 0%, #f8fafc 40px, #ffffff 100%)',
+                                  borderTop: '1px solid #bae6fd'
+                                }}
+                              >
+                                {/* Header bar of expanded section */}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: '10px',
+                                    marginBottom: '14px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div
+                                      style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 8,
+                                        background: '#e0f2fe',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#0284c7'
+                                      }}
+                                    >
+                                      <PackageCheck size={20} />
+                                    </div>
+                                    <div>
+                                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span>Received Delivery Challans from Mill</span>
+                                        <span
+                                          style={{
+                                            fontSize: '0.72rem',
+                                            fontWeight: 800,
+                                            color: '#0369a1',
+                                            background: '#e0f2fe',
+                                            padding: '2px 8px',
+                                            borderRadius: 6,
+                                            border: '1px solid #bae6fd'
+                                          }}
+                                        >
+                                          Outward Challan #{ch.challanNo}
+                                        </span>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>
+                                          ({ch.millParty} • {ch.fabricQuality || 'Gray Fabric'})
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 3 }}>
+                                        Dispatched Gray: <strong style={{ color: '#0f172a' }}>{sentMtr.toFixed(1)} Mtr ({ch.totalTps} TPs)</strong>
+                                        <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
+                                        Total Received RFD: <strong style={{ color: '#0284c7' }}>{chReceivedMtrs.toFixed(1)} Mtr</strong>
+                                        <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
+                                        Shortage Loss: <strong style={{ color: '#d97706' }}>{chShortageMtrs.toFixed(1)} Mtr ({sentMtr > 0 ? ((chShortageMtrs / sentMtr) * 100).toFixed(1) : 0}%)</strong>
+                                        <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
+                                        Fabric Still at Mill: <strong style={{ color: stillAtMill > 0 ? '#b45309' : '#16a34a' }}>{stillAtMill.toFixed(1)} Mtr</strong>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenInwardRfdModal(ch);
+                                      }}
+                                      className="btn-primary"
+                                      style={{
+                                        padding: '6px 12px',
+                                        fontSize: '0.76rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                                        fontWeight: 700
+                                      }}
+                                    >
+                                      <PlusCircle size={14} /> + Record Received Delivery from Mill
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleExpandChallan(ch.id);
+                                      }}
+                                      style={{
+                                        padding: '5px 10px',
+                                        fontSize: '0.74rem',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: 6,
+                                        background: '#ffffff',
+                                        color: '#64748b',
+                                        cursor: 'pointer'
+                                      }}
+                                      title="Close expanded view"
+                                    >
+                                      Close
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Content of received challans */}
+                                {chRfdLots.length > 0 ? (
+                                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflowX: 'auto', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                                      <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                                          <th style={{ padding: '8px 10px' }}>RFD Lot #</th>
+                                          <th style={{ padding: '8px 10px' }}>Inward Date</th>
+                                          <th style={{ padding: '8px 10px' }}>Mill Delivery / LR #</th>
+                                          <th style={{ padding: '8px 10px' }}>Quality</th>
+                                          <th style={{ padding: '8px 10px' }}>Received RFD</th>
+                                          <th style={{ padding: '8px 10px' }}>Shortage Loss</th>
+                                          <th style={{ padding: '8px 10px' }}>Still At Mill</th>
+                                          <th style={{ padding: '8px 10px' }}>Warehouse Balance</th>
+                                          <th style={{ padding: '8px 10px' }}>Delivery Status</th>
+                                          <th style={{ padding: '8px 10px', textAlign: 'center', minWidth: '150px' }}>Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {chRfdLots.map((lot, idx) => {
+                                          const balance = Math.max(0, lot.receivedRfdMeters - (lot.issuedMeters || 0));
+                                          const rolls = lot.receivedRollsCount || (lot.tps ? lot.tps.length : 1);
+                                          const isHighShortage = (lot.shrinkagePercent || 0) > 4.0;
+                                          return (
+                                            <tr key={lot.id || idx} style={{ borderBottom: idx < chRfdLots.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                                              <td style={{ padding: '8px 10px', fontWeight: 800, color: '#0284c7' }}>
+                                                {lot.lotNumber}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', color: '#64748b' }}>
+                                                {lot.inwardDate}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
+                                                {lot.millChallanNo || ch.challanNo}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', color: '#334155' }}>
+                                                {lot.fabricQuality || ch.fabricQuality}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a' }}>
+                                                {lot.receivedRfdMeters} Mtr
+                                                <span style={{ display: 'block', fontSize: '0.68rem', color: '#059669', fontWeight: 600 }}>
+                                                  {rolls} Rolls/TPs
+                                                </span>
+                                              </td>
+                                              <td style={{ padding: '8px 10px' }}>
+                                                <span
+                                                  style={{
+                                                    display: 'inline-block',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: 700,
+                                                    background: isHighShortage ? '#fef2f2' : '#f0fdf4',
+                                                    color: isHighShortage ? '#dc2626' : '#16a34a',
+                                                    border: `1px solid ${isHighShortage ? '#fecaca' : '#bbf7d0'}`
+                                                  }}
+                                                >
+                                                  {lot.shrinkageLossMeters > 0 ? `-${lot.shrinkageLossMeters} Mtr` : '0 Mtr'} ({lot.shrinkagePercent || 0}%)
+                                                </span>
+                                              </td>
+                                              <td style={{ padding: '8px 10px' }}>
+                                                {(lot.stillAtMillMeters || 0) > 0 ? (
+                                                  <span style={{ color: '#b45309', fontWeight: 700 }}>
+                                                    {lot.stillAtMillMeters} Mtr
+                                                  </span>
+                                                ) : (
+                                                  <span style={{ color: '#16a34a', fontWeight: 700 }}>
+                                                    0 Mtr (Clear)
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', fontWeight: 800, color: '#16a34a' }}>
+                                                {balance.toFixed(1)} Mtr
+                                              </td>
+                                              <td style={{ padding: '8px 10px' }}>
+                                                <span
+                                                  style={{
+                                                    fontSize: '0.66rem',
+                                                    fontWeight: 800,
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    background: lot.isChallanClosed ? '#dcfce7' : '#e0f2fe',
+                                                    color: lot.isChallanClosed ? '#15803d' : '#0369a1',
+                                                    border: `1px solid ${lot.isChallanClosed ? '#bbf7d0' : '#bae6fd'}`
+                                                  }}
+                                                >
+                                                  {lot.isChallanClosed ? 'Final Delivery' : 'Partial Delivery'}
+                                                </span>
+                                              </td>
+                                              <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setViewingRfdTpsLot(lot);
+                                                    }}
+                                                    style={{
+                                                      padding: '3px 6px',
+                                                      fontSize: '0.7rem',
+                                                      border: '1px solid #cbd5e1',
+                                                      borderRadius: '4px',
+                                                      background: '#f8fafc',
+                                                      color: '#334155',
+                                                      cursor: 'pointer',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px'
+                                                    }}
+                                                    title="View Details"
+                                                  >
+                                                    <Eye size={11} /> View
+                                                  </button>
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleOpenEditRfdLot(lot);
+                                                    }}
+                                                    style={{
+                                                      padding: '3px 6px',
+                                                      fontSize: '0.7rem',
+                                                      border: '1px solid #cbd5e1',
+                                                      borderRadius: '4px',
+                                                      background: '#ffffff',
+                                                      color: '#0f172a',
+                                                      cursor: 'pointer',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px'
+                                                    }}
+                                                    title="Edit Received Delivery"
+                                                  >
+                                                    <Edit2 size={11} /> Edit
+                                                  </button>
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleDeleteRfdLot(lot);
+                                                    }}
+                                                    style={{
+                                                      padding: '3px 6px',
+                                                      fontSize: '0.7rem',
+                                                      border: '1px solid #fecaca',
+                                                      borderRadius: '4px',
+                                                      background: '#fef2f2',
+                                                      color: '#dc2626',
+                                                      cursor: 'pointer',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px'
+                                                    }}
+                                                    title="Delete Received Delivery"
+                                                  >
+                                                    <Trash2 size={11} /> Delete
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <div
+                                    style={{
+                                      padding: '1.5rem',
+                                      textAlign: 'center',
+                                      border: '2px dashed #cbd5e1',
+                                      borderRadius: 8,
+                                      background: '#ffffff'
+                                    }}
+                                  >
+                                    <div style={{ color: '#0284c7', marginBottom: 6 }}>
+                                      <PackageCheck size={28} style={{ opacity: 0.8 }} />
+                                    </div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>
+                                      No received delivery recorded yet for Challan #{ch.challanNo}
+                                    </div>
+                                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: 12 }}>
+                                      When the processing mill ({ch.millParty}) delivers back processed RFD fabric, record it against this outward challan.
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenInwardRfdModal(ch);
+                                      }}
+                                      className="btn-primary"
+                                      style={{
+                                        padding: '6px 14px',
+                                        fontSize: '0.76rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        fontWeight: 700
+                                      }}
+                                    >
+                                      <PlusCircle size={14} /> + Record Received Challan / Delivery
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                     })}
                     {filteredMillChallans.length === 0 && (
