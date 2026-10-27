@@ -22,9 +22,9 @@ module.exports = {
       kill_timeout: 6000,          // Grace period for active sockets/requests to close cleanly
       shutdown_with_message: true, // Enables IPC message shutdown sequence
 
-      // Memory Leak & Crash Safeguards
-      node_args: '--max-old-space-size=280', // Keeps memory safely bounded within 1GB RAM
-      max_memory_restart: '290M',  // Auto-cycles worker if memory reaches 290MB
+      // Memory Safeguards (Calibrated for 4GB RAM instance: 2 workers x 850MB = ~1.7GB max heap, leaving 2GB+ free)
+      node_args: '--max-old-space-size=768',
+      max_memory_restart: '850M',  // Prevents worker recycles during heavy PDF/Excel/200+ socket loads
       exp_backoff_restart_delay: 200, // Exponential backoff prevents CPU pegging on crash loops
       max_restarts: 15,            // Guards against infinite restart loops
       min_uptime: '10s',           // Deems app healthy if it runs uninterrupted for 10s
