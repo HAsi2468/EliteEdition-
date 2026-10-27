@@ -85,12 +85,21 @@ server.listen(port, host, async () => {
   logger.info(`App is listening on primary port ${port} on ${host}`);
   console.log('Server bound to', server.address());
 
-  await syncCommunicationGroups();
-  const { seedFacilitiesOnStartup } = require('./controllers/facility.controller');
-  await seedFacilitiesOnStartup();
-
   if (typeof process.send === 'function') {
     process.send('ready');
+  }
+
+  try {
+    await syncCommunicationGroups();
+  } catch (err) {
+    logger.warn('Failed to sync communication groups on startup: ' + err.message);
+  }
+
+  try {
+    const { seedFacilitiesOnStartup } = require('./controllers/facility.controller');
+    await seedFacilitiesOnStartup();
+  } catch (err) {
+    logger.warn('Failed to seed facilities on startup: ' + err.message);
   }
 
   process.on('message', (packet) => {
