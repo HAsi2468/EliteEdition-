@@ -19,6 +19,7 @@ import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import QuickActionMenu from './common/QuickActionMenu';
 import { SmartActionGroup } from './common/SmartActionGroup';
+import TablePaginationBar from './common/TablePaginationBar';
 import * as XLSX from 'xlsx';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
@@ -1451,6 +1452,11 @@ export default function EliteBillingDepartment({
     });
   }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseTypeFilter, purchaseDateRange]);
 
+  const paginatedPurchases = useMemo(() => {
+    const start = (purchasePage - 1) * purchasePageSize;
+    return filteredPurchases.slice(start, start + purchasePageSize);
+  }, [filteredPurchases, purchasePage, purchasePageSize]);
+
   const totalPurchaseValue = filteredPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
   const totalInwardQty = filteredPurchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
   const uniqueVendorsCount = new Set(filteredPurchases.map(p => p.vendorName).filter(Boolean)).size;
@@ -2698,8 +2704,21 @@ export default function EliteBillingDepartment({
   const [vendorSearch, setVendorSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
   const [digitalChallans, setDigitalChallans] = useState([]);
-  const [loadingChallans, setLoadingChallans] = useState(false);
   const [challanSearch, setChallanSearch] = useState('');
+
+  // Pagination states for invoices & purchases (25 default for low browser memory)
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePageSize, setInvoicePageSize] = useState(25);
+  const [purchasePage, setPurchasePage] = useState(1);
+  const [purchasePageSize, setPurchasePageSize] = useState(25);
+
+  useEffect(() => {
+    setInvoicePage(1);
+  }, [search, statusFilter, signedCopyFilter, datePreset, customDateStart, customDateEnd]);
+
+  useEffect(() => {
+    setPurchasePage(1);
+  }, [purchaseSearch, purchaseDatePreset, purchaseDateStart, purchaseDateEnd, purchaseVendorFilter, purchaseGstFilter]);
 
   const fetchDigitalChallans = async () => {
     setLoadingChallans(true);
@@ -4153,7 +4172,12 @@ export default function EliteBillingDepartment({
                   }
                   return true;
                 });
+              const paginatedInvoices = displayedInvoices.slice(
+                (invoicePage - 1) * invoicePageSize,
+                invoicePage * invoicePageSize
+              );
               return (
+                <>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
@@ -4202,7 +4226,7 @@ export default function EliteBillingDepartment({
                         </td>
                       </tr>
                     ) : (
-                      displayedInvoices.map(inv => {
+                      paginatedInvoices.map(inv => {
                         const rawChallanStr = inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '';
                         const challanList = rawChallanStr ? rawChallanStr.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -4455,6 +4479,19 @@ export default function EliteBillingDepartment({
                 )}
               </tbody>
             </table>
+            <TablePaginationBar
+              page={invoicePage}
+              totalItems={displayedInvoices.length}
+              pageSize={invoicePageSize}
+              onPageChange={setInvoicePage}
+              onPageSizeChange={(newSize) => {
+                setInvoicePageSize(newSize);
+                setInvoicePage(1);
+              }}
+              pageSizeOptions={[25, 50, 100]}
+              itemName="invoices"
+            />
+          </>
           );
         })()}
       </div>
@@ -6137,7 +6174,7 @@ export default function EliteBillingDepartment({
                     </td>
                   </tr>
                 ) : (
-                  filteredPurchases.map((p) => {
+                  paginatedPurchases.map((p) => {
                     const billTotal = Number(p.grandTotal || p.totalAmount || 0);
                     const paidAmt = Number(p.paidAmount || 0);
                     const balDue = p.balanceDue != null ? Number(p.balanceDue) : (p.paymentStatus === 'PAID' ? 0 : Math.max(0, billTotal - paidAmt));
@@ -6320,6 +6357,18 @@ export default function EliteBillingDepartment({
               </tbody>
             </table>
           </div>
+          <TablePaginationBar
+            page={purchasePage}
+            totalItems={filteredPurchases.length}
+            pageSize={purchasePageSize}
+            onPageChange={setPurchasePage}
+            onPageSizeChange={(newSize) => {
+              setPurchasePageSize(newSize);
+              setPurchasePage(1);
+            }}
+            pageSizeOptions={[25, 50, 100]}
+            itemName="purchases"
+          />
         </div>
       )}
 

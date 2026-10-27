@@ -1,4 +1,5 @@
 import { downloadOrPreviewPdf } from '../utils/pdfDownloadService';
+import { triggerPushNotification } from '../components/NotificationToast';
 import { silentAuth } from './authInterceptor';
 
 // API Base URL management
@@ -671,17 +672,71 @@ export const api = {
     return request(`/stockOut${query}`);
   },
 
-  // Reports
-  async downloadReport(reportPath, fileName) {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/${reportPath}`);
-
+  // Reports & Background Job Handling
+  async handleAsyncOrDirectDownload(response, fileName, options = {}) {
     if (!response.ok) {
-      throw new Error('Failed to generate report PDF');
+      let errMsg = 'Failed to generate report PDF';
+      try {
+        const errJson = await response.json();
+        errMsg = errJson.message || errJson.error || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    // If server offloaded large report (> 5,000 rows) to async background job
+    if (response.status === 202) {
+      let jobData = {};
+      try {
+        jobData = await response.json();
+      } catch (_) {}
+      const jobId = jobData.jobId;
+
+      triggerPushNotification(
+        'Generating Background Report',
+        'Dataset exceeds 5,000 rows. Processing out-of-band to keep browser fast. It will download automatically once ready.',
+        'info'
+      );
+
+      const baseUrl = getBaseUrl();
+      const pollInterval = 1500;
+      const maxAttempts = 120; // 3 minutes maximum polling
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, pollInterval));
+        attempts++;
+
+        try {
+          const checkRes = await authFetch(`${baseUrl}/jobs/${jobId}`);
+          if (!checkRes.ok) continue;
+          const jobStatus = await checkRes.json();
+
+          if (jobStatus.status === 'completed') {
+            const downloadRes = await authFetch(`${baseUrl}/jobs/${jobId}/download`);
+            if (!downloadRes.ok) throw new Error('Failed to retrieve completed report file');
+            const blob = await downloadRes.blob();
+            downloadOrPreviewPdf(blob, fileName, options);
+            triggerPushNotification('Report Ready', `${fileName} has finished downloading.`, 'success');
+            return;
+          } else if (jobStatus.status === 'failed') {
+            triggerPushNotification('Report Failed', jobStatus.error || 'Failed to generate report', 'error');
+            throw new Error(jobStatus.error || 'Background report generation failed');
+          }
+        } catch (pollErr) {
+          if (attempts >= maxAttempts) throw pollErr;
+        }
+      }
+      throw new Error('Report generation timed out. Please try again.');
     }
 
     const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    downloadOrPreviewPdf(blob, fileName, options);
+  },
+
+  async downloadReport(reportPath, fileName) {
+    const baseUrl = getBaseUrl();
+    const response = await authFetch(`${baseUrl}/${reportPath}`);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   async downloadInventoryReport(reportPath, dateStart, dateEnd, fileName) {
@@ -692,13 +747,7 @@ export const api = {
     const queryString = query.toString() ? `?${query.toString()}` : '';
 
     const response = await authFetch(`${baseUrl}/inventory/report/${reportPath}${queryString}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate inventory report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   async downloadSalesReport(dateStart, dateEnd, searchCode, fileName) {
@@ -707,13 +756,7 @@ export const api = {
     if (searchCode) query.append('searchCode', searchCode);
 
     const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate sales report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   async downloadBrandReport(dateStart, dateEnd, searchCode, fileName) {
@@ -722,13 +765,7 @@ export const api = {
     if (searchCode) query.append('searchCode', searchCode);
 
     const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate brand report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   async downloadBrandReportHourWise(dateStart, dateEnd, searchCode, fileName) {
@@ -737,13 +774,7 @@ export const api = {
     if (searchCode) query.append('searchCode', searchCode);
 
     const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate hourly brand report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   async downloadReturnsBrandReport(dateStart, dateEnd, subType, fileName) {
@@ -751,13 +782,7 @@ export const api = {
     const query = new URLSearchParams({ type: 'returns-analysis', subType, dateStart, dateEnd });
 
     const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate returns brand report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   async downloadSalesReturnsRatioReport(dateStart, dateEnd, fileName) {
@@ -765,13 +790,7 @@ export const api = {
     const query = new URLSearchParams({ type: 'sales-returns-ratio', dateStart, dateEnd });
 
     const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate sales & returns ratio report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName);
+    await this.handleAsyncOrDirectDownload(response, fileName);
   },
 
   // Raw Report Data
@@ -823,13 +842,7 @@ export const api = {
     const queryString = query.toString() ? `?${query.toString()}` : '';
 
     const response = await authFetch(`${baseUrl}/department-reports/elite-print/pdf${queryString}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to generate Elite Print report PDF');
-    }
-
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Elite Print Report' });
+    await this.handleAsyncOrDirectDownload(response, fileName, { title: 'Elite Print Report' });
   },
 
   async getBrandReportData(dateStart, dateEnd, searchCode = '') {

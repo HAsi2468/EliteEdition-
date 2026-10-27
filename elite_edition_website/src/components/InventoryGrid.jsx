@@ -14,6 +14,7 @@ import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
+import TablePaginationBar from './common/TablePaginationBar';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -133,6 +134,36 @@ export default function InventoryGrid({
   const [sortField, setSortField] = useState('itemName');
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
   const [updatingStockId, setUpdatingStockId] = useState(null);
+
+  // Pagination States (25 items per page default for lightweight client browser memory)
+  const [overviewPage, setOverviewPage] = useState(1);
+  const [overviewPageSize, setOverviewPageSize] = useState(25);
+
+  const [inwardChallanPage, setInwardChallanPage] = useState(1);
+  const [inwardChallanPageSize, setInwardChallanPageSize] = useState(25);
+
+  const [inwardItemPage, setInwardItemPage] = useState(1);
+  const [inwardItemPageSize, setInwardItemPageSize] = useState(25);
+
+  const [outwardChallanPage, setOutwardChallanPage] = useState(1);
+  const [outwardChallanPageSize, setOutwardChallanPageSize] = useState(25);
+
+  const [outwardItemPage, setOutwardItemPage] = useState(1);
+  const [outwardItemPageSize, setOutwardItemPageSize] = useState(25);
+
+  useEffect(() => {
+    setOverviewPage(1);
+  }, [searchTerm, sizeFilter, facilityFilter, stockStatusFilter, overviewDateStart, overviewDateEnd]);
+
+  useEffect(() => {
+    setInwardChallanPage(1);
+    setInwardItemPage(1);
+  }, [inwardSearchTerm, facilityFilter, inwardDateStart, inwardDateEnd]);
+
+  useEffect(() => {
+    setOutwardChallanPage(1);
+    setOutwardItemPage(1);
+  }, [outwardSearchTerm, facilityFilter, outwardDateStart, outwardDateEnd]);
 
   // Load facilities from backend and listen for dynamic updates
   const loadFacilities = useCallback(async () => {
@@ -1159,6 +1190,32 @@ export default function InventoryGrid({
     });
   }, [outwardChallans, outwardSearchTerm, outwardChallanSortField, outwardChallanSortOrder]);
 
+  // Sliced paginated datasets to keep DOM size and browser memory usage small
+  const paginatedOverviewItems = useMemo(() => {
+    const start = (overviewPage - 1) * overviewPageSize;
+    return filteredOverviewItems.slice(start, start + overviewPageSize);
+  }, [filteredOverviewItems, overviewPage, overviewPageSize]);
+
+  const paginatedInwardChallans = useMemo(() => {
+    const start = (inwardChallanPage - 1) * inwardChallanPageSize;
+    return filteredInwardChallans.slice(start, start + inwardChallanPageSize);
+  }, [filteredInwardChallans, inwardChallanPage, inwardChallanPageSize]);
+
+  const paginatedInwardItems = useMemo(() => {
+    const start = (inwardItemPage - 1) * inwardItemPageSize;
+    return filteredInwardItems.slice(start, start + inwardItemPageSize);
+  }, [filteredInwardItems, inwardItemPage, inwardItemPageSize]);
+
+  const paginatedOutwardChallans = useMemo(() => {
+    const start = (outwardChallanPage - 1) * outwardChallanPageSize;
+    return filteredOutwardChallans.slice(start, start + outwardChallanPageSize);
+  }, [filteredOutwardChallans, outwardChallanPage, outwardChallanPageSize]);
+
+  const paginatedOutwardItems = useMemo(() => {
+    const start = (outwardItemPage - 1) * outwardItemPageSize;
+    return filteredOutwardItems.slice(start, start + outwardItemPageSize);
+  }, [filteredOutwardItems, outwardItemPage, outwardItemPageSize]);
+
   const handlePrintOutwardChallan = (challan) => {
     if (!challan) return;
     const printWindow = window.open('', '_blank');
@@ -1991,7 +2048,7 @@ export default function InventoryGrid({
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOverviewItems.map((item, idx) => {
+                    {paginatedOverviewItems.map((item, idx) => {
                       const stock = Number(item.currentlyAvailableStock) || 0;
 
                       let stockBadgeBg = '#ecfdf5';
@@ -2096,6 +2153,18 @@ export default function InventoryGrid({
                 </table>
               )}
             </div>
+            <TablePaginationBar
+              page={overviewPage}
+              totalItems={filteredOverviewItems.length}
+              pageSize={overviewPageSize}
+              onPageChange={setOverviewPage}
+              onPageSizeChange={(newSize) => {
+                setOverviewPageSize(newSize);
+                setOverviewPage(1);
+              }}
+              pageSizeOptions={[25, 50, 100]}
+              itemName="inventory items"
+            />
           </div>
         </>
       )}
@@ -2323,7 +2392,8 @@ export default function InventoryGrid({
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
+                <>
+                  <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                   <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
@@ -2383,7 +2453,7 @@ export default function InventoryGrid({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredInwardChallans.map((ch, idx) => {
+                      {paginatedInwardChallans.map((ch, idx) => {
                         const dtObj = ch.date ? new Date(ch.date) : null;
                         const dateStr = dtObj && !isNaN(dtObj.getTime())
                           ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -2743,16 +2813,30 @@ export default function InventoryGrid({
                     </tbody>
                   </table>
                 </div>
-              )
+                <TablePaginationBar
+                  page={inwardChallanPage}
+                  totalItems={filteredInwardChallans.length}
+                  pageSize={inwardChallanPageSize}
+                  onPageChange={setInwardChallanPage}
+                  onPageSizeChange={(newSize) => {
+                    setInwardChallanPageSize(newSize);
+                    setInwardChallanPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="inward challans"
+                />
+              </>
+            )
+          ) : (
+            /* ================= INDIVIDUAL SKUs VIEW ================= */
+            filteredInwardItems.length === 0 ? (
+              <div style={styles.emptyState}>
+                <span style={{ fontSize: '2.8rem' }}>📥</span>
+                <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
+              </div>
             ) : (
-              /* ================= INDIVIDUAL SKUs VIEW ================= */
-              filteredInwardItems.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <span style={{ fontSize: '2.8rem' }}>📥</span>
-                  <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
-                </div>
-              ) : (
+              <>
                 <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                   <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                     <thead>
@@ -2829,7 +2913,7 @@ export default function InventoryGrid({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredInwardItems.map((item, idx) => {
+                      {paginatedInwardItems.map((item, idx) => {
                         const rawDt = item.created_date_time || item.date;
                         const dtObj = rawDt ? new Date(rawDt) : null;
                         const dateStr = dtObj
@@ -2995,8 +3079,21 @@ export default function InventoryGrid({
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+                <TablePaginationBar
+                  page={inwardItemPage}
+                  totalItems={filteredInwardItems.length}
+                  pageSize={inwardItemPageSize}
+                  onPageChange={setInwardItemPage}
+                  onPageSizeChange={(newSize) => {
+                    setInwardItemPageSize(newSize);
+                    setInwardItemPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="inward items"
+                />
+              </>
+            )
+          )}
           </div>
         </>
       )}
@@ -3212,7 +3309,8 @@ export default function InventoryGrid({
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or record a stock dispatch.</p>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
+                <>
+                  <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                   <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
@@ -3280,7 +3378,7 @@ export default function InventoryGrid({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredOutwardChallans.map((ch, idx) => {
+                      {paginatedOutwardChallans.map((ch, idx) => {
                         const dtObj = ch.date ? new Date(ch.date) : null;
                         const dateStr = dtObj && !isNaN(dtObj.getTime())
                           ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -3617,14 +3715,28 @@ export default function InventoryGrid({
                     </tbody>
                   </table>
                 </div>
-              )
-            ) : filteredOutwardItems.length === 0 ? (
-              <div style={styles.emptyState}>
-                <span style={{ fontSize: '2.8rem' }}>📤</span>
-                <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No outward stock dispatches found</h4>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try adjusting date filters or record a stock dispatch.</p>
-              </div>
-            ) : (
+                <TablePaginationBar
+                  page={outwardChallanPage}
+                  totalItems={filteredOutwardChallans.length}
+                  pageSize={outwardChallanPageSize}
+                  onPageChange={setOutwardChallanPage}
+                  onPageSizeChange={(newSize) => {
+                    setOutwardChallanPageSize(newSize);
+                    setOutwardChallanPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="outward challans"
+                />
+              </>
+            )
+          ) : filteredOutwardItems.length === 0 ? (
+            <div style={styles.emptyState}>
+              <span style={{ fontSize: '2.8rem' }}>📤</span>
+              <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No outward stock dispatches found</h4>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try adjusting date filters or record a stock dispatch.</p>
+            </div>
+          ) : (
+            <>
               <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                 <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                   <thead>
@@ -3722,7 +3834,7 @@ export default function InventoryGrid({
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOutwardItems.map((item, idx) => {
+                    {paginatedOutwardItems.map((item, idx) => {
                       const rawDt = item.created_date_time || item.createdAt || item.date;
                       const dtObj = rawDt ? new Date(rawDt) : null;
                       const dateStr = dtObj
@@ -3823,7 +3935,20 @@ export default function InventoryGrid({
                   </tbody>
                 </table>
               </div>
-            )}
+              <TablePaginationBar
+                page={outwardItemPage}
+                totalItems={filteredOutwardItems.length}
+                pageSize={outwardItemPageSize}
+                onPageChange={setOutwardItemPage}
+                onPageSizeChange={(newSize) => {
+                  setOutwardItemPageSize(newSize);
+                  setOutwardItemPage(1);
+                }}
+                pageSizeOptions={[25, 50, 100]}
+                itemName="outward items"
+              />
+            </>
+          )}
           </div>
         </>
       )}

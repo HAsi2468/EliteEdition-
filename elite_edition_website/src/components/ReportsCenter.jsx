@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api, getBaseUrl } from '../services/api';
+import TablePaginationBar from './common/TablePaginationBar';
 import { 
   BarChart2, 
   FileText, 
@@ -98,6 +99,26 @@ export default function ReportsCenter({ department }) {
   const [error, setError] = useState('');
   const [expandedHour, setExpandedHour] = useState(null);
   const [returnsSubTab, setReturnsSubTab] = useState('pickup');
+
+  // Pagination states for reports (25 items per page default for lightweight client memory)
+  const [reportPage, setReportPage] = useState(1);
+  const [reportPageSize, setReportPageSize] = useState(25);
+
+  useEffect(() => {
+    setReportPage(1);
+  }, [activeReportTab, activeDepartment, dateStart, dateEnd, searchCode]);
+
+  const rawReportItems = useMemo(() => {
+    if (!reportData) return [];
+    if (Array.isArray(reportData)) return reportData;
+    if (Array.isArray(reportData.items)) return reportData.items;
+    return [];
+  }, [reportData]);
+
+  const paginatedReportItems = useMemo(() => {
+    const start = (reportPage - 1) * reportPageSize;
+    return rawReportItems.slice(start, start + reportPageSize);
+  }, [rawReportItems, reportPage, reportPageSize]);
 
   // Sharing states
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1219,126 +1240,24 @@ export default function ReportsCenter({ department }) {
             )}
 
             {activeReportTab === 'stock-value' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Photo</th>
-                    <th>SKU Code</th>
-                    <th>Product Name</th>
-                    <th>Vendor</th>
-                    <th className="text-center">Sizes & Quantities</th>
-                    <th className="text-center">Total Stock</th>
-                    <th className="text-right">Purchase Price (Unit)</th>
-                    <th className="text-right">Purchase Value (Total)</th>
-                    <th className="text-right">Sale Price (Unit)</th>
-                    <th className="text-right">Sale Value (Total)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.items?.map((item, idx) => (
-                    <tr key={item.sku || idx}>
-                      <td>
-                        {item.imageUrl ? (
-                          <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
-                        ) : (
-                          <div style={styles.noPhoto}>N/A</div>
-                        )}
-                      </td>
-                      <td style={styles.skuCode}>{item.sku}</td>
-                      <td>{item.itemName}</td>
-                      <td>{item.party}</td>
-                      <td className="text-center">
-                        <div style={styles.sizesGrid}>
-                          {item.sizes?.map(s => (
-                            <span key={s.size} style={styles.sizeTag}>{s.size}: {s.qty}</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="text-center" style={{ fontWeight: 'bold' }}>{item.total}</td>
-                      <td className="text-right">{formatPrice(item.purchasePrice)}</td>
-                      <td className="text-right" style={{ color: 'var(--text-muted)' }}>{formatPrice(item.totalPurchaseAmount)}</td>
-                      <td className="text-right" style={{ color: 'var(--primary)', fontWeight: '500' }}>{formatPrice(item.salePrice)}</td>
-                      <td className="text-right" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{formatPrice(item.totalSellableAmount)}</td>
+              <>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Photo</th>
+                      <th>SKU Code</th>
+                      <th>Product Name</th>
+                      <th>Vendor</th>
+                      <th className="text-center">Sizes & Quantities</th>
+                      <th className="text-center">Total Stock</th>
+                      <th className="text-right">Purchase Price (Unit)</th>
+                      <th className="text-right">Purchase Value (Total)</th>
+                      <th className="text-right">Sale Price (Unit)</th>
+                      <th className="text-right">Sale Value (Total)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {activeReportTab === 'stock-inward' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date & Time</th>
-                    <th>Photo</th>
-                    <th>SKU Code</th>
-                    <th>Product Name</th>
-                    <th>Vendor</th>
-                    <th className="text-center">Size & Quantity</th>
-                    <th className="text-center">Qty Inwarded</th>
-                    <th className="text-right">Purchase Price (Unit)</th>
-                    <th className="text-right">Purchase Value (Total)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.items?.map((item, idx) => {
-                    const dtStr = (item.created_date_time || item.date)
-                      ? new Date(item.created_date_time || item.date).toLocaleString('en-IN', {
-                          day: '2-digit', month: 'short', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit', hour12: true
-                        })
-                      : 'N/A';
-                    return (
-                      <tr key={item.id || idx}>
-                        <td style={{ fontSize: '12px', color: '#64748B', whiteSpace: 'nowrap' }}>{dtStr}</td>
-                        <td>
-                          {item.imageUrl ? (
-                            <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
-                          ) : (
-                            <div style={styles.noPhoto}>N/A</div>
-                          )}
-                        </td>
-                        <td style={styles.skuCode}>{item.skuCode || item.sku}</td>
-                        <td style={{ fontWeight: '500' }}>{item.itemName}</td>
-                        <td>{item.party}</td>
-                        <td className="text-center">
-                          <div style={styles.sizesGrid}>
-                            {item.sizes?.map(s => (
-                              <span key={s.size} style={styles.sizeTag}>{s.size}: {s.qty}</span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="text-center" style={{ fontWeight: 'bold', color: '#2563eb' }}>{item.qty || item.total}</td>
-                        <td className="text-right">{formatPrice(item.purchasePrice)}</td>
-                        <td className="text-right" style={{ color: '#d97706', fontWeight: 'bold' }}>{formatPrice(item.totalPurchaseAmount)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-
-            {activeReportTab === 'stock-outward' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Photo</th>
-                    <th>SKU Code</th>
-                    <th>Product Name</th>
-                    <th>Vendor</th>
-                    <th className="text-center">Sizes & Quantities</th>
-                    <th className="text-center">Total Qty</th>
-                    <th className="text-right">Purchase Price (Unit)</th>
-                    <th className="text-right">Purchase Value (Total)</th>
-                    <th className="text-right">Sale Price (Unit)</th>
-                    <th className="text-right">Sale Value (Total)</th>
-                    <th className="text-right">Profit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.items?.map((item, idx) => {
-                    const profit = item.totalSellableAmount - item.totalPurchaseAmount;
-                    return (
+                  </thead>
+                  <tbody>
+                    {paginatedReportItems.map((item, idx) => (
                       <tr key={item.sku || idx}>
                         <td>
                           {item.imageUrl ? (
@@ -1360,55 +1279,213 @@ export default function ReportsCenter({ department }) {
                         <td className="text-center" style={{ fontWeight: 'bold' }}>{item.total}</td>
                         <td className="text-right">{formatPrice(item.purchasePrice)}</td>
                         <td className="text-right" style={{ color: 'var(--text-muted)' }}>{formatPrice(item.totalPurchaseAmount)}</td>
-                        <td className="text-right" style={{ color: 'var(--primary)' }}>{formatPrice(item.salePrice)}</td>
-                        <td className="text-right" style={{ color: 'var(--primary)' }}>{formatPrice(item.totalSellableAmount)}</td>
-                        <td className="text-right" style={{ color: profit >= 0 ? '#34d399' : '#f87171', fontWeight: 'bold' }}>
-                          {formatPrice(profit)}
-                        </td>
+                        <td className="text-right" style={{ color: 'var(--primary)', fontWeight: '500' }}>{formatPrice(item.salePrice)}</td>
+                        <td className="text-right" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{formatPrice(item.totalSellableAmount)}</td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+                <TablePaginationBar
+                  page={reportPage}
+                  totalItems={rawReportItems.length}
+                  pageSize={reportPageSize}
+                  onPageChange={setReportPage}
+                  onPageSizeChange={(newSize) => {
+                    setReportPageSize(newSize);
+                    setReportPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="stock items"
+                />
+              </>
+            )}
+
+            {activeReportTab === 'stock-inward' && (
+              <>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Photo</th>
+                      <th>SKU Code</th>
+                      <th>Product Name</th>
+                      <th>Vendor</th>
+                      <th className="text-center">Size & Quantity</th>
+                      <th className="text-center">Qty Inwarded</th>
+                      <th className="text-right">Purchase Price (Unit)</th>
+                      <th className="text-right">Purchase Value (Total)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedReportItems.map((item, idx) => {
+                      const dtStr = (item.created_date_time || item.date)
+                        ? new Date(item.created_date_time || item.date).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })
+                        : 'N/A';
+                      return (
+                        <tr key={item.id || idx}>
+                          <td style={{ fontSize: '12px', color: '#64748B', whiteSpace: 'nowrap' }}>{dtStr}</td>
+                          <td>
+                            {item.imageUrl ? (
+                              <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                            ) : (
+                              <div style={styles.noPhoto}>N/A</div>
+                            )}
+                          </td>
+                          <td style={styles.skuCode}>{item.skuCode || item.sku}</td>
+                          <td style={{ fontWeight: '500' }}>{item.itemName}</td>
+                          <td>{item.party}</td>
+                          <td className="text-center">
+                            <div style={styles.sizesGrid}>
+                              {item.sizes?.map(s => (
+                                <span key={s.size} style={styles.sizeTag}>{s.size}: {s.qty}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="text-center" style={{ fontWeight: 'bold', color: '#2563eb' }}>{item.qty || item.total}</td>
+                          <td className="text-right">{formatPrice(item.purchasePrice)}</td>
+                          <td className="text-right" style={{ color: '#d97706', fontWeight: 'bold' }}>{formatPrice(item.totalPurchaseAmount)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <TablePaginationBar
+                  page={reportPage}
+                  totalItems={rawReportItems.length}
+                  pageSize={reportPageSize}
+                  onPageChange={setReportPage}
+                  onPageSizeChange={(newSize) => {
+                    setReportPageSize(newSize);
+                    setReportPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="inward records"
+                />
+              </>
+            )}
+
+            {activeReportTab === 'stock-outward' && (
+              <>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Photo</th>
+                      <th>SKU Code</th>
+                      <th>Product Name</th>
+                      <th>Vendor</th>
+                      <th className="text-center">Sizes & Quantities</th>
+                      <th className="text-center">Total Qty</th>
+                      <th className="text-right">Purchase Price (Unit)</th>
+                      <th className="text-right">Purchase Value (Total)</th>
+                      <th className="text-right">Sale Price (Unit)</th>
+                      <th className="text-right">Sale Value (Total)</th>
+                      <th className="text-right">Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedReportItems.map((item, idx) => {
+                      const profit = item.totalSellableAmount - item.totalPurchaseAmount;
+                      return (
+                        <tr key={item.sku || idx}>
+                          <td>
+                            {item.imageUrl ? (
+                              <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                            ) : (
+                              <div style={styles.noPhoto}>N/A</div>
+                            )}
+                          </td>
+                          <td style={styles.skuCode}>{item.sku}</td>
+                          <td>{item.itemName}</td>
+                          <td>{item.party}</td>
+                          <td className="text-center">
+                            <div style={styles.sizesGrid}>
+                              {item.sizes?.map(s => (
+                                <span key={s.size} style={styles.sizeTag}>{s.size}: {s.qty}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="text-center" style={{ fontWeight: 'bold' }}>{item.total}</td>
+                          <td className="text-right">{formatPrice(item.purchasePrice)}</td>
+                          <td className="text-right" style={{ color: 'var(--text-muted)' }}>{formatPrice(item.totalPurchaseAmount)}</td>
+                          <td className="text-right" style={{ color: 'var(--primary)' }}>{formatPrice(item.salePrice)}</td>
+                          <td className="text-right" style={{ color: 'var(--primary)' }}>{formatPrice(item.totalSellableAmount)}</td>
+                          <td className="text-right" style={{ color: profit >= 0 ? '#34d399' : '#f87171', fontWeight: 'bold' }}>
+                            {formatPrice(profit)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <TablePaginationBar
+                  page={reportPage}
+                  totalItems={rawReportItems.length}
+                  pageSize={reportPageSize}
+                  onPageChange={setReportPage}
+                  onPageSizeChange={(newSize) => {
+                    setReportPageSize(newSize);
+                    setReportPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="outward records"
+                />
+              </>
             )}
 
             {activeReportTab === 'sales' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Photo</th>
-                    <th>SKU Code</th>
-                    <th>Product Name</th>
-                    <th>Brand</th>
-                    <th className="text-center">Total Orders</th>
-                    <th className="text-right">Avg Order Price</th>
-                    <th className="text-right">Total Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.isArray(reportData) && reportData.map((row, idx) => (
-                    <tr key={row.itemSKUCode || idx}>
-                      <td>
-                        {row.productImage ? (
-                          <img src={convertDriveUrl(row.productImage, row.itemSKUCode)} alt={row.itemSKUCode} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
-                        ) : (
-                          <div style={styles.noPhoto}>N/A</div>
-                        )}
-                      </td>
-                      <td style={styles.skuCode}>{row.itemSKUCode || row.skuName}</td>
-                      <td>{row.skuName || '-'}</td>
-                      <td>{row.itemTypeBrand || '-'}</td>
-                      <td className="text-center" style={{ fontWeight: 'bold' }}>{row.salesCount}</td>
-                      <td className="text-right">
-                        {formatPrice(row.salesCount > 0 ? (row.sellableAmount / row.salesCount) : 0)}
-                      </td>
-                      <td className="text-right" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                        {formatPrice(row.sellableAmount)}
-                      </td>
+              <>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Photo</th>
+                      <th>SKU Code</th>
+                      <th>Product Name</th>
+                      <th>Brand</th>
+                      <th className="text-center">Total Orders</th>
+                      <th className="text-right">Avg Order Price</th>
+                      <th className="text-right">Total Revenue</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginatedReportItems.map((row, idx) => (
+                      <tr key={row.itemSKUCode || idx}>
+                        <td>
+                          {row.productImage ? (
+                            <img src={convertDriveUrl(row.productImage, row.itemSKUCode)} alt={row.itemSKUCode} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <div style={styles.noPhoto}>N/A</div>
+                          )}
+                        </td>
+                        <td style={styles.skuCode}>{row.itemSKUCode || row.skuName}</td>
+                        <td>{row.skuName || '-'}</td>
+                        <td>{row.itemTypeBrand || '-'}</td>
+                        <td className="text-center" style={{ fontWeight: 'bold' }}>{row.salesCount}</td>
+                        <td className="text-right">
+                          {formatPrice(row.salesCount > 0 ? (row.sellableAmount / row.salesCount) : 0)}
+                        </td>
+                        <td className="text-right" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
+                          {formatPrice(row.sellableAmount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <TablePaginationBar
+                  page={reportPage}
+                  totalItems={rawReportItems.length}
+                  pageSize={reportPageSize}
+                  onPageChange={setReportPage}
+                  onPageSizeChange={(newSize) => {
+                    setReportPageSize(newSize);
+                    setReportPage(1);
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  itemName="sales rows"
+                />
+              </>
             )}
 
             {activeReportTab === 'brand' && (

@@ -571,7 +571,7 @@ export default function FusingDepartment() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.getJobCards({ limit: 5000, department: 'digital_print' });
+      const res = await api.getJobCards({ limit: 100, department: 'digital_print' });
       const allCards = res?.data || (Array.isArray(res) ? res : []);
       setCards(allCards);
 
@@ -584,7 +584,7 @@ export default function FusingDepartment() {
       }
 
       try {
-        const fLogsRes = await api.getJobFusingLogs({ limit: 5000 });
+        const fLogsRes = await api.getJobFusingLogs({ limit: 100 });
         const flogs = fLogsRes?.data || (Array.isArray(fLogsRes) ? fLogsRes : []);
         setFusingLogs(flogs);
       } catch (flErr) {

@@ -44,7 +44,7 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
         dateStart,
         dateEnd,
         department,
-        limit: 5000,
+        limit: 500,
         sortBy: 'jobNo',
         sortOrder: 'desc'
       });

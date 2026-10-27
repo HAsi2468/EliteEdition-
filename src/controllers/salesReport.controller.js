@@ -1,3 +1,6 @@
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
 const db = require('../db/models');
 const logger = require('../config/logger');
 const PDFDocument = require('pdfkit');
@@ -5,6 +8,16 @@ const axios = require('axios');
 const sharp = require('sharp');
 const { fetchSalesReportData } = require('../services/product.service');
 const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
+const { asyncJobQueue } = require('../services/asyncJobQueue.service');
+const { registerJobArtifact } = require('../routes/v1/jobs.route');
+
+const ensureReportsDir = () => {
+  const reportsDir = path.join(os.tmpdir(), 'elite-reports');
+  if (!fs.existsSync(reportsDir)) {
+    fs.mkdirSync(reportsDir, { recursive: true });
+  }
+  return reportsDir;
+};
 
 // ─────────────────────────────────────────────────────────────
 // Fetch & convert image to JPEG buffer (handles WebP from CDN)
@@ -217,6 +230,231 @@ const parseDateEnd = (str) => {
   return isNaN(parsed.getTime()) ? new Date(str) : parsed;
 };
 
+const buildSalesReportPdfStream = async (targetStream, whereClause, dateStart, dateEnd, updateProgress) => {
+  if (updateProgress) await updateProgress(15);
+  const rawOrders = await db.SalesList.find(whereClause).lean();
+  const baseSkuMap = new Map();
+
+  for (const item of rawOrders) {
+    const rawSku = item.itemSKUCode || '';
+    const baseSku = extractBaseSku(rawSku);
+    const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || 'N/A');
+    const qty = Number(item.saleCount || 1);
+    const price = parseFloat(item.totalPrice) || 0;
+    const amt = qty * price;
+
+    if (!baseSkuMap.has(baseSku)) {
+      baseSkuMap.set(baseSku, {
+        _id: baseSku,
+        qty: 0,
+        amt: 0,
+        variationsMap: new Map()
+      });
+    }
+
+    const baseObj = baseSkuMap.get(baseSku);
+    baseObj.qty += qty;
+    baseObj.amt += amt;
+
+    if (!baseObj.variationsMap.has(size)) {
+      baseObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+    }
+    const varObj = baseObj.variationsMap.get(size);
+    varObj.quantity += qty;
+    varObj.sellableAmount += amt;
+  }
+
+  const products = Array.from(baseSkuMap.values()).map(b => ({
+    _id: b._id,
+    qty: b.qty,
+    amt: b.amt,
+    variations: Array.from(b.variationsMap.values())
+  })).sort((a, b) => b.qty - a.qty);
+
+  if (updateProgress) await updateProgress(35);
+
+  // Fetch images
+  const baseSkus = products.map(p => p._id).filter(Boolean);
+  const regexes = baseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
+  const productDocs = await db.InventoryProduct.find({
+    skuCode: { $in: regexes },
+    imageUrl: { $exists: true, $nin: [null, ''] }
+  }).lean();
+
+  const skuImageMap = {};
+  productDocs.forEach(p => {
+    const base = extractBaseSku(p.skuCode);
+    if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
+  });
+
+  const productDocs2 = await db.Product.find({ skuCode: { $in: baseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
+  productDocs2.forEach(p => {
+    if (p.skuCode && !skuImageMap[p.skuCode] && p.imageUrl) skuImageMap[p.skuCode] = p.imageUrl;
+  });
+
+  // Pre-fetch all images
+  const uniqueUrls = [...new Set(Object.values(skuImageMap).filter(Boolean))];
+  const imageCache = {};
+  const CHUNK = 8;
+  for (let i = 0; i < uniqueUrls.length; i += CHUNK) {
+    await Promise.all(uniqueUrls.slice(i, i + CHUNK).map(async url => {
+      imageCache[url] = await fetchImageBuffer(url);
+    }));
+  }
+
+  if (updateProgress) await updateProgress(60);
+
+  // Totals
+  const totalOrders  = products.reduce((s, r) => s + r.qty, 0);
+  const totalAmount  = products.reduce((s, r) => s + r.amt, 0);
+  const dateStr = formatReportDateStr(dateStart, dateEnd);
+
+  const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
+    info: { Title: `Elite Edition Sales Report ${dateStart}`, Author: 'Elite Edition ERP' }
+  });
+
+  doc.on('pageAdded', () => drawPunchGuide(doc));
+  drawPunchGuide(doc);
+
+  doc.pipe(targetStream);
+
+  let pageNum = 1;
+  drawHeader(doc, 'Sales Report', dateStr, pageNum);
+
+  // Summary cards
+  let y = 65;
+  y = drawSummaryCards(doc, y, [
+    { label: 'Total SKUs',    value: fmtN(products.length) },
+    { label: 'Total Orders',  value: fmtN(totalOrders) },
+    { label: 'Total Revenue', value: fmt(totalAmount) },
+    { label: 'Avg per Order', value: totalOrders > 0 ? fmt(totalAmount / totalOrders) : '0', color: C.accentBlue },
+  ]);
+
+  const SIMPLE_COLS = [
+    { label: 'Photo',       w: 52  },
+    { label: 'SKU',         w: 110 },
+    { label: 'Sizes & Qty', w: 90 },
+    { label: 'Orders',      w: 55  },
+    { label: 'Revenue',     w: 78  },
+    { label: 'Avg',         w: 78  },
+  ];
+
+  const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+
+  // Table header
+  y = drawTableHeader(doc, y, SIMPLE_COLS);
+
+  let alt = false;
+  for (let idx = 0; idx < products.length; idx++) {
+    const prod = products[idx];
+    const baseSku  = prod._id || '-';
+    const imgUrl   = skuImageMap[baseSku];
+    const imgBuf   = imgUrl ? imageCache[imgUrl] : null;
+
+    const sortedVariations = (prod.variations || []).sort((a, b) => {
+      let sa = (a.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
+      let sb = (b.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
+      let ia = sizeOrder.indexOf(sa);
+      let ib = sizeOrder.indexOf(sb);
+      if (ia === -1 && ib === -1) return (a.size || '').localeCompare(b.size || '');
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+
+    const sizesText = sortedVariations.map(v => `${(v.size || '').toUpperCase()}: ${v.quantity}`).join('\n');
+    const numLines = Math.max(1, sortedVariations.length);
+    const rowH = Math.max(50, numLines * 10 + 20);
+
+    if (y + rowH > PAGE_H - MARGIN - 28) {
+      if (prod !== products[products.length - 1]) {
+        doc.addPage();
+        pageNum++;
+        drawHeader(doc, 'Sales Report (continued)', dateStr, pageNum);
+        y = 65;
+        y = drawTableHeader(doc, y, SIMPLE_COLS);
+        alt = false;
+      }
+    }
+
+    // Row background
+    doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+    doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH)
+       .strokeColor(C.border).lineWidth(0.4).stroke();
+    drawDividers(doc, MARGIN, y, rowH, SIMPLE_COLS);
+
+    const mid = y + rowH / 2;
+    let x = MARGIN;
+
+    // Image
+    const imgSize = Math.min(rowH - 10, 40);
+    const ix = x + (SIMPLE_COLS[0].w - imgSize) / 2;
+    const iy = y + (rowH - imgSize) / 2;
+    if (imgBuf) {
+      try {
+        doc.rect(ix - 1, iy - 1, imgSize + 2, imgSize + 2).strokeColor(C.border).lineWidth(0.5).stroke();
+        doc.image(imgBuf, ix, iy, { width: imgSize, height: imgSize, cover: [imgSize, imgSize] });
+      } catch (_) {
+        doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
+      }
+    } else {
+      doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
+      doc.fillColor(C.subText).font('Helvetica').fontSize(5).text('No Photo', ix, iy + imgSize / 2 - 3, { width: imgSize, align: 'center' });
+    }
+    x += SIMPLE_COLS[0].w;
+
+    // SKU
+    doc.fillColor(C.tableText).font('Helvetica-Bold').fontSize(9)
+       .text(baseSku, x + 3, mid - 5, { width: SIMPLE_COLS[1].w - 6, align: 'center', lineBreak: false, ellipsis: true });
+    x += SIMPLE_COLS[1].w;
+
+    // Sizes
+    doc.fillColor(C.text).font('Helvetica').fontSize(8);
+    const sizesHeight = doc.heightOfString(sizesText, { width: SIMPLE_COLS[2].w - 8, align: 'center' });
+    const sizesY = y + (rowH - sizesHeight) / 2;
+    doc.text(sizesText, x + 4, sizesY, { width: SIMPLE_COLS[2].w - 8, align: 'center', lineBreak: true });
+    x += SIMPLE_COLS[2].w;
+
+    // Orders
+    doc.fillColor(C.text).font('Helvetica-Bold').fontSize(10)
+       .text(fmtN(prod.qty), x + 2, mid - 7, { width: SIMPLE_COLS[3].w - 4, align: 'center' });
+    x += SIMPLE_COLS[3].w;
+
+    // Revenue
+    doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(8)
+       .text(fmt(prod.amt), x + 2, mid - 5, { width: SIMPLE_COLS[4].w - 4, align: 'center' });
+    x += SIMPLE_COLS[4].w;
+
+    // Avg
+    const avgAmt = prod.qty > 0 ? prod.amt / prod.qty : 0;
+    doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+       .text(fmt(avgAmt), x + 2, mid - 5, { width: SIMPLE_COLS[5].w - 4, align: 'center' });
+
+    y += rowH;
+    alt = !alt;
+  }
+
+  // Footer on all pages
+  const pages = doc.bufferedPageRange();
+  for (let p = 0; p < pages.count; p++) {
+    doc.switchToPage(pages.start + p);
+    doc.page.margins.bottom = 0;
+    doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
+    doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
+       .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
+         MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
+  }
+
+  if (updateProgress) await updateProgress(95);
+  doc.end();
+
+  return new Promise((resolve, reject) => {
+    targetStream.on('finish', resolve);
+    targetStream.on('close', resolve);
+    targetStream.on('error', reject);
+  });
+};
+
 const downloadSalesReportPdf = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
@@ -234,222 +472,30 @@ const downloadSalesReportPdf = async (req, res) => {
     }
     logger.info('Generating Sales PDF report %s → %s', dateStart, dateEnd);
 
-    const rawOrders = await db.SalesList.find(whereClause).lean();
-    const baseSkuMap = new Map();
+    const count = await db.SalesList.countDocuments(whereClause);
+    if (count > 5000) {
+      logger.info(`Sales report dataset is large (${count} rows > 5,000 threshold). Offloading to async job queue.`);
+      const enqueued = await asyncJobQueue.enqueue('SALES_REPORT_PDF', { dateStart, dateEnd, searchCode, count }, async (job, updateProgress) => {
+        const reportsDir = ensureReportsDir();
+        const filePath = path.join(reportsDir, `${job.jobId}.pdf`);
+        const fileStream = fs.createWriteStream(filePath);
+        await buildSalesReportPdfStream(fileStream, whereClause, dateStart, dateEnd, updateProgress);
+        registerJobArtifact(job.jobId, filePath);
+        return `/v1/jobs/${job.jobId}/download`;
+      });
 
-    for (const item of rawOrders) {
-      const rawSku = item.itemSKUCode || '';
-      const baseSku = extractBaseSku(rawSku);
-      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || 'N/A');
-      const qty = Number(item.saleCount || 1);
-      const price = parseFloat(item.totalPrice) || 0;
-      const amt = qty * price;
-
-      if (!baseSkuMap.has(baseSku)) {
-        baseSkuMap.set(baseSku, {
-          _id: baseSku,
-          qty: 0,
-          amt: 0,
-          variationsMap: new Map()
-        });
-      }
-
-      const baseObj = baseSkuMap.get(baseSku);
-      baseObj.qty += qty;
-      baseObj.amt += amt;
-
-      if (!baseObj.variationsMap.has(size)) {
-        baseObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
-      }
-      const varObj = baseObj.variationsMap.get(size);
-      varObj.quantity += qty;
-      varObj.sellableAmount += amt;
+      return res.status(202).json({
+        success: true,
+        code: 'JOB_ACCEPTED',
+        jobId: enqueued.jobId,
+        status: enqueued.status,
+        message: `Sales report contains ${count.toLocaleString('en-IN')} rows and is being generated in the background. Download will start automatically once ready.`
+      });
     }
-
-    const products = Array.from(baseSkuMap.values()).map(b => ({
-      _id: b._id,
-      qty: b.qty,
-      amt: b.amt,
-      variations: Array.from(b.variationsMap.values())
-    })).sort((a, b) => b.qty - a.qty);
-
-    // Fetch images
-    const baseSkus = products.map(p => p._id).filter(Boolean);
-    const regexes = baseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
-    const productDocs = await db.InventoryProduct.find({
-      skuCode: { $in: regexes },
-      imageUrl: { $exists: true, $nin: [null, ''] }
-    }).lean();
-
-    const skuImageMap = {};
-    productDocs.forEach(p => {
-      const base = extractBaseSku(p.skuCode);
-      if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
-    });
-
-    const productDocs2 = await db.Product.find({ skuCode: { $in: baseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
-    productDocs2.forEach(p => {
-      if (p.skuCode && !skuImageMap[p.skuCode] && p.imageUrl) skuImageMap[p.skuCode] = p.imageUrl;
-    });
-
-    // Pre-fetch all images
-    const uniqueUrls = [...new Set(Object.values(skuImageMap).filter(Boolean))];
-    const imageCache = {};
-    const CHUNK = 8;
-    for (let i = 0; i < uniqueUrls.length; i += CHUNK) {
-      await Promise.all(uniqueUrls.slice(i, i + CHUNK).map(async url => {
-        imageCache[url] = await fetchImageBuffer(url);
-      }));
-    }
-
-    // Totals
-    const totalOrders  = products.reduce((s, r) => s + r.qty, 0);
-    const totalAmount  = products.reduce((s, r) => s + r.amt, 0);
-    const dateStr = formatReportDateStr(dateStart, dateEnd);
-
-    const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
-      info: { Title: `Elite Edition Sales Report ${dateStart}`, Author: 'Elite Edition ERP' }
-    });
-
-    doc.on('pageAdded', () => drawPunchGuide(doc));
-    drawPunchGuide(doc);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Sales_Report_${dateStart}.pdf"`);
-    doc.pipe(res);
-
-    let pageNum = 1;
-    drawHeader(doc, 'Sales Report', dateStr, pageNum);
-
-    // Summary cards
-    let y = 65;
-    y = drawSummaryCards(doc, y, [
-      { label: 'Total SKUs',    value: fmtN(products.length) },
-      { label: 'Total Orders',  value: fmtN(totalOrders) },
-      { label: 'Total Revenue', value: fmt(totalAmount) },
-      { label: 'Avg per Order', value: totalOrders > 0 ? fmt(totalAmount / totalOrders) : '0', color: C.accentBlue },
-    ]);
-
-    const SIMPLE_COLS = [
-      { label: 'Photo',       w: 52  },
-      { label: 'SKU',         w: 110 },
-      { label: 'Sizes & Qty', w: 90 },
-      { label: 'Orders',      w: 55  },
-      { label: 'Revenue',     w: 78  },
-      { label: 'Avg',         w: 78  },
-    ];
-
-    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
-
-    // Table header
-    y = drawTableHeader(doc, y, SIMPLE_COLS);
-
-    let alt = false;
-    for (const prod of products) {
-      const baseSku  = prod._id || '-';
-      const imgUrl   = skuImageMap[baseSku];
-      const imgBuf   = imgUrl ? imageCache[imgUrl] : null;
-
-      const sortedVariations = (prod.variations || []).sort((a, b) => {
-        let sa = (a.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
-        let sb = (b.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
-        let ia = sizeOrder.indexOf(sa);
-        let ib = sizeOrder.indexOf(sb);
-        if (ia === -1 && ib === -1) return (a.size || '').localeCompare(b.size || '');
-        if (ia === -1) return 1;
-        if (ib === -1) return -1;
-        return ia - ib;
-      });
-
-      const sizesText = sortedVariations.map(v => `${(v.size || '').toUpperCase()}: ${v.quantity}`).join('\n');
-      const numLines = Math.max(1, sortedVariations.length);
-      const rowH = Math.max(50, numLines * 10 + 20);
-
-      if (y + rowH > PAGE_H - MARGIN - 28) {
-        // Only add a new page if there is remaining data to render
-        if (y + rowH > PAGE_H - MARGIN - 28) {
-          // Only add a new page if there is another product after this one
-          if (prod !== products[products.length - 1]) {
-            doc.addPage();
-            pageNum++;
-            drawHeader(doc, 'Sales Report (continued)', dateStr, pageNum);
-            y = 65;
-            y = drawTableHeader(doc, y, SIMPLE_COLS);
-            alt = false;
-          }
-        }
-      }
-
-       // Row background – moved font settings outside loop for speed
-       doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
-       // Bottom border
-       doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH)
-          .strokeColor(C.border).lineWidth(0.4).stroke();
-       drawDividers(doc, MARGIN, y, rowH, SIMPLE_COLS);
-
-      const mid = y + rowH / 2;
-      let x = MARGIN;
-
-      // Image
-      const imgSize = Math.min(rowH - 10, 40);
-      const ix = x + (SIMPLE_COLS[0].w - imgSize) / 2;
-      const iy = y + (rowH - imgSize) / 2;
-      if (imgBuf) {
-        try {
-          doc.rect(ix - 1, iy - 1, imgSize + 2, imgSize + 2).strokeColor(C.border).lineWidth(0.5).stroke();
-          doc.image(imgBuf, ix, iy, { width: imgSize, height: imgSize, cover: [imgSize, imgSize] });
-        } catch (_) {
-          doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
-        }
-      } else {
-        doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
-        doc.fillColor(C.subText).font('Helvetica').fontSize(5).text('No Photo', ix, iy + imgSize / 2 - 3, { width: imgSize, align: 'center' });
-      }
-      x += SIMPLE_COLS[0].w;
-
-      // SKU
-      doc.fillColor(C.tableText).font('Helvetica-Bold').fontSize(9)
-         .text(baseSku, x + 3, mid - 5, { width: SIMPLE_COLS[1].w - 6, align: 'center', lineBreak: false, ellipsis: true });
-      x += SIMPLE_COLS[1].w;
-
-      // Sizes
-      doc.fillColor(C.text).font('Helvetica').fontSize(8);
-      const sizesHeight = doc.heightOfString(sizesText, { width: SIMPLE_COLS[2].w - 8, align: 'center' });
-      const sizesY = y + (rowH - sizesHeight) / 2;
-      doc.text(sizesText, x + 4, sizesY, { width: SIMPLE_COLS[2].w - 8, align: 'center', lineBreak: true });
-      x += SIMPLE_COLS[2].w;
-
-      // Orders
-      doc.fillColor(C.text).font('Helvetica-Bold').fontSize(10)
-         .text(fmtN(prod.qty), x + 2, mid - 7, { width: SIMPLE_COLS[3].w - 4, align: 'center' });
-      x += SIMPLE_COLS[3].w;
-
-      // Revenue
-      doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(8)
-         .text(fmt(prod.amt), x + 2, mid - 5, { width: SIMPLE_COLS[4].w - 4, align: 'center' });
-      x += SIMPLE_COLS[4].w;
-
-      // Avg
-      const avgAmt = prod.qty > 0 ? prod.amt / prod.qty : 0;
-      doc.fillColor(C.subText).font('Helvetica').fontSize(8)
-         .text(fmt(avgAmt), x + 2, mid - 5, { width: SIMPLE_COLS[5].w - 4, align: 'center' });
-
-      y += rowH;
-      alt = !alt;
-    }
-
-    // Footer on all pages
-    const pages = doc.bufferedPageRange();
-    for (let p = 0; p < pages.count; p++) {
-      doc.switchToPage(pages.start + p);
-      doc.page.margins.bottom = 0;
-      doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
-      doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
-         .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
-           MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
-    }
-
-    doc.end();
+    await buildSalesReportPdfStream(res, whereClause, dateStart, dateEnd);
     logger.info('Sales PDF complete.');
   } catch (err) {
     logger.error('Sales PDF error: %o', err);
@@ -587,7 +633,7 @@ const normalizeAndMergeBrands = (rawBrands) => {
 // ─────────────────────────────────────────────────────────────
 // BRAND REPORT PDF
 // ─────────────────────────────────────────────────────────────
-const downloadBrandReportPdf = async (req, res) => {
+const downloadBrandReportPdf = async (req, res, targetStreamOverride = null) => {
   try {
     const { dateStart, dateEnd } = req.query;
     if (!dateStart || !dateEnd) {
@@ -605,6 +651,27 @@ const downloadBrandReportPdf = async (req, res) => {
     const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
     if (searchCode) {
       whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
+    }
+
+    const count = targetStreamOverride ? 0 : await db.SalesList.countDocuments(whereClause);
+    if (!targetStreamOverride && count > 5000) {
+      logger.info(`Brand report dataset is large (${count} rows > 5,000 threshold). Offloading to async job queue.`);
+      const enqueued = await asyncJobQueue.enqueue('BRAND_REPORT_PDF', { dateStart, dateEnd, searchCode, count }, async (job, updateProgress) => {
+        const reportsDir = ensureReportsDir();
+        const filePath = path.join(reportsDir, `${job.jobId}.pdf`);
+        const fileStream = fs.createWriteStream(filePath);
+        await downloadBrandReportPdf(req, res, fileStream);
+        registerJobArtifact(job.jobId, filePath);
+        return `/v1/jobs/${job.jobId}/download`;
+      });
+
+      return res.status(202).json({
+        success: true,
+        code: 'JOB_ACCEPTED',
+        jobId: enqueued.jobId,
+        status: enqueued.status,
+        message: `Brand report contains ${count.toLocaleString('en-IN')} rows and is being generated in the background. Download will start automatically once ready.`
+      });
     }
 
     const rawOrders = await db.SalesList.find(whereClause).lean();
@@ -688,9 +755,13 @@ const downloadBrandReportPdf = async (req, res) => {
 
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Brand_Report_${dateStart}.pdf"`);
-    doc.pipe(res);
+    if (!targetStreamOverride) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Brand_Report_${dateStart}.pdf"`);
+      doc.pipe(res);
+    } else {
+      doc.pipe(targetStreamOverride);
+    }
 
     let pageNum = 1;
     drawHeader(doc, 'Brand Report', dateStr, pageNum);
@@ -844,6 +915,13 @@ const downloadBrandReportPdf = async (req, res) => {
     }
 
     doc.end();
+    if (targetStreamOverride) {
+      await new Promise((resolve, reject) => {
+        targetStreamOverride.on('finish', resolve);
+        targetStreamOverride.on('close', resolve);
+        targetStreamOverride.on('error', reject);
+      });
+    }
     logger.info('Brand PDF complete.');
   } catch (err) {
     logger.error('Brand PDF error: %o', err);

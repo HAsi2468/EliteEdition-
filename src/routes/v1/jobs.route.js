@@ -80,6 +80,16 @@ router.get('/:jobId/download', async (req, res) => {
     return res.download(filePath);
   }
 
+  const os = require('os');
+  const tempPdf = path.join(os.tmpdir(), 'elite-reports', `${jobId}.pdf`);
+  if (fs.existsSync(tempPdf)) {
+    return res.download(tempPdf);
+  }
+  const tempXlsx = path.join(os.tmpdir(), 'elite-reports', `${jobId}.xlsx`);
+  if (fs.existsSync(tempXlsx)) {
+    return res.download(tempXlsx);
+  }
+
   // If downloadUrl is a direct Cloudflare R2 / S3 URL, redirect
   if (job.downloadUrl && job.downloadUrl.startsWith('http')) {
     return res.redirect(job.downloadUrl);
