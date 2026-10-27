@@ -258,186 +258,11 @@ export const normalizeParty = (item, defaultCity = 'Surat, Gujarat') => {
 export const getPartyName = (p) => (typeof p === 'string' ? p : p?.name || '');
 
 // ==========================================
-// SEED DATA FOR GRAY FABRIC
+// SEED DATA FOR GRAY FABRIC (Clean slate, no dummy data)
 // ==========================================
-const SEED_GRAY_LOTS = [
-  {
-    id: 'GRAY-LOT-2026-001',
-    lotNumber: 'GRAY-2026-001',
-    inwardDate: '2026-10-24',
-    weaverParty: 'Maruti Weaving Works',
-    weaverChallanNo: 'MWW-8921',
-    fabricQuality: 'Pure Viscose Rayon 14kg',
-    totalTps: 10,
-    totalMeters: 1024.5,
-    sentToMillMeters: 512.0,
-    ratePerMeter: 46.0,
-    status: 'Partially at Mill', // In Stock, Partially at Mill, Fully at Mill
-    rackLocation: 'Gray Rack G-01',
-    remarks: 'Dense 14kg warp-weft weave. Zero weaving defect.',
-    tps: [
-      { srNo: 1, tpNo: '101', tpMtr: 102.5, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
-      { srNo: 2, tpNo: '102', tpMtr: 101.0, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
-      { srNo: 3, tpNo: '103', tpMtr: 104.2, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
-      { srNo: 4, tpNo: '104', tpMtr: 103.0, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
-      { srNo: 5, tpNo: '105', tpMtr: 101.3, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
-      { srNo: 6, tpNo: '106', tpMtr: 102.0, status: 'In Stock', millChallanNo: null },
-      { srNo: 7, tpNo: '107', tpMtr: 103.5, status: 'In Stock', millChallanNo: null },
-      { srNo: 8, tpNo: '108', tpMtr: 101.8, status: 'In Stock', millChallanNo: null },
-      { srNo: 9, tpNo: '109', tpMtr: 102.7, status: 'In Stock', millChallanNo: null },
-      { srNo: 10, tpNo: '110', tpMtr: 102.5, status: 'In Stock', millChallanNo: null }
-    ]
-  },
-  {
-    id: 'GRAY-LOT-2026-002',
-    lotNumber: 'GRAY-2026-002',
-    inwardDate: '2026-10-25',
-    weaverParty: 'Harikrishna Textiles',
-    weaverChallanNo: 'HKT-4450',
-    fabricQuality: 'Pure Modal Satin 60s',
-    totalTps: 8,
-    totalMeters: 818.0,
-    sentToMillMeters: 0,
-    ratePerMeter: 82.0,
-    status: 'In Stock',
-    rackLocation: 'Gray Rack G-02',
-    remarks: 'High twist modal gray fabric received from Katargam looms.',
-    tps: [
-      { srNo: 1, tpNo: '201', tpMtr: 102.0, status: 'In Stock', millChallanNo: null },
-      { srNo: 2, tpNo: '202', tpMtr: 101.5, status: 'In Stock', millChallanNo: null },
-      { srNo: 3, tpNo: '203', tpMtr: 103.0, status: 'In Stock', millChallanNo: null },
-      { srNo: 4, tpNo: '204', tpMtr: 102.5, status: 'In Stock', millChallanNo: null },
-      { srNo: 5, tpNo: '205', tpMtr: 101.0, status: 'In Stock', millChallanNo: null },
-      { srNo: 6, tpNo: '206', tpMtr: 103.5, status: 'In Stock', millChallanNo: null },
-      { srNo: 7, tpNo: '207', tpMtr: 102.0, status: 'In Stock', millChallanNo: null },
-      { srNo: 8, tpNo: '208', tpMtr: 102.5, status: 'In Stock', millChallanNo: null }
-    ]
-  },
-  {
-    id: 'GRAY-LOT-2026-003',
-    lotNumber: 'GRAY-2026-003',
-    inwardDate: '2026-10-26',
-    weaverParty: 'Shivam Loom Industries',
-    weaverChallanNo: 'SLI-1029',
-    fabricQuality: 'Cotton 60x60 Cambric',
-    totalTps: 12,
-    totalMeters: 1248.0,
-    sentToMillMeters: 0,
-    ratePerMeter: 38.5,
-    status: 'In Stock',
-    rackLocation: 'Gray Rack G-03',
-    remarks: '58" wide cambric fresh inward from weaver.',
-    tps: Array.from({ length: 12 }, (_, i) => ({
-      srNo: i + 1,
-      tpNo: `30${i + 1}`,
-      tpMtr: 104.0,
-      status: 'In Stock',
-      millChallanNo: null
-    }))
-  },
-  {
-    id: 'GRAY-LOT-2026-004',
-    lotNumber: 'GRAY-2026-004',
-    inwardDate: '2026-10-27',
-    weaverParty: 'Harikrishna Textiles',
-    weaverChallanNo: 'HKT-5099',
-    fabricQuality: 'Pure Modal Satin 60s',
-    totalTps: 50,
-    totalMeters: 5110.0,
-    sentToMillMeters: 0,
-    ratePerMeter: 82.0,
-    status: 'In Stock',
-    rackLocation: 'Gray Rack G-04',
-    remarks: 'Bulk 50 TP fresh inward from Harikrishna looms. Ready for RFD processing.',
-    tps: Array.from({ length: 50 }, (_, i) => ({
-      srNo: i + 1,
-      tpNo: `50${String(i + 1).padStart(2, '0')}`,
-      tpMtr: parseFloat((101.0 + ((i * 7) % 25) * 0.1).toFixed(1)),
-      status: 'In Stock',
-      millChallanNo: null
-    }))
-  },
-  {
-    id: 'GRAY-LOT-2026-005',
-    lotNumber: 'GRAY-2026-005',
-    inwardDate: '2026-10-27',
-    weaverParty: 'Radhe Shyam Weaving Works',
-    weaverChallanNo: 'RSW-10022',
-    fabricQuality: 'Heavy Rayon 14kg',
-    totalTps: 100,
-    totalMeters: 10220.0,
-    sentToMillMeters: 0,
-    ratePerMeter: 74.0,
-    status: 'In Stock',
-    rackLocation: 'Gray Rack G-05',
-    remarks: 'Bulk 100 TP fresh inward from Radhe Shyam looms. High-grade RFD quality.',
-    tps: Array.from({ length: 100 }, (_, i) => ({
-      srNo: i + 1,
-      tpNo: `100${String(i + 1).padStart(3, '0')}`,
-      tpMtr: parseFloat((101.0 + ((i * 11) % 25) * 0.1).toFixed(1)),
-      status: 'In Stock',
-      millChallanNo: null
-    }))
-  }
-];
-
-// Seed Mill Outward Challans
-const SEED_MILL_CHALLANS = [
-  {
-    id: 'MILL-CH-101',
-    challanNo: 'MILL-CH-101',
-    challanDate: '2026-10-25',
-    millParty: 'Shree Radhe Bleaching & Dyeing Processors',
-    vehicleNo: 'GJ-05-BT-4412',
-    driverName: 'Ramesh Patel',
-    processRequired: 'RFD Bleaching, Scouring & Heat Setting',
-    fabricQuality: 'Pure Viscose Rayon 14kg',
-    lotNumber: 'GRAY-2026-001',
-    totalTps: 5,
-    totalMeters: 512.0,
-    status: 'At Mill',
-    tps: [
-      { srNo: 1, lotNumber: 'GRAY-2026-001', tpNo: '101', tpMtr: 102.5 },
-      { srNo: 2, lotNumber: 'GRAY-2026-001', tpNo: '102', tpMtr: 101.0 },
-      { srNo: 3, lotNumber: 'GRAY-2026-001', tpNo: '103', tpMtr: 104.2 },
-      { srNo: 4, lotNumber: 'GRAY-2026-001', tpNo: '104', tpMtr: 103.0 },
-      { srNo: 5, lotNumber: 'GRAY-2026-001', tpNo: '105', tpMtr: 101.3 }
-    ],
-    notes: 'Urgent RFD required for digital discharge printing batch #1102.'
-  }
-];
-
-// Seed Processed RFD Lots
-const SEED_RFD_LOTS = [
-  {
-    id: 'YJ-RFD-2026-001',
-    lotNumber: 'YJ-RFD-2026-001',
-    inwardDate: '2026-10-26',
-    millParty: 'Shree Radhe Bleaching & Dyeing Processors',
-    millChallanNo: 'RADHE-RFD-7721',
-    originMillChallan: 'MILL-CH-101',
-    fabricQuality: 'Pure Viscose Rayon 14kg',
-    gsm: 140,
-    graySentMeters: 512.0,
-    receivedRfdMeters: 498.0,
-    shrinkageLossMeters: 14.0,
-    shrinkagePercent: 2.73,
-    totalRolls: 5,
-    issuedMeters: 200.0,
-    ratePerMeter: 68.5,
-    qualityGrade: 'A Grade',
-    status: 'Partially Issued',
-    rackLocation: 'RFD Rack YJ-A1',
-    remarks: 'Ready for digital sublimation discharge. 0% residue verified.',
-    rolls: [
-      { rollNo: 'R-01', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
-      { rollNo: 'R-02', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
-      { rollNo: 'R-03', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-04', meters: 99, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-05', meters: 99, status: 'In Stock', issueTo: null }
-    ]
-  }
-];
+const SEED_GRAY_LOTS = [];
+const SEED_MILL_CHALLANS = [];
+const SEED_RFD_LOTS = [];
 
 export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigate }) {
   // Master Screen Mode: 'gray' (Gray Fabric) or 'rfd' (RFD Fabric)
@@ -474,30 +299,21 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(configs)); } catch (e) {}
   }, [configs]);
 
-  // Data States
+  // Data States (Clean slate, filters out any legacy dummy/seed lots)
   const [grayLots, setGrayLots] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_GRAY_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p) && p.length > 0) {
-          const toPrepend = [];
-          const lot100 = SEED_GRAY_LOTS.find(l => l.lotNumber === 'GRAY-2026-005');
-          const lot50 = SEED_GRAY_LOTS.find(l => l.lotNumber === 'GRAY-2026-004');
-          if (lot100 && !p.some(l => l.lotNumber === 'GRAY-2026-005' || l.totalTps === 100)) {
-            toPrepend.push(lot100);
-          }
-          if (lot50 && !p.some(l => l.lotNumber === 'GRAY-2026-004' || l.totalTps === 50)) {
-            toPrepend.push(lot50);
-          }
-          if (toPrepend.length > 0) {
-            return [...toPrepend, ...p];
-          }
-          return p;
+        if (Array.isArray(p)) {
+          return p.filter(l => 
+            !l.id?.startsWith('GRAY-LOT-2026-') && 
+            !['GRAY-2026-001', 'GRAY-2026-002', 'GRAY-2026-003', 'GRAY-2026-004', 'GRAY-2026-005'].includes(l.lotNumber)
+          );
         }
       }
     } catch (e) {}
-    return SEED_GRAY_LOTS;
+    return [];
   });
 
   const [millChallans, setMillChallans] = useState(() => {
@@ -505,10 +321,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       const saved = localStorage.getItem(STORAGE_MILL_CHALLAN_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p) && p.length > 0) return p;
+        if (Array.isArray(p)) {
+          return p.filter(c => c.id !== 'MILL-CH-101' && c.challanNo !== 'MILL-CH-101');
+        }
       }
     } catch (e) {}
-    return SEED_MILL_CHALLANS;
+    return [];
   });
 
   const [rfdLots, setRfdLots] = useState(() => {
@@ -516,10 +334,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       const saved = localStorage.getItem(STORAGE_RFD_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p) && p.length > 0) return p;
+        if (Array.isArray(p)) {
+          return p.filter(r => r.id !== 'YJ-RFD-2026-001' && r.lotNumber !== 'YJ-RFD-2026-001');
+        }
       }
     } catch (e) {}
-    return SEED_RFD_LOTS;
+    return [];
   });
 
   // Search & Filter
@@ -565,22 +385,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [editingRfdLot, setEditingRfdLot] = useState(null);
   const [editRfdLotForm, setEditRfdLotForm] = useState(null);
 
-  // Form State for Weaver Inward with TP details
+  // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
     lotNumber: '',
     inwardDate: new Date().toISOString().split('T')[0],
     weaverParty: '',
     weaverChallanNo: '',
-    fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
-    ratePerMeter: 45,
-    rackLocation: 'Gray Rack G-01',
+    fabricQuality: '',
+    ratePerMeter: '',
+    rackLocation: '',
     remarks: '',
     tps: [
-      { srNo: 1, tpNo: '1', tpMtr: '' },
-      { srNo: 2, tpNo: '2', tpMtr: '' },
-      { srNo: 3, tpNo: '3', tpMtr: '' },
-      { srNo: 4, tpNo: '4', tpMtr: '' },
-      { srNo: 5, tpNo: '5', tpMtr: '' }
+      { srNo: 1, tpNo: '', tpMtr: '' }
     ]
   });
 
@@ -588,16 +404,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [millQualityFilter, setMillQualityFilter] = useState('all');
   const [millSearchQuery, setMillSearchQuery] = useState('');
 
-  // Form State for Mill Outward Challan
+  // Form State for Mill Outward Challan (Clean, no dummy/default values)
   const [millChallanForm, setMillChallanForm] = useState({
     challanNo: '',
     challanDate: new Date().toISOString().split('T')[0],
-    fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
+    fabricQuality: '',
     selectedLotId: 'all',
-    millParty: getPartyName(configs.mills[0]) || 'Shree Radhe Bleaching & Dyeing Processors',
+    millParty: '',
     vehicleNo: '',
     driverName: '',
-    processRequired: configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting',
+    processRequired: '',
     selectedTpKeys: {}, // key: "lotId__tpIndex" -> boolean
     notes: ''
   });
@@ -808,11 +624,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const handleAddTpRow = () => {
     setWeaverForm(prev => {
       const nextSr = prev.tps.length + 1;
-      const lastTpNo = prev.tps.length > 0 ? Number(prev.tps[prev.tps.length - 1].tpNo) : 0;
-      const nextTpNo = !isNaN(lastTpNo) && lastTpNo > 0 ? String(lastTpNo + 1) : String(nextSr);
       return {
         ...prev,
-        tps: [...prev.tps, { srNo: nextSr, tpNo: nextTpNo, tpMtr: '' }]
+        tps: [...prev.tps, { srNo: nextSr, tpNo: '', tpMtr: '' }]
       };
     });
   };
@@ -822,110 +636,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       const updated = [...prev.tps];
       for (let i = 0; i < count; i++) {
         const nextSr = updated.length + 1;
-        const lastTpNo = updated.length > 0 ? Number(updated[updated.length - 1].tpNo) : 0;
-        const nextTpNo = !isNaN(lastTpNo) && lastTpNo > 0 ? String(lastTpNo + 1) : String(nextSr);
-        updated.push({ srNo: nextSr, tpNo: nextTpNo, tpMtr: '' });
+        updated.push({ srNo: nextSr, tpNo: '', tpMtr: '' });
       }
       return { ...prev, tps: updated };
     });
+  };
+
+  const handleClearAllTps = () => {
+    setWeaverForm(prev => ({
+      ...prev,
+      tps: [{ srNo: 1, tpNo: '', tpMtr: '' }]
+    }));
   };
 
   const handleRemoveTpRow = (index) => {
     setWeaverForm(prev => {
       const filtered = prev.tps.filter((_, idx) => idx !== index);
       const reIndexed = filtered.map((item, idx) => ({ ...item, srNo: idx + 1 }));
-      return { ...prev, tps: reIndexed };
+      return { ...prev, tps: reIndexed.length > 0 ? reIndexed : [{ srNo: 1, tpNo: '', tpMtr: '' }] };
     });
-  };
-
-  const handleQuickGenerate50Tps = () => {
-    setWeaverForm(prev => {
-      const generated = Array.from({ length: 50 }, (_, i) => {
-        const srNo = i + 1;
-        const tpMtr = (101.0 + ((i * 7) % 25) * 0.1).toFixed(1);
-        return {
-          srNo,
-          tpNo: `50${String(srNo).padStart(2, '0')}`,
-          tpMtr: String(tpMtr)
-        };
-      });
-      return {
-        ...prev,
-        tps: generated
-      };
-    });
-    triggerEliteAlert('Generated 50 TP rows with sequential numbers and realistic meters!', '50 TPs Generated');
-  };
-
-  const handlePreFill50TpInward = () => {
-    const nextLot = `GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`;
-    const generated = Array.from({ length: 50 }, (_, i) => {
-      const srNo = i + 1;
-      const tpMtr = (101.0 + ((i * 7) % 25) * 0.1).toFixed(1);
-      return {
-        srNo,
-        tpNo: `50${String(srNo).padStart(2, '0')}`,
-        tpMtr: String(tpMtr)
-      };
-    });
-    setWeaverForm(prev => ({
-      ...prev,
-      lotNumber: nextLot,
-      inwardDate: new Date().toISOString().split('T')[0],
-      weaverParty: getPartyName(configs.weavers[0]) || 'Harikrishna Textiles',
-      weaverChallanNo: 'HKT-5099',
-      fabricQuality: configs.qualities[0] || 'Pure Modal Satin 60s',
-      ratePerMeter: 82,
-      rackLocation: 'Gray Rack G-04',
-      remarks: 'Bulk 50 TP inward received from weaver loom. Quality verified.',
-      tps: generated
-    }));
-    triggerEliteAlert('Populated complete 50 TP Inward entry! Review and click Save.', '50 TPs Ready');
-  };
-
-  const handleQuickGenerate100Tps = () => {
-    setWeaverForm(prev => {
-      const generated = Array.from({ length: 100 }, (_, i) => {
-        const srNo = i + 1;
-        const tpMtr = (101.0 + ((i * 11) % 25) * 0.1).toFixed(1);
-        return {
-          srNo,
-          tpNo: `100${String(srNo).padStart(3, '0')}`,
-          tpMtr: String(tpMtr)
-        };
-      });
-      return {
-        ...prev,
-        tps: generated
-      };
-    });
-    triggerEliteAlert('Generated 100 TP rows with sequential numbers and realistic meters!', '100 TPs Generated');
-  };
-
-  const handlePreFill100TpInward = () => {
-    const nextLot = `GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`;
-    const generated = Array.from({ length: 100 }, (_, i) => {
-      const srNo = i + 1;
-      const tpMtr = (101.0 + ((i * 11) % 25) * 0.1).toFixed(1);
-      return {
-        srNo,
-        tpNo: `100${String(srNo).padStart(3, '0')}`,
-        tpMtr: String(tpMtr)
-      };
-    });
-    setWeaverForm(prev => ({
-      ...prev,
-      lotNumber: nextLot,
-      inwardDate: new Date().toISOString().split('T')[0],
-      weaverParty: getPartyName(configs.weavers[1]) || getPartyName(configs.weavers[0]) || 'Radhe Shyam Weaving Works',
-      weaverChallanNo: 'RSW-10022',
-      fabricQuality: configs.qualities[1] || configs.qualities[0] || 'Heavy Rayon 14kg',
-      ratePerMeter: 74,
-      rackLocation: 'Gray Rack G-05',
-      remarks: 'Bulk 100 TP inward received from weaver loom. High-grade RFD quality.',
-      tps: generated
-    }));
-    triggerEliteAlert('Populated complete 100 TP Inward entry! Review and click Save.', '100 TPs Ready');
   };
 
   const handleTpKeyDown = (e, index) => {
@@ -939,6 +668,24 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         if (nextInput) nextInput.focus();
       }, 50);
     }
+  };
+
+  const handleResetToCleanSlate = () => {
+    triggerEliteConfirm(
+      'Are you sure you want to clear all fabric lots and mill challans from the system? This will remove all test/demo data and start completely fresh.',
+      () => {
+        setGrayLots([]);
+        setMillChallans([]);
+        setRfdLots([]);
+        try {
+          localStorage.removeItem(STORAGE_GRAY_KEY);
+          localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
+          localStorage.removeItem(STORAGE_RFD_KEY);
+        } catch (e) {}
+        triggerEliteAlert('All fabric lots and mill challans have been cleared. System is now on a completely clean slate!', 'Clean Slate');
+      },
+      'Clear All Data'
+    );
   };
 
   const weaverFormSummary = useMemo(() => {
@@ -978,6 +725,10 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       triggerEliteAlert('Please enter Weaver / Loom Owner Party Name.', 'Missing Weaver');
       return;
     }
+    if (!weaverForm.fabricQuality) {
+      triggerEliteAlert('Please select Fabric Quality from the dropdown.', 'Missing Quality');
+      return;
+    }
     const validTps = weaverForm.tps.filter(t => {
       const m = parseFloat(t.tpMtr);
       return !isNaN(m) && m > 0;
@@ -1004,11 +755,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       sentToMillMeters: 0,
       ratePerMeter: parseFloat(weaverForm.ratePerMeter) || 0,
       status: 'In Stock',
-      rackLocation: weaverForm.rackLocation.trim() || 'Gray Rack',
+      rackLocation: weaverForm.rackLocation.trim() || '',
       remarks: weaverForm.remarks.trim(),
       tps: validTps.map((t, idx) => ({
         srNo: idx + 1,
-        tpNo: t.tpNo || String(idx + 1),
+        tpNo: t.tpNo ? t.tpNo.trim() : String(idx + 1),
         tpMtr: parseFloat(t.tpMtr),
         status: 'In Stock',
         millChallanNo: null
@@ -1018,22 +769,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setGrayLots(prev => [newGrayLot, ...prev]);
     setShowWeaverInwardModal(false);
 
-    // Reset Form
+    // Reset Form to clean slate
     setWeaverForm({
       lotNumber: '',
       inwardDate: new Date().toISOString().split('T')[0],
       weaverParty: '',
       weaverChallanNo: '',
-      fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
-      ratePerMeter: 45,
-      rackLocation: 'Gray Rack G-01',
+      fabricQuality: '',
+      ratePerMeter: '',
+      rackLocation: '',
       remarks: '',
       tps: [
-        { srNo: 1, tpNo: '1', tpMtr: '' },
-        { srNo: 2, tpNo: '2', tpMtr: '' },
-        { srNo: 3, tpNo: '3', tpMtr: '' },
-        { srNo: 4, tpNo: '4', tpMtr: '' },
-        { srNo: 5, tpNo: '5', tpMtr: '' }
+        { srNo: 1, tpNo: '', tpMtr: '' }
       ]
     });
 
@@ -1287,12 +1034,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setMillChallanForm({
       challanNo: '',
       challanDate: new Date().toISOString().split('T')[0],
-      fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
+      fabricQuality: '',
       selectedLotId: 'all',
-      millParty: getPartyName(configs.mills[0]) || 'Shree Radhe Bleaching & Dyeing Processors',
+      millParty: '',
       vehicleNo: '',
       driverName: '',
-      processRequired: configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting',
+      processRequired: '',
       selectedTpKeys: {},
       notes: ''
     });
@@ -2935,14 +2682,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
             {/* Modal Footer with Reset Defaults */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
-              <button
-                type="button"
-                onClick={handleResetMasterTabDefaults}
-                className="btn-secondary"
-                style={{ fontSize: '0.76rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #fde68a' }}
-              >
-                <RotateCcw size={13} /> Restore Default {settingsActiveTab}
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleResetMasterTabDefaults}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.76rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #fde68a' }}
+                >
+                  <RotateCcw size={13} /> Restore Default {settingsActiveTab}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetToCleanSlate}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.76rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #fca5a5' }}
+                  title="Clear all saved transaction data to start completely fresh"
+                >
+                  <Trash2 size={13} /> Clear All Lots & Challans
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -3212,26 +2970,10 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <Boxes size={22} color="#0284c7" />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
                       + Inward Gray Fabric from Weaver
                     </h3>
-                    <button
-                      type="button"
-                      onClick={handlePreFill50TpInward}
-                      style={{ padding: '3px 10px', fontSize: '0.72rem', background: '#eff6ff', color: '#0284c7', border: '1px solid #bfdbfe', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                      title="Click to automatically fill all fields with 50 TPs sample entry"
-                    >
-                      ⚡ Quick 50 TP Preset
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handlePreFill100TpInward}
-                      style={{ padding: '3px 10px', fontSize: '0.72rem', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                      title="Click to automatically fill all fields with 100 TPs sample entry"
-                    >
-                      ⚡ Quick 100 TP Preset
-                    </button>
                   </div>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     Select weaver & quality from masters. Enter individual TP Numbers & TP Meters. Press Enter to add next row.
@@ -3380,7 +3122,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     onChange={(e) => setWeaverForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
                     className="input-field"
                     style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                    required
                   >
+                    <option value="">-- Select Fabric Quality * --</option>
                     {(configs.qualities || []).map(q => (
                       <option key={q} value={q}>{q}</option>
                     ))}
@@ -3394,7 +3138,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <input
                     type="number"
                     step="0.01"
-                    placeholder="e.g. 45"
+                    placeholder="Enter rate per meter..."
                     value={weaverForm.ratePerMeter}
                     onChange={(e) => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
                     className="input-field"
@@ -3416,21 +3160,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <div style={{ display: 'flex', gap: '5px' }}>
                     <button
                       type="button"
-                      onClick={handleQuickGenerate50Tps}
+                      onClick={() => handleAddMultipleTpRows(10)}
                       className="btn-secondary"
-                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontWeight: 800 }}
-                      title="Add 50 sequential TP rows with valid meters"
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
                     >
-                      ⚡ + 50 TPs
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleQuickGenerate100Tps}
-                      className="btn-secondary"
-                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px', background: '#fdf4ff', color: '#c026d3', border: '1px solid #f5d0fe', fontWeight: 800 }}
-                      title="Add 100 sequential TP rows with valid meters"
-                    >
-                      ⚡ + 100 TPs
+                      + Add 10 Rows
                     </button>
                     <button
                       type="button"
@@ -3448,6 +3182,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     >
                       + Add Row
                     </button>
+                    {weaverForm.tps.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllTps}
+                        style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        title="Clear all rows and reset to 1 empty row"
+                      >
+                        Reset Rows
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -3764,6 +3508,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       className="input-field"
                       style={{ height: '34px', fontSize: '0.8rem', width: '100%', fontWeight: 700 }}
                     >
+                      <option value="">-- Select Fabric Quality * --</option>
                       {grayStockQualities.map(item => (
                         <option key={item.quality} value={item.quality}>
                           {item.quality} {item.inStockTps > 0 ? `(${item.inStockTps} In Stock, ${item.inStockMtr.toFixed(0)} Mtr)` : `(0 In Stock)`}
