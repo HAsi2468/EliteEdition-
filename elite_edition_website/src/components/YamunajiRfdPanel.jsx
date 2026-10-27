@@ -147,14 +147,6 @@ export const DEFAULT_CONFIGS = {
     'Dola Silk Heavy 80gm',
     'Tissue Silk Zari'
   ],
-  pannas: [
-    '44"',
-    '48"',
-    '50"',
-    '54"',
-    '58"',
-    '60"'
-  ],
   mills: [
     {
       name: 'Shree Radhe Bleaching & Dyeing Processors',
@@ -472,7 +464,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               ? p.weavers.map(w => normalizeParty(w)) 
               : DEFAULT_CONFIGS.weavers,
             qualities: Array.isArray(p.qualities) && p.qualities.length > 0 ? p.qualities : DEFAULT_CONFIGS.qualities,
-            pannas: Array.isArray(p.pannas) && p.pannas.length > 0 ? p.pannas : DEFAULT_CONFIGS.pannas,
             mills: Array.isArray(p.mills) && p.mills.length > 0 
               ? p.mills.map(m => normalizeParty(m)) 
               : DEFAULT_CONFIGS.mills,
@@ -542,7 +533,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   // Modals
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsActiveTab, setSettingsActiveTab] = useState('weavers'); // 'weavers' | 'qualities' | 'pannas' | 'mills' | 'processes'
+  const [settingsActiveTab, setSettingsActiveTab] = useState('weavers'); // 'weavers' | 'qualities' | 'mills' | 'processes'
   const [newSettingInput, setNewSettingInput] = useState('');
   const [editingItemIndex, setEditingItemIndex] = useState(null);
   const [editingItemValue, setEditingItemValue] = useState('');
@@ -587,7 +578,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     weaverParty: '',
     weaverChallanNo: '',
     fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
-    panna: configs.pannas[0] || '44"',
     ratePerMeter: 45,
     rackLocation: 'Gray Rack G-01',
     remarks: '',
@@ -891,7 +881,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       weaverParty: getPartyName(configs.weavers[0]) || 'Harikrishna Textiles',
       weaverChallanNo: 'HKT-5099',
       fabricQuality: configs.qualities[0] || 'Pure Modal Satin 60s',
-      panna: configs.pannas[0] || '44"',
       ratePerMeter: 82,
       rackLocation: 'Gray Rack G-04',
       remarks: 'Bulk 50 TP inward received from weaver loom. Quality verified.',
@@ -937,7 +926,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       weaverParty: getPartyName(configs.weavers[1]) || getPartyName(configs.weavers[0]) || 'Radhe Shyam Weaving Works',
       weaverChallanNo: 'RSW-10022',
       fabricQuality: configs.qualities[1] || configs.qualities[0] || 'Heavy Rayon 14kg',
-      panna: configs.pannas[1] || configs.pannas[0] || '48"',
       ratePerMeter: 74,
       rackLocation: 'Gray Rack G-05',
       remarks: 'Bulk 100 TP inward received from weaver loom. High-grade RFD quality.',
@@ -1017,7 +1005,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       weaverParty: weaverForm.weaverParty.trim(),
       weaverChallanNo: weaverForm.weaverChallanNo.trim() || 'Direct Inward',
       fabricQuality: weaverForm.fabricQuality,
-      panna: weaverForm.panna,
       totalTps: validTps.length,
       totalMeters: parseFloat(totalMeters.toFixed(2)),
       sentToMillMeters: 0,
@@ -1044,7 +1031,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       weaverParty: '',
       weaverChallanNo: '',
       fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
-      panna: configs.pannas[0] || '44"',
       ratePerMeter: 45,
       rackLocation: 'Gray Rack G-01',
       remarks: '',
@@ -1435,7 +1421,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       weaverParty: lot.weaverParty || '',
       weaverChallanNo: lot.weaverChallanNo || '',
       fabricQuality: lot.fabricQuality || '',
-      panna: lot.panna || '',
       ratePerMeter: lot.ratePerMeter || 0,
       notes: lot.notes || lot.remarks || '',
       tps: (lot.tps || []).map(t => ({ ...t }))
@@ -1471,7 +1456,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           weaverParty: editGrayLotForm.weaverParty,
           weaverChallanNo: editGrayLotForm.weaverChallanNo,
           fabricQuality: editGrayLotForm.fabricQuality,
-          panna: editGrayLotForm.panna,
           ratePerMeter: parseFloat(editGrayLotForm.ratePerMeter) || 0,
           remarks: editGrayLotForm.notes,
           notes: editGrayLotForm.notes,
@@ -1523,7 +1507,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       millParty: lot.millParty || '',
       millChallanNo: lot.millChallanNo || '',
       fabricQuality: lot.fabricQuality || '',
-      panna: lot.panna || '',
       graySentMeters: lot.graySentMeters || 0,
       receivedRfdMeters: lot.receivedRfdMeters || 0,
       status: lot.status || 'In Stock'
@@ -1773,7 +1756,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               cursor: 'pointer',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
             }}
-            title="Configure Weaver Names, Fabric Qualities, Panna Widths & Mills"
+            title="Configure Weaver Names, Fabric Qualities, Processing Mills & Process Types"
           >
             <Settings size={15} color="#0284c7" /> Settings
           </button>
@@ -2032,7 +2015,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <th style={{ padding: '10px 12px' }}>Weaver / Loom Owner</th>
                       <th style={{ padding: '10px 12px' }}>Weaver Challan #</th>
                       <th style={{ padding: '10px 12px' }}>Quality</th>
-                      <th style={{ padding: '10px 12px' }}>Panna</th>
                       <th style={{ padding: '10px 12px' }}>Total TPs</th>
                       <th style={{ padding: '10px 12px' }}>Total Gray Mtr</th>
                       <th style={{ padding: '10px 12px' }}>At Mill Mtr</th>
@@ -2064,9 +2046,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             <span style={{ background: '#f8fafc', padding: '3px 8px', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
                               {lot.fabricQuality}
                             </span>
-                          </td>
-                          <td style={{ padding: '10px 12px', fontWeight: 700 }}>
-                            {lot.panna}
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
                             {lot.totalTps} TPs
@@ -2420,7 +2399,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     <th style={{ padding: '10px 12px' }}>Processing Mill</th>
                     <th style={{ padding: '10px 12px' }}>Mill Challan #</th>
                     <th style={{ padding: '10px 12px' }}>Fabric Quality</th>
-                    <th style={{ padding: '10px 12px' }}>Panna</th>
                     <th style={{ padding: '10px 12px' }}>Gray Sent</th>
                     <th style={{ padding: '10px 12px' }}>RFD Received</th>
                     <th style={{ padding: '10px 12px' }}>Shrinkage / Loss</th>
@@ -2448,9 +2426,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 600 }}>
                           {lot.fabricQuality}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>
-                          {lot.panna}
                         </td>
                         <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
                           {lot.graySentMeters} Mtr
@@ -2584,7 +2559,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     Yamunaji Master Configuration Settings
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Configure dropdown values for Weaver Names, Fabric Qualities, Panna Widths, Processing Mills & Process Types.
+                    Configure dropdown values for Weaver Names, Fabric Qualities, Processing Mills & Process Types.
                   </span>
                 </div>
               </div>
@@ -2630,23 +2605,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 }}
               >
                 🥻 Fabric Qualities ({configs.qualities?.length || 0})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setSettingsActiveTab('pannas'); setEditingItemIndex(null); setNewSettingInput(''); }}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: settingsActiveTab === 'pannas' ? 800 : 600,
-                  background: settingsActiveTab === 'pannas' ? '#0ea5e9' : 'transparent',
-                  color: settingsActiveTab === 'pannas' ? '#ffffff' : '#64748b',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                📏 Panna / Widths ({configs.pannas?.length || 0})
               </button>
 
               <button
@@ -2882,7 +2840,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     required
                     placeholder={
                       settingsActiveTab === 'qualities' ? 'Enter Fabric Quality (e.g. Cotton 60x60 Cambric)...' :
-                      settingsActiveTab === 'pannas' ? 'Enter Panna / Width (e.g. 52", 64")...' :
                       'Enter Process Type (e.g. RFD Bleaching)...'
                     }
                     value={newSettingInput}
@@ -3410,8 +3367,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
 
-              {/* Fabric Quality & Panna from Master Settings */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr', gap: '0.75rem' }}>
+              {/* Fabric Quality & Rate per Meter from Master Settings */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                     <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
@@ -3438,37 +3395,13 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
 
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
-                      Panna / Width *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => { setSettingsActiveTab('pannas'); setShowSettingsModal(true); }}
-                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ⚙️ Manage Panna
-                    </button>
-                  </div>
-                  <select
-                    value={weaverForm.panna}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, panna: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  >
-                    {(configs.pannas || []).map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
                     Rate / Mtr (₹)
                   </label>
                   <input
                     type="number"
-                    step="any"
+                    step="0.01"
+                    placeholder="e.g. 45"
                     value={weaverForm.ratePerMeter}
                     onChange={(e) => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
                     className="input-field"
@@ -4986,24 +4919,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Panna
-                  </label>
-                  <select
-                    className="input-field"
-                    value={editGrayLotForm.panna}
-                    onChange={e => setEditGrayLotForm({ ...editGrayLotForm, panna: e.target.value })}
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  >
-                    {configs.pannas.map((p, idx) => (
-                      <option key={idx} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
                     Rate per Meter (₹)
                   </label>
                   <input
@@ -5015,19 +4930,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Notes / Remarks
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={editGrayLotForm.notes}
-                    onChange={e => setEditGrayLotForm({ ...editGrayLotForm, notes: e.target.value })}
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  />
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                  Notes / Remarks
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={editGrayLotForm.notes}
+                  onChange={e => setEditGrayLotForm({ ...editGrayLotForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                />
               </div>
 
               {/* TP Breakdown in Edit Gray Lot */}
