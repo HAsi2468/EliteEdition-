@@ -268,7 +268,6 @@ const SEED_GRAY_LOTS = [
     weaverParty: 'Maruti Weaving Works',
     weaverChallanNo: 'MWW-8921',
     fabricQuality: 'Pure Viscose Rayon 14kg',
-    panna: '44"',
     totalTps: 10,
     totalMeters: 1024.5,
     sentToMillMeters: 512.0,
@@ -296,7 +295,6 @@ const SEED_GRAY_LOTS = [
     weaverParty: 'Harikrishna Textiles',
     weaverChallanNo: 'HKT-4450',
     fabricQuality: 'Pure Modal Satin 60s',
-    panna: '44"',
     totalTps: 8,
     totalMeters: 818.0,
     sentToMillMeters: 0,
@@ -322,7 +320,6 @@ const SEED_GRAY_LOTS = [
     weaverParty: 'Shivam Loom Industries',
     weaverChallanNo: 'SLI-1029',
     fabricQuality: 'Cotton 60x60 Cambric',
-    panna: '58"',
     totalTps: 12,
     totalMeters: 1248.0,
     sentToMillMeters: 0,
@@ -345,7 +342,6 @@ const SEED_GRAY_LOTS = [
     weaverParty: 'Harikrishna Textiles',
     weaverChallanNo: 'HKT-5099',
     fabricQuality: 'Pure Modal Satin 60s',
-    panna: '44"',
     totalTps: 50,
     totalMeters: 5110.0,
     sentToMillMeters: 0,
@@ -368,7 +364,6 @@ const SEED_GRAY_LOTS = [
     weaverParty: 'Radhe Shyam Weaving Works',
     weaverChallanNo: 'RSW-10022',
     fabricQuality: 'Heavy Rayon 14kg',
-    panna: '48"',
     totalTps: 100,
     totalMeters: 10220.0,
     sentToMillMeters: 0,
@@ -422,7 +417,6 @@ const SEED_RFD_LOTS = [
     millChallanNo: 'RADHE-RFD-7721',
     originMillChallan: 'MILL-CH-101',
     fabricQuality: 'Pure Viscose Rayon 14kg',
-    panna: '44"',
     gsm: 140,
     graySentMeters: 512.0,
     receivedRfdMeters: 498.0,
@@ -452,7 +446,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // Sub-tabs for Gray: 'weaver_inward' or 'mill_outward'
   const [graySubTab, setGraySubTab] = useState('weaver_inward');
 
-  // Master Configuration State (Weavers, Qualities, Pannas, Mills, Processes)
+  // Master Configuration State (Weavers, Qualities, Mills, Processes)
   const [configs, setConfigs] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_CONFIGS_KEY);
@@ -1107,7 +1101,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           weaverParty: lot.weaverParty,
           weaverChallanNo: lot.weaverChallanNo || lot.lotNumber,
           fabricQuality: lot.fabricQuality,
-          panna: lot.panna,
           tpIndex: tpIdx,
           srNo: tp.srNo,
           tpNo: tp.tpNo,
@@ -2831,7 +2824,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
             ) : (
-              /* TAB CONTENT: QUALITIES, PANNAS, PROCESSES */
+              /* TAB CONTENT: QUALITIES, PROCESSES */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 {/* Quick Add Bar */}
                 <form onSubmit={handleAddMasterSetting} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
