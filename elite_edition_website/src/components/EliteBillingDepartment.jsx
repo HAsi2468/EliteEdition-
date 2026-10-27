@@ -300,6 +300,12 @@ export default function EliteBillingDepartment({
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
 
+  // Pagination states for invoices & purchases (25 default for low browser memory)
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePageSize, setInvoicePageSize] = useState(25);
+  const [purchasePage, setPurchasePage] = useState(1);
+  const [purchasePageSize, setPurchasePageSize] = useState(25);
+
   // ── NON-BLOCKING VALIDATION DOCK & INDUSTRIAL SCANNER HOOKS ────────────────
   const { errors: validationErrors, setErrors: setValidationErrors, clearErrors: clearValidationErrors } = useValidationDock();
 
@@ -2705,12 +2711,6 @@ export default function EliteBillingDepartment({
   const [itemSearch, setItemSearch] = useState('');
   const [digitalChallans, setDigitalChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
-
-  // Pagination states for invoices & purchases (25 default for low browser memory)
-  const [invoicePage, setInvoicePage] = useState(1);
-  const [invoicePageSize, setInvoicePageSize] = useState(25);
-  const [purchasePage, setPurchasePage] = useState(1);
-  const [purchasePageSize, setPurchasePageSize] = useState(25);
 
   useEffect(() => {
     setInvoicePage(1);
