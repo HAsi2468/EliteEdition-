@@ -385,6 +385,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [editingRfdLot, setEditingRfdLot] = useState(null);
   const [editRfdLotForm, setEditRfdLotForm] = useState(null);
 
+  // Inward RFD Lot Modal & TP-wise entry state
+  const [showInwardRfdModal, setShowInwardRfdModal] = useState(false);
+  const [inwardRfdForm, setInwardRfdForm] = useState({
+    lotNumber: '',
+    inwardDate: new Date().toISOString().split('T')[0],
+    sourceChallanId: '',
+    millParty: '',
+    millChallanNo: '',
+    fabricQuality: '',
+    notes: '',
+    tps: [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+  });
+
+  // Modal state for viewing individual TP breakdown & Shortage audit of an RFD lot
+  const [viewingRfdTpsLot, setViewingRfdTpsLot] = useState(null);
+
   // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
     lotNumber: '',
@@ -459,12 +475,29 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const rfdStats = useMemo(() => {
     let inStockRfdMtrs = 0;
     let inStockRolls = 0;
+    let totalGraySent = 0;
+    let totalShortageMtrs = 0;
+
     rfdLots.forEach(lot => {
       const bal = Math.max(0, (lot.receivedRfdMeters || 0) - (lot.issuedMeters || 0));
       inStockRfdMtrs += bal;
-      inStockRolls += (lot.rolls || []).filter(r => r.status === 'In Stock').length;
+      const pieceCount = (lot.tps && lot.tps.length > 0)
+        ? lot.tps.filter(t => t.status === 'In Stock').length
+        : (lot.rolls || []).filter(r => r.status === 'In Stock').length;
+      inStockRolls += (pieceCount > 0 ? pieceCount : (lot.totalTps || (lot.tps ? lot.tps.length : 0)));
+      totalGraySent += (lot.graySentMeters || 0);
+      totalShortageMtrs += (lot.shrinkageLossMeters || 0);
     });
-    return { inStockRfdMtrs, inStockRolls, totalRfdLots: rfdLots.length };
+
+    const avgShortagePercent = totalGraySent > 0 ? parseFloat(((totalShortageMtrs / totalGraySent) * 100).toFixed(1)) : 0;
+    return {
+      inStockRfdMtrs,
+      inStockRolls,
+      totalRfdLots: rfdLots.length,
+      totalGraySent: parseFloat(totalGraySent.toFixed(1)),
+      totalShortageMtrs: parseFloat(totalShortageMtrs.toFixed(1)),
+      avgShortagePercent
+    };
   }, [rfdLots]);
 
   // ==========================================
@@ -1237,6 +1270,264 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   };
 
   // ==========================================
+  // 🥻 INWARD RFD FABRIC (TP-WISE SHORTAGE AUDIT)
+  // ==========================================
+  const handleOpenInwardRfdModal = (challan = null) => {
+    if (challan) {
+      const sentTps = (challan.tps || []).map((t, idx) => ({
+        srNo: idx + 1,
+        tpNo: t.tpNo || String(idx + 1),
+        grayMtr: t.tpMtr !== undefined && t.tpMtr !== null ? String(t.tpMtr) : '',
+        rfdMtr: '',
+        status: 'In Stock'
+      }));
+
+      const cleanChallanNo = (challan.challanNo || '').replace(/[^a-zA-Z0-9]/g, '');
+      const suggestedLot = `YJ-RFD-${cleanChallanNo || String(rfdLots.length + 1).padStart(3, '0')}`;
+
+      setInwardRfdForm({
+        lotNumber: suggestedLot,
+        inwardDate: new Date().toISOString().split('T')[0],
+        sourceChallanId: challan.id,
+        millParty: challan.millParty || '',
+        millChallanNo: challan.challanNo || '',
+        fabricQuality: challan.fabricQuality || '',
+        notes: `Received from Mill Challan ${challan.challanNo}`,
+        tps: sentTps.length > 0 ? sentTps : [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+      });
+    } else {
+      setInwardRfdForm({
+        lotNumber: `YJ-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`,
+        inwardDate: new Date().toISOString().split('T')[0],
+        sourceChallanId: '',
+        millParty: '',
+        millChallanNo: '',
+        fabricQuality: '',
+        notes: '',
+        tps: [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+      });
+    }
+    setShowInwardRfdModal(true);
+  };
+
+  const handleSelectSourceChallan = (challanId) => {
+    if (!challanId) {
+      setInwardRfdForm(prev => ({
+        ...prev,
+        sourceChallanId: '',
+        millParty: '',
+        millChallanNo: '',
+        fabricQuality: '',
+        notes: '',
+        tps: [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+      }));
+      return;
+    }
+
+    const ch = millChallans.find(c => String(c.id) === String(challanId));
+    if (!ch) return;
+
+    const sentTps = (ch.tps || []).map((t, idx) => ({
+      srNo: idx + 1,
+      tpNo: t.tpNo || String(idx + 1),
+      grayMtr: t.tpMtr !== undefined && t.tpMtr !== null ? String(t.tpMtr) : '',
+      rfdMtr: '',
+      status: 'In Stock'
+    }));
+
+    const cleanChallanNo = (ch.challanNo || '').replace(/[^a-zA-Z0-9]/g, '');
+    const suggestedLot = `YJ-RFD-${cleanChallanNo || String(rfdLots.length + 1).padStart(3, '0')}`;
+
+    setInwardRfdForm(prev => ({
+      ...prev,
+      sourceChallanId: ch.id,
+      lotNumber: suggestedLot,
+      millParty: ch.millParty || '',
+      millChallanNo: ch.challanNo || '',
+      fabricQuality: ch.fabricQuality || '',
+      notes: `Received from Mill Challan ${ch.challanNo}`,
+      tps: sentTps.length > 0 ? sentTps : [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+    }));
+  };
+
+  const handleInwardTpChange = (index, field, value) => {
+    setInwardRfdForm(prev => {
+      const updated = [...prev.tps];
+      if (field === 'rfdMtr' || field === 'grayMtr') {
+        const sanitized = value.replace(/[^0-9.]/g, '');
+        const parts = sanitized.split('.');
+        const clean = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
+        updated[index] = { ...updated[index], [field]: clean };
+      } else {
+        updated[index] = { ...updated[index], [field]: value };
+      }
+      return { ...prev, tps: updated };
+    });
+  };
+
+  const handleAddInwardTpRow = () => {
+    setInwardRfdForm(prev => {
+      const nextSr = prev.tps.length + 1;
+      return {
+        ...prev,
+        tps: [...prev.tps, { srNo: nextSr, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+      };
+    });
+  };
+
+  const handleAddMultipleInwardTpRows = (count = 5) => {
+    setInwardRfdForm(prev => {
+      const updated = [...prev.tps];
+      for (let i = 0; i < count; i++) {
+        const nextSr = updated.length + 1;
+        updated.push({ srNo: nextSr, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' });
+      }
+      return { ...prev, tps: updated };
+    });
+  };
+
+  const handleRemoveInwardTpRow = (index) => {
+    setInwardRfdForm(prev => {
+      const reIndexed = prev.tps
+        .filter((_, idx) => idx !== index)
+        .map((t, idx) => ({ ...t, srNo: idx + 1 }));
+      return { ...prev, tps: reIndexed.length > 0 ? reIndexed : [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }] };
+    });
+  };
+
+  const handleAutoBaselineRfdMtrs = () => {
+    setInwardRfdForm(prev => {
+      const updated = (prev.tps || []).map(t => {
+        if (!t.rfdMtr && t.grayMtr) {
+          return { ...t, rfdMtr: String(t.grayMtr) };
+        }
+        return t;
+      });
+      return { ...prev, tps: updated };
+    });
+    triggerEliteAlert('Gray meters copied to RFD meters as baseline! You can now adjust the pieces that had shortage.', 'Baseline Filled');
+  };
+
+  // Live calculation of Inward RFD metrics
+  const inwardRfdSummary = useMemo(() => {
+    let totalGray = 0;
+    let totalRfd = 0;
+    let validCount = 0;
+
+    (inwardRfdForm.tps || []).forEach(t => {
+      const g = parseFloat(t.grayMtr) || 0;
+      const r = parseFloat(t.rfdMtr) || 0;
+      totalGray += g;
+      totalRfd += r;
+      if (r > 0) validCount++;
+    });
+
+    const diff = totalGray - totalRfd;
+    const shortageMtr = diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
+    const shortagePct = totalGray > 0 ? parseFloat(((shortageMtr / totalGray) * 100).toFixed(2)) : 0;
+
+    return {
+      totalGray: parseFloat(totalGray.toFixed(2)),
+      totalRfd: parseFloat(totalRfd.toFixed(2)),
+      shortageMtr,
+      shortagePct,
+      validCount,
+      totalRows: inwardRfdForm.tps.length
+    };
+  }, [inwardRfdForm.tps]);
+
+  const handleSubmitInwardRfd = (e) => {
+    e.preventDefault();
+    if (!inwardRfdForm.millParty.trim()) {
+      triggerEliteAlert('Please select or enter the Processing Mill name.', 'Missing Mill');
+      return;
+    }
+    if (!inwardRfdForm.fabricQuality) {
+      triggerEliteAlert('Please select Fabric Quality from the dropdown.', 'Missing Quality');
+      return;
+    }
+
+    const validTps = (inwardRfdForm.tps || []).filter(t => {
+      const r = parseFloat(t.rfdMtr);
+      return !isNaN(r) && r > 0;
+    });
+
+    if (validTps.length === 0) {
+      triggerEliteAlert('Please enter received RFD meters for at least one TP.', 'No RFD Meters');
+      return;
+    }
+
+    const lotNumber = inwardRfdForm.lotNumber.trim() || `YJ-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`;
+    const totalGray = inwardRfdSummary.totalGray;
+    const totalRfd = inwardRfdSummary.totalRfd;
+    const shortageMtr = inwardRfdSummary.shortageMtr;
+    const shortagePct = inwardRfdSummary.shortagePct;
+
+    const newRfdLot = {
+      id: `RFD-LOT-${Date.now()}`,
+      lotNumber,
+      inwardDate: inwardRfdForm.inwardDate,
+      millParty: inwardRfdForm.millParty.trim(),
+      millChallanNo: inwardRfdForm.millChallanNo.trim() || 'Direct Mill Inward',
+      fabricQuality: inwardRfdForm.fabricQuality,
+      graySentMeters: totalGray,
+      receivedRfdMeters: totalRfd,
+      shrinkageLossMeters: shortageMtr,
+      shrinkagePercent: shortagePct,
+      status: 'In Stock',
+      issuedMeters: 0,
+      notes: inwardRfdForm.notes.trim(),
+      sourceChallanId: inwardRfdForm.sourceChallanId || null,
+      totalTps: validTps.length,
+      tps: validTps.map((t, idx) => {
+        const g = parseFloat(t.grayMtr) || 0;
+        const r = parseFloat(t.rfdMtr) || 0;
+        const diff = g - r;
+        const sMtr = diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
+        const sPct = g > 0 ? parseFloat(((sMtr / g) * 100).toFixed(2)) : 0;
+        return {
+          srNo: idx + 1,
+          tpNo: t.tpNo ? t.tpNo.trim() : String(idx + 1),
+          grayMtr: g,
+          rfdMtr: r,
+          shortageMtr: sMtr,
+          shortagePercent: sPct,
+          status: 'In Stock'
+        };
+      })
+    };
+
+    setRfdLots(prev => [newRfdLot, ...prev]);
+
+    // If linked to a source mill challan, update its status
+    if (inwardRfdForm.sourceChallanId) {
+      setMillChallans(prev => prev.map(ch => {
+        if (ch.id === inwardRfdForm.sourceChallanId) {
+          return { ...ch, status: 'Received as RFD' };
+        }
+        return ch;
+      }));
+    }
+
+    setShowInwardRfdModal(false);
+    setInwardRfdForm({
+      lotNumber: '',
+      inwardDate: new Date().toISOString().split('T')[0],
+      sourceChallanId: '',
+      millParty: '',
+      millChallanNo: '',
+      fabricQuality: '',
+      notes: '',
+      tps: [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }]
+    });
+
+    triggerEliteAlert(
+      `RFD Fabric Lot "${lotNumber}" inwarded successfully with ${validTps.length} TPs (${totalRfd} Mtr). Total Shortage: ${shortageMtr} Mtr (${shortagePct}%).`,
+      'RFD Inward Successful'
+    );
+  };
+
+  // ==========================================
   // ✏️ Edit & Delete Handlers: RFD Fabric Lots
   // ==========================================
   const handleOpenEditRfdLot = (lot) => {
@@ -1249,7 +1540,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       fabricQuality: lot.fabricQuality || '',
       graySentMeters: lot.graySentMeters || 0,
       receivedRfdMeters: lot.receivedRfdMeters || 0,
-      status: lot.status || 'In Stock'
+      status: lot.status || 'In Stock',
+      tps: (lot.tps || []).map(t => ({ ...t }))
     });
   };
 
@@ -1259,14 +1551,40 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
     setRfdLots(prev => prev.map(l => {
       if (l.id === editingRfdLot.id) {
-        const receivedRfdMeters = parseFloat(editRfdLotForm.receivedRfdMeters) || 0;
-        const graySentMeters = parseFloat(editRfdLotForm.graySentMeters || l.graySentMeters) || 0;
+        let tps = editRfdLotForm.tps;
+        let receivedRfdMeters = parseFloat(editRfdLotForm.receivedRfdMeters) || 0;
+        let graySentMeters = parseFloat(editRfdLotForm.graySentMeters || l.graySentMeters) || 0;
+
+        if (tps && tps.length > 0) {
+          let calcGray = 0;
+          let calcRfd = 0;
+          tps = tps.map((tp, idx) => {
+            const g = parseFloat(tp.grayMtr) || 0;
+            const r = parseFloat(tp.rfdMtr) || 0;
+            const diff = g - r;
+            calcGray += g;
+            calcRfd += r;
+            return {
+              ...tp,
+              srNo: idx + 1,
+              grayMtr: g,
+              rfdMtr: r,
+              shortageMtr: diff > 0 ? parseFloat(diff.toFixed(2)) : 0,
+              shortagePercent: g > 0 ? parseFloat(((Math.max(0, diff) / g) * 100).toFixed(2)) : 0
+            };
+          });
+          if (calcGray > 0) graySentMeters = parseFloat(calcGray.toFixed(2));
+          if (calcRfd > 0) receivedRfdMeters = parseFloat(calcRfd.toFixed(2));
+        }
+
         const shrinkageLossMeters = graySentMeters > receivedRfdMeters ? parseFloat((graySentMeters - receivedRfdMeters).toFixed(2)) : 0;
         const shrinkagePercent = graySentMeters > 0 ? parseFloat(((shrinkageLossMeters / graySentMeters) * 100).toFixed(1)) : 0;
 
         return {
           ...l,
           ...editRfdLotForm,
+          tps,
+          totalTps: tps && tps.length > 0 ? tps.length : (l.totalTps || 0),
           graySentMeters,
           receivedRfdMeters,
           shrinkageLossMeters,
@@ -1995,6 +2313,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                            {ch.status !== 'Received as RFD' && (
+                              <button
+                                onClick={() => {
+                                  setScreenMode('rfd');
+                                  handleOpenInwardRfdModal(ch);
+                                }}
+                                className="btn-secondary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '0.74rem',
+                                  height: '28px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#ecfdf5',
+                                  color: '#059669',
+                                  border: '1px solid #a7f3d0',
+                                  fontWeight: 700
+                                }}
+                                title="Inward RFD back from this Mill Challan (TP-wise Shortage Audit)"
+                              >
+                                <PackageCheck size={13} /> Receive RFD
+                              </button>
+                            )}
                             <button
                               onClick={() => setShowPrintChallanModal(ch)}
                               className="btn-primary"
@@ -2078,7 +2420,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       {/* ======================================================== */}
       {screenMode === 'rfd' && (
         <>
-          {/* RFD Quick HUD */}
+          {/* RFD Quick HUD with TP Shortage & Balance KPI */}
           <div
             style={{
               display: 'grid',
@@ -2097,37 +2439,88 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 {rfdStats.inStockRfdMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
               </div>
               <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                {rfdStats.inStockRolls} Rolls Ready for Digital Printing
+                Available balance for Digital Printing
               </div>
             </div>
 
             <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  Active RFD Lots
+                  In-Stock Rolls / TPs
                 </span>
-                <PackageCheck size={16} color="#10b981" />
+                <Boxes size={16} color="#10b981" />
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669' }}>
+                {rfdStats.inStockRolls} <span style={{ fontSize: '0.85rem' }}>TPs</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                Individual processed rolls ready
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Active RFD Lots
+                </span>
+                <PackageCheck size={16} color="#8b5cf6" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#7c3aed' }}>
                 {rfdStats.totalRfdLots} <span style={{ fontSize: '0.85rem' }}>Lots</span>
               </div>
               <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                Received from processing mills
+                Received back from processing mills
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Mill Shortage / Loss
+                </span>
+                <TrendingUp size={16} color="#f59e0b" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#d97706' }}>
+                {rfdStats.totalShortageMtrs || 0} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#b45309', marginLeft: 6 }}>
+                  ({rfdStats.avgShortagePercent || 0}%)
+                </span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                Avg shrinkage during scouring & heat set
               </div>
             </div>
           </div>
 
           {/* RFD Inventory Table */}
           <div className="glass-panel" style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                   Processed RFD Fabric Inventory (Ready For Dyeing / Discharge)
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                  Received back from processing mills. Directly available for EDP Digital Printing job cards.
+                  Received back from processing mills. Individual TP breakdown tracks exact piece-by-piece shortage.
                 </p>
               </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenInwardRfdModal()}
+                className="btn-primary"
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                  border: 'none',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                }}
+              >
+                <PlusCircle size={15} /> + Inward RFD Lot (TP-wise)
+              </button>
             </div>
 
             <div className="table-container" style={{ overflowX: 'auto' }}>
@@ -2141,15 +2534,17 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     <th style={{ padding: '10px 12px' }}>Fabric Quality</th>
                     <th style={{ padding: '10px 12px' }}>Gray Sent</th>
                     <th style={{ padding: '10px 12px' }}>RFD Received</th>
-                    <th style={{ padding: '10px 12px' }}>Shrinkage / Loss</th>
+                    <th style={{ padding: '10px 12px' }}>Shortage / Loss</th>
                     <th style={{ padding: '10px 12px' }}>Available Balance</th>
                     <th style={{ padding: '10px 12px' }}>Status</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center', minWidth: '150px' }}>Actions</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center', minWidth: '220px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rfdLots.map(lot => {
                     const balance = Math.max(0, lot.receivedRfdMeters - (lot.issuedMeters || 0));
+                    const tpCount = lot.tps ? lot.tps.length : (lot.rolls ? lot.rolls.length : 0);
+                    const isHighShortage = (lot.shrinkagePercent || 0) > 4.0;
                     return (
                       <tr key={lot.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
                         <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0284c7' }}>
@@ -2173,8 +2568,21 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
                           {lot.receivedRfdMeters} Mtr
                         </td>
-                        <td style={{ padding: '10px 12px', color: '#ef4444', fontWeight: 700 }}>
-                          {lot.shrinkageLossMeters} Mtr ({lot.shrinkagePercent}%)
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              background: isHighShortage ? '#fef2f2' : '#f0fdf4',
+                              color: isHighShortage ? '#dc2626' : '#16a34a',
+                              border: `1px solid ${isHighShortage ? '#fecaca' : '#bbf7d0'}`
+                            }}
+                          >
+                            {lot.shrinkageLossMeters > 0 ? `-${lot.shrinkageLossMeters} Mtr` : '0 Mtr'} ({lot.shrinkagePercent || 0}%)
+                          </span>
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 800, color: '#16a34a' }}>
                           {balance.toFixed(1)} Mtr
@@ -2195,6 +2603,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => setViewingRfdTpsLot(lot)}
+                              className="btn-secondary"
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: '0.74rem',
+                                height: '28px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe',
+                                fontWeight: 700
+                              }}
+                              title="View individual TP meters & shortage details"
+                            >
+                              <Eye size={13} /> TPs ({tpCount})
+                            </button>
                             <button
                               onClick={() => handleOpenEditRfdLot(lot)}
                               className="btn-secondary"
@@ -2238,12 +2665,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   })}
                   {rfdLots.length === 0 && (
                     <tr>
-                      <td colSpan={12} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={11} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>
                           No Processed RFD Lots Found
                         </div>
                         <div style={{ fontSize: '0.78rem' }}>
-                          RFD fabric lots inwarded back from mills will appear here.
+                          Click <strong>"+ Inward RFD Lot (TP-wise)"</strong> above or receive directly from a dispatched Mill Challan to log processed fabric with shortage audit.
                         </div>
                       </td>
                     </tr>
@@ -4790,6 +5217,575 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       )}
 
       {/* ======================================================== */}
+      {/* 📥 MODAL: INWARD RFD FABRIC (TP-WISE SHORTAGE AUDIT)      */}
+      {/* ======================================================== */}
+      {showInwardRfdModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '920px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Layers size={20} color="#0284c7" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                    Inward Processed RFD Fabric (TP-Wise Shortage Audit)
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Enter received meters per piece to audit exact mill shrinkage loss & shortage percentage.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInwardRfdModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitInwardRfd} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Source Mill Challan Selection */}
+              <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0369a1', marginBottom: 4 }}>
+                  🔗 Link to Dispatched Mill Outward Challan (Optional)
+                </label>
+                <select
+                  className="input-field"
+                  value={inwardRfdForm.sourceChallanId}
+                  onChange={e => handleSelectSourceChallan(e.target.value)}
+                  style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, background: '#ffffff' }}
+                >
+                  <option value="">-- Manual / Direct RFD Inward (No Outward Challan) --</option>
+                  {millChallans.map(ch => (
+                    <option key={ch.id} value={ch.id}>
+                      Challan #{ch.challanNo} — {ch.millParty} ({ch.fabricQuality || 'Gray'}) — {ch.totalTps} TPs ({ch.totalMeters.toFixed(1)} Mtr) [{ch.status}]
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 3, display: 'block' }}>
+                  Selecting a Mill Challan automatically populates the sent Gray TPs & meters for instant comparison.
+                </span>
+              </div>
+
+              {/* Basic Fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                    RFD Lot Number *
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={inwardRfdForm.lotNumber}
+                    onChange={e => setInwardRfdForm({ ...inwardRfdForm, lotNumber: e.target.value })}
+                    required
+                    placeholder="e.g. YJ-RFD-001"
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                    Inward Date *
+                  </label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={inwardRfdForm.inwardDate}
+                    onChange={e => setInwardRfdForm({ ...inwardRfdForm, inwardDate: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                    Processing Mill Name *
+                  </label>
+                  <select
+                    className="input-field"
+                    value={inwardRfdForm.millParty}
+                    onChange={e => setInwardRfdForm({ ...inwardRfdForm, millParty: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                  >
+                    <option value="">-- Select Processing Mill * --</option>
+                    {configs.mills.map((m, idx) => (
+                      <option key={idx} value={getPartyName(m)}>{getPartyName(m)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                    Fabric Quality *
+                  </label>
+                  <select
+                    className="input-field"
+                    value={inwardRfdForm.fabricQuality}
+                    onChange={e => setInwardRfdForm({ ...inwardRfdForm, fabricQuality: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                  >
+                    <option value="">-- Select Fabric Quality * --</option>
+                    {configs.qualities.map((q, idx) => (
+                      <option key={idx} value={q}>{q}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* TP-Wise Entries Section */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem', background: '#fafbfc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                      TP (Piece) Inward & Shortage Calculation
+                    </h4>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Enter RFD meters for each TP. Shortage loss and % will calculate automatically.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleAddMultipleInwardTpRows(5)}
+                      className="btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.74rem', background: '#ffffff', border: '1px solid #cbd5e1' }}
+                    >
+                      + Add 5 Rows
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddInwardTpRow}
+                      className="btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.74rem', background: '#ffffff', border: '1px solid #cbd5e1' }}
+                    >
+                      + Add Row
+                    </button>
+                    {inwardRfdForm.sourceChallanId && (
+                      <button
+                        type="button"
+                        onClick={handleAutoBaselineRfdMtrs}
+                        className="btn-secondary"
+                        style={{ padding: '3px 8px', fontSize: '0.74rem', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontWeight: 700 }}
+                        title="Copy Gray Sent meters to RFD as baseline so you only adjust shortage TPs"
+                      >
+                        Copy Gray Mtr to RFD
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setInwardRfdForm(p => ({ ...p, tps: [{ srNo: 1, tpNo: '', grayMtr: '', rfdMtr: '', status: 'In Stock' }] }))}
+                      className="btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.74rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}
+                    >
+                      Reset Rows
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '340px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#ffffff' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 2 }}>
+                      <tr style={{ borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '8px 10px', width: '45px' }}>Sr.</th>
+                        <th style={{ padding: '8px 10px', width: '130px' }}>TP No.</th>
+                        <th style={{ padding: '8px 10px', width: '130px' }}>Gray Sent (Mtr)</th>
+                        <th style={{ padding: '8px 10px', width: '150px' }}>Received RFD (Mtr) *</th>
+                        <th style={{ padding: '8px 10px', width: '130px' }}>Shortage (Mtr)</th>
+                        <th style={{ padding: '8px 10px', width: '110px' }}>Shortage (%)</th>
+                        <th style={{ padding: '8px 10px', width: '140px' }}>Status</th>
+                        <th style={{ padding: '8px 10px', width: '40px', textAlign: 'center' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inwardRfdForm.tps.map((tp, idx) => {
+                        const gMtr = parseFloat(tp.grayMtr) || 0;
+                        const rMtr = parseFloat(tp.rfdMtr) || 0;
+                        const diff = gMtr - rMtr;
+                        const hasRfd = !isNaN(rMtr) && rMtr > 0;
+                        const shortageMtr = hasRfd && diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
+                        const shortagePct = hasRfd && gMtr > 0 && diff > 0 ? parseFloat(((diff / gMtr) * 100).toFixed(2)) : 0;
+                        const isGain = hasRfd && gMtr > 0 && diff < 0;
+
+                        return (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
+                            <td style={{ padding: '6px 10px', color: '#64748b', fontWeight: 600 }}>
+                              {idx + 1}
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              <input
+                                type="text"
+                                className="input-field"
+                                value={tp.tpNo}
+                                placeholder={`TP #${idx + 1}`}
+                                onChange={e => handleInwardTpChange(idx, 'tpNo', e.target.value)}
+                                style={{ height: '28px', fontSize: '0.78rem', padding: '2px 6px', width: '100%', border: '1px solid #cbd5e1', borderRadius: 4 }}
+                              />
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="input-field"
+                                value={tp.grayMtr}
+                                placeholder="0.0"
+                                onChange={e => handleInwardTpChange(idx, 'grayMtr', e.target.value)}
+                                style={{ height: '28px', fontSize: '0.78rem', padding: '2px 6px', width: '100%', border: '1px solid #cbd5e1', borderRadius: 4, background: '#f8fafc' }}
+                              />
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="input-field"
+                                value={tp.rfdMtr}
+                                placeholder="Enter Mtr"
+                                onChange={e => handleInwardTpChange(idx, 'rfdMtr', e.target.value)}
+                                style={{
+                                  height: '28px',
+                                  fontSize: '0.84rem',
+                                  fontWeight: 800,
+                                  padding: '2px 6px',
+                                  width: '100%',
+                                  border: hasRfd ? '1px solid #0284c7' : '1px solid #fca5a5',
+                                  borderRadius: 4,
+                                  background: hasRfd ? '#f0f9ff' : '#ffffff'
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '6px 10px', fontWeight: 800 }}>
+                              {hasRfd ? (
+                                shortageMtr > 0 ? (
+                                  <span style={{ color: '#dc2626' }}>-{shortageMtr.toFixed(1)} Mtr</span>
+                                ) : isGain ? (
+                                  <span style={{ color: '#0284c7' }}>+{(rMtr - gMtr).toFixed(1)} Mtr</span>
+                                ) : (
+                                  <span style={{ color: '#16a34a' }}>0.0 Mtr</span>
+                                )
+                              ) : (
+                                <span style={{ color: '#cbd5e1' }}>--</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '6px 10px', fontWeight: 800 }}>
+                              {hasRfd && gMtr > 0 ? (
+                                shortageMtr > 0 ? (
+                                  <span style={{ color: shortagePct > 4 ? '#b91c1c' : '#b45309' }}>
+                                    {shortagePct.toFixed(1)}%
+                                  </span>
+                                ) : isGain ? (
+                                  <span style={{ color: '#0284c7' }}>Gain</span>
+                                ) : (
+                                  <span style={{ color: '#16a34a' }}>0.0%</span>
+                                )
+                              ) : (
+                                <span style={{ color: '#cbd5e1' }}>--</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {hasRfd ? (
+                                shortagePct > 4 ? (
+                                  <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: 4, fontWeight: 800, fontSize: '0.7rem' }}>
+                                    🚨 High Shortage
+                                  </span>
+                                ) : shortagePct > 0 ? (
+                                  <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, fontWeight: 800, fontSize: '0.7rem' }}>
+                                    ⚠️ Normal Shortage
+                                  </span>
+                                ) : (
+                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: 4, fontWeight: 800, fontSize: '0.7rem' }}>
+                                    ✓ 100% Inward
+                                  </span>
+                                )
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>Awaiting Mtr</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInwardTpRow(idx)}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}
+                                title="Remove TP Row"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Summary Bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 8,
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.82rem',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem'
+                }}
+              >
+                <div>
+                  <span style={{ color: '#64748b' }}>Filled TPs: </span>
+                  <strong style={{ color: '#0f172a' }}>{inwardRfdSummary.validCount}</strong>
+                  <span style={{ color: '#94a3b8' }}> / {inwardRfdSummary.totalRows}</span>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b' }}>Total Gray Sent: </span>
+                  <strong style={{ color: '#0f172a' }}>{inwardRfdSummary.totalGray} Mtr</strong>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b' }}>Total RFD Received: </span>
+                  <strong style={{ color: '#0284c7' }}>{inwardRfdSummary.totalRfd} Mtr</strong>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b' }}>Net Shortage Loss: </span>
+                  <strong style={{ color: inwardRfdSummary.shortagePct > 4 ? '#dc2626' : '#d97706' }}>
+                    {inwardRfdSummary.shortageMtr} Mtr ({inwardRfdSummary.shortagePct}%)
+                  </strong>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowInwardRfdModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    padding: '0.45rem 1.5rem',
+                    fontSize: '0.82rem',
+                    background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                    border: 'none',
+                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                  }}
+                >
+                  Save & Inward RFD Lot ({inwardRfdSummary.validCount} TPs)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 👁️ MODAL: VIEW TP BREAKDOWN & SHORTAGE AUDIT             */}
+      {/* ======================================================== */}
+      {viewingRfdTpsLot && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '820px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                    TP Breakdown & Shortage Audit: {viewingRfdTpsLot.lotNumber}
+                  </h3>
+                  <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
+                    {viewingRfdTpsLot.status}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                  Processing Mill: <strong>{viewingRfdTpsLot.millParty}</strong> | Fabric: <strong>{viewingRfdTpsLot.fabricQuality}</strong> | Date: <strong>{viewingRfdTpsLot.inwardDate}</strong>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingRfdTpsLot(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* KPI Badges */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>TOTAL PIECES</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                  {viewingRfdTpsLot.tps ? viewingRfdTpsLot.tps.length : (viewingRfdTpsLot.totalTps || 0)} TPs
+                </span>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>GRAY SENT</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#475569' }}>
+                  {viewingRfdTpsLot.graySentMeters} Mtr
+                </span>
+              </div>
+
+              <div style={{ background: '#f0f9ff', padding: '0.75rem', borderRadius: 8, border: '1px solid #bae6fd' }}>
+                <span style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 700, display: 'block' }}>RFD RECEIVED</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0284c7' }}>
+                  {viewingRfdTpsLot.receivedRfdMeters} Mtr
+                </span>
+              </div>
+
+              <div style={{ background: (viewingRfdTpsLot.shrinkagePercent || 0) > 4 ? '#fef2f2' : '#fffbeb', padding: '0.75rem', borderRadius: 8, border: (viewingRfdTpsLot.shrinkagePercent || 0) > 4 ? '1px solid #fecaca' : '1px solid #fde68a' }}>
+                <span style={{ fontSize: '0.7rem', color: (viewingRfdTpsLot.shrinkagePercent || 0) > 4 ? '#b91c1c' : '#b45309', fontWeight: 700, display: 'block' }}>MILL SHORTAGE</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 900, color: (viewingRfdTpsLot.shrinkagePercent || 0) > 4 ? '#dc2626' : '#d97706' }}>
+                  {viewingRfdTpsLot.shrinkageLossMeters} Mtr ({viewingRfdTpsLot.shrinkagePercent || 0}%)
+                </span>
+              </div>
+            </div>
+
+            {/* TP Table */}
+            <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 2 }}>
+                  <tr style={{ borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '8px 12px' }}>Sr.</th>
+                    <th style={{ padding: '8px 12px' }}>TP No.</th>
+                    <th style={{ padding: '8px 12px' }}>Gray Sent (Mtr)</th>
+                    <th style={{ padding: '8px 12px' }}>RFD Received (Mtr)</th>
+                    <th style={{ padding: '8px 12px' }}>Shortage (Mtr)</th>
+                    <th style={{ padding: '8px 12px' }}>Shortage (%)</th>
+                    <th style={{ padding: '8px 12px' }}>Audit Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(viewingRfdTpsLot.tps || []).map((tp, idx) => {
+                    const g = parseFloat(tp.grayMtr) || 0;
+                    const r = parseFloat(tp.rfdMtr) || 0;
+                    const diff = g - r;
+                    const shortageMtr = diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
+                    const shortagePct = g > 0 && diff > 0 ? parseFloat(((diff / g) * 100).toFixed(1)) : 0;
+                    const isHigh = shortagePct > 4.0;
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
+                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{idx + 1}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 800, color: '#0f172a' }}>{tp.tpNo}</td>
+                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{g > 0 ? `${g.toFixed(1)} Mtr` : '--'}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 800, color: '#0284c7' }}>{r.toFixed(1)} Mtr</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 800, color: shortageMtr > 0 ? '#dc2626' : '#16a34a' }}>
+                          {shortageMtr > 0 ? `-${shortageMtr.toFixed(1)} Mtr` : '0.0 Mtr'}
+                        </td>
+                        <td style={{ padding: '8px 12px', fontWeight: 800, color: isHigh ? '#b91c1c' : '#b45309' }}>
+                          {shortagePct > 0 ? `${shortagePct.toFixed(1)}%` : '0.0%'}
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          {shortagePct > 4 ? (
+                            <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '2px 8px', borderRadius: 4, fontWeight: 800, fontSize: '0.72rem' }}>
+                              🚨 High Shortage
+                            </span>
+                          ) : shortagePct > 0 ? (
+                            <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: 4, fontWeight: 800, fontSize: '0.72rem' }}>
+                              ⚠️ Normal Loss
+                            </span>
+                          ) : (
+                            <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 4, fontWeight: 800, fontSize: '0.72rem' }}>
+                              ✓ 100% Retained
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {(!viewingRfdTpsLot.tps || viewingRfdTpsLot.tps.length === 0) && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                        No individual piece breakdown was logged for this legacy lot. Edit the lot to input TP-wise meters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setViewingRfdTpsLot(null)}
+                className="btn-secondary"
+                style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
       {/* ✏️ MODAL: EDIT RFD FABRIC LOT                           */}
       {/* ======================================================== */}
       {editingRfdLot && editRfdLotForm && (
@@ -4809,11 +5805,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           <div
             style={{
               width: '100%',
-              maxWidth: '600px',
-              maxHeight: '90vh',
+              maxWidth: '780px',
+              maxHeight: '92vh',
               overflowY: 'auto',
               background: '#ffffff',
-              borderRadius: 12,
+              borderRadius: 14,
               boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
               padding: '1.5rem',
               display: 'flex',
@@ -4831,6 +5827,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </span>
               </div>
               <button
+                type="button"
                 onClick={() => { setEditingRfdLot(null); setEditRfdLotForm(null); }}
                 style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
               >
@@ -4921,6 +5918,100 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                    Status
+                  </label>
+                  <select
+                    className="input-field"
+                    value={editRfdLotForm.status}
+                    onChange={e => setEditRfdLotForm({ ...editRfdLotForm, status: e.target.value })}
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                  >
+                    <option value="In Stock">In Stock</option>
+                    <option value="Partially Issued">Partially Issued</option>
+                    <option value="Fully Issued">Fully Issued</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* TP-Wise Editor if TPs exist */}
+              {editRfdLotForm.tps && editRfdLotForm.tps.length > 0 ? (
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.75rem', background: '#f8fafc' }}>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0369a1', marginBottom: 6 }}>
+                    TP Breakdown Entries ({editRfdLotForm.tps.length} Pieces)
+                  </div>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: 6, background: '#ffffff' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9' }}>
+                        <tr style={{ textAlign: 'left', color: '#475569' }}>
+                          <th style={{ padding: '6px 8px' }}>Sr.</th>
+                          <th style={{ padding: '6px 8px' }}>TP No.</th>
+                          <th style={{ padding: '6px 8px' }}>Gray (Mtr)</th>
+                          <th style={{ padding: '6px 8px' }}>RFD (Mtr)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editRfdLotForm.tps.map((tp, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '4px 8px' }}>{idx + 1}</td>
+                            <td style={{ padding: '4px 8px' }}>
+                              <input
+                                type="text"
+                                className="input-field"
+                                value={tp.tpNo}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setEditRfdLotForm(prev => {
+                                    const next = [...prev.tps];
+                                    next[idx] = { ...next[idx], tpNo: val };
+                                    return { ...prev, tps: next };
+                                  });
+                                }}
+                                style={{ height: '24px', fontSize: '0.75rem', padding: '2px 4px', width: '100%' }}
+                              />
+                            </td>
+                            <td style={{ padding: '4px 8px' }}>
+                              <input
+                                type="number"
+                                step="0.1"
+                                className="input-field"
+                                value={tp.grayMtr}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setEditRfdLotForm(prev => {
+                                    const next = [...prev.tps];
+                                    next[idx] = { ...next[idx], grayMtr: val };
+                                    return { ...prev, tps: next };
+                                  });
+                                }}
+                                style={{ height: '24px', fontSize: '0.75rem', padding: '2px 4px', width: '100%' }}
+                              />
+                            </td>
+                            <td style={{ padding: '4px 8px' }}>
+                              <input
+                                type="number"
+                                step="0.1"
+                                className="input-field"
+                                value={tp.rfdMtr}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setEditRfdLotForm(prev => {
+                                    const next = [...prev.tps];
+                                    next[idx] = { ...next[idx], rfdMtr: val };
+                                    return { ...prev, tps: next };
+                                  });
+                                }}
+                                style={{ height: '24px', fontSize: '0.75rem', fontWeight: 800, padding: '2px 4px', width: '100%' }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
                     Received RFD Meters
                   </label>
                   <input
@@ -4933,7 +6024,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
                   />
                 </div>
-              </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
                 <button
