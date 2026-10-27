@@ -384,6 +384,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const [editingRfdLot, setEditingRfdLot] = useState(null);
   const [editRfdLotForm, setEditRfdLotForm] = useState(null);
+  const [viewingRfdTpsLot, setViewingRfdTpsLot] = useState(null);
 
   // Inward RFD Lot Modal & Total Meter / Shortage / Mill Balance tracking
   const [showInwardRfdModal, setShowInwardRfdModal] = useState(false);
@@ -2642,6 +2643,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => setViewingRfdTpsLot(lot)}
+                              className="btn-secondary"
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: '0.74rem',
+                                height: '28px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#f0f9ff',
+                                color: '#0284c7',
+                                border: '1px solid #bae6fd',
+                                fontWeight: 600
+                              }}
+                              title="View Lot Reconciliation Details"
+                            >
+                              <Eye size={13} /> View
+                            </button>
                             <button
                               onClick={() => handleOpenEditRfdLot(lot)}
                               className="btn-secondary"
