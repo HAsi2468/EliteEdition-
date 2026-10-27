@@ -1,3 +1,8 @@
+// Expand libuv worker threadpool immediately before any async I/O or crypto modules initialize
+if (!process.env.UV_THREADPOOL_SIZE) {
+  process.env.UV_THREADPOOL_SIZE = '64';
+}
+
 const dns = require('dns');
 if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');

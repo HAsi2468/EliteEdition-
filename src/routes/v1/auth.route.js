@@ -15,7 +15,7 @@ router.get('/csrf-token', csrfManager.handshakeHandler);
 router.post('/csrf-token', csrfManager.handshakeHandler);
 
 
-const { authLimiter } = require('../../middlewares/rateLimiter');
+const { authLimiter, tokenRefreshLimiter } = require('../../middlewares/rateLimiter');
 
 // Existing routes
 router.post(
@@ -24,8 +24,8 @@ router.post(
   authController.register
 );
 router.post('/login', authLimiter, validate(authValidation.login), authController.login);
-router.post('/refresh-tokens', authLimiter, authController.refreshTokens);
-router.post('/refresh', authLimiter, authController.refreshTokens);
+router.post('/refresh-tokens', tokenRefreshLimiter, authController.refreshTokens);
+router.post('/refresh', tokenRefreshLimiter, authController.refreshTokens);
 router.post('/logout', authController.logout);
 router.post(
   '/forgot-password',

@@ -12,8 +12,8 @@ module.exports = {
       script: 'src/index.js',
       cwd: process.env.PM2_CWD || '/home/ubuntu/EliteEditionMongo',
 
-      // Scaling: Runs 1 dedicated worker to fit within 1GB RAM on t3.micro
-      instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 1,
+      // Scaling: Runs 2 cluster workers across 2 vCPUs for parallel auth & event loop resilience
+      instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 2,
       exec_mode: 'cluster',
 
       // Zero-Downtime Reload & Handshake Controls
@@ -23,8 +23,8 @@ module.exports = {
       shutdown_with_message: true, // Enables IPC message shutdown sequence
 
       // Memory Leak & Crash Safeguards
-      node_args: '--max-old-space-size=350', // Constrains V8 heap safely below 1GB limit
-      max_memory_restart: '380M',  // Auto-cycles worker if memory reaches 380MB
+      node_args: '--max-old-space-size=280', // Keeps memory safely bounded within 1GB RAM
+      max_memory_restart: '290M',  // Auto-cycles worker if memory reaches 290MB
       exp_backoff_restart_delay: 200, // Exponential backoff prevents CPU pegging on crash loops
       max_restarts: 15,            // Guards against infinite restart loops
       min_uptime: '10s',           // Deems app healthy if it runs uninterrupted for 10s
@@ -36,6 +36,16 @@ module.exports = {
       out_file: '/home/ubuntu/.pm2/logs/elite-backend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss.SSS Z',
 
+      // Default Environment Variables
+      env: {
+        NODE_ENV: 'production',
+        HOST: '127.0.0.1',
+        PORT: 3001,
+        REDIS_HOST: '127.0.0.1',
+        REDIS_PORT: 6379,
+        UV_THREADPOOL_SIZE: 64
+      },
+
       // Production Environment Variables
       env_production: {
         NODE_ENV: 'production',
@@ -43,7 +53,7 @@ module.exports = {
         PORT: 3001,
         REDIS_HOST: '127.0.0.1',
         REDIS_PORT: 6379,
-        UV_THREADPOOL_SIZE: 16     // Expands libuv threadpool for sharp image processing & crypto
+        UV_THREADPOOL_SIZE: 64     // Expands libuv threadpool for sharp image processing & crypto
       },
 
       // Staging / Testing Environment Variables

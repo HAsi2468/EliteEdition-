@@ -560,10 +560,19 @@ const deleteTask = async (req, res) => {
     }
 
     const { id } = req.params;
-    const task = await Task.findByIdAndDelete(id);
+    let task = null;
+
+    if (id && mongoose.Types.ObjectId.isValid(String(id))) {
+      task = await Task.findByIdAndDelete(id);
+    } else if (id) {
+      task = await Task.findOneAndDelete({
+        $or: [{ projectRef: String(id) }, { title: String(id) }]
+      });
+    }
+
     if (!task) {
       // Idempotent: Deleting an already-deleted or non-existent task is considered success
-      return res.status(200).json({ success: true, message: 'Task already deleted', taskId: id });
+      return res.status(200).json({ success: true, message: 'Task already deleted or not found', taskId: id });
     }
 
     // Broadcast real-time deletion

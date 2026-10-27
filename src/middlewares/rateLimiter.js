@@ -23,10 +23,11 @@ function getClientSubnet(ip) {
 	return cleanIp;
 }
 
-// 1. IP & Subnet Brute Force Limiter: 5 failed attempts per 15 minutes per IP/subnet
+// 1. IP & Subnet Brute Force Limiter: 300 login requests per 15 minutes per IP/subnet
+// Enterprise-grade capacity allows 50-100 staff/QA users on one NAT office IP to log in concurrently
 const authIpLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 5, // Strict brute-force shield: 5 failed attempts per 15 min window
+	max: 300, // Allows high-concurrency office networks & burst logins (20 req/min)
 	skipSuccessfulRequests: true,
 	standardHeaders: true,
 	legacyHeaders: false,
@@ -45,15 +46,15 @@ const authIpLimiter = rateLimit({
 	handler: (req, res) => {
 		return res.status(429).json({
 			code: 429,
-			error: 'Too many failed login attempts. Access is temporarily locked from this network for 15 minutes to protect against brute-force attacks.',
+			error: 'Too many login requests from this network. Please wait a few moments before trying again.',
 		});
 	},
 });
 
-// 2. Account / Target Identifier Limiter: 5 failed attempts per 15 minutes per target email/mobile
+// 2. Account / Target Identifier Limiter: 10 failed attempts per 15 minutes per target email/mobile
 const authAccountLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 5, // Strict brute-force shield: 5 failed attempts per target account
+	max: 10, // Strict brute-force shield: 10 failed attempts per target account
 	skipSuccessfulRequests: true,
 	standardHeaders: true,
 	legacyHeaders: false,
@@ -76,7 +77,7 @@ const authAccountLimiter = rateLimit({
 	handler: (req, res) => {
 		return res.status(429).json({
 			code: 429,
-			error: 'Too many failed login attempts for this account. Access is temporarily locked for 15 minutes to protect against brute-force attacks.',
+			error: 'Too many failed login attempts for this account. Access is temporarily locked for 15 minutes to protect your account.',
 		});
 	},
 });
@@ -84,6 +85,25 @@ const authAccountLimiter = rateLimit({
 const authLimiter = [authIpLimiter, authAccountLimiter];
 authLimiter.ipLimiter = authIpLimiter;
 authLimiter.accountLimiter = authAccountLimiter;
+
+// 3. Token Refresh Limiter: Dedicated high-ceiling limiter for silent background token rotation
+const tokenRefreshLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000, // 15 minutes
+	max: 3000, // High ceiling for background token renewals across multi-tab workstations
+	standardHeaders: true,
+	legacyHeaders: false,
+	skipSuccessfulRequests: true,
+	keyGenerator: (req) => {
+		const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+		return `refresh:${getClientSubnet(ip)}`;
+	},
+	handler: (req, res) => {
+		return res.status(429).json({
+			code: 429,
+			error: 'Too many token refresh requests. Please wait a moment before trying again.',
+		});
+	},
+});
 
 const apiLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
@@ -104,6 +124,7 @@ const apiLimiter = rateLimit({
 
 module.exports = {
 	authLimiter,
+	tokenRefreshLimiter,
 	apiLimiter,
 };
 

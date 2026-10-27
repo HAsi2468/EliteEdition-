@@ -23,7 +23,7 @@ async function verifyToken(token) {
 }
 
 async function encryptData(string) {
-	const salt = await bycrypt.genSalt(12);
+	const salt = await bycrypt.genSalt(10);
 	const hashedString = await bycrypt.hash(string, salt);
 	return hashedString;
 }
