@@ -39,7 +39,17 @@ const MODEL_TO_ENTITY = {
   Party: 'party',
   Vendor: 'vendor',
   FabricVendor: 'vendor',
-  Client: 'client'
+  Client: 'client',
+  DeliveryChallan: 'challan',
+  FabricTransaction: 'fabric',
+  FabricStockAdjustment: 'fabric',
+  WhiteFabricLog: 'fabric',
+  Design: 'design',
+  Lead: 'lead',
+  CustomerProfile: 'customer',
+  MonthlyCosting: 'costing',
+  LedgerReconciliation: 'ledger',
+  CourierManifest: 'courier'
 };
 
 function extractCompanyId(doc) {

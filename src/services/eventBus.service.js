@@ -12,7 +12,7 @@
  * 7. Tracks performance metrics (emitted, delivered, debounced, dropped).
  */
 
-const { normalizeCompanyId } = require('../config/company.constants');
+const { normalizeCompanyId, COMPANY_IDS } = require('../config/company.constants');
 
 const safeIsoDate = (d) => {
   if (!d) return new Date().toISOString();
@@ -165,7 +165,9 @@ class EventBusService {
       this.metrics.delivered++;
     } else {
       // Broadcast only to authenticated company rooms (never unauthenticated sockets)
-      const companyRooms = ['digital_print', 'elite_edition', 'elite_fabtex', 'stitching', 'elite_online'];
+      const companyRooms = (COMPANY_IDS && COMPANY_IDS.length > 0)
+        ? COMPANY_IDS
+        : ['digital_print', 'elite_edition', 'elite_fabtex', 'stitching', 'elite_online', 'sobise', 'ethno_wear', 'yamunaji'];
       companyRooms.forEach((cid) => {
         io.to(`company:${cid}`).emit('data-changed', eventObject);
         io.to(`company:${cid}`).emit('data-change', eventObject);

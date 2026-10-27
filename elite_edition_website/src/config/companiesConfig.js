@@ -131,6 +131,10 @@ export const COMPANIES = [
  */
 export const normalizeCompanyId = (input) => {
   if (!input) return 'digital_print';
+  if (typeof input === 'object') {
+    input = input.id || input.companyId || input.company_id || input.code || input.companyCode || input.name || '';
+  }
+  if (!input) return 'digital_print';
   const raw = String(input).trim();
   const lower = raw.toLowerCase();
   const clean = lower.replace(/[\s_-]+/g, '_');

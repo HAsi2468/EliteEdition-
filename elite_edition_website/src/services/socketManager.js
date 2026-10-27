@@ -26,6 +26,7 @@ import { io } from 'socket.io-client';
 import { getAccessToken } from './api';
 import { getBaseUrl } from './api';
 import { lifecycleManager } from './resilientLifecycleManager';
+import { normalizeCompanyId } from '../config/companiesConfig';
 
 class SocketManager {
   constructor() {
@@ -206,7 +207,11 @@ class SocketManager {
       'sales-updated', 'sales-created', 'sales-deleted',
       'task-updated', 'task-created', 'task-deleted',
       'fabric-updated', 'fabric-challan-updated', 'catalog-updated', 'returns-updated',
-      'stitching-updated', 'stitching-challan-updated', 'product-updated'
+      'stitching-updated', 'stitching-challan-updated', 'product-updated',
+      'delivery-challan-updated', 'delivery-challan-created', 'delivery-challan-deleted',
+      'rfd-updated', 'rfd-created', 'rfd-deleted',
+      'lead-updated', 'lead-created', 'lead-deleted',
+      'challan-updated', 'challan-created', 'challan-deleted'
     ];
 
     legacyEvents.forEach((evtName) => {
@@ -760,12 +765,13 @@ class SocketManager {
   _handleIncomingDataEvent(event) {
     if (!event) return;
 
-    if (
-      event.companyId &&
-      this.currentCompanyId &&
-      String(event.companyId).toLowerCase() !== String(this.currentCompanyId).toLowerCase()
-    ) {
-      return;
+    // Enforce company scoping if event is company-specific (allow 'all' or unscoped global events through)
+    if (event.companyId && event.companyId !== 'all') {
+      const eventCompany = normalizeCompanyId(event.companyId);
+      const currentCompany = normalizeCompanyId(this.currentCompanyId);
+      if (eventCompany && currentCompany && eventCompany !== currentCompany) {
+        return;
+      }
     }
 
     const { eventId, timestamp } = event;

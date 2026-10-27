@@ -245,8 +245,11 @@ const setupSockets = (io) => {
     });
 
     // 3. Switch company room request with server-side permission validation
-    socket.on('switch-company', (companyId) => {
-      const canonical = normalizeCompanyId(companyId);
+    socket.on('switch-company', (payload) => {
+      const target = (payload && typeof payload === 'object')
+        ? (payload.companyId || payload.companyCode || payload.company || payload.id)
+        : payload;
+      const canonical = normalizeCompanyId(target);
       if (!canonical) return;
 
       const isAllowed = !socket.user ||
@@ -257,8 +260,10 @@ const setupSockets = (io) => {
       if (isAllowed) {
         socket.join(`company:${canonical}`);
         socket.activeCompanyId = canonical;
+        socket.emit('company-switched', { companyId: canonical, success: true });
       } else {
         console.warn(`[Socket Security] Denied company switch: ${socket.id} -> ${canonical}`);
+        socket.emit('company-switched', { companyId: canonical, success: false, error: 'Unauthorized' });
       }
     });
 

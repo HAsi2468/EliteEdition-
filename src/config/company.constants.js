@@ -66,6 +66,10 @@ const COMPANY_IDS = COMPANIES.map((c) => c.id);
 
 function normalizeCompanyId(input) {
   if (!input) return null;
+  if (typeof input === 'object') {
+    input = input.id || input.companyId || input.company_id || input.code || input.companyCode || input.name || '';
+  }
+  if (!input) return null;
   const str = String(input).trim().toLowerCase();
   for (const c of COMPANIES) {
     if (
