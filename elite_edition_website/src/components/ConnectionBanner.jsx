@@ -95,7 +95,7 @@ export function ConnectionBanner() {
     if (isReconnecting) {
       timer = setTimeout(() => {
         setShowReconnectingPill(true);
-      }, 3000);
+      }, 4500);
     } else {
       setShowReconnectingPill(false);
     }

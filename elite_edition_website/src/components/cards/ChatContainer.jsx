@@ -504,7 +504,7 @@ export function ChatContainer({ onClose }) {
             >
               <Globe size={13} />
               <span>
-                {selectedLang === 'hi-IN' ? 'हिन्दी' : selectedLang === 'gu-IN' ? 'ગુજરાતી' : 'EN'}
+                {selectedLang === 'hi-IN' ? 'Hindi' : selectedLang === 'gu-IN' ? 'Gujarati' : 'EN'}
               </span>
             </button>
 
@@ -566,7 +566,9 @@ export function ChatContainer({ onClose }) {
               isListening
                 ? "Listening... Speak your command..."
                 : selectedLang === 'hi-IN'
-                ? "બોલો અથવા ટાઇપ કરો (e.g. JC-2026-104 નો સ્ટેટસ બતાવો)"
+                ? "Speak or type in Hindi (e.g. Show status of JC-2026-104)"
+                : selectedLang === 'gu-IN'
+                ? "Speak or type in Gujarati (e.g. Show status of JC-2026-104)"
                 : "Ask stock, check job card, or tap mic to speak..."
             }
             className="flex-1 px-4 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50"
@@ -587,7 +589,7 @@ export function ChatContainer({ onClose }) {
             type="button"
             disabled={isSending}
             onClick={toggleListening}
-            title={isListening ? "Stop Listening" : `Voice Input (${selectedLang === 'hi-IN' ? 'हिन्दी' : selectedLang === 'gu-IN' ? 'ગુજરાતી' : 'English'})`}
+            title={isListening ? "Stop Listening" : `Voice Input (${selectedLang === 'hi-IN' ? 'Hindi' : selectedLang === 'gu-IN' ? 'Gujarati' : 'English'})`}
             style={{
               display: 'flex',
               alignItems: 'center',

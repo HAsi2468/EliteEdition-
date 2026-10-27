@@ -5,8 +5,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
  */
 export const SUPPORTED_VOICE_LANGUAGES = [
   { code: 'en-IN', label: 'English (IN)', flag: '🇮🇳' },
-  { code: 'hi-IN', label: 'हिन्दी (Hindi)', flag: '🇮🇳' },
-  { code: 'gu-IN', label: 'ગુજરાતી (Gujarati)', flag: '🇮🇳' }
+  { code: 'hi-IN', label: 'Hindi', flag: '🇮🇳' },
+  { code: 'gu-IN', label: 'Gujarati', flag: '🇮🇳' }
 ];
 
 /**
