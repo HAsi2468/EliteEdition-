@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Layers,
   PlusCircle,
@@ -772,27 +772,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         const nextInput = document.getElementById(`tp-mtr-input-${index + 1}`);
         if (nextInput) nextInput.focus();
       }, 50);
-    }
-  };
-
-  const handleResetToCleanSlate = async () => {
-    const confirmed = await triggerEliteConfirm({
-      title: 'Clear All Data',
-      message: 'Are you sure you want to clear all fabric lots and mill challans from the system? This will remove all test/demo data and start completely fresh.',
-      confirmText: 'Clear All Data',
-      cancelText: 'Cancel',
-      type: 'danger'
-    });
-    if (confirmed) {
-      setGrayLots([]);
-      setMillChallans([]);
-      setRfdLots([]);
-      try {
-        localStorage.removeItem(STORAGE_GRAY_KEY);
-        localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
-        localStorage.removeItem(STORAGE_RFD_KEY);
-      } catch (e) {}
-      triggerEliteAlert('All fabric lots and mill challans have been cleared. System is now on a completely clean slate!', 'Clean Slate');
     }
   };
 
