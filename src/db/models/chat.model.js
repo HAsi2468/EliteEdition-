@@ -108,7 +108,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'poll'],
+      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'poll', 'sticker', 'gif', 'image', 'attachment'],
       default: 'text',
     },
     taskId: {

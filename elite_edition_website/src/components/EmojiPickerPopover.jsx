@@ -588,10 +588,10 @@ export default function EmojiPickerPopover({
           position: 'absolute',
           bottom: 'calc(100% + 10px)',
           left: 0,
-          width: '380px',
-          maxWidth: 'calc(100vw - 24px)',
-          height: '450px',
-          maxHeight: 'min(450px, 75vh)',
+          width: '410px',
+          maxWidth: 'calc(100vw - 20px)',
+          height: '465px',
+          maxHeight: 'min(465px, 80vh)',
           background: '#ffffff',
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
@@ -740,26 +740,49 @@ export default function EmojiPickerPopover({
             z-index: 5;
           }
           .phoenix-pill-filter-chip {
-            padding: 4px 10px;
-            border-radius: 16px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
-            color: #64748b;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.14s ease;
+            padding: 5px 12px !important;
+            border-radius: 9999px !important;
+            font-size: 0.74rem !important;
+            font-weight: 700 !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
+            color: #475569 !important;
+            cursor: pointer !important;
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            flex: 0 0 auto !important;
+            min-width: max-content !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1.3 !important;
+            transition: all 0.15s ease !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+            user-select: none !important;
           }
           .phoenix-pill-filter-chip:hover {
-            background: #f1f5f9;
-            color: #0f172a;
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
           }
           .phoenix-pill-filter-chip.active {
-            background: #2563eb;
-            color: #ffffff;
-            border-color: #2563eb;
-            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+            background: #2563eb !important;
+            color: #ffffff !important;
+            border-color: #2563eb !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
+          }
+          .phoenix-pill-container {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          .phoenix-pill-container::-webkit-scrollbar {
+            display: none !important;
           }
           .phoenix-media-scroll-body::-webkit-scrollbar {
             width: 6px;
@@ -1022,14 +1045,11 @@ export default function EmojiPickerPopover({
             {/* Sticker Pack Horizontal Filter Tabs */}
             {!searchQuery && (
               <div
+                className="phoenix-pill-container"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 10px',
+                  padding: '8px 12px',
                   borderBottom: '1px solid #f1f5f9',
                   background: '#fafafa',
-                  overflowX: 'auto',
                   boxSizing: 'border-box'
                 }}
               >
@@ -1136,7 +1156,7 @@ export default function EmojiPickerPopover({
             {/* GIF Category Chips & Custom URL Link */}
             <div
               style={{
-                padding: '6px 10px',
+                padding: '8px 12px',
                 borderBottom: '1px solid #f1f5f9',
                 background: '#fafafa',
                 display: 'flex',
@@ -1147,11 +1167,8 @@ export default function EmojiPickerPopover({
               }}
             >
               <div
+                className="phoenix-pill-container"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  overflowX: 'auto',
                   flex: 1
                 }}
               >

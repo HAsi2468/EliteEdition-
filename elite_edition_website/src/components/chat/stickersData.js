@@ -16,7 +16,7 @@ export const STICKERS = [
   // ==========================================
   {
     id: 'stk_approved',
-    title: 'Approved',
+    title: 'Approved ✅',
     pack: 'workplace',
     tags: ['approved', 'yes', 'ok', 'verified', 'done', 'accept', 'green'],
     url: encodeSvg(`
@@ -101,6 +101,51 @@ export const STICKERS = [
     `)
   },
   {
+    id: 'stk_on_it',
+    title: "I'm On It ⚡",
+    pack: 'workplace',
+    tags: ['on it', 'working', 'taking care', 'fast', 'assigned', 'action'],
+    url: encodeSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+        <circle cx="90" cy="90" r="76" fill="#8b5cf6" stroke="#c4b5fd" stroke-width="3"/>
+        <path d="M100 35 L65 95 L95 95 L80 145 L125 80 L95 80 Z" fill="#fde047" stroke="#ffffff" stroke-width="2"/>
+        <text x="90" y="156" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="1.5">I'M ON IT! ⚡</text>
+      </svg>
+    `)
+  },
+  {
+    id: 'stk_noted',
+    title: 'Noted 📝',
+    pack: 'workplace',
+    tags: ['noted', 'ok', 'understood', 'copy that', 'record', 'write'],
+    url: encodeSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+        <circle cx="90" cy="90" r="76" fill="#0284c7" stroke="#7dd3fc" stroke-width="3"/>
+        <rect x="55" y="45" width="70" height="85" rx="8" fill="#ffffff"/>
+        <line x1="70" y1="65" x2="110" y2="65" stroke="#0284c7" stroke-width="4" stroke-linecap="round"/>
+        <line x1="70" y1="80" x2="110" y2="80" stroke="#0284c7" stroke-width="4" stroke-linecap="round"/>
+        <line x1="70" y1="95" x2="95" y2="95" stroke="#0284c7" stroke-width="4" stroke-linecap="round"/>
+        <path d="M100 110 L130 80" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"/>
+        <text x="90" y="154" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="1.5">NOTED! 📝</text>
+      </svg>
+    `)
+  },
+  {
+    id: 'stk_payment_received',
+    title: 'Payment Received 💰',
+    pack: 'workplace',
+    tags: ['payment', 'paid', 'money', 'received', 'cash', 'invoice', 'bank'],
+    url: encodeSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+        <circle cx="90" cy="90" r="76" fill="#047857" stroke="#6ee7b7" stroke-width="3"/>
+        <circle cx="90" cy="80" r="40" fill="#10b981" stroke="#ffffff" stroke-width="3"/>
+        <text x="90" y="93" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="38" fill="#ffffff">₹</text>
+        <rect x="25" y="132" width="130" height="26" rx="6" fill="#064e3b"/>
+        <text x="90" y="150" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="11" fill="#a7f3d0" letter-spacing="1">PAYMENT RECEIVED</text>
+      </svg>
+    `)
+  },
+  {
     id: 'stk_target_met',
     title: 'Target Met 🎯',
     pack: 'workplace',
@@ -119,56 +164,13 @@ export const STICKERS = [
     `)
   },
   {
-    id: 'stk_quality_100',
-    title: '100% Quality 💯',
-    pack: 'workplace',
-    tags: ['100', 'hundred', 'perfect', 'quality', 'best', 'top', 'pure'],
-    url: encodeSvg(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <defs>
-          <linearGradient id="gGold" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#f59e0b"/>
-            <stop offset="100%" stop-color="#b45309"/>
-          </linearGradient>
-        </defs>
-        <polygon points="90,12 110,48 150,30 145,72 178,85 152,112 165,150 125,145 110,178 90,155 70,178 55,145 15,150 28,112 2,85 35,72 30,30 70,48" fill="url(#gGold)" stroke="#fde68a" stroke-width="2"/>
-        <circle cx="90" cy="90" r="50" fill="#78350f" stroke="#fef3c7" stroke-width="2"/>
-        <text x="90" y="90" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="28" fill="#fbbf24">100%</text>
-        <text x="90" y="112" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="10" fill="#ffffff" letter-spacing="1">QUALITY ASSURED</text>
-      </svg>
-    `)
-  },
-  {
-    id: 'stk_coffee_fuel',
-    title: 'Coffee Break ☕',
-    pack: 'workplace',
-    tags: ['coffee', 'break', 'tea', 'relax', 'fuel', 'energy', 'morning'],
-    url: encodeSvg(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <circle cx="90" cy="90" r="76" fill="#78350f" stroke="#d97706" stroke-width="3"/>
-        <rect x="52" y="70" width="60" height="50" rx="8" fill="#ffffff"/>
-        <path d="M112 80 C125 80 125 105 112 105" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
-        <ellipse cx="82" cy="70" rx="30" ry="8" fill="#451a03"/>
-        <path d="M68 56 C68 46 76 46 76 36" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
-        <path d="M84 56 C84 46 92 46 92 36" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
-        <text x="90" y="148" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="12" fill="#fde68a" letter-spacing="1.5">COFFEE BREAK</text>
-      </svg>
-    `)
-  },
-  {
     id: 'stk_deal_closed',
     title: 'Deal Closed 🤝',
     pack: 'workplace',
     tags: ['deal', 'handshake', 'partner', 'agreement', 'client', 'win'],
     url: encodeSvg(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <defs>
-          <linearGradient id="gDeal" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#6366f1"/>
-            <stop offset="100%" stop-color="#4338ca"/>
-          </linearGradient>
-        </defs>
-        <circle cx="90" cy="90" r="76" fill="url(#gDeal)" stroke="#c7d2fe" stroke-width="3"/>
+        <circle cx="90" cy="90" r="76" fill="#4f46e5" stroke="#c7d2fe" stroke-width="3"/>
         <path d="M45 100 L70 75 L85 90 L100 75 L135 105" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="90" cy="85" r="10" fill="#fbbf24"/>
         <rect x="35" y="128" width="110" height="24" rx="6" fill="#1e1b4b"/>
@@ -178,7 +180,7 @@ export const STICKERS = [
   },
 
   // ==========================================
-  // PACK 2: TEXTILE & FACTORY (SPECIALIZED)
+  // PACK 2: TEXTILE & FACTORY
   // ==========================================
   {
     id: 'stk_elite_fabric',
@@ -187,13 +189,7 @@ export const STICKERS = [
     tags: ['elite', 'fabric', 'luxury', 'royal', 'purple', 'textile', 'swatch'],
     url: encodeSvg(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <defs>
-          <linearGradient id="gFab" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#9333ea"/>
-            <stop offset="100%" stop-color="#581c87"/>
-          </linearGradient>
-        </defs>
-        <rect x="20" y="20" width="140" height="140" rx="30" fill="url(#gFab)" stroke="#e9d5ff" stroke-width="3"/>
+        <rect x="20" y="20" width="140" height="140" rx="30" fill="#7e22ce" stroke="#e9d5ff" stroke-width="3"/>
         <path d="M50 50 Q90 30 130 50 Q110 90 130 130 Q90 110 50 130 Q70 90 50 50 Z" fill="none" stroke="#fbcfe8" stroke-width="3" stroke-dasharray="4 3"/>
         <polygon points="65,95 75,70 90,85 105,70 115,95" fill="#fbbf24" stroke="#ffffff" stroke-width="1.5"/>
         <text x="90" y="132" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="2">ELITE EDITION</text>
@@ -227,7 +223,7 @@ export const STICKERS = [
     tags: ['cutting', 'scissors', 'fabric', 'cut', 'done', 'job'],
     url: encodeSvg(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <circle cx="90" cy="90" r="76" fill="#14b8a6" stroke="#99f6e4" stroke-width="3"/>
+        <circle cx="90" cy="90" r="76" fill="#0f766e" stroke="#99f6e4" stroke-width="3"/>
         <circle cx="68" cy="112" r="16" fill="none" stroke="#ffffff" stroke-width="6"/>
         <circle cx="112" cy="112" r="16" fill="none" stroke="#ffffff" stroke-width="6"/>
         <line x1="78" y1="100" x2="120" y2="52" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
@@ -274,7 +270,7 @@ export const STICKERS = [
   // ==========================================
   {
     id: 'stk_thumbs_up_king',
-    title: 'Thumbs Up 👍',
+    title: 'Superb! 👍',
     pack: 'reactions',
     tags: ['thumbs', 'up', 'great', 'awesome', 'like', 'super', 'gold'],
     url: encodeSvg(`
@@ -284,6 +280,46 @@ export const STICKERS = [
           <path d="M42 22 C42 12 36 6 28 6 C24 6 20 10 20 18 L20 32 L10 32 C4 32 0 36 0 42 L0 74 C0 80 4 84 10 84 L56 84 C64 84 72 78 74 70 L80 46 C82 38 76 32 68 32 L46 32 L46 22 Z" fill="#ffffff"/>
         </g>
         <text x="90" y="152" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#78350f" letter-spacing="1.5">SUPERB! 👍</text>
+      </svg>
+    `)
+  },
+  {
+    id: 'stk_fire_lit',
+    title: "It's Fire! 🔥",
+    pack: 'reactions',
+    tags: ['fire', 'flame', 'lit', 'hot', 'epic', 'trending', 'awesome'],
+    url: encodeSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+        <circle cx="90" cy="90" r="76" fill="#7c2d12" stroke="#ea580c" stroke-width="3"/>
+        <path d="M90 25 C95 50 115 65 125 90 C135 115 120 145 90 148 C60 145 45 115 55 90 C65 65 85 50 90 25 Z" fill="#f97316"/>
+        <path d="M90 60 C93 75 105 85 110 100 C115 115 105 135 90 138 C75 135 65 115 70 100 C75 85 87 75 90 60 Z" fill="#fde047"/>
+        <text x="90" y="165" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="13" fill="#fed7aa" letter-spacing="1.5">IT'S FIRE! 🔥</text>
+      </svg>
+    `)
+  },
+  {
+    id: 'stk_big_heart',
+    title: 'Love It ❤️',
+    pack: 'reactions',
+    tags: ['love', 'heart', 'adore', 'care', 'sweet', 'red'],
+    url: encodeSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+        <circle cx="90" cy="90" r="76" fill="#be123c" stroke="#fecdd3" stroke-width="3"/>
+        <path d="M90 130 C90 130 50 100 40 75 C30 50 50 35 70 45 C80 50 90 60 90 60 C90 60 100 50 110 45 C130 35 150 50 140 75 C130 100 90 130 90 130 Z" fill="#f43f5e" stroke="#ffffff" stroke-width="3"/>
+        <text x="90" y="158" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="1.5">LOVE IT! ❤️</text>
+      </svg>
+    `)
+  },
+  {
+    id: 'stk_rofl_laugh',
+    title: 'LOL Hahaha 🤣',
+    pack: 'reactions',
+    tags: ['laugh', 'rofl', 'lol', 'funny', 'haha', 'joke', 'crying'],
+    url: encodeSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+        <circle cx="90" cy="90" r="76" fill="#eab308" stroke="#fef08a" stroke-width="3"/>
+        <text x="90" y="100" text-anchor="middle" font-size="58">🤣</text>
+        <text x="90" y="152" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#713f12" letter-spacing="1.5">HAHAHA! 🤣</text>
       </svg>
     `)
   },
@@ -299,54 +335,8 @@ export const STICKERS = [
         <circle cx="76" cy="98" r="6" fill="#1e1b4b"/>
         <circle cx="104" cy="98" r="6" fill="#1e1b4b"/>
         <ellipse cx="90" cy="120" rx="14" ry="10" fill="#1e1b4b"/>
-        <!-- explosion -->
         <polygon points="90,20 105,45 130,35 125,60 150,68 130,85 140,110 115,100 100,120 90,100 80,120 65,100 40,110 50,85 30,68 55,60 50,35 75,45" fill="#f43f5e"/>
         <text x="90" y="165" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="12" fill="#a5b4fc" letter-spacing="1">MIND BLOWN!</text>
-      </svg>
-    `)
-  },
-  {
-    id: 'stk_lets_go',
-    title: 'Let\'s Go! 🚀',
-    pack: 'reactions',
-    tags: ['rocket', 'go', 'launch', 'fast', 'success', 'fire', 'letsgo'],
-    url: encodeSvg(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <defs>
-          <linearGradient id="gRock" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#0284c7"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-        </defs>
-        <circle cx="90" cy="90" r="76" fill="url(#gRock)" stroke="#38bdf8" stroke-width="3"/>
-        <g transform="translate(45, 30)">
-          <!-- flame -->
-          <polygon points="45,90 35,115 45,105 55,115" fill="#f97316"/>
-          <!-- rocket body -->
-          <path d="M45 10 C30 35 30 75 45 85 C60 75 60 35 45 10 Z" fill="#ffffff"/>
-          <circle cx="45" cy="40" r="8" fill="#0284c7"/>
-          <polygon points="30,60 15,80 30,80" fill="#ef4444"/>
-          <polygon points="60,60 75,80 60,80" fill="#ef4444"/>
-        </g>
-        <text x="90" y="156" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#38bdf8" letter-spacing="2">LET'S GO! 🔥</text>
-      </svg>
-    `)
-  },
-  {
-    id: 'stk_cheers',
-    title: 'Cheers! 🥂',
-    pack: 'reactions',
-    tags: ['cheers', 'celebrate', 'party', 'champagne', 'drink', 'toast'],
-    url: encodeSvg(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-        <circle cx="90" cy="90" r="76" fill="#ec4899" stroke="#fbcfe8" stroke-width="3"/>
-        <g transform="translate(52, 40)">
-          <path d="M20 20 L28 48 L28 65 L18 65 L18 70 L38 70 L38 65 L28 65 L28 48 L36 20 Z" fill="#fbbf24"/>
-          <path d="M56 20 L48 48 L48 65 L58 65 L58 70 L38 70 L38 65 L48 65 L48 48 L40 20 Z" fill="#fbbf24"/>
-          <circle cx="38" cy="22" r="4" fill="#ffffff"/>
-          <circle cx="42" cy="15" r="3" fill="#ffffff"/>
-        </g>
-        <text x="90" y="148" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="2">CHEERS! 🎉</text>
       </svg>
     `)
   },
@@ -388,20 +378,15 @@ export const STICKERS = [
     url: encodeSvg(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
         <circle cx="90" cy="90" r="76" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
-        <!-- ears -->
         <circle cx="56" cy="54" r="18" fill="#1e293b"/>
         <circle cx="124" cy="54" r="18" fill="#1e293b"/>
-        <!-- head -->
         <circle cx="90" cy="94" r="48" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
-        <!-- eye patches -->
         <ellipse cx="72" cy="90" rx="12" ry="16" fill="#1e293b"/>
         <ellipse cx="108" cy="90" rx="12" ry="16" fill="#1e293b"/>
         <circle cx="74" cy="88" r="4" fill="#ffffff"/>
         <circle cx="106" cy="88" r="4" fill="#ffffff"/>
-        <!-- nose & smile -->
         <ellipse cx="90" cy="106" rx="6" ry="4" fill="#1e293b"/>
         <path d="M84 114 Q90 120 96 114" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round"/>
-        <!-- salute arm -->
         <path d="M125 110 L140 76 L118 78" fill="none" stroke="#1e293b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
         <text x="90" y="160" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="11" fill="#475569" letter-spacing="1">ROGER THAT! 🫡</text>
       </svg>

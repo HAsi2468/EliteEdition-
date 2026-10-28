@@ -4428,7 +4428,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setReplyToMessage(null);
 
     try {
-      const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      let res;
+      try {
+        res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      } catch (postErr) {
+        // If server rejects custom type (e.g. strict enum), fall back to type: 'text' with attachment.fileType intact
+        console.warn('Initial sticker/gif post failed, retrying with fallback type="text":', postErr.message);
+        const fallbackPayload = { ...messagePayload, type: 'text' };
+        res = await api.sendCommunicationMessage(activeGroup._id, fallbackPayload);
+      }
+
       if (res && res.success && res.data) {
         const realMsg = { ...res.data, isOptimistic: false };
         setMessages((prev) => {
@@ -4451,9 +4460,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         throw new Error(res?.message || 'Server did not acknowledge media saving');
       }
     } catch (err) {
-      console.warn('Send sticker/gif failed, falling back to socket emit:', err.message);
+      console.warn('Send sticker/gif failed via HTTP, attempting socket fallback:', err.message);
       if (socket && socket.connected) {
-        socket.emit('send-message', messagePayload);
+        socket.emit('send-message', messagePayload, (ack) => {
+          if (ack && ack.success && ack.message) {
+            const realMsg = { ...ack.message, isOptimistic: false };
+            setMessages((prev) => {
+              const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(realMsg._id));
+              return mergeMessages(filtered, [realMsg]);
+            });
+          }
+        });
+        // Also emit with type: 'text' to ensure older socket listeners accept it
+        socket.emit('send-message', { ...messagePayload, type: 'text' });
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === tempId ? { ...m, isOptimistic: false, sendFailed: true, sendError: err.message } : m
+          )
+        );
       }
     }
   };

@@ -61,6 +61,39 @@ export const DEFAULT_CONFIGS = {
   processes: []
 };
 
+export const STANDARD_SURAT_CONFIGS = {
+  weavers: [
+    { name: 'Maruti Weaving Works', gst: '24AABCM1234F1Z8', address: 'Plot 42, GIDC Pandesara', city: 'Surat, Gujarat', phone: '+91 98251 12345', contactPerson: 'Rameshbhai Patel', broker: 'Shree Krishna Agency', processTypes: '', notes: 'Quality loom weaving' },
+    { name: 'Jay Ambe Textiles', gst: '24AAACJ5678K1Z2', address: 'Shed 12, Sachin Industrial Area', city: 'Surat, Gujarat', phone: '+91 98980 67890', contactPerson: 'Ketanbhai Shah', broker: 'Harikrishna Brokerage', processTypes: '', notes: 'Standard viscose & modal' },
+    { name: 'Radha Krishna Loom Mills', gst: '24AABCR9012M1Z4', address: 'Plot 88, Road No. 8, Khatodara GIDC', city: 'Surat, Gujarat', phone: '+91 98253 44556', contactPerson: 'Ashokbhai Dholakiya', broker: 'Direct', processTypes: '', notes: 'Prompt gray delivery' }
+  ],
+  qualities: [
+    'Pure Viscose Rayon 14kg',
+    'Pure Modal Satin 60s',
+    'Cotton 60x60 Cambric',
+    'Organza Viscose Gold Weave',
+    'Chanderi Silk 50gm',
+    'Pure Linen Slub 60s',
+    'Viscose Crepe 80gm',
+    'Georgette 60gm Pure',
+    'Heavy Cotton Twill 200 GSM',
+    'Dola Silk Heavy 80gm'
+  ],
+  mills: [
+    { name: 'Shree Radhe Bleaching & Dyeing Processors', gst: '24AAACR1234A1Z5', address: 'Plot 112-116, Road No. 12, Sachin GIDC', city: 'Surat, Gujarat - 394230', phone: '+91 98250 11999', contactPerson: 'Maheshbhai (Mill Manager)', processTypes: 'RFD Bleaching, Scouring & Heat Setting', notes: 'Turnaround: 2-3 Days. Loss/Shrinkage avg 2.5-3%' },
+    { name: 'Vrundavan Mills Pvt Ltd', gst: '24AABCV5678B1Z0', address: 'Block 402, GIDC Pandesara, Opp. Water Tank', city: 'Surat, Gujarat - 394221', phone: '+91 98241 88776', contactPerson: 'Kishorebhai Desai', processTypes: 'Mercerizing & RFD Bleaching, Bio Wash', notes: 'Specialist for 60s Cambric & Pure Modal' },
+    { name: 'Ganesh Textile Processors', gst: '24AAACG9012C1Z8', address: 'Plot 55, Kadodara Road, Palsana GIDC', city: 'Surat, Gujarat - 394317', phone: '+91 99798 22334', contactPerson: 'Rajubhai Kothari', processTypes: 'Soft Finish & Wash RFD, Stenter Finishing', notes: 'Fast delivery for urgent job card requirements' },
+    { name: 'Bhagwati Dyeing House', gst: '24AAACB7890E1Z1', address: 'Plot 18, Road No. 3, Hojiwala Industrial Estate', city: 'Surat, Gujarat - 394230', phone: '+91 98795 44332', contactPerson: 'Girishbhai Parmar', processTypes: 'Bio Wash & Zero Shrinkage Finish', notes: 'Continuous bleaching range (CBR)' }
+  ],
+  processes: [
+    'RFD Bleaching, Scouring & Heat Setting',
+    'Mercerizing & RFD Bleaching',
+    'Soft Finish & Wash RFD',
+    'High Tensile Heat Setting',
+    'Bio Wash & Zero Shrinkage Finish'
+  ]
+};
+
 // ==========================================
 // PARTY NORMALIZATION & HELPER UTILITIES
 // ==========================================
@@ -461,18 +494,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       } else if (partyModalIndex !== null) {
         list[partyModalIndex] = cleanParty;
       }
-      return { ...prev, [partyModalType]: list };
+      const updated = { ...prev, [partyModalType]: list };
+      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+      return updated;
     });
 
     setShowPartyModal(false);
     triggerEliteAlert(
-      `${partyModalType === 'weavers' ? 'Weaver' : 'Processing Mill'} "${cleanParty.name}" details saved!`,
+      `${partyModalType === 'weavers' ? 'Weaver' : 'Processing Mill'} "${cleanParty.name}" details saved to Master!`,
       'Party Saved'
     );
   };
 
   const handleAddMasterSetting = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     const val = newSettingInput.trim();
     if (!val) return;
     const currentList = configs[settingsActiveTab] || [];
@@ -480,11 +515,95 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       triggerEliteAlert(`"${val}" is already present in ${settingsActiveTab}!`, 'Duplicate Item');
       return;
     }
-    setConfigs(prev => ({
-      ...prev,
-      [settingsActiveTab]: [...(prev[settingsActiveTab] || []), val]
-    }));
+    const tabLabel = settingsActiveTab === 'qualities' ? 'Fabric Qualities' : settingsActiveTab === 'processes' ? 'Process Types' : settingsActiveTab === 'weavers' ? 'Weavers' : 'Processing Mills';
+    setConfigs(prev => {
+      const updatedList = (settingsActiveTab === 'weavers' || settingsActiveTab === 'mills')
+        ? [...(prev[settingsActiveTab] || []), normalizeParty(val)]
+        : [...(prev[settingsActiveTab] || []), val];
+      const updated = {
+        ...prev,
+        [settingsActiveTab]: updatedList
+      };
+      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+      return updated;
+    });
     setNewSettingInput('');
+    triggerEliteAlert(`"${val}" has been saved to ${tabLabel}!`, 'Saved to Master');
+  };
+
+  const handleCloseSettingsModal = () => {
+    const val = newSettingInput.trim();
+    if (val) {
+      const currentList = configs[settingsActiveTab] || [];
+      const isDuplicate = currentList.some(item => (typeof item === 'string' ? item : item.name).toLowerCase() === val.toLowerCase());
+      if (!isDuplicate) {
+        setConfigs(prev => {
+          const updatedList = (settingsActiveTab === 'weavers' || settingsActiveTab === 'mills')
+            ? [...(prev[settingsActiveTab] || []), normalizeParty(val)]
+            : [...(prev[settingsActiveTab] || []), val];
+          const updated = {
+            ...prev,
+            [settingsActiveTab]: updatedList
+          };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        });
+      }
+    }
+    setNewSettingInput('');
+    setEditingItemIndex(null);
+    setShowSettingsModal(false);
+  };
+
+  const handleRestoreStandardDefaults = async () => {
+    const confirmed = await triggerEliteConfirm({
+      title: 'Load Standard Surat Defaults',
+      message: 'Would you like to populate standard Surat textile defaults (Weavers, Fabric Qualities, Mills, and Process Types)? Existing entries will be preserved.',
+      confirmText: 'Load Defaults',
+      cancelText: 'Cancel',
+      type: 'info'
+    });
+    if (confirmed) {
+      setConfigs(prev => {
+        const mergedWeavers = [...(prev.weavers || [])];
+        STANDARD_SURAT_CONFIGS.weavers.forEach(sw => {
+          if (!mergedWeavers.some(w => getPartyName(w).toLowerCase() === sw.name.toLowerCase())) {
+            mergedWeavers.push(sw);
+          }
+        });
+
+        const mergedQualities = [...(prev.qualities || [])];
+        STANDARD_SURAT_CONFIGS.qualities.forEach(sq => {
+          if (!mergedQualities.some(q => q.toLowerCase() === sq.toLowerCase())) {
+            mergedQualities.push(sq);
+          }
+        });
+
+        const mergedMills = [...(prev.mills || [])];
+        STANDARD_SURAT_CONFIGS.mills.forEach(sm => {
+          if (!mergedMills.some(m => getPartyName(m).toLowerCase() === sm.name.toLowerCase())) {
+            mergedMills.push(sm);
+          }
+        });
+
+        const mergedProcesses = [...(prev.processes || [])];
+        STANDARD_SURAT_CONFIGS.processes.forEach(sp => {
+          if (!mergedProcesses.some(p => p.toLowerCase() === sp.toLowerCase())) {
+            mergedProcesses.push(sp);
+          }
+        });
+
+        const updated = {
+          weavers: mergedWeavers,
+          qualities: mergedQualities,
+          mills: mergedMills,
+          processes: mergedProcesses
+        };
+        try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+        return updated;
+      });
+      triggerEliteAlert('Standard Surat textile presets loaded successfully!', 'Defaults Loaded');
+    }
   };
 
   const handleStartEditMasterSetting = (index, value) => {
@@ -496,16 +615,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const val = editingItemValue.trim();
     if (!val) return;
     setConfigs(prev => {
-      const updated = [...prev[settingsActiveTab]];
-      if (typeof updated[index] === 'object') {
-        updated[index] = { ...updated[index], name: val };
+      const updatedList = [...prev[settingsActiveTab]];
+      if (typeof updatedList[index] === 'object') {
+        updatedList[index] = { ...updatedList[index], name: val };
       } else {
-        updated[index] = val;
+        updatedList[index] = val;
       }
-      return { ...prev, [settingsActiveTab]: updated };
+      const updated = { ...prev, [settingsActiveTab]: updatedList };
+      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+      return updated;
     });
     setEditingItemIndex(null);
     setEditingItemValue('');
+    triggerEliteAlert(`Updated to "${val}".`, 'Item Updated');
   };
 
   const handleDeleteMasterSetting = async (index, item) => {
@@ -520,7 +642,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     if (confirmed) {
       setConfigs(prev => {
         const currentList = prev[settingsActiveTab] || [];
-        const updated = currentList.filter((it, idx) => {
+        const updatedList = currentList.filter((it, idx) => {
           if (idx === index) return false;
           if (typeof it === 'object' && typeof item === 'object' && it.name && item.name) {
             return it.name.trim().toLowerCase() !== item.name.trim().toLowerCase();
@@ -530,10 +652,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           }
           return true;
         });
-        return {
+        const updated = {
           ...prev,
-          [settingsActiveTab]: updated
+          [settingsActiveTab]: updatedList
         };
+        try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+        return updated;
       });
       triggerEliteAlert(`"${itemName}" removed from master list.`, 'Item Removed');
     }
@@ -686,6 +810,34 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
     setGrayLots(prev => [newGrayLot, ...prev]);
     setShowWeaverInwardModal(false);
+
+    // Auto-save weaver party to master configs if not yet present
+    const enteredWeaver = weaverForm.weaverParty.trim();
+    if (enteredWeaver) {
+      setConfigs(prev => {
+        const list = prev.weavers || [];
+        if (!list.some(w => getPartyName(w).toLowerCase() === enteredWeaver.toLowerCase())) {
+          const updated = { ...prev, weavers: [...list, normalizeParty(enteredWeaver)] };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
+
+    // Auto-save fabric quality to master configs if not yet present
+    const enteredQuality = (weaverForm.fabricQuality || '').trim();
+    if (enteredQuality) {
+      setConfigs(prev => {
+        const list = prev.qualities || [];
+        if (!list.some(q => q.toLowerCase() === enteredQuality.toLowerCase())) {
+          const updated = { ...prev, qualities: [...list, enteredQuality] };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
 
     // Reset Form to clean slate
     setWeaverForm({
@@ -1233,6 +1385,34 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setMillChallans(prev => [newChallan, ...prev]);
     setShowMillChallanModal(false);
 
+    // Auto-save mill party to master configs if not yet present
+    const enteredMill = millChallanForm.millParty.trim();
+    if (enteredMill) {
+      setConfigs(prev => {
+        const list = prev.mills || [];
+        if (!list.some(m => getPartyName(m).toLowerCase() === enteredMill.toLowerCase())) {
+          const updated = { ...prev, mills: [...list, normalizeParty(enteredMill)] };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
+
+    // Auto-save process required to master configs if entered and not present
+    const enteredProcess = (millChallanForm.processRequired || '').trim();
+    if (enteredProcess) {
+      setConfigs(prev => {
+        const list = prev.processes || [];
+        if (!list.some(p => p.toLowerCase() === enteredProcess.toLowerCase())) {
+          const updated = { ...prev, processes: [...list, enteredProcess] };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
+
     setMillChallanForm({
       challanNo: '',
       challanDate: new Date().toISOString().split('T')[0],
@@ -1600,6 +1780,34 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     };
 
     setRfdLots(prev => [newRfdLot, ...prev]);
+
+    // Auto-save mill party to master configs if not yet present
+    const enteredMill = (inwardRfdForm.millParty || '').trim();
+    if (enteredMill) {
+      setConfigs(prev => {
+        const list = prev.mills || [];
+        if (!list.some(m => getPartyName(m).toLowerCase() === enteredMill.toLowerCase())) {
+          const updated = { ...prev, mills: [...list, normalizeParty(enteredMill)] };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
+
+    // Auto-save fabric quality to master configs if not yet present
+    const enteredQuality = (inwardRfdForm.fabricQuality || '').trim();
+    if (enteredQuality) {
+      setConfigs(prev => {
+        const list = prev.qualities || [];
+        if (!list.some(q => q.toLowerCase() === enteredQuality.toLowerCase())) {
+          const updated = { ...prev, qualities: [...list, enteredQuality] };
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
 
     // Update Mill Challan status & pending meters
     if (inwardRfdForm.sourceChallanId) {
@@ -3361,7 +3569,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
               <button
-                onClick={() => { setShowSettingsModal(false); setEditingItemIndex(null); }}
+                onClick={handleCloseSettingsModal}
                 style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
               >
                 <X size={20} />
@@ -3442,43 +3650,76 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             {/* TAB CONTENT: PARTY TABS (WEAVERS & MILLS) */}
             {(settingsActiveTab === 'weavers' || settingsActiveTab === 'mills') ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {/* Search & Add Bar */}
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                  <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-                    <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                {/* Quick Add Bar & Full Details Button */}
+                <form onSubmit={handleAddMasterSetting} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
                     <input
                       type="text"
-                      placeholder={`Search ${settingsActiveTab === 'weavers' ? 'weavers' : 'mills'} by name, GSTIN, address, phone...`}
-                      value={partySearchTerm}
-                      onChange={(e) => setPartySearchTerm(e.target.value)}
+                      placeholder={`Enter ${settingsActiveTab === 'weavers' ? 'Weaver / Loom Owner Name' : 'Processing Mill Name'} (e.g. Maruti Weaving)...`}
+                      value={newSettingInput}
+                      onChange={(e) => setNewSettingInput(e.target.value)}
                       className="input-field"
-                      style={{ paddingLeft: '32px', height: '36px', fontSize: '0.82rem', width: '100%' }}
+                      style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
                     />
                   </div>
-
                   <button
-                    type="button"
-                    onClick={() => handleOpenAddParty(settingsActiveTab)}
+                    type="submit"
                     className="btn-primary"
                     style={{
                       height: '36px',
-                      padding: '0 16px',
+                      padding: '0 14px',
                       fontSize: '0.82rem',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '5px',
                       background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
                       border: 'none',
                       borderRadius: 8,
                       fontWeight: 700,
                       cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 5px rgba(2, 132, 199, 0.25)'
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    <Plus size={16} /> + Add New {settingsActiveTab === 'weavers' ? 'Weaver' : 'Processing Mill'}
+                    <Plus size={15} /> + Add {settingsActiveTab === 'weavers' ? 'Weaver' : 'Mill'}
                   </button>
-                </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddParty(settingsActiveTab)}
+                    className="btn-secondary"
+                    style={{
+                      height: '36px',
+                      padding: '0 12px',
+                      fontSize: '0.80rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      color: '#0369a1',
+                      borderColor: '#bae6fd',
+                      background: '#f0f9ff'
+                    }}
+                    title="Add with complete GST, factory address, phone and broker details"
+                  >
+                    <Building size={14} /> + Full Details (GST)
+                  </button>
+                </form>
+
+                {/* Filter / Search Bar (if items exist) */}
+                {(configs[settingsActiveTab] || []).length > 0 && (
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder={`Filter existing ${settingsActiveTab === 'weavers' ? 'weavers' : 'mills'} by name, GSTIN, city, phone...`}
+                      value={partySearchTerm}
+                      onChange={(e) => setPartySearchTerm(e.target.value)}
+                      className="input-field"
+                      style={{ paddingLeft: '32px', height: '32px', fontSize: '0.78rem', width: '100%' }}
+                    />
+                  </div>
+                )}
 
                 {/* Party Cards List */}
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.65rem', maxHeight: '380px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc' }}>
@@ -3501,8 +3742,37 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                     if (filtered.length === 0) {
                       return (
-                        <div style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
-                          No {settingsActiveTab} found matching your search. Click "+ Add New" above to register details.
+                        <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                          {partySearchTerm.trim() ? (
+                            <div>
+                              <div>No {settingsActiveTab} found matching "{partySearchTerm}".</div>
+                              <div style={{ marginTop: '10px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const term = partySearchTerm.trim();
+                                    if (!term) return;
+                                    setConfigs(prev => {
+                                      const updatedList = [...(prev[settingsActiveTab] || []), normalizeParty(term)];
+                                      const updated = { ...prev, [settingsActiveTab]: updatedList };
+                                      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+                                      return updated;
+                                    });
+                                    setPartySearchTerm('');
+                                    triggerEliteAlert(`"${term}" added to ${settingsActiveTab}!`, 'Saved to Master');
+                                  }}
+                                  className="btn-primary"
+                                  style={{ padding: '5px 14px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                >
+                                  <Plus size={14} /> + Add "{partySearchTerm}" to Master
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              No {settingsActiveTab} registered yet. Enter a name above to add to master.
+                            </div>
+                          )}
                         </div>
                       );
                     }
@@ -3636,8 +3906,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     type="text"
                     required
                     placeholder={
-                      settingsActiveTab === 'qualities' ? 'Enter Fabric Quality (e.g. Cotton 60x60 Cambric)...' :
-                      'Enter Process Type (e.g. RFD Bleaching)...'
+                      settingsActiveTab === 'qualities' ? 'Enter Fabric Quality (e.g. Cotton 60x60 Cambric, Pure Viscose Rayon)...' :
+                      'Enter Process Type (e.g. RFD Bleaching, Scouring & Heat Setting)...'
                     }
                     value={newSettingInput}
                     onChange={(e) => setNewSettingInput(e.target.value)}
@@ -3647,17 +3917,17 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <button
                     type="submit"
                     className="btn-primary"
-                    style={{ height: '36px', padding: '0 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: 'none' }}
+                    style={{ height: '36px', padding: '0 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
-                    <Plus size={15} /> Add to Master
+                    <Plus size={15} /> + Add to Master
                   </button>
                 </form>
 
                 {/* Items List */}
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.5rem', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.5rem', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', background: '#f8fafc' }}>
                   {(configs[settingsActiveTab] || []).length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
-                      No items configured for {settingsActiveTab}. Add a new value above.
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                      No items configured for {settingsActiveTab === 'qualities' ? 'Fabric Qualities' : 'Process Types'}. Type a name above and click "+ Add to Master", or click "⚡ Load Standard Surat Preset" below.
                     </div>
                   ) : (
                     (configs[settingsActiveTab] || []).map((item, idx) => {
@@ -3670,10 +3940,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: '7px 12px',
+                            padding: '8px 12px',
                             borderRadius: 6,
-                            background: '#f8fafc',
-                            border: '1px solid #f1f5f9'
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                           }}
                         >
                           {isEditing ? (
@@ -3690,7 +3961,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                 type="button"
                                 onClick={() => handleSaveEditMasterSetting(idx)}
                                 className="btn-primary"
-                                style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                                style={{ height: '30px', padding: '0 10px', fontSize: '0.74rem', background: '#0284c7', border: 'none', borderRadius: 6 }}
                               >
                                 Save
                               </button>
@@ -3704,7 +3975,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               </button>
                             </div>
                           ) : (
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
                               {textVal}
                             </span>
                           )}
@@ -3714,7 +3985,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               <button
                                 type="button"
                                 onClick={() => handleStartEditMasterSetting(idx, item)}
-                                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 3 }}
+                                style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 4 }}
                                 title="Edit / Rename"
                               >
                                 <Edit2 size={13} />
@@ -3722,7 +3993,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               <button
                                 type="button"
                                 onClick={() => handleDeleteMasterSetting(idx, item)}
-                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 3 }}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
                                 title="Delete"
                               >
                                 <Trash2 size={13} />
@@ -3737,15 +4008,47 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
             )}
 
-            {/* Modal Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+            {/* Modal Footer with Save & Close and Preset Loader */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <button
                 type="button"
-                onClick={() => { setShowSettingsModal(false); setEditingItemIndex(null); }}
-                className="btn-primary"
-                style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem' }}
+                onClick={handleRestoreStandardDefaults}
+                className="btn-secondary"
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  color: '#0284c7',
+                  borderColor: '#bae6fd',
+                  background: '#f0f9ff',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  borderRadius: 8
+                }}
+                title="Populate standard Surat textile presets for Weavers, Mills, Qualities & Processes"
               >
-                Done / Close
+                <Sliders size={13} /> ⚡ Load Standard Surat Preset
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCloseSettingsModal}
+                className="btn-primary"
+                style={{
+                  padding: '0.45rem 1.4rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  border: 'none',
+                  borderRadius: 8,
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
+                }}
+              >
+                <Check size={15} /> Save & Close
               </button>
             </div>
           </div>
@@ -5137,7 +5440,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               }
 
               const renderCopy = (copyLabel, copyColor, extraProps = {}) => {
-                const lotDisplay = showPrintChallanModal.lotNumber || Array.from(new Set((showPrintChallanModal.tps || []).map(tp => tp.lotNumber).filter(Boolean))).join(', ') || 'N/A';
                 const tableRows = Array.from({ length: numRows }, (_, rowIdx) => {
                   return Array.from({ length: numCols }, (_, colIdx) => {
                     const itemIdx = colIdx * numRows + rowIdx;
@@ -5212,9 +5514,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         <div style={{ textAlign: 'right', fontSize: '0.68rem', lineHeight: 1.35 }}>
                           <div><strong>Challan No:</strong> <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
                           <div><strong>Date:</strong> {showPrintChallanModal.challanDate}</div>
-                          <div><strong>Vehicle No:</strong> {showPrintChallanModal.vehicleNo}</div>
                           <div><strong>Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
-                          <div><strong>Lot No:</strong> <span style={{ fontWeight: 800 }}>{lotDisplay}</span></div>
                         </div>
                       </div>
                     </div>
