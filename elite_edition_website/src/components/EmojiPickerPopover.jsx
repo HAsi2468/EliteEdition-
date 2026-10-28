@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Search, X, Clock, Smile, ThumbsUp, Heart, Briefcase, AlertCircle, Coffee, Compass,
-  Sparkles, Film, Layers, CheckCircle2, Send, ExternalLink, Link2, Image as ImageIcon
+  Sparkles, Film, Layers, CheckCircle2, Send, ExternalLink, Link2, Image as ImageIcon,
+  Plus, Trash2, Loader2, Upload
 } from 'lucide-react';
-import { STICKER_PACKS, STICKERS } from './chat/stickersData';
+import { STICKER_PACKS, STICKERS, loadCustomStickers, saveCustomSticker, deleteCustomSticker } from './chat/stickersData';
 import { GIF_CATEGORIES, CURATED_GIFS } from './chat/gifsData';
 
 const EMOJI_CATEGORIES = [
@@ -385,6 +386,19 @@ const EMOJI_CATEGORIES = [
 
 const DEFAULT_RECENTS = ['👍', '❤️', '😊', '😂', '🔥', '🎉', '👏', '🙏', '✅', '💯', '🚀', '✨', '📦', '💡', '⚠️', '⏳'];
 
+const GIPHY_API_KEY = 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh';
+const GIPHY_LIMIT = 24;
+const GIF_CATEGORY_KEYWORDS = {
+  all: '',
+  thumbs_up: 'thumbs up',
+  celebration: 'celebration',
+  work: 'work office',
+  approved: 'approved',
+  mind_blown: 'mind blown',
+  funny: 'funny memes',
+  thank_you: 'thank you'
+};
+
 export default function EmojiPickerPopover({
   isOpen,
   onClose,
@@ -404,6 +418,16 @@ export default function EmojiPickerPopover({
   const [customUrlError, setCustomUrlError] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
 
+  // Custom user-uploaded stickers
+  const [customStickers, setCustomStickers] = useState(() => loadCustomStickers());
+  const fileInputRef = useRef(null);
+
+  // Live Giphy Search & Infinite Scroll State
+  const [liveGifs, setLiveGifs] = useState([]);
+  const [gifOffset, setGifOffset] = useState(0);
+  const [loadingGifs, setLoadingGifs] = useState(false);
+  const [hasMoreGifs, setHasMoreGifs] = useState(true);
+
   const [recentEmojis, setRecentEmojis] = useState(() => {
     try {
       const stored = localStorage.getItem('phoenix_chat_recent_emojis');
@@ -418,6 +442,98 @@ export default function EmojiPickerPopover({
   const scrollRef = useRef(null);
   const categoryHeadersRef = useRef({});
   const searchInputRef = useRef(null);
+
+  // Live Giphy search fetcher
+  const fetchLiveGifs = useCallback(async (reset = false) => {
+    try {
+      setLoadingGifs(true);
+      const currentOffset = reset ? 0 : gifOffset;
+      const q = searchQuery.trim();
+      let url = '';
+
+      if (q) {
+        url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(q)}&limit=${GIPHY_LIMIT}&offset=${currentOffset}&rating=g`;
+      } else {
+        const catKeyword = GIF_CATEGORY_KEYWORDS[activeGifCategory] || '';
+        if (!catKeyword) {
+          url = `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=${GIPHY_LIMIT}&offset=${currentOffset}&rating=g`;
+        } else {
+          url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(catKeyword)}&limit=${GIPHY_LIMIT}&offset=${currentOffset}&rating=g`;
+        }
+      }
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch from Giphy');
+      const data = await res.json();
+      const mapped = (data.data || []).map((item) => ({
+        id: item.id,
+        title: item.title || 'GIF',
+        previewUrl: item.images?.fixed_width?.url || item.images?.downsized?.url || item.images?.original?.url,
+        url: item.images?.original?.url || item.images?.fixed_width?.url
+      })).filter((g) => g.previewUrl);
+
+      setLiveGifs((prev) => (reset ? mapped : [...prev, ...mapped]));
+      setGifOffset(currentOffset + mapped.length);
+      setHasMoreGifs(mapped.length >= GIPHY_LIMIT);
+    } catch (err) {
+      console.warn('Giphy live fetch failed, using curated fallback', err);
+      if (reset) {
+        setLiveGifs([]);
+      }
+    } finally {
+      setLoadingGifs(false);
+    }
+  }, [searchQuery, activeGifCategory, gifOffset]);
+
+  // Debounced live search whenever search query or category chip changes
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'gif') return;
+    const timer = setTimeout(() => {
+      fetchLiveGifs(true);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeGifCategory, activeTab, isOpen]);
+
+  // Infinite scroll listener for GIF tab
+  const handleGifScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 150 && !loadingGifs && hasMoreGifs) {
+      fetchLiveGifs(false);
+    }
+  };
+
+  // Custom Sticker File Uploader
+  const handleUploadSticker = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert('Sticker image size should be under 2.5 MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const title = file.name.replace(/\.[^/.]+$/, '').slice(0, 24);
+      const newStk = {
+        id: 'cstk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        title: title || 'Custom Sticker',
+        pack: 'custom',
+        tags: ['custom', title.toLowerCase()],
+        url: reader.result
+      };
+      const updated = saveCustomSticker(newStk);
+      setCustomStickers(updated);
+      setActiveStickerPack('custom');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleDeleteSticker = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const updated = deleteCustomSticker(id);
+    setCustomStickers(updated);
+  };
 
   // Sync initial tab when popover opens
   useEffect(() => {
@@ -521,21 +637,29 @@ export default function EmojiPickerPopover({
     }).filter((cat) => cat.emojis.length > 0);
   }, [searchQuery, recentEmojis]);
 
+  // All stickers including custom
+  const allStickers = useMemo(() => {
+    return [...customStickers, ...STICKERS];
+  }, [customStickers]);
+
   // Build filtered stickers
   const filteredStickers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      return STICKERS.filter((s) => {
+      return allStickers.filter((s) => {
         return (
           s.title.toLowerCase().includes(q) ||
           (s.tags && s.tags.some((t) => t.toLowerCase().includes(q)))
         );
       });
     }
+    if (activeStickerPack === 'custom') {
+      return customStickers;
+    }
     return STICKERS.filter((s) => s.pack === activeStickerPack);
-  }, [searchQuery, activeStickerPack]);
+  }, [searchQuery, activeStickerPack, allStickers, customStickers]);
 
-  // Build filtered GIFs
+  // Build filtered GIFs (curated fallback)
   const filteredGifs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q) {
@@ -552,6 +676,12 @@ export default function EmojiPickerPopover({
     }
     return CURATED_GIFS.filter((g) => g.category === activeGifCategory);
   }, [searchQuery, activeGifCategory]);
+
+  // Active GIFs to display (prioritize live Giphy results, graceful fallback to curated)
+  const displayGifs = useMemo(() => {
+    if (liveGifs && liveGifs.length > 0) return liveGifs;
+    return filteredGifs;
+  }, [liveGifs, filteredGifs]);
 
   const scrollToCategory = (catId) => {
     setActiveCategory(catId);
@@ -825,7 +955,7 @@ export default function EmojiPickerPopover({
             <Sparkles size={14} color="#8b5cf6" />
             <span>Stickers</span>
             <span style={{ fontSize: '0.66rem', background: activeTab === 'sticker' ? '#ede9fe' : '#e2e8f0', color: activeTab === 'sticker' ? '#7c3aed' : '#64748b', padding: '1px 5px', borderRadius: '10px' }}>
-              {STICKERS.length}
+              {allStickers.length}
             </span>
           </button>
           <button
@@ -840,7 +970,7 @@ export default function EmojiPickerPopover({
             <Film size={14} color="#0284c7" />
             <span>GIFs</span>
             <span style={{ fontSize: '0.66rem', background: activeTab === 'gif' ? '#e0f2fe' : '#e2e8f0', color: activeTab === 'gif' ? '#0369a1' : '#64748b', padding: '1px 5px', borderRadius: '10px' }}>
-              {CURATED_GIFS.length}
+              {liveGifs.length > 0 ? `${liveGifs.length}+` : CURATED_GIFS.length}
             </span>
           </button>
         </div>
@@ -1042,6 +1172,15 @@ export default function EmojiPickerPopover({
         {/* ============================================================== */}
         {activeTab === 'sticker' && (
           <>
+            {/* Hidden file input for custom transparent stickers */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/webp,image/jpeg,image/gif"
+              onChange={handleUploadSticker}
+              style={{ display: 'none' }}
+            />
+
             {/* Sticker Pack Horizontal Filter Tabs */}
             {!searchQuery && (
               <div
@@ -1055,6 +1194,8 @@ export default function EmojiPickerPopover({
               >
                 {STICKER_PACKS.map((pack) => {
                   const isActive = activeStickerPack === pack.id;
+                  const isCustom = pack.id === 'custom';
+                  const count = isCustom ? customStickers.length : STICKERS.filter((s) => s.pack === pack.id).length;
                   return (
                     <button
                       key={pack.id}
@@ -1062,7 +1203,10 @@ export default function EmojiPickerPopover({
                       className={`phoenix-pill-filter-chip ${isActive ? 'active' : ''}`}
                       onClick={() => setActiveStickerPack(pack.id)}
                     >
-                      {pack.name}
+                      <span>{pack.name}</span>
+                      <span style={{ fontSize: '0.62rem', opacity: 0.8, marginLeft: '3px' }}>
+                        ({count})
+                      </span>
                     </button>
                   );
                 })}
@@ -1079,7 +1223,7 @@ export default function EmojiPickerPopover({
                 boxSizing: 'border-box'
               }}
             >
-              {filteredStickers.length === 0 ? (
+              {filteredStickers.length === 0 && activeStickerPack !== 'custom' ? (
                 <div
                   style={{
                     display: 'flex',
@@ -1094,7 +1238,7 @@ export default function EmojiPickerPopover({
                 >
                   <Sparkles size={32} style={{ opacity: 0.5, color: '#8b5cf6' }} />
                   <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>No stickers match your search</div>
-                  <div style={{ fontSize: '0.74rem' }}>Try searching &quot;approved&quot;, &quot;rush&quot;, or &quot;textile&quot;</div>
+                  <div style={{ fontSize: '0.74rem' }}>Try searching &quot;approved&quot;, &quot;namaste&quot;, or &quot;textile&quot;</div>
                 </div>
               ) : (
                 <div
@@ -1104,15 +1248,82 @@ export default function EmojiPickerPopover({
                     gap: '10px'
                   }}
                 >
+                  {/* + Upload Custom Sticker Button when in 'custom' pack or searching */}
+                  {activeStickerPack === 'custom' && (
+                    <div
+                      className="phoenix-sticker-card"
+                      style={{
+                        border: '1.5px dashed #8b5cf6',
+                        background: '#f5f3ff',
+                        minHeight: '94px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      title="Upload your own transparent PNG / WebP sticker"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: '#ede9fe',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#7c3aed'
+                        }}
+                      >
+                        <Plus size={20} />
+                      </div>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#6d28d9', textAlign: 'center' }}>
+                        + Add Sticker
+                      </span>
+                    </div>
+                  )}
+
                   {filteredStickers.map((sticker) => (
                     <div
                       key={sticker.id}
                       className="phoenix-sticker-card"
+                      style={{ position: 'relative' }}
                       title={sticker.title}
                       onMouseEnter={() => setHoveredItem({ type: 'sticker', ...sticker })}
                       onMouseLeave={() => setHoveredItem(null)}
                       onClick={() => handlePickSticker(sticker)}
                     >
+                      {/* Delete button for custom stickers */}
+                      {sticker.pack === 'custom' && (
+                        <button
+                          type="button"
+                          title="Delete custom sticker"
+                          onClick={(e) => handleDeleteSticker(e, sticker.id)}
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            padding: 0,
+                            zIndex: 10,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                          }}
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      )}
+
                       <img
                         src={sticker.url}
                         alt={sticker.title}
@@ -1149,11 +1360,11 @@ export default function EmojiPickerPopover({
         )}
 
         {/* ============================================================== */}
-        {/* TAB 3: GIFS CONTENT                                            */}
+        {/* TAB 3: GIFS CONTENT (Live Giphy + Infinite Scroll)             */}
         {/* ============================================================== */}
         {activeTab === 'gif' && (
           <>
-            {/* GIF Category Chips & Custom URL Link */}
+            {/* GIF Category Chips, GIPHY badge & Custom URL Link */}
             <div
               style={{
                 padding: '8px 12px',
@@ -1190,28 +1401,44 @@ export default function EmojiPickerPopover({
                 })}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowCustomUrlInput(!showCustomUrlInput)}
-                style={{
-                  background: showCustomUrlInput ? '#eff6ff' : 'transparent',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '16px',
-                  padding: '3px 8px',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  color: showCustomUrlInput ? '#2563eb' : '#475569',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  flexShrink: 0
-                }}
-                title="Paste a direct GIF link"
-              >
-                <Link2 size={12} />
-                <span>Custom Link</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <span
+                  style={{
+                    fontSize: '0.58rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.06em',
+                    color: '#94a3b8',
+                    textTransform: 'uppercase',
+                    userSelect: 'none'
+                  }}
+                  title="Powered by GIPHY API"
+                >
+                  GIPHY
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCustomUrlInput(!showCustomUrlInput)}
+                  style={{
+                    background: showCustomUrlInput ? '#eff6ff' : 'transparent',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '16px',
+                    padding: '3px 8px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    color: showCustomUrlInput ? '#2563eb' : '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    flexShrink: 0
+                  }}
+                  title="Paste a direct GIF link"
+                >
+                  <Link2 size={12} />
+                  <span>Custom</span>
+                </button>
+              </div>
             </div>
 
             {/* Custom GIF Link Bar (Expandable) */}
@@ -1266,9 +1493,10 @@ export default function EmojiPickerPopover({
               </form>
             )}
 
-            {/* GIF Grid Body (2 columns responsive) */}
+            {/* GIF Grid Body (2 columns responsive with infinite scroll) */}
             <div
               className="phoenix-media-scroll-body"
+              onScroll={handleGifScroll}
               style={{
                 flex: 1,
                 overflowY: 'auto',
@@ -1276,7 +1504,7 @@ export default function EmojiPickerPopover({
                 boxSizing: 'border-box'
               }}
             >
-              {filteredGifs.length === 0 ? (
+              {displayGifs.length === 0 && !loadingGifs ? (
                 <div
                   style={{
                     display: 'flex',
@@ -1301,7 +1529,7 @@ export default function EmojiPickerPopover({
                     gap: '8px'
                   }}
                 >
-                  {filteredGifs.map((gif) => (
+                  {displayGifs.map((gif) => (
                     <div
                       key={gif.id}
                       className="phoenix-gif-card"
@@ -1340,6 +1568,31 @@ export default function EmojiPickerPopover({
                       </div>
                     </div>
                   ))}
+
+                  {/* Infinite Scroll Loading Indicator */}
+                  {loadingGifs && (
+                    <div
+                      style={{
+                        gridColumn: 'span 2',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '12px 0',
+                        color: '#0284c7',
+                        fontSize: '0.74rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <Loader2
+                        size={15}
+                        style={{
+                          animation: 'emojiPopoverIn 0.4s ease infinite alternate'
+                        }}
+                      />
+                      <span>Searching millions of GIFs...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
