@@ -2710,6 +2710,7 @@ export default function EliteBillingDepartment({
   const [vendorSearch, setVendorSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
   const [digitalChallans, setDigitalChallans] = useState([]);
+  const [loadingChallans, setLoadingChallans] = useState(false);
   const [challanSearch, setChallanSearch] = useState('');
 
   useEffect(() => {
