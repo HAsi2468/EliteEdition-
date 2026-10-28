@@ -24,6 +24,7 @@ const getTasks = async (req, res) => {
     } = req.query;
 
     const query = {};
+    const andConditions = [];
 
     if (status && status !== 'all') {
       query.status = status;
@@ -118,7 +119,8 @@ const getTasks = async (req, res) => {
       .limit(limitNum);
 
     // Trigger async overdue tasks check
-    checkOverdueTasks(req.app.get('socketio')).catch(e => console.error('Overdue check error:', e));
+    const io = req.app?.get ? (req.app.get('socketio') || req.app.get('io')) : (global.io || null);
+    checkOverdueTasks(io).catch(e => console.error('Overdue check error:', e));
 
     res.json({
       success: true,

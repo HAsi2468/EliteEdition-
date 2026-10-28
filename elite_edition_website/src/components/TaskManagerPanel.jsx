@@ -457,18 +457,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const fetchInitialData = async () => {
-    setLoading(true);
+  const fetchStaffUsers = async () => {
     try {
-      const [tasksRes, usersRes] = await Promise.all([
-        api.getTasks({ limit: 200 }),
-        api.getUsers({ limit: 100 }).catch(() => api.getCommunicationUsers(myId))
-      ]);
-
-      if (tasksRes.success && tasksRes.data) {
-        const rawTasks = tasksRes.data;
-        setTasks(isMasterAdmin ? rawTasks : rawTasks.filter(isTaskVisible));
+      let usersRes = null;
+      try {
+        usersRes = await api.getUsers({ limit: 150 });
+      } catch (err) {
+        usersRes = await api.getCommunicationUsers(myId).catch(() => null);
       }
+
       let loadedUsers = [];
       if (usersRes?.users?.rows && Array.isArray(usersRes.users.rows)) {
         loadedUsers = usersRes.users.rows;
@@ -501,13 +498,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
       // Ensure currentUser is always included in allUsers so their data can be filtered
       if (currentUser && (currentUser._id || currentUser.id || currentUser.name)) {
         const myUserId = String(currentUser._id || currentUser.id || '');
-        const myName = (currentUser.name || currentUser.username || '').toLowerCase().trim();
+        const myNameStr = (currentUser.name || currentUser.username || '').toLowerCase().trim();
         const exists = loadedUsers.some((u) => {
           const uId = String(u._id || u.id || '');
           const uName = (u.name || u.username || '').toLowerCase().trim();
-          return (myUserId && uId === myUserId) || (myName && uName === myName);
+          return (myUserId && uId === myUserId) || (myNameStr && uName === myNameStr);
         });
-        if (!exists && (myUserId || myName)) {
+        if (!exists && (myUserId || myNameStr)) {
           loadedUsers = [
             {
               _id: myUserId || 'me',
@@ -521,7 +518,37 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         }
       }
 
-      setAllUsers(loadedUsers);
+      const normalizedUsers = loadedUsers.map((u) => ({
+        ...u,
+        _id: String(u._id || u.id || ''),
+        id: String(u._id || u.id || '')
+      }));
+
+      setAllUsers(normalizedUsers);
+      return normalizedUsers;
+    } catch (err) {
+      console.error('Failed to fetch staff members:', err);
+      return [];
+    }
+  };
+
+  const fetchInitialData = async () => {
+    setLoading(true);
+    try {
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const tasksRes = await api.getTasks({ limit: 200 });
+            if (tasksRes?.success && tasksRes?.data) {
+              const rawTasks = tasksRes.data;
+              setTasks(isMasterAdmin ? rawTasks : rawTasks.filter(isTaskVisible));
+            }
+          } catch (tErr) {
+            console.error('Failed to load tasks:', tErr);
+          }
+        })(),
+        fetchStaffUsers()
+      ]);
       setSelectedAssigneeIds([]);
     } catch (err) {
       console.error('Failed to fetch task management data:', err);
@@ -534,6 +561,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     setShowCreateModal(true);
     setStaffSearch('');
     setSelectedAssigneeIds([]);
+    if (!allUsers || allUsers.length === 0) {
+      fetchStaffUsers();
+    }
   };
 
   const toggleAssigneeSelection = (userId) => {
@@ -548,6 +578,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
   const handleDeselectAllStaff = () => {
     setSelectedAssigneeIds([]);
+  };
+
+  const handleAssignToSelf = () => {
+    if (myId) {
+      setSelectedAssigneeIds([myId]);
+    }
   };
 
   const handleOpenEditModal = (task, e) => {
@@ -568,6 +604,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     setEditRecurrenceFreq(task.recurrence?.frequency || 'daily');
     setEditStaffSearch('');
     setShowEditModal(true);
+    if (!allUsers || allUsers.length === 0) {
+      fetchStaffUsers();
+    }
   };
 
   const toggleEditAssigneeSelection = (userId) => {
@@ -582,6 +621,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
   const handleEditDeselectAllStaff = () => {
     setEditAssigneeIds([]);
+  };
+
+  const handleEditAssignToSelf = () => {
+    if (myId) {
+      setEditAssigneeIds([myId]);
+    }
   };
 
   const handleEditTaskSubmit = async (e) => {
@@ -4697,92 +4742,236 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
               </div>
 
               {/* Assigned To Staff Selection Checkboxes */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '0.4rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Assigned To Staff Members
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Users size={14} color="#2563eb" /> Assign Task To Staff
                     </label>
                     <span
                       style={{
                         fontSize: '0.7rem',
                         fontWeight: 700,
-                        padding: '1px 7px',
-                        borderRadius: '10px',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
                         background: selectedAssigneeIds.length > 0 ? '#eff6ff' : '#f0fdf4',
                         color: selectedAssigneeIds.length > 0 ? '#2563eb' : '#16a34a',
                         border: `1px solid ${selectedAssigneeIds.length > 0 ? '#bfdbfe' : '#bbf7d0'}`
                       }}
                     >
-                      {selectedAssigneeIds.length > 0 ? `${selectedAssigneeIds.length} selected` : `Auto-assigned to self (${myName})`}
+                      {selectedAssigneeIds.length > 0 ? `✓ ${selectedAssigneeIds.length} Staff Selected` : `Auto: ${myName}`}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button type="button" onClick={handleSelectAllStaff} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {myId && (
+                      <button
+                        type="button"
+                        onClick={handleAssignToSelf}
+                        style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 7px', borderRadius: '4px', color: '#0f172a', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Assign Myself
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSelectAllStaff}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
                       Select All
                     </button>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>|</span>
-                    <button type="button" onClick={handleDeselectAllStaff} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
-                      Deselect All
+                    <span style={{ color: '#cbd5e1', fontSize: '0.72rem' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllStaff}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      Clear
                     </button>
                   </div>
                 </div>
-                {selectedAssigneeIds.length === 0 && (
-                  <p style={{ margin: '2px 0 6px', fontSize: '0.72rem', color: '#16a34a', fontWeight: 600 }}>
-                    💡 No staff selected — this task will automatically be assigned to you ({myName}).
-                  </p>
-                )}
 
-                <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
-                  <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <input
-                    type="text"
-                    placeholder="Search staff members..."
-                    value={staffSearch}
-                    onChange={(e) => setStaffSearch(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '26px', fontSize: '0.74rem', height: '28px', background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '3px', background: '#ffffff' }}>
-                  {allUsers
-                    .filter((u) => {
-                      const term = staffSearch.toLowerCase().trim();
-                      if (!term) return true;
-                      return (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
-                    })
-                    .map((u) => {
-                      const isChecked = selectedAssigneeIds.includes(String(u._id));
+                {/* Selected Staff Tags Ribbon */}
+                {selectedAssigneeIds.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px', padding: '4px 6px', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    {selectedAssigneeIds.map((id) => {
+                      const u = allUsers.find((user) => String(user._id) === String(id));
+                      const displayName = u ? (u.name || u.username) : (id === myId ? myName : 'Staff');
                       return (
-                        <div
-                          key={u._id}
-                          onClick={() => toggleAssigneeSelection(String(u._id))}
+                        <span
+                          key={id}
                           style={{
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.35rem 0.55rem',
-                            borderRadius: '6px',
-                            background: isChecked ? '#eff6ff' : 'transparent',
-                            border: isChecked ? '1px solid #bfdbfe' : '1px solid transparent',
-                            cursor: 'pointer'
+                            gap: '4px',
+                            padding: '2px 7px',
+                            borderRadius: '12px',
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            fontSize: '0.72rem',
+                            fontWeight: 700
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}}
-                              style={{ cursor: 'pointer' }}
-                              aria-label={`Assign to ${u.name || u.username}`}
-                              title={`Assign to ${u.name || u.username}`}
-                            />
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || u.username}</span>
-                          </div>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
-                        </div>
+                          👤 {displayName}
+                          <button
+                            type="button"
+                            onClick={() => toggleAssigneeSelection(id)}
+                            style={{ background: 'none', border: 'none', color: '#1e40af', cursor: 'pointer', padding: 0, fontSize: '0.8rem', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </span>
                       );
                     })}
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: '8px', padding: '6px 10px', background: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0', fontSize: '0.72rem', color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>💡 No staff selected — this task will automatically be assigned to you (<strong>{myName}</strong>).</span>
+                    <span style={{ fontSize: '0.68rem', color: '#16a34a' }}>Select one or more below to delegate</span>
+                  </div>
+                )}
+
+                {/* Search staff input */}
+                <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
+                  <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input
+                    type="text"
+                    placeholder="Type to filter staff by name, email, or department..."
+                    value={staffSearch}
+                    onChange={(e) => setStaffSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      paddingLeft: '28px',
+                      paddingRight: staffSearch ? '24px' : '8px',
+                      fontSize: '0.75rem',
+                      height: '30px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {staffSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setStaffSearch('')}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Staff list box */}
+                <div style={{ maxHeight: 170, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.35rem', display: 'flex', flexDirection: 'column', gap: '3px', background: '#ffffff' }}>
+                  {allUsers.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '1.25rem', color: '#64748b', fontSize: '0.76rem' }}>
+                      <p style={{ margin: '0 0 6px', fontWeight: 600 }}>Loading staff members...</p>
+                      <button
+                        type="button"
+                        onClick={() => fetchStaffUsers()}
+                        style={{ padding: '3px 10px', fontSize: '0.72rem', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        🔄 Reload Staff List
+                      </button>
+                    </div>
+                  ) : (
+                    (() => {
+                      const filtered = allUsers.filter((u) => {
+                        const term = staffSearch.toLowerCase().trim();
+                        if (!term) return true;
+                        return (u.name || '').toLowerCase().includes(term) ||
+                               (u.username || '').toLowerCase().includes(term) ||
+                               (u.email || '').toLowerCase().includes(term) ||
+                               (u.department || '').toLowerCase().includes(term);
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.74rem' }}>
+                            No staff members found matching "{staffSearch}".
+                          </div>
+                        );
+                      }
+
+                      return filtered.map((u) => {
+                        const uId = String(u._id || u.id);
+                        const isChecked = selectedAssigneeIds.includes(uId);
+                        const initials = (u.name || u.username || 'U')
+                          .split(' ')
+                          .map((n) => n[0])
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase();
+                        const isMe = uId === myId;
+
+                        return (
+                          <div
+                            key={uId}
+                            onClick={() => toggleAssigneeSelection(uId)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.4rem 0.6rem',
+                              borderRadius: '6px',
+                              background: isChecked ? '#eff6ff' : 'transparent',
+                              border: isChecked ? '1px solid #93c5fd' : '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              transition: 'background 0.12s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                style={{ cursor: 'pointer', width: '14px', height: '14px' }}
+                                aria-label={`Assign to ${u.name || u.username}`}
+                              />
+                              <div
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: isChecked ? '#2563eb' : '#e2e8f0',
+                                  color: isChecked ? '#ffffff' : '#334155',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                {initials}
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>
+                                    {u.name || u.username}
+                                  </span>
+                                  {isMe && (
+                                    <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: '#dcfce7', color: '#15803d', fontWeight: 800 }}>
+                                      You
+                                    </span>
+                                  )}
+                                  {u.role === 'admin' && (
+                                    <span style={{ fontSize: '0.62rem', padding: '1px 5px', borderRadius: '4px', background: '#fef3c7', color: '#92400e', fontWeight: 800 }}>
+                                      Admin
+                                    </span>
+                                  )}
+                                </div>
+                                {u.department && u.department !== 'General' && (
+                                  <span style={{ fontSize: '0.65rem', color: '#64748b' }}>{u.department}</span>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{u.email}</span>
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
                 </div>
               </div>
 
@@ -5234,80 +5423,231 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
               </div>
 
               {/* Assigned To Staff Selection */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '0.4rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Assigned To Staff Members
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Users size={14} color="#2563eb" /> Assigned Staff
                     </label>
                     <span
                       style={{
                         fontSize: '0.7rem',
                         fontWeight: 700,
-                        padding: '1px 7px',
-                        borderRadius: '10px',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
                         background: editAssigneeIds.length > 0 ? '#eff6ff' : '#fef2f2',
                         color: editAssigneeIds.length > 0 ? '#2563eb' : '#dc2626',
                         border: `1px solid ${editAssigneeIds.length > 0 ? '#bfdbfe' : '#fecaca'}`
                       }}
                     >
-                      {editAssigneeIds.length} staff selected
+                      {editAssigneeIds.length > 0 ? `✓ ${editAssigneeIds.length} Staff Selected` : '⚠️ No staff assigned'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button type="button" onClick={handleEditSelectAllStaff} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {myId && (
+                      <button
+                        type="button"
+                        onClick={handleEditAssignToSelf}
+                        style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 7px', borderRadius: '4px', color: '#0f172a', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Assign Myself
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleEditSelectAllStaff}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
                       Select All
                     </button>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>|</span>
-                    <button type="button" onClick={handleEditDeselectAllStaff} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
-                      Deselect All
+                    <span style={{ color: '#cbd5e1', fontSize: '0.72rem' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={handleEditDeselectAllStaff}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      Clear
                     </button>
                   </div>
                 </div>
 
-                <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
-                  <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <input
-                    type="text"
-                    placeholder="Search staff members..."
-                    value={editStaffSearch}
-                    onChange={(e) => setEditStaffSearch(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '26px', fontSize: '0.74rem', height: '28px', background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '3px', background: '#ffffff' }}>
-                  {allUsers
-                    .filter((u) => {
-                      const term = editStaffSearch.toLowerCase().trim();
-                      if (!term) return true;
-                      return (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
-                    })
-                    .map((u) => {
-                      const isChecked = editAssigneeIds.includes(String(u._id));
+                {/* Selected Staff Tags Ribbon */}
+                {editAssigneeIds.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px', padding: '4px 6px', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    {editAssigneeIds.map((id) => {
+                      const u = allUsers.find((user) => String(user._id) === String(id));
+                      const displayName = u ? (u.name || u.username) : (id === myId ? myName : 'Staff');
                       return (
-                        <div
-                          key={u._id}
-                          onClick={() => toggleEditAssigneeSelection(String(u._id))}
+                        <span
+                          key={id}
                           style={{
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.35rem 0.55rem',
-                            borderRadius: '6px',
-                            background: isChecked ? '#eff6ff' : 'transparent',
-                            border: isChecked ? '1px solid #bfdbfe' : '1px solid transparent',
-                            cursor: 'pointer'
+                            gap: '4px',
+                            padding: '2px 7px',
+                            borderRadius: '12px',
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            fontSize: '0.72rem',
+                            fontWeight: 700
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ cursor: 'pointer' }} />
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || u.username}</span>
-                          </div>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
-                        </div>
+                          👤 {displayName}
+                          <button
+                            type="button"
+                            onClick={() => toggleEditAssigneeSelection(id)}
+                            style={{ background: 'none', border: 'none', color: '#1e40af', cursor: 'pointer', padding: 0, fontSize: '0.8rem', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </span>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Search staff input */}
+                <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
+                  <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input
+                    type="text"
+                    placeholder="Type to filter staff by name, email, or department..."
+                    value={editStaffSearch}
+                    onChange={(e) => setEditStaffSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      paddingLeft: '28px',
+                      paddingRight: editStaffSearch ? '24px' : '8px',
+                      fontSize: '0.75rem',
+                      height: '30px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {editStaffSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setEditStaffSearch('')}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Staff list box */}
+                <div style={{ maxHeight: 170, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.35rem', display: 'flex', flexDirection: 'column', gap: '3px', background: '#ffffff' }}>
+                  {allUsers.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '1.25rem', color: '#64748b', fontSize: '0.76rem' }}>
+                      <p style={{ margin: '0 0 6px', fontWeight: 600 }}>Loading staff members...</p>
+                      <button
+                        type="button"
+                        onClick={() => fetchStaffUsers()}
+                        style={{ padding: '3px 10px', fontSize: '0.72rem', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        🔄 Reload Staff List
+                      </button>
+                    </div>
+                  ) : (
+                    (() => {
+                      const filtered = allUsers.filter((u) => {
+                        const term = editStaffSearch.toLowerCase().trim();
+                        if (!term) return true;
+                        return (u.name || '').toLowerCase().includes(term) ||
+                               (u.username || '').toLowerCase().includes(term) ||
+                               (u.email || '').toLowerCase().includes(term) ||
+                               (u.department || '').toLowerCase().includes(term);
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.74rem' }}>
+                            No staff members found matching "{editStaffSearch}".
+                          </div>
+                        );
+                      }
+
+                      return filtered.map((u) => {
+                        const uId = String(u._id || u.id);
+                        const isChecked = editAssigneeIds.includes(uId);
+                        const initials = (u.name || u.username || 'U')
+                          .split(' ')
+                          .map((n) => n[0])
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase();
+                        const isMe = uId === myId;
+
+                        return (
+                          <div
+                            key={uId}
+                            onClick={() => toggleEditAssigneeSelection(uId)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.4rem 0.6rem',
+                              borderRadius: '6px',
+                              background: isChecked ? '#eff6ff' : 'transparent',
+                              border: isChecked ? '1px solid #93c5fd' : '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              transition: 'background 0.12s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                style={{ cursor: 'pointer', width: '14px', height: '14px' }}
+                                aria-label={`Assign to ${u.name || u.username}`}
+                              />
+                              <div
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: isChecked ? '#2563eb' : '#e2e8f0',
+                                  color: isChecked ? '#ffffff' : '#334155',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                {initials}
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>
+                                    {u.name || u.username}
+                                  </span>
+                                  {isMe && (
+                                    <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: '#dcfce7', color: '#15803d', fontWeight: 800 }}>
+                                      You
+                                    </span>
+                                  )}
+                                  {u.role === 'admin' && (
+                                    <span style={{ fontSize: '0.62rem', padding: '1px 5px', borderRadius: '4px', background: '#fef3c7', color: '#92400e', fontWeight: 800 }}>
+                                      Admin
+                                    </span>
+                                  )}
+                                </div>
+                                {u.department && u.department !== 'General' && (
+                                  <span style={{ fontSize: '0.65rem', color: '#64748b' }}>{u.department}</span>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{u.email}</span>
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
                 </div>
               </div>
 
