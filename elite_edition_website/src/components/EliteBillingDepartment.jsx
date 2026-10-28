@@ -3996,29 +3996,74 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* KPI CARDS GRID */}
-          <div className="ent-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{fmtINR(periodStats.totalInvoiced)}</div>
-              <div style={{ fontSize: '0.68rem', color: '#3b82f6', marginTop: 2 }}>{periodStats.totalInvoices} Invoices</div>
+          <div className="ent-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+            <div className="ent-stat-card" style={{
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(255, 255, 255, 0.02))',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              borderLeft: '4px solid #3b82f6',
+              borderRadius: 10,
+              padding: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Invoiced</span>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontSize: '0.75rem' }}>🧾</span>
+              </div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(periodStats.totalInvoiced)}</div>
+              <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: 4, fontWeight: 700 }}>{periodStats.totalInvoices} Invoices Generated</div>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#15803d', marginTop: 2 }}>{fmtINR(periodStats.totalPaid)}</div>
-              <div style={{ fontSize: '0.68rem', color: '#15803d', marginTop: 2 }}>{periodStats.paidCount} Paid Invoices</div>
+            <div className="ent-stat-card" style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(255, 255, 255, 0.02))',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderLeft: '4px solid #10b981',
+              borderRadius: 10,
+              padding: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Received</span>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', fontSize: '0.75rem' }}>✓</span>
+              </div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#10b981', marginTop: 4 }}>{fmtINR(periodStats.totalPaid)}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700 }}>{periodStats.paidCount} Fully Paid</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                  {periodStats.totalInvoiced > 0 ? ((periodStats.totalPaid / periodStats.totalInvoiced) * 100).toFixed(0) : 0}% Collected
+                </span>
+              </div>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Balance</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309', marginTop: 2 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
-              <div style={{ fontSize: '0.68rem', color: '#b45309', marginTop: 2 }}>{periodStats.unpaidCount} Pending / Partial</div>
+            <div className="ent-stat-card" style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(255, 255, 255, 0.02))',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              borderLeft: '4px solid #f59e0b',
+              borderRadius: 10,
+              padding: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Pending Balance</span>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontSize: '0.75rem' }}>⏳</span>
+              </div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b', marginTop: 4 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
+              <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: 4, fontWeight: 700 }}>{periodStats.unpaidCount} Pending / Partial</div>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b91c1c', marginTop: 2 }}>{periodStats.overdueCount}</div>
-              <div style={{ fontSize: '0.68rem', color: '#b91c1c', marginTop: 2 }}>Payment Passed</div>
+            <div className="ent-stat-card" style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(255, 255, 255, 0.02))',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderLeft: '4px solid #ef4444',
+              borderRadius: 10,
+              padding: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Overdue Invoices</span>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: '0.75rem' }}>🚨</span>
+              </div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444', marginTop: 4 }}>{periodStats.overdueCount}</div>
+              <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: 4, fontWeight: 700 }}>Past Due Date</div>
             </div>
           </div>
         </div>
@@ -4299,17 +4344,20 @@ export default function EliteBillingDepartment({
                             </td>
                             <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
                               <span style={{
-                                padding: '0.25rem 0.6rem',
-                                borderRadius: 6,
+                                padding: '0.28rem 0.65rem',
+                                borderRadius: 20,
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
-                                background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                                color: inv.paymentStatus === 'PAID' ? '#34d399' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
-                                border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                                whiteSpace: 'nowrap',
-                                display: 'inline-block'
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.12)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
+                                color: inv.paymentStatus === 'PAID' ? '#10b981' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#f59e0b' : '#ef4444',
+                                border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.25)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                                whiteSpace: 'nowrap'
                               }}>
-                                {inv.paymentStatus}
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                                {inv.paymentStatus === 'PARTIALLY_PAID' ? 'PARTIAL' : inv.paymentStatus}
                               </span>
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle' }}>
@@ -6288,18 +6336,18 @@ export default function EliteBillingDepartment({
                         <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 800, color: balDue > 0 ? '#ef4444' : '#16a34a', verticalAlign: 'top' }}>
                           ₹{balDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'middle' }}>
                           {isPaid ? (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: '#16a34a', display: 'inline-block' }}>
-                              PAID
+                            <span style={{ padding: '0.25rem 0.65rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 800, background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> PAID
                             </span>
                           ) : isPartial ? (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: 'rgba(234,179,8,0.15)', color: '#ca8a04', display: 'inline-block' }}>
-                              PARTIAL
+                            <span style={{ padding: '0.25rem 0.65rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 800, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} /> PARTIAL
                             </span>
                           ) : (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', display: 'inline-block' }}>
-                              UNPAID
+                            <span style={{ padding: '0.25rem 0.65rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 800, background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} /> UNPAID
                             </span>
                           )}
                         </td>

@@ -270,13 +270,56 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
 
   if (!isOpen) return null;
 
-  const unreadCount = history.filter(h => !h.read).length;
+  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'unread' | 'alerts'
 
-  const toggleSelectNotif = (id, e) => {
+  const unreadCount = history.filter(h => !h.read).length;
+  const alertCount = history.filter(h => h.type === 'danger' || h.type === 'warning' || (h.title && (h.title.toLowerCase().includes('alert') || h.title.toLowerCase().includes('error')))).length;
+
+  // Smart deduplication & grouping of identical notifications
+  const groupedNotifications = useMemo(() => {
+    let list = history;
+    if (filterTab === 'unread') {
+      list = list.filter(h => !h.read);
+    } else if (filterTab === 'alerts') {
+      list = list.filter(h => h.type === 'danger' || h.type === 'warning' || (h.title && (h.title.toLowerCase().includes('alert') || h.title.toLowerCase().includes('error'))));
+    }
+
+    const groups = [];
+    const map = new Map();
+
+    list.forEach(item => {
+      const key = `${(item.title || '').trim()}|||${(item.message || '').trim()}`;
+      if (map.has(key)) {
+        const existing = map.get(key);
+        existing.count += 1;
+        existing.ids.push(item.id);
+        if (!item.read) existing.hasUnread = true;
+        if (new Date(item.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+          existing.timestamp = item.timestamp;
+        }
+      } else {
+        const entry = {
+          ...item,
+          count: 1,
+          ids: [item.id],
+          hasUnread: !item.read
+        };
+        map.set(key, entry);
+        groups.push(entry);
+      }
+    });
+
+    return groups;
+  }, [history, filterTab]);
+
+  const toggleSelectGroup = (itemIds, e) => {
     if (e) e.stopPropagation();
-    setSelectedNotifIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    const allSelected = itemIds.every(id => selectedNotifIds.includes(id));
+    if (allSelected) {
+      setSelectedNotifIds(prev => prev.filter(x => !itemIds.includes(x)));
+    } else {
+      setSelectedNotifIds(prev => Array.from(new Set([...prev, ...itemIds])));
+    }
   };
 
   const handleSelectAllNotifs = () => {
@@ -315,8 +358,8 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     setSelectedNotifIds([]);
   };
 
-  const markSingleRead = (id) => {
-    const updated = history.map(h => h.id === id ? { ...h, read: true } : h);
+  const markGroupRead = (itemIds) => {
+    const updated = history.map(h => itemIds.includes(h.id) ? { ...h, read: true } : h);
     saveNotificationHistory(updated);
     setHistory(updated);
   };
@@ -343,20 +386,95 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', zIndex: 10001, display: 'flex', justifyContent: 'flex-end' }}>
-      <div style={{ width: '420px', maxWidth: '100vw', height: '100%', background: 'var(--bg-card, #161b26)', borderLeft: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 40px rgba(0,0,0,0.8)', animation: 'slideInRight 0.25s ease-out' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 10001, display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ width: '440px', maxWidth: '100vw', height: '100%', background: 'var(--bg-card, #161b26)', borderLeft: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 45px rgba(0,0,0,0.6)', animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
         
         {/* Drawer Header */}
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <BellRing size={20} color="var(--primary)" />
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <BellRing size={18} color="var(--primary)" />
+            </div>
             <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Notification History</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Notification Center</h3>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}</span>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px' }}>
             <X size={18} />
+          </button>
+        </div>
+
+        {/* Category Filter Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)', background: 'rgba(0,0,0,0.1)' }}>
+          <button
+            onClick={() => setFilterTab('all')}
+            style={{
+              flex: 1,
+              padding: '0.6rem 0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: filterTab === 'all' ? 800 : 600,
+              color: filterTab === 'all' ? 'var(--primary)' : 'var(--text-muted)',
+              borderBottom: filterTab === 'all' ? '2px solid var(--primary)' : '2px solid transparent',
+              background: 'none',
+              border: 'none',
+              borderBottomWidth: 2,
+              borderBottomStyle: 'solid',
+              borderBottomColor: filterTab === 'all' ? 'var(--primary)' : 'transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4
+            }}
+          >
+            All <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: '0.65rem', background: filterTab === 'all' ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.06)' }}>{history.length}</span>
+          </button>
+
+          <button
+            onClick={() => setFilterTab('unread')}
+            style={{
+              flex: 1,
+              padding: '0.6rem 0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: filterTab === 'unread' ? 800 : 600,
+              color: filterTab === 'unread' ? 'var(--primary)' : 'var(--text-muted)',
+              border: 'none',
+              borderBottomWidth: 2,
+              borderBottomStyle: 'solid',
+              borderBottomColor: filterTab === 'unread' ? 'var(--primary)' : 'transparent',
+              background: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4
+            }}
+          >
+            Unread <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: '0.65rem', background: unreadCount > 0 ? '#38bdf8' : 'rgba(255,255,255,0.06)', color: unreadCount > 0 ? '#0f172a' : 'inherit', fontWeight: 800 }}>{unreadCount}</span>
+          </button>
+
+          <button
+            onClick={() => setFilterTab('alerts')}
+            style={{
+              flex: 1,
+              padding: '0.6rem 0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: filterTab === 'alerts' ? 800 : 600,
+              color: filterTab === 'alerts' ? '#ef4444' : 'var(--text-muted)',
+              border: 'none',
+              borderBottomWidth: 2,
+              borderBottomStyle: 'solid',
+              borderBottomColor: filterTab === 'alerts' ? '#ef4444' : 'transparent',
+              background: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4
+            }}
+          >
+            Alerts <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: '0.65rem', background: alertCount > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)', color: alertCount > 0 ? '#ef4444' : 'inherit' }}>{alertCount}</span>
           </button>
         </div>
 
@@ -389,7 +507,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                 onChange={handleSelectAllNotifs}
                 style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
               />
-              <span>All ({history.length})</span>
+              <span>Select All</span>
             </label>
           )}
 
@@ -420,17 +538,17 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
           )}
         </div>
 
-        {/* Notification List */}
+        {/* Grouped Notification List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem' }}>
-          {history.length === 0 ? (
+          {groupedNotifications.length === 0 ? (
             <div style={{ padding: '4rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               <Bell size={36} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
-              <p style={{ margin: 0, fontSize: '0.88rem' }}>No notifications received yet.</p>
+              <p style={{ margin: 0, fontSize: '0.88rem' }}>No notifications found.</p>
               <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Notifications for chat messages, tasks, and system events will appear here.</span>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {history.map(item => {
+              {groupedNotifications.map(item => {
                 const getIcon = () => {
                   switch (item.type) {
                     case 'success': return <CheckCircle2 size={16} color="var(--success)" />;
@@ -440,13 +558,13 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                   }
                 };
 
-                const isSelected = selectedNotifIds.includes(item.id);
+                const isGroupSelected = item.ids.every(id => selectedNotifIds.includes(id));
 
                 return (
                   <div
                     key={item.id}
                     onClick={() => {
-                      markSingleRead(item.id);
+                      markGroupRead(item.ids);
                       if (item.actionTab && onSelectTab) {
                         onSelectTab(item.actionTab);
                         onClose();
@@ -454,9 +572,9 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                     }}
                     style={{
                       padding: '0.85rem 1rem',
-                      borderRadius: '8px',
-                      background: isSelected ? 'rgba(56, 189, 248, 0.15)' : item.read ? 'rgba(255,255,255,0.02)' : 'rgba(56,189,248,0.08)',
-                      border: isSelected ? '1px solid var(--primary)' : item.read ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(56,189,248,0.25)',
+                      borderRadius: '10px',
+                      background: isGroupSelected ? 'rgba(56, 189, 248, 0.15)' : !item.hasUnread ? 'rgba(255,255,255,0.02)' : 'rgba(56,189,248,0.08)',
+                      border: isGroupSelected ? '1px solid var(--primary)' : !item.hasUnread ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(56,189,248,0.25)',
                       cursor: item.actionTab ? 'pointer' : 'default',
                       transition: 'all 0.15s ease',
                       position: 'relative'
@@ -465,16 +583,23 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
                       <input
                         type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => toggleSelectNotif(item.id, e)}
+                        checked={isGroupSelected}
+                        onChange={(e) => toggleSelectGroup(item.ids, e)}
                         onClick={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)', marginTop: '2px', flexShrink: 0 }}
                         title="Select notification"
                       />
                       <div style={{ marginTop: '2px', flexShrink: 0 }}>{getIcon()}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: item.read ? 600 : 700, color: 'var(--text-primary)' }}>{item.title}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', gap: 6, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: !item.hasUnread ? 600 : 800, color: 'var(--text-primary)' }}>{item.title}</span>
+                            {item.count > 1 && (
+                              <span style={{ padding: '1px 6px', borderRadius: 99, fontSize: '0.68rem', fontWeight: 800, background: 'rgba(56,189,248,0.18)', color: 'var(--primary)', border: '1px solid rgba(56,189,248,0.3)' }}>
+                                ×{item.count}
+                              </span>
+                            )}
+                          </div>
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{formatTime(item.timestamp)}</span>
                         </div>
                         {item.message && <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.35 }}>{item.message}</p>}
@@ -484,7 +609,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                           </div>
                         )}
                       </div>
-                      {!item.read && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, marginTop: '5px' }} />}
+                      {item.hasUnread && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, marginTop: '5px' }} />}
                     </div>
                   </div>
                 );

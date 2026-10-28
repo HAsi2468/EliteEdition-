@@ -6068,24 +6068,69 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           </span>
                         )}
                       </div>
+
+                      {/* Quick-fill Mill Shortage Presets */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: 6 }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>Quick:</span>
+                        {[2.5, 3.0, 3.5, 4.0].map(pct => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => {
+                              const gSent = parseFloat(inwardRfdForm.graySentMeters) || 0;
+                              const recVal = parseFloat(inwardRfdForm.receivedRfdMeters) || 0;
+                              const loss = gSent > 0 ? parseFloat(((gSent * pct) / 100).toFixed(1)) : 0;
+                              const rem = Math.max(0, parseFloat((gSent - (recVal + loss)).toFixed(1)));
+                              let newClosed = inwardRfdForm.isChallanClosed;
+                              if (!inwardRfdForm.isChallanClosedUserOverridden && gSent > 0 && recVal > 0) {
+                                newClosed = rem <= 0.5;
+                              }
+                              setInwardRfdForm(prev => ({
+                                ...prev,
+                                shortagePercent: String(pct),
+                                shortageMeters: String(loss),
+                                isChallanClosed: newClosed
+                              }));
+                            }}
+                            style={{
+                              padding: '2px 7px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              borderRadius: 4,
+                              border: inwardRfdForm.shortagePercent === String(pct) ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                              background: inwardRfdForm.shortagePercent === String(pct) ? '#e0f2fe' : '#ffffff',
+                              color: inwardRfdForm.shortagePercent === String(pct) ? '#0369a1' : '#475569',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Mill Challan Delivery Status & Still at Mill Check */}
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.9rem', background: '#fafbfc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '6px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                      Delivery Status & Mill Remaining Balance
-                    </label>
+                {/* Mill Challan Delivery Status — Interactive Selectable Cards */}
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '1rem', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '6px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>
+                        Delivery Status & Mill Remaining Balance
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        Determines whether fabric lot is final or partial inward
+                      </span>
+                    </div>
                     <div>
                       {!inwardRfdForm.isChallanClosedUserOverridden ? (
-                        <span style={{ fontSize: '0.68rem', color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: 4, fontWeight: 700, border: '1px solid #bae6fd' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#0284c7', background: '#e0f2fe', padding: '3px 8px', borderRadius: 6, fontWeight: 800, border: '1px solid #bae6fd', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           ⚡ Auto-calculated from meters
                         </span>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
                             Manual Override
                           </span>
                           <button
@@ -6115,65 +6160,182 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: inwardRfdForm.isChallanClosed ? '#059669' : '#64748b' }}>
-                      <input
-                        type="radio"
-                        name="challanDeliveryStatus"
-                        checked={inwardRfdForm.isChallanClosed}
-                        onChange={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: true, isChallanClosedUserOverridden: true })}
-                      />
-                      ✓ Complete Delivery (Challan Closed — 0 Mtr Left at Mill)
-                    </label>
 
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: !inwardRfdForm.isChallanClosed ? '#d97706' : '#64748b' }}>
-                      <input
-                        type="radio"
-                        name="challanDeliveryStatus"
-                        checked={!inwardRfdForm.isChallanClosed}
-                        onChange={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: false, isChallanClosedUserOverridden: true })}
-                      />
-                      ⏳ Partial Delivery (Fabric Still Remaining at Processing Mill{calculatedStillAtMill > 0 ? `: ${calculatedStillAtMill} Mtr` : ''})
-                    </label>
+                  {/* Interactive Option Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                    {/* Complete Delivery Card */}
+                    <div
+                      onClick={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: true, isChallanClosedUserOverridden: true })}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem',
+                        padding: '0.85rem 1rem',
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        border: inwardRfdForm.isChallanClosed ? '2px solid #10b981' : '1.5px solid #e2e8f0',
+                        background: inwardRfdForm.isChallanClosed ? 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(255,255,255,0.9))' : '#fafbfc',
+                        boxShadow: inwardRfdForm.isChallanClosed ? '0 4px 12px rgba(16,185,129,0.12)' : 'none'
+                      }}
+                    >
+                      <div style={{
+                        width: 22, height: 22, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: inwardRfdForm.isChallanClosed ? '#10b981' : '#cbd5e1',
+                        color: '#ffffff', fontSize: '0.75rem', fontWeight: 900, flexShrink: 0, marginTop: 2
+                      }}>
+                        ✓
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: inwardRfdForm.isChallanClosed ? '#065f46' : '#334155' }}>
+                          Complete Delivery
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: inwardRfdForm.isChallanClosed ? '#047857' : '#64748b', marginTop: 2 }}>
+                          Challan Closed — 0 Mtr Left at Mill
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Partial Delivery Card */}
+                    <div
+                      onClick={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: false, isChallanClosedUserOverridden: true })}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem',
+                        padding: '0.85rem 1rem',
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        border: !inwardRfdForm.isChallanClosed ? '2px solid #f59e0b' : '1.5px solid #e2e8f0',
+                        background: !inwardRfdForm.isChallanClosed ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(255,255,255,0.9))' : '#fafbfc',
+                        boxShadow: !inwardRfdForm.isChallanClosed ? '0 4px 12px rgba(245,158,11,0.12)' : 'none'
+                      }}
+                    >
+                      <div style={{
+                        width: 22, height: 22, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: !inwardRfdForm.isChallanClosed ? '#f59e0b' : '#cbd5e1',
+                        color: '#ffffff', fontSize: '0.75rem', fontWeight: 900, flexShrink: 0, marginTop: 2
+                      }}>
+                        ⏳
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: !inwardRfdForm.isChallanClosed ? '#92400e' : '#334155' }}>
+                          Partial Delivery
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: !inwardRfdForm.isChallanClosed ? '#b45309' : '#64748b', marginTop: 2, fontWeight: !inwardRfdForm.isChallanClosed ? 700 : 400 }}>
+                          {calculatedStillAtMill > 0 ? `${calculatedStillAtMill} Mtr Fabric Remaining at Mill` : 'Fabric Still at Mill'}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Live Reconciliation HUD Summary Box */}
+                {/* Live Reconciliation HUD Summary Box with Visual Life Cycle Progress Bar */}
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                    gap: '0.75rem',
                     background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: 10,
-                    padding: '0.85rem'
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: 12,
+                    padding: '1rem',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                   }}
                 >
-                  <div>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>GRAY SENT</span>
-                    <strong style={{ fontSize: '1.15rem', color: '#0f172a' }}>{modalGraySent} Mtr</strong>
-                  </div>
+                  {/* Segmented Progress Bar */}
+                  {modalGraySent > 0 && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                          Fabric Lot Lifecycle Progress
+                        </span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                          {modalGraySent > 0 ? Math.min(100, (((modalReceivedRfd + modalShortageMtr) / modalGraySent) * 100)).toFixed(1) : 0}% Accounted
+                        </span>
+                      </div>
+                      <div style={{ height: 10, borderRadius: 99, background: '#e2e8f0', display: 'flex', overflow: 'hidden' }}>
+                        {/* Received RFD Bar */}
+                        <div
+                          style={{
+                            width: `${modalGraySent > 0 ? Math.min(100, (modalReceivedRfd / modalGraySent) * 100) : 0}%`,
+                            background: '#10b981',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`Received: ${modalReceivedRfd} Mtr`}
+                        />
+                        {/* Mill Shortage Bar */}
+                        <div
+                          style={{
+                            width: `${modalGraySent > 0 ? Math.min(100, (modalShortageMtr / modalGraySent) * 100) : 0}%`,
+                            background: isHighShortage ? '#ef4444' : '#f59e0b',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`Shortage: ${modalShortageMtr} Mtr`}
+                        />
+                        {/* Still at Mill Bar */}
+                        <div
+                          style={{
+                            width: `${modalGraySent > 0 ? Math.min(100, (modalStillAtMill / modalGraySent) * 100) : 0}%`,
+                            background: '#38bdf8',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`Still at Mill: ${modalStillAtMill} Mtr`}
+                        />
+                      </div>
+                      {/* Progress Legend */}
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: '#047857', fontWeight: 700 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+                          Received ({modalGraySent > 0 ? ((modalReceivedRfd / modalGraySent) * 100).toFixed(1) : 0}%)
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: isHighShortage ? '#b91c1c' : '#b45309', fontWeight: 700 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: isHighShortage ? '#ef4444' : '#f59e0b' }} />
+                          Loss ({modalShortagePct}%)
+                        </div>
+                        {modalStillAtMill > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: '#0284c7', fontWeight: 700 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8' }} />
+                            At Mill ({modalGraySent > 0 ? ((modalStillAtMill / modalGraySent) * 100).toFixed(1) : 0}%)
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700, display: 'block' }}>RECEIVED RFD</span>
-                    <strong style={{ fontSize: '1.15rem', color: '#0284c7' }}>{modalReceivedRfd} Mtr</strong>
-                  </div>
+                  {/* Metrics Grid */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, display: 'block' }}>GRAY SENT</span>
+                      <strong style={{ fontSize: '1.15rem', color: '#0f172a' }}>{modalGraySent} Mtr</strong>
+                    </div>
 
-                  <div>
-                    <span style={{ fontSize: '0.7rem', color: isHighShortage ? '#dc2626' : '#d97706', fontWeight: 700, display: 'block' }}>MILL SHORTAGE</span>
-                    <strong style={{ fontSize: '1.15rem', color: isHighShortage ? '#dc2626' : '#d97706' }}>
-                      {modalShortageMtr} Mtr ({modalShortagePct}%)
-                    </strong>
-                  </div>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 700, display: 'block' }}>RECEIVED RFD</span>
+                      <strong style={{ fontSize: '1.15rem', color: '#0284c7' }}>{modalReceivedRfd} Mtr</strong>
+                    </div>
 
-                  <div>
-                    <span style={{ fontSize: '0.7rem', color: modalStillAtMill > 0 ? '#b45309' : '#15803d', fontWeight: 800, display: 'block' }}>
-                      STILL AT MILL (PENDING)
-                    </span>
-                    <strong style={{ fontSize: '1.15rem', color: modalStillAtMill > 0 ? '#d97706' : '#16a34a' }}>
-                      {modalStillAtMill > 0 ? `${modalStillAtMill} Mtr` : '0 Mtr (Clear)'}
-                    </strong>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: isHighShortage ? '#dc2626' : '#d97706', fontWeight: 700, display: 'block' }}>MILL SHORTAGE</span>
+                      <strong style={{ fontSize: '1.15rem', color: isHighShortage ? '#dc2626' : '#d97706' }}>
+                        {modalShortageMtr} Mtr ({modalShortagePct}%)
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: modalStillAtMill > 0 ? '#b45309' : '#15803d', fontWeight: 800, display: 'block' }}>
+                        STILL AT MILL (PENDING)
+                      </span>
+                      <strong style={{ fontSize: '1.15rem', color: modalStillAtMill > 0 ? '#d97706' : '#16a34a' }}>
+                        {modalStillAtMill > 0 ? `${modalStillAtMill} Mtr` : '0 Mtr (Clear)'}
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
