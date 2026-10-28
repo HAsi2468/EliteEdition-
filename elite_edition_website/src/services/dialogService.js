@@ -53,14 +53,40 @@ export const triggerEliteAlert = (title, message = '', type = 'warning', confirm
  * @param {'info'|'warning'|'error'|'success'|'danger'} [options.type='warning']
  * @returns {Promise<boolean>}
  */
-export const triggerEliteConfirm = ({
-  title = 'Confirmation Required',
-  message = '',
-  confirmText = 'Yes',
-  cancelText = 'No',
-  type = 'warning'
-}) => {
+export const triggerEliteConfirm = (
+  optionsOrMessage,
+  onConfirm = null,
+  onCancel = null,
+  customTitle = 'Confirmation Required',
+  customConfirmText = 'Yes',
+  customCancelText = 'No',
+  customType = 'warning'
+) => {
   return new Promise((resolve) => {
+    let title = 'Confirmation Required';
+    let message = '';
+    let confirmText = 'Yes';
+    let cancelText = 'No';
+    let type = 'warning';
+    let confirmCb = typeof onConfirm === 'function' ? onConfirm : null;
+    let cancelCb = typeof onCancel === 'function' ? onCancel : null;
+
+    if (optionsOrMessage && typeof optionsOrMessage === 'object') {
+      title = optionsOrMessage.title || 'Confirmation Required';
+      message = optionsOrMessage.message || '';
+      confirmText = optionsOrMessage.confirmText || 'Yes';
+      cancelText = optionsOrMessage.cancelText || 'No';
+      type = optionsOrMessage.type || 'warning';
+      if (typeof optionsOrMessage.onConfirm === 'function') confirmCb = optionsOrMessage.onConfirm;
+      if (typeof optionsOrMessage.onCancel === 'function') cancelCb = optionsOrMessage.onCancel;
+    } else {
+      message = typeof optionsOrMessage === 'string' ? optionsOrMessage : String(optionsOrMessage || '');
+      if (typeof customTitle === 'string' && customTitle) title = customTitle;
+      if (typeof customConfirmText === 'string' && customConfirmText) confirmText = customConfirmText;
+      if (typeof customCancelText === 'string' && customCancelText) cancelText = customCancelText;
+      if (typeof customType === 'string' && customType) type = customType;
+    }
+
     const event = new CustomEvent('elite-modal-dialog', {
       detail: {
         mode: 'confirm',
@@ -69,7 +95,18 @@ export const triggerEliteConfirm = ({
         confirmText: confirmText || 'Yes',
         cancelText: cancelText || 'No',
         type: type === 'danger' ? 'error' : type,
-        resolve
+        resolve: (result) => {
+          if (result) {
+            if (confirmCb) {
+              try { confirmCb(); } catch (err) { console.error('Error in confirm callback:', err); }
+            }
+          } else {
+            if (cancelCb) {
+              try { cancelCb(); } catch (err) { console.error('Error in cancel callback:', err); }
+            }
+          }
+          resolve(result);
+        }
       }
     });
     window.dispatchEvent(event);

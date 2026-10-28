@@ -176,7 +176,7 @@ export default function EliteModalDialog() {
         background: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
-        zIndex: 10005,
+        zIndex: 9999999,
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
         justifyContent: 'center',

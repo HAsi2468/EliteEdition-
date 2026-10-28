@@ -386,7 +386,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 10001, display: 'flex', justifyContent: 'flex-end' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 1000001, display: 'flex', justifyContent: 'flex-end' }}>
       <div style={{ width: '440px', maxWidth: '100vw', height: '100%', background: 'var(--bg-card, #161b26)', borderLeft: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 45px rgba(0,0,0,0.6)', animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
         
         {/* Drawer Header */}
@@ -627,7 +627,7 @@ const styles = {
     position: 'fixed',
     top: '1.25rem',
     right: '1.25rem',
-    zIndex: 10000,
+    zIndex: 1000000,
     display: 'flex',
     flexDirection: 'column',
     gap: '0.65rem',

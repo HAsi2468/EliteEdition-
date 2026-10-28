@@ -675,38 +675,38 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setEditingItemValue('');
   };
 
-  const handleDeleteMasterSetting = (index, item) => {
+  const handleDeleteMasterSetting = async (index, item) => {
     const itemName = typeof item === 'object' ? item.name : item;
-    triggerEliteConfirm(
-      `Are you sure you want to remove "${itemName}" from master list?`,
-      () => {
-        setConfigs(prev => ({
-          ...prev,
-          [settingsActiveTab]: prev[settingsActiveTab].filter((_, idx) => idx !== index)
-        }));
-      },
-      null,
-      'Delete Master Item',
-      'Delete',
-      'Cancel'
-    );
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Master Item',
+      message: `Are you sure you want to remove "${itemName}" from master list?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (confirmed) {
+      setConfigs(prev => ({
+        ...prev,
+        [settingsActiveTab]: prev[settingsActiveTab].filter((_, idx) => idx !== index)
+      }));
+    }
   };
 
-  const handleResetMasterTabDefaults = () => {
-    triggerEliteConfirm(
-      `Reset all ${settingsActiveTab} back to standard Surat factory defaults?`,
-      () => {
-        setConfigs(prev => ({
-          ...prev,
-          [settingsActiveTab]: DEFAULT_CONFIGS[settingsActiveTab]
-        }));
-        triggerEliteAlert(`Reset ${settingsActiveTab} to default values.`, 'Reset Complete');
-      },
-      null,
-      'Reset Defaults',
-      'Reset',
-      'Cancel'
-    );
+  const handleResetMasterTabDefaults = async () => {
+    const confirmed = await triggerEliteConfirm({
+      title: 'Reset Defaults',
+      message: `Reset all ${settingsActiveTab} back to standard Surat factory defaults?`,
+      confirmText: 'Reset',
+      cancelText: 'Cancel',
+      type: 'warning'
+    });
+    if (confirmed) {
+      setConfigs(prev => ({
+        ...prev,
+        [settingsActiveTab]: DEFAULT_CONFIGS[settingsActiveTab]
+      }));
+      triggerEliteAlert(`Reset ${settingsActiveTab} to default values.`, 'Reset Complete');
+    }
   };
 
   // ==========================================
@@ -776,22 +776,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     }
   };
 
-  const handleResetToCleanSlate = () => {
-    triggerEliteConfirm(
-      'Are you sure you want to clear all fabric lots and mill challans from the system? This will remove all test/demo data and start completely fresh.',
-      () => {
-        setGrayLots([]);
-        setMillChallans([]);
-        setRfdLots([]);
-        try {
-          localStorage.removeItem(STORAGE_GRAY_KEY);
-          localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
-          localStorage.removeItem(STORAGE_RFD_KEY);
-        } catch (e) {}
-        triggerEliteAlert('All fabric lots and mill challans have been cleared. System is now on a completely clean slate!', 'Clean Slate');
-      },
-      'Clear All Data'
-    );
+  const handleResetToCleanSlate = async () => {
+    const confirmed = await triggerEliteConfirm({
+      title: 'Clear All Data',
+      message: 'Are you sure you want to clear all fabric lots and mill challans from the system? This will remove all test/demo data and start completely fresh.',
+      confirmText: 'Clear All Data',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (confirmed) {
+      setGrayLots([]);
+      setMillChallans([]);
+      setRfdLots([]);
+      try {
+        localStorage.removeItem(STORAGE_GRAY_KEY);
+        localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
+        localStorage.removeItem(STORAGE_RFD_KEY);
+      } catch (e) {}
+      triggerEliteAlert('All fabric lots and mill challans have been cleared. System is now on a completely clean slate!', 'Clean Slate');
+    }
   };
 
   const weaverFormSummary = useMemo(() => {
