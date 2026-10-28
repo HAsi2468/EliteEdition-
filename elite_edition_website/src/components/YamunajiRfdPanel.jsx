@@ -1099,7 +1099,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
     let successMsg = `Gray Fabric Lot ${lotNumber} (${validTps.length} TPs, ${roundMtrs.toFixed(1)} Mtr) successfully inwarded!`;
     if (isPending) {
-      successMsg += `\n⏳ Marked as 'Invoice Pending' (બિલ બાકી). You can attach the invoice later.`;
+      successMsg += `\n⏳ Marked as 'Invoice Pending'. You can attach the invoice later.`;
     } else if (createdPurchaseNo) {
       successMsg += `\n🧾 Purchase Bill ${createdPurchaseNo} (₹${totalInvAmt.toLocaleString('en-IN')}) posted to Purchase Register.`;
     }
@@ -2856,7 +2856,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
             </div>
 
-            {/* Stat 5: Pending Invoices (બિલ બાકી) */}
+            {/* Stat 5: Pending Invoices */}
             <div
               className="glass-panel"
               onClick={() => setGrayInvoiceFilter(prev => prev === 'pending' ? 'all' : 'pending')}
@@ -2868,11 +2868,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 boxShadow: grayInvoiceFilter === 'pending' ? '0 0 0 2px #f59e0b' : undefined,
                 transition: 'all 0.2s ease'
               }}
-              title="Click to filter lots with pending invoices (બિલ બાકી લોટ્સ)"
+              title="Click to filter lots with pending invoices"
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: '0.74rem', fontWeight: 700, color: grayInvoiceFilter === 'pending' ? '#b45309' : '#64748b', textTransform: 'uppercase' }}>
-                  Pending Invoices (બિલ બાકી)
+                  Pending Invoices
                 </span>
                 <Clock size={16} color="#f59e0b" />
               </div>
@@ -5321,7 +5321,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             📄 Bill Received
                           </div>
                           <div style={{ fontSize: '0.66rem', color: '#64748b' }}>
-                            ચલણ સાથે બિલ મળેલ છે
+                            Invoice received with challan
                           </div>
                         </div>
                       </div>
@@ -5352,7 +5352,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             ⏳ Bill Pending
                           </div>
                           <div style={{ fontSize: '0.66rem', color: '#64748b' }}>
-                            બિલ બાકી છે - પાછળથી આવશે
+                            Invoice pending / to be received later
                           </div>
                         </div>
                       </div>
@@ -5362,7 +5362,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <Clock size={16} color="#b45309" style={{ flexShrink: 0, marginTop: 2 }} />
                         <div style={{ fontSize: '0.74rem', color: '#92400e', lineHeight: 1.45 }}>
-                          <strong>Invoice Pending (બિલ બાકી):</strong> Fabric is inwarded to stock now so mill dispatch won't be delayed. You can attach the bill later with 1-click.
+                          <strong>Invoice Pending:</strong> Fabric is inwarded to stock now so mill dispatch won't be delayed. You can attach the bill later with 1-click.
                         </div>
                       </div>
                     ) : (
@@ -7361,7 +7361,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#0f172a' }}>
-                      Attach Weaver Invoice (બિલ એન્ટ્રી કરો)
+                      Attach Weaver Invoice
                     </h3>
                     <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
                       Lot {attachingInvoiceLot.lotNumber}
@@ -7540,7 +7540,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     onChange={e => setAttachInvoiceForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
                     style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
                   />
-                  Auto-Post to Purchase Register (ખરેદી ખાતું — Elite Digital Prints)
+                  Auto-Post to Purchase Register (Elite Digital Prints)
                 </label>
                 <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2, marginLeft: 24 }}>
                   Creates an inventory purchase voucher linked with Lot #{attachingInvoiceLot.lotNumber} and Weaver party.
@@ -8263,7 +8263,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <FileText size={15} color="#0284c7" />
                       <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
-                        Mill Job Work / Processing Bill (Optional - ખરેદી નોંધ)
+                        Mill Job Work / Processing Bill (Optional)
                       </span>
                     </div>
 
