@@ -1971,7 +1971,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 };
                 await api.createFabricChallan(payload);
                 setLoading(false);
-                setIsModalOpen(false);
+                setIsCombinedModalOpen(false);
                 triggerPushNotification(
                   '🛡️ Submitted to Admin Approval Queue',
                   `Delivery Challan for Job #${j.jobNo} (${effectiveTotalMtr}m) submitted to Admin Review & Approvals Queue.`,
@@ -2013,7 +2013,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 };
                 await api.createFabricChallan(payload);
                 setLoading(false);
-                setIsModalOpen(false);
+                setIsCombinedModalOpen(false);
                 triggerPushNotification(
                   '🛡️ Submitted to Admin Approval Queue',
                   `Delivery Challan for Job #${j.jobNo} (${effectiveTotalMtr}m) submitted to Admin Review & Approvals Queue.`,

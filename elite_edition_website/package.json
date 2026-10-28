@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check:integrity": "node scripts/check-react-integrity.mjs",
     "test": "vitest run",
     "lint": "eslint .",
     "preview": "vite preview"

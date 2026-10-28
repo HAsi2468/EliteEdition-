@@ -3,6 +3,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { api } from '../services/api';
 import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip, Mic, Pin, Trash2, Edit2, Settings, Volume2, ChevronDown } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import axios from 'axios';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 
 const Workspace = ({ currentUser }) => {

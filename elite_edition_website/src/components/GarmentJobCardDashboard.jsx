@@ -23,6 +23,52 @@ const PIPELINE_STAGES = [
   { stage_number: 8, key: '8_delivery', name: 'Delivery', icon: '🚚', color: '#10b981', desc: 'Final Dispatch & Delivery' }
 ];
 
+const tThStyle = {
+  padding: '10px 12px',
+  fontWeight: 700,
+  fontSize: '0.78rem',
+  color: 'var(--text-muted, #64748b)',
+  borderBottom: '1px solid var(--border-light, #e2e8f0)',
+  whiteSpace: 'nowrap'
+};
+
+const tTdStyle = {
+  padding: '10px 12px',
+  fontSize: '0.82rem',
+  color: 'var(--text-primary, #0f172a)',
+  verticalAlign: 'middle'
+};
+
+const actionBtnStyle = {
+  padding: '4px 8px',
+  borderRadius: '6px',
+  border: '1px solid var(--border-light, #e2e8f0)',
+  background: 'transparent',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'var(--text-primary, #0f172a)'
+};
+
+const modalLabelStyle = {
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  color: 'var(--text-muted, #64748b)',
+  display: 'block',
+  marginBottom: '4px'
+};
+
+const modalInputStyle = {
+  width: '100%',
+  padding: '8px 10px',
+  borderRadius: '6px',
+  border: '1px solid var(--border-light, #e2e8f0)',
+  fontSize: '0.85rem',
+  background: 'var(--bg-card, #ffffff)',
+  color: 'var(--text-primary, #0f172a)'
+};
+
 export default function GarmentJobCardDashboard() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);

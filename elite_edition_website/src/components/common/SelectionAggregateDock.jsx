@@ -29,12 +29,11 @@ export function SelectionAggregateDock({
   className = '',
   style = {}
 }) {
-  if (!Array.isArray(selectedRows) || selectedRows.length < threshold) {
-    return null;
-  }
-
-  // Compute live aggregates
+  // Compute live aggregates unconditionally (React Rules of Hooks)
   const aggregates = useMemo(() => {
+    if (!Array.isArray(selectedRows) || selectedRows.length === 0) {
+      return { count: 0, totalUnits: 0, totalValue: 0, avgUnit: 0, avgValue: 0 };
+    }
     let totalUnits = 0;
     let totalValue = 0;
 
@@ -59,6 +58,10 @@ export function SelectionAggregateDock({
       avgValue: Math.round(avgValue * 100) / 100
     };
   }, [selectedRows, unitField, valueField]);
+
+  if (!Array.isArray(selectedRows) || selectedRows.length < threshold) {
+    return null;
+  }
 
   return (
     <div className={`selection-aggregate-dock ${className}`} style={style}>

@@ -1532,7 +1532,7 @@ export const api = {
     return this.sendCommunicationMessage(roomId, data);
   },
 
-  async getTasks() {
+  async getWorkspaceTasks() {
     return request('/workspace/tasks');
   },
 
@@ -2957,26 +2957,7 @@ export const api = {
     });
   },
 
-  // ── White Fabric QA Inspection Logs ──
-  async getWhiteFabricLogs(params = {}) {
-    const qs = new URLSearchParams();
-    if (params.department) qs.set('department', params.department);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/fabric/white-qa-logs${query}`);
-  },
 
-  async createWhiteFabricLog(payload) {
-    return request('/fabric/white-qa-logs', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
-
-  async deleteWhiteFabricLog(id) {
-    return request(`/fabric/white-qa-logs/${id}`, {
-      method: 'DELETE'
-    });
-  },
 
   // ── Client Details & Accounts Management ──
   async getClients(params = {}) {

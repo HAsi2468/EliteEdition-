@@ -942,18 +942,16 @@ function DetailCell({ label, value, highlight, color, fullWidth, extra }) {
 }
 
 function JobCardPrintView({ card, onClose, onShare }) {
-  if (!card) return null;
-
   const formatDateSafe = (dateVal) => formatDateDDMMYYYY(dateVal, '—');
   const formatDateTimeSafe = (dateVal) => formatDateTimeDDMMYYYY(dateVal, '—');
 
   const [resolvedImages, setResolvedImages] = useState({
-    imageUrl1: card.imageUrl1 || '',
-    imageUrl2: card.imageUrl2 || '',
+    imageUrl1: card?.imageUrl1 || '',
+    imageUrl2: card?.imageUrl2 || '',
   });
   const [zoomImage, setZoomImage] = useState(null);
   const [viewTab, setViewTab] = useState('all'); // 'all' | 'sheet' | 'tracking'
-  const [challans, setChallans] = useState(card.challans || []);
+  const [challans, setChallans] = useState(card?.challans || []);
 
   useEffect(() => {
     if (card?.challans && card.challans.length > 0) {
@@ -1078,6 +1076,8 @@ function JobCardPrintView({ card, onClose, onShare }) {
     minWidth: '32px',
     color: '#000'
   };
+
+  if (!card) return null;
 
   return (
     <div

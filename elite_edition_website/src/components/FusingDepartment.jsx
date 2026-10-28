@@ -442,6 +442,13 @@ export default function FusingDepartment() {
     }));
   };
 
+  const handleUsageRowChange = (id, field, value) => {
+    setReportForm(prev => ({
+      ...prev,
+      usageRows: prev.usageRows.map(r => r.id === id ? { ...r, [field]: value } : r)
+    }));
+  };
+
   // Quick Inline Panna Dropdown Manager Modal State
   const [showPannaManagerModal, setShowPannaManagerModal] = useState(false);
   const [newPannaInput, setNewPannaInput] = useState('');
@@ -4895,10 +4902,10 @@ export default function FusingDepartment() {
           isOpen={showAiModal}
           onClose={() => setShowAiModal(false)}
           initialData={{
-            fabric: topForm.fabricName || (cardToUpdate && cardToUpdate.fabric) || '',
-            panna: topForm.panna || (cardToUpdate && cardToUpdate.panna) || '58"',
-            meters: topForm.printedMtr || (cardToUpdate && cardToUpdate.fusingMtr) || 100,
-            fusingMtr: topForm.printedMtr || 100
+            fabric: topForm?.fabricName || '',
+            panna: topForm?.panna || '58"',
+            meters: topForm?.printedMtr || 100,
+            fusingMtr: topForm?.printedMtr || 100
           }}
           onApply={(data) => {
             setTopForm(prev => ({

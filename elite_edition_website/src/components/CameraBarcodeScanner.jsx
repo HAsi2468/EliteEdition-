@@ -40,6 +40,7 @@ export default function CameraBarcodeScanner({
   const [continuousMode, setContinuousMode] = useState(true);
   const [batchCount, setBatchCount] = useState(0);
   const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const recentBatchCodesRef = useRef(new Map());
 
   const html5QrcodeRef = useRef(null);

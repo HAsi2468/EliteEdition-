@@ -178,6 +178,18 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
     }
   };
 
+  const handleRemoveMachineProfile = async (machineName, profileName) => {
+    try {
+      setActionLoading(true);
+      const updated = await api.updatePrintConfig({ action: 'remove', field: 'machine_profile', machineName, value: profileName });
+      setConfig(updated);
+    } catch (err) {
+      console.error(`Failed to remove profile from ${machineName}:`, err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const [newComplaintCategory, setNewComplaintCategory] = useState('');
   const [newComplaintSubCategory, setNewComplaintSubCategory] = useState({});
   const [selectedCategoryForSub, setSelectedCategoryForSub] = useState('');

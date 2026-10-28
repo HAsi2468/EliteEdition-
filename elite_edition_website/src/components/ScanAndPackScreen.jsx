@@ -154,6 +154,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [manifestDriverPhone, setManifestDriverPhone] = useState('');
   const [manifestVehicleNumber, setManifestVehicleNumber] = useState('');
   const [manifestTab, setManifestTab] = useState('PENDING'); // 'PENDING' | 'HISTORY'
+  const [manifestLoading, setManifestLoading] = useState(false);
   const [pastManifests, setPastManifests] = useState([]);
   const [activePrintManifest, setActivePrintManifest] = useState(null);
 
@@ -1366,6 +1367,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   };
 
   const fetchManifestPending = async (customParams = {}) => {
+    setManifestLoading(true);
     try {
       const activeStartDate = customParams.startDate !== undefined ? customParams.startDate : manifestStartDate;
       const activeEndDate = customParams.endDate !== undefined ? customParams.endDate : manifestEndDate;
@@ -1383,6 +1385,8 @@ export default function ScanAndPackScreen({ currentUser }) {
       }
     } catch (e) {
       console.warn('Error fetching pending manifest:', e);
+    } finally {
+      setManifestLoading(false);
     }
   };
 

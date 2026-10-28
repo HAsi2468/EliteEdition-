@@ -159,7 +159,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       triggerEliteAlert('✅ Initial Opening Balances configured successfully!');
       setShowSettingsModal(false);
       triggerGlobalDataRefresh('expenses');
-      loadExpenses();
+      fetchExpenses();
     } catch (err) {
       console.error('Failed to save ledger settings:', err);
       triggerEliteAlert(`Failed to save initial balances: ${err.message}`);

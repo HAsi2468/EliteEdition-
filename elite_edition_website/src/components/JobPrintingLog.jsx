@@ -749,28 +749,7 @@ export default function JobPrintingLog() {
     });
   };
 
-  // Paper Entry Handlers for Multiple Paper Rows
-  const handleAddPaperEntry = () => {
-    setPaperEntries(prev => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        paperType: paperTypesList[0] || 'A++',
-        paperPanna: pannaOptionsList[0] || '44" Panna',
-        paperCustomPanna: '',
-        paperRollsQty: ''
-      }
-    ]);
-  };
 
-  const handleRemovePaperEntry = (id) => {
-    if (paperEntries.length === 1) return;
-    setPaperEntries(prev => prev.filter(p => p.id !== id));
-  };
-
-  const handlePaperEntryChange = (id, field, value) => {
-    setPaperEntries(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
-  };
 
   // Load Machines, Widths (Panna) & Paper Types from Print Settings Config
   const fetchPrintConfig = async () => {
@@ -2005,7 +1984,7 @@ export default function JobPrintingLog() {
                     <button
                       type="button"
                       onClick={() => {
-                        setFilterMachine(mach);
+                        setPrintFilters(prev => ({ ...prev, machine: [mach] }));
                         setActiveView('log');
                       }}
                       style={{

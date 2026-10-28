@@ -6433,7 +6433,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {!msg.isDeleted && activeMsgMenuId === msg._id && (() => {
                               const isUpward = msgMenuUpward[msg._id] !== undefined
                                 ? msgMenuUpward[msg._id]
-                                : (msgIndex >= Math.max(0, filteredList.length - 6));
+                                : (msgIndex >= Math.max(0, (group?.messages?.length || 0) - 6));
                               return (
                                 <>
                                   <div

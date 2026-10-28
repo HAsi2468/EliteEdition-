@@ -264,7 +264,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
    - Instance: ${systemHealth?.server?.instanceType || 't3.medium (2 vCPU, 4 GiB)'}
    - Status: ${systemHealth?.server?.status || 'Online'}
    - Uptime: ${systemHealth?.server?.uptimeFormatted || 'N/A'}
-   - Node.js: ${systemHealth?.server?.nodeVersion || process.version}
+   - Node.js: ${systemHealth?.server?.nodeVersion || 'v20.20.2'}
    - Process RAM: RSS ${systemHealth?.server?.memory?.rssMb || 232} MB | Heap ${systemHealth?.server?.memory?.heapUsedMb || 75} MB
 
 2. DATABASE (MONGODB ATLAS):

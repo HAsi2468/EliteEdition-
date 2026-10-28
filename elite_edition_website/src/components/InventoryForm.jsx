@@ -451,7 +451,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
     };
   }, [catalogItems]);
 
-  return (
+  const modalMarkup = (
     <div style={styles.overlay}>
       <div className="inventory-modal-container" style={styles.container}>
         {/* Modal Header */}
