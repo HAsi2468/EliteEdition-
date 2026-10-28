@@ -308,6 +308,21 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     postToPurchase: false
   });
 
+  // Filter for gray lots: 'all' | 'pending' | 'invoiced'
+  const [grayInvoiceFilter, setGrayInvoiceFilter] = useState('all');
+
+  // Modal state for attaching an invoice to an existing lot that was received with "Invoice Pending"
+  const [attachingInvoiceLot, setAttachingInvoiceLot] = useState(null);
+  const [attachInvoiceForm, setAttachInvoiceForm] = useState({
+    invoiceNo: '',
+    invoiceDate: new Date().toISOString().split('T')[0],
+    hsnCode: '5208',
+    ratePerMeter: '',
+    gstRate: '5',
+    paymentTerms: '30 Days',
+    postToPurchase: true
+  });
+
   // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
     lotNumber: '',
@@ -318,7 +333,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     ratePerMeter: '',
     rackLocation: '',
     remarks: '',
-    // Invoice & Purchase Register parameters
+    // Invoice arrival option: 'received' (with challan) or 'pending' (will arrive later)
+    invoiceReceivedOption: 'received',
     invoiceNo: '',
     invoiceDate: new Date().toISOString().split('T')[0],
     hsnCode: '5208',
@@ -371,6 +387,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     let inStockTps = 0;
     let atMillMtrs = 0;
     let totalGrayValuation = 0;
+    let pendingInvoiceCount = 0;
+    let pendingInvoiceMtrs = 0;
 
     grayLots.forEach(lot => {
       const availableTps = (lot.tps || []).filter(t => t.status === 'In Stock');
@@ -379,6 +397,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       inStockTps += availableTps.length;
       atMillMtrs += (lot.sentToMillMeters || 0);
       totalGrayValuation += inStockMtr * (lot.ratePerMeter || 0);
+
+      const isPending = lot.invoiceStatus === 'Pending' || (!lot.invoiceNo && !lot.purchaseNo);
+      if (isPending) {
+        pendingInvoiceCount++;
+        pendingInvoiceMtrs += (lot.totalMeters || 0);
+      }
     });
 
     return {
@@ -386,7 +410,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       inStockTps,
       atMillMtrs,
       totalGrayValuation,
-      totalLots: grayLots.length
+      totalLots: grayLots.length,
+      pendingInvoiceCount,
+      pendingInvoiceMtrs: parseFloat(pendingInvoiceMtrs.toFixed(1))
     };
   }, [grayLots]);
 
@@ -820,11 +846,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const totalInvAmt = Math.round(taxableAmt + gstAmt);
     const roundOffVal = parseFloat((totalInvAmt - (taxableAmt + gstAmt)).toFixed(2));
 
+    const isPending = weaverForm.invoiceReceivedOption === 'pending';
     let createdPurchaseNo = '';
     let createdPurchaseId = '';
 
-    // Auto-create Purchase in Billing Register if enabled and rate is provided
-    if (weaverForm.postToPurchase && ratePerMtr > 0) {
+    // Auto-create Purchase in Billing Register if enabled, not pending, and rate is provided
+    if (!isPending && weaverForm.postToPurchase && ratePerMtr > 0) {
       try {
         let nextPurNo = '';
         try {
@@ -954,15 +981,17 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       rackLocation: weaverForm.rackLocation.trim() || '',
       remarks: weaverForm.remarks.trim(),
       // Invoice & Purchase parameters
-      invoiceNo: (weaverForm.invoiceNo || '').trim(),
-      invoiceDate: weaverForm.invoiceDate || weaverForm.inwardDate,
+      invoiceStatus: isPending ? 'Pending' : 'Invoiced',
+      invoiceReceivedOption: weaverForm.invoiceReceivedOption,
+      invoiceNo: isPending ? '' : (weaverForm.invoiceNo || '').trim(),
+      invoiceDate: isPending ? null : (weaverForm.invoiceDate || weaverForm.inwardDate),
       hsnCode: weaverForm.hsnCode || '5208',
       gstRate: gstPct,
-      taxableAmount: taxableAmt,
-      gstAmount: gstAmt,
-      grandTotal: totalInvAmt,
+      taxableAmount: isPending ? 0 : taxableAmt,
+      gstAmount: isPending ? 0 : gstAmt,
+      grandTotal: isPending ? 0 : totalInvAmt,
       paymentTerms: weaverForm.paymentTerms || '30 Days',
-      postToPurchase: weaverForm.postToPurchase,
+      postToPurchase: !isPending && weaverForm.postToPurchase,
       purchaseNo: createdPurchaseNo || null,
       purchaseId: createdPurchaseId || null,
       tps: validTps.map((t, idx) => ({
@@ -1015,6 +1044,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       ratePerMeter: '',
       rackLocation: '',
       remarks: '',
+      invoiceReceivedOption: 'received',
       invoiceNo: '',
       invoiceDate: new Date().toISOString().split('T')[0],
       hsnCode: '5208',
@@ -1027,10 +1057,189 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     });
 
     let successMsg = `Gray Fabric Lot ${lotNumber} (${validTps.length} TPs, ${roundMtrs.toFixed(1)} Mtr) successfully inwarded!`;
-    if (createdPurchaseNo) {
+    if (isPending) {
+      successMsg += `\n⏳ Marked as 'Invoice Pending' (બિલ બાકી). You can attach the invoice later.`;
+    } else if (createdPurchaseNo) {
       successMsg += `\n🧾 Purchase Bill ${createdPurchaseNo} (₹${totalInvAmt.toLocaleString('en-IN')}) posted to Purchase Register.`;
     }
-    triggerEliteAlert(successMsg, 'Inward & Purchase Saved');
+    triggerEliteAlert(successMsg, isPending ? 'Inward Saved (Invoice Pending)' : 'Inward & Purchase Saved');
+  };
+
+  // Open modal to attach invoice for a pending lot
+  const handleOpenAttachInvoice = (lot) => {
+    setAttachingInvoiceLot(lot);
+    setAttachInvoiceForm({
+      invoiceNo: lot.invoiceNo || '',
+      invoiceDate: lot.invoiceDate || new Date().toISOString().split('T')[0],
+      hsnCode: lot.hsnCode || '5208',
+      ratePerMeter: lot.ratePerMeter > 0 ? String(lot.ratePerMeter) : '',
+      gstRate: String(lot.gstRate !== undefined ? lot.gstRate : '5'),
+      paymentTerms: lot.paymentTerms || '30 Days',
+      postToPurchase: true
+    });
+  };
+
+  // Save attached invoice and post to purchase register
+  const handleSaveAttachInvoice = async (e) => {
+    e.preventDefault();
+    if (!attachingInvoiceLot) return;
+    if (!attachInvoiceForm.invoiceNo.trim()) {
+      triggerEliteAlert('Please enter the Weaver Invoice / Bill Number.', 'Missing Invoice Number');
+      return;
+    }
+    const rate = parseFloat(attachInvoiceForm.ratePerMeter) || 0;
+    if (rate <= 0) {
+      triggerEliteAlert('Please enter a valid Rate per Meter (greater than 0).', 'Invalid Rate');
+      return;
+    }
+
+    const roundMtrs = parseFloat(attachingInvoiceLot.totalMeters.toFixed(2));
+    const gstPct = parseFloat(attachInvoiceForm.gstRate) || 0;
+    const taxableAmt = parseFloat((roundMtrs * rate).toFixed(2));
+    const gstAmt = parseFloat(((taxableAmt * gstPct) / 100).toFixed(2));
+    const totalInvAmt = Math.round(taxableAmt + gstAmt);
+    const roundOffVal = parseFloat((totalInvAmt - (taxableAmt + gstAmt)).toFixed(2));
+
+    let createdPurchaseNo = '';
+    let createdPurchaseId = '';
+
+    if (attachInvoiceForm.postToPurchase) {
+      try {
+        let nextPurNo = '';
+        try {
+          const numRes = await api.getNextPurchaseNo('Elite Digital Prints');
+          if (numRes && (numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data)) {
+            nextPurNo = numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data;
+          }
+        } catch (numErr) {}
+        if (!nextPurNo) {
+          nextPurNo = `PUR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+        }
+
+        let dueDateObj = new Date(attachInvoiceForm.invoiceDate || new Date());
+        const term = attachInvoiceForm.paymentTerms || '30 Days';
+        if (term === '15 Days') dueDateObj.setDate(dueDateObj.getDate() + 15);
+        else if (term === '45 Days') dueDateObj.setDate(dueDateObj.getDate() + 45);
+        else if (term === '60 Days') dueDateObj.setDate(dueDateObj.getDate() + 60);
+        else if (term === 'Immediate Cash') { /* same day */ }
+        else dueDateObj.setDate(dueDateObj.getDate() + 30);
+
+        const weaverDetails = (configs.weavers || []).find(w => getPartyName(w).toLowerCase() === (attachingInvoiceLot.weaverParty || '').toLowerCase());
+        const normWeaver = weaverDetails ? normalizeParty(weaverDetails) : null;
+
+        const purchasePayload = {
+          companyEntity: 'Elite Digital Prints',
+          purchaseNo: nextPurNo,
+          billNo: attachInvoiceForm.invoiceNo.trim(),
+          purchaseType: 'inventory',
+          ourChallanNo: attachingInvoiceLot.lotNumber,
+          date: attachInvoiceForm.invoiceDate,
+          dueDate: dueDateObj.toISOString().split('T')[0],
+          vendorName: attachingInvoiceLot.weaverParty,
+          vendor: {
+            name: attachingInvoiceLot.weaverParty,
+            businessName: attachingInvoiceLot.weaverParty,
+            phone: normWeaver?.phone || '',
+            gstin: normWeaver?.gst || '',
+            billingAddress: normWeaver?.address || '',
+            shippingAddress: normWeaver?.address || '',
+            state: 'Gujarat',
+            stateCode: '24'
+          },
+          items: [{
+            itemName: `${attachingInvoiceLot.fabricQuality} (Gray Fabric)`,
+            description: `Yamunaji Gray Lot ${attachingInvoiceLot.lotNumber} from ${attachingInvoiceLot.weaverParty}`,
+            fabric: attachingInvoiceLot.fabricQuality,
+            fabricName: attachingInvoiceLot.fabricQuality,
+            lotNo: attachingInvoiceLot.lotNumber,
+            partyChallan: attachingInvoiceLot.weaverChallanNo || '',
+            ourChallanNo: attachingInvoiceLot.lotNumber,
+            hsnCode: attachInvoiceForm.hsnCode || '5208',
+            quantity: roundMtrs,
+            qty: roundMtrs,
+            unit: 'Meters',
+            rate: rate,
+            unitPrice: rate,
+            taxRate: gstPct,
+            taxAmount: gstAmt,
+            amount: taxableAmt,
+            totalAmount: totalInvAmt
+          }],
+          itemName: `${attachingInvoiceLot.fabricQuality} (Gray Fabric)`,
+          quantity: roundMtrs,
+          unit: 'Meters',
+          rate: rate,
+          subtotal: taxableAmt,
+          taxableAmount: taxableAmt,
+          discountType: 'flat',
+          discountValue: 0,
+          discountTotal: 0,
+          taxType: 'CGST_SGST',
+          gstRate: gstPct,
+          cgstAmount: parseFloat((gstAmt / 2).toFixed(2)),
+          sgstAmount: parseFloat((gstAmt / 2).toFixed(2)),
+          igstAmount: 0,
+          totalTax: gstAmt,
+          gstAmount: gstAmt,
+          enableRoundOff: true,
+          roundOff: roundOffVal,
+          totalAmount: totalInvAmt,
+          grandTotal: totalInvAmt,
+          paidAmount: 0,
+          balanceDue: totalInvAmt,
+          paymentStatus: 'UNPAID',
+          notes: `Weaver Invoice attached to Lot ${attachingInvoiceLot.lotNumber} | Challan: ${attachingInvoiceLot.weaverChallanNo || 'N/A'}`,
+          terms: term
+        };
+
+        const purRes = await api.createBillingPurchase(purchasePayload);
+        const savedPur = (purRes && purRes.data) ? purRes.data : { ...purchasePayload, id: `pur_${Date.now()}` };
+        createdPurchaseNo = savedPur.purchaseNo || nextPurNo;
+        createdPurchaseId = savedPur._id || savedPur.id || '';
+
+        try {
+          const cacheKey = 'elite_purchases_Elite Digital Prints';
+          const cached = localStorage.getItem(cacheKey);
+          let currentList = cached ? JSON.parse(cached) : [];
+          if (!Array.isArray(currentList)) currentList = [];
+          currentList.unshift(savedPur);
+          localStorage.setItem(cacheKey, JSON.stringify(currentList));
+        } catch (cErr) {}
+
+        window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'billing' } }));
+      } catch (purErr) {
+        console.error('Failed to auto-create purchase when attaching invoice:', purErr);
+      }
+    }
+
+    setGrayLots(prev => prev.map(l => {
+      if (l.id === attachingInvoiceLot.id) {
+        return {
+          ...l,
+          invoiceNo: attachInvoiceForm.invoiceNo.trim(),
+          invoiceDate: attachInvoiceForm.invoiceDate,
+          hsnCode: attachInvoiceForm.hsnCode || '5208',
+          ratePerMeter: rate,
+          gstRate: gstPct,
+          taxableAmount: taxableAmt,
+          gstAmount: gstAmt,
+          grandTotal: totalInvAmt,
+          paymentTerms: attachInvoiceForm.paymentTerms || '30 Days',
+          invoiceStatus: 'Invoiced',
+          purchaseNo: createdPurchaseNo || l.purchaseNo || null,
+          purchaseId: createdPurchaseId || l.purchaseId || null
+        };
+      }
+      return l;
+    }));
+
+    setAttachingInvoiceLot(null);
+
+    let msg = `Invoice ${attachInvoiceForm.invoiceNo} successfully attached to Lot ${attachingInvoiceLot.lotNumber}!`;
+    if (createdPurchaseNo) {
+      msg += `\n🧾 Purchase Bill ${createdPurchaseNo} (₹${totalInvAmt.toLocaleString('en-IN')}) posted to Purchase Register.`;
+    }
+    triggerEliteAlert(msg, 'Invoice Attached & Saved');
   };
 
   // ==========================================
@@ -1379,6 +1588,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         if (!matchesStatus) return false;
       }
 
+      // Invoice Status filter (Pending vs Invoiced)
+      if (grayInvoiceFilter === 'pending') {
+        const isPending = lot.invoiceStatus === 'Pending' || (!lot.invoiceNo && !lot.purchaseNo);
+        if (!isPending) return false;
+      } else if (grayInvoiceFilter === 'invoiced') {
+        const isInvoiced = lot.invoiceStatus === 'Invoiced' || Boolean(lot.invoiceNo || lot.purchaseNo);
+        if (!isInvoiced) return false;
+      }
+
       if (searchQuery && searchQuery.trim() !== '') {
         const q = searchQuery.trim().toLowerCase();
         const matchLot = lot.lotNumber && lot.lotNumber.toLowerCase().includes(q);
@@ -1390,7 +1608,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
       return true;
     });
-  }, [grayLots, matchesDateRange, activeFilters, searchQuery]);
+  }, [grayLots, matchesDateRange, activeFilters, searchQuery, grayInvoiceFilter]);
 
   // Filtered Mill Outward Challans
   const filteredMillChallans = useMemo(() => {
@@ -2596,6 +2814,35 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 Purchase rate from weavers
               </div>
             </div>
+
+            {/* Stat 5: Pending Invoices (બિલ બાકી) */}
+            <div
+              className="glass-panel"
+              onClick={() => setGrayInvoiceFilter(prev => prev === 'pending' ? 'all' : 'pending')}
+              style={{
+                padding: '1rem',
+                borderLeft: '4px solid #f59e0b',
+                cursor: 'pointer',
+                background: grayInvoiceFilter === 'pending' ? 'rgba(254, 243, 199, 0.45)' : undefined,
+                boxShadow: grayInvoiceFilter === 'pending' ? '0 0 0 2px #f59e0b' : undefined,
+                transition: 'all 0.2s ease'
+              }}
+              title="Click to filter lots with pending invoices (બિલ બાકી લોટ્સ)"
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: grayInvoiceFilter === 'pending' ? '#b45309' : '#64748b', textTransform: 'uppercase' }}>
+                  Pending Invoices (બિલ બાકી)
+                </span>
+                <Clock size={16} color="#f59e0b" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#d97706' }}>
+                {grayStats.pendingInvoiceCount} <span style={{ fontSize: '0.85rem' }}>Lots</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                {grayStats.pendingInvoiceMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Mtr invoice awaited
+                {grayInvoiceFilter === 'pending' && <span style={{ marginLeft: 6, fontWeight: 800, color: '#b45309' }}>• FILTER ACTIVE</span>}
+              </div>
+            </div>
           </div>
 
           {/* Sub Navigation Bar for Gray Fabric */}
@@ -2716,14 +2963,77 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           {/* ======================================================== */}
           {graySubTab === 'weaver_inward' && (
             <div className="glass-panel" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                     Gray Fabric Inward Lots (Received from Weavers)
                   </h3>
                   <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                    Each lot contains full TP breakdown (Sr No, TP No, TP Mtr). Click "View TPs" to inspect all pieces.
+                    Each lot contains full TP breakdown. Track arrival of Weaver commercial invoices and post to purchase register.
                   </p>
+                </div>
+
+                {/* Quick Filter Pills: All / Pending Invoices / Invoiced */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '3px 4px', borderRadius: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setGrayInvoiceFilter('all')}
+                    style={{
+                      border: 'none',
+                      background: grayInvoiceFilter === 'all' ? '#ffffff' : 'transparent',
+                      color: grayInvoiceFilter === 'all' ? '#0f172a' : '#64748b',
+                      fontWeight: grayInvoiceFilter === 'all' ? 800 : 600,
+                      boxShadow: grayInvoiceFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    All Lots ({grayLots.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGrayInvoiceFilter('pending')}
+                    style={{
+                      border: 'none',
+                      background: grayInvoiceFilter === 'pending' ? '#fef3c7' : 'transparent',
+                      color: grayInvoiceFilter === 'pending' ? '#92400e' : '#64748b',
+                      fontWeight: grayInvoiceFilter === 'pending' ? 800 : 600,
+                      boxShadow: grayInvoiceFilter === 'pending' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <Clock size={12} color="#b45309" />
+                    ⏳ Bill Pending ({grayStats.pendingInvoiceCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGrayInvoiceFilter('invoiced')}
+                    style={{
+                      border: 'none',
+                      background: grayInvoiceFilter === 'invoiced' ? '#dcfce7' : 'transparent',
+                      color: grayInvoiceFilter === 'invoiced' ? '#166534' : '#64748b',
+                      fontWeight: grayInvoiceFilter === 'invoiced' ? 800 : 600,
+                      boxShadow: grayInvoiceFilter === 'invoiced' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <Check size={12} color="#15803d" />
+                    ✓ Invoiced ({grayLots.length - grayStats.pendingInvoiceCount})
+                  </button>
                 </div>
               </div>
 
@@ -2784,10 +3094,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             {lot.weaverParty}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
-                            <div style={{ color: '#0f172a', fontWeight: 600 }}>{lot.weaverChallanNo}</div>
-                            {lot.invoiceNo && (
-                              <div style={{ fontSize: '0.71rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
-                                Inv: {lot.invoiceNo}
+                            <div style={{ color: '#0f172a', fontWeight: 600 }}>{lot.weaverChallanNo || 'N/A'}</div>
+                            {lot.invoiceNo ? (
+                              <div style={{ fontSize: '0.71rem', color: '#0284c7', fontWeight: 700, marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                <FileText size={11} color="#0284c7" /> Inv: {lot.invoiceNo}
+                              </div>
+                            ) : (
+                              <div style={{ marginTop: 2 }}>
+                                <span style={{ fontSize: '0.64rem', background: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: 4, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  <Clock size={10} color="#b45309" /> Bill Pending
+                                </span>
                               </div>
                             )}
                             {lot.purchaseNo && (
@@ -2838,6 +3154,29 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           </td>
                           <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                              {(!lot.invoiceNo && !lot.purchaseNo) && (
+                                <button
+                                  onClick={() => handleOpenAttachInvoice(lot)}
+                                  className="btn-primary"
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '0.74rem',
+                                    height: '28px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                    border: 'none',
+                                    color: '#fff',
+                                    fontWeight: 700,
+                                    borderRadius: 5,
+                                    boxShadow: '0 2px 4px rgba(217, 119, 6, 0.2)'
+                                  }}
+                                  title="Weaver Bill arrived? Click to enter bill number & rate"
+                                >
+                                  <FileText size={13} /> Attach Bill
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedGrayLotForView(lot)}
                                 className="btn-secondary"
@@ -4952,146 +5291,240 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
 
               {/* 🧾 INVOICE & PURCHASE REGISTER INTEGRATION */}
-              <div style={{ border: '1.5px solid #0284c7', borderRadius: 10, background: '#f8fafc', padding: '0.85rem 1rem', boxShadow: '0 2px 6px rgba(2, 132, 199, 0.06)' }}>
+              <div style={{
+                border: weaverForm.invoiceReceivedOption === 'pending' ? '1.5px solid #f59e0b' : '1.5px solid #0284c7',
+                borderRadius: 10,
+                background: weaverForm.invoiceReceivedOption === 'pending' ? '#fffdf7' : '#f8fafc',
+                padding: '0.85rem 1rem',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+              }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <FileText size={16} color="#0284c7" />
+                    <FileText size={16} color={weaverForm.invoiceReceivedOption === 'pending' ? '#d97706' : '#0284c7'} />
                     <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
-                      Purchase Invoice Details (ખરેદી બિલ & GST વિગત)
+                      Weaver Invoice Status (બિલની વિગત)
                     </span>
-                    <span style={{ fontSize: '0.68rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
-                      ERP Purchase Link
+                    <span style={{
+                      fontSize: '0.68rem',
+                      background: weaverForm.invoiceReceivedOption === 'pending' ? '#fef3c7' : '#e0f2fe',
+                      color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#0369a1',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      fontWeight: 800
+                    }}>
+                      {weaverForm.invoiceReceivedOption === 'pending' ? '⏳ Bill Pending (બિલ બાકી)' : '✓ Bill Received (બિલ મળેલ)'}
                     </span>
                   </div>
 
-                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 800, color: weaverForm.postToPurchase ? '#0369a1' : '#64748b', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={weaverForm.postToPurchase}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
-                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
-                    />
-                    Auto-Post to Purchase Register (ખરેદી ખાતું)
-                  </label>
+                  {weaverForm.invoiceReceivedOption === 'received' && (
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 800, color: weaverForm.postToPurchase ? '#0369a1' : '#64748b', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={weaverForm.postToPurchase}
+                        onChange={e => setWeaverForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
+                      />
+                      Auto-Post to Purchase Register (ખરેદી ખાતું)
+                    </label>
+                  )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                      Invoice / Bill No
-                    </label>
+                {/* Option Selector: Received with Challan vs Pending / Arrives Later */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                  <div
+                    onClick={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'received' }))}
+                    style={{
+                      border: weaverForm.invoiceReceivedOption === 'received' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                      background: weaverForm.invoiceReceivedOption === 'received' ? '#eff6ff' : '#ffffff',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
                     <input
-                      type="text"
-                      placeholder="e.g. INV-2026/89"
-                      value={weaverForm.invoiceNo}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, invoiceNo: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                      type="radio"
+                      name="weaverInvoiceOption"
+                      checked={weaverForm.invoiceReceivedOption === 'received'}
+                      onChange={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'received' }))}
+                      style={{ cursor: 'pointer', accentColor: '#0284c7' }}
                     />
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: weaverForm.invoiceReceivedOption === 'received' ? '#0369a1' : '#334155' }}>
+                        📄 Invoice Received with Challan
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        ચલણ સાથે બિલ આવેલ છે — Enter invoice now
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                      Invoice Date
-                    </label>
+                  <div
+                    onClick={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'pending' }))}
+                    style={{
+                      border: weaverForm.invoiceReceivedOption === 'pending' ? '2px solid #f59e0b' : '1px solid #cbd5e1',
+                      background: weaverForm.invoiceReceivedOption === 'pending' ? '#fffbeb' : '#ffffff',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
                     <input
-                      type="date"
-                      value={weaverForm.invoiceDate}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                      type="radio"
+                      name="weaverInvoiceOption"
+                      checked={weaverForm.invoiceReceivedOption === 'pending'}
+                      onChange={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'pending' }))}
+                      style={{ cursor: 'pointer', accentColor: '#f59e0b' }}
                     />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                      HSN Code
-                    </label>
-                    <input
-                      type="text"
-                      list="fabric-hsn-datalist"
-                      placeholder="5208"
-                      value={weaverForm.hsnCode}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, hsnCode: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
-                    />
-                    <datalist id="fabric-hsn-datalist">
-                      <option value="5208" label="Woven cotton gray fabric" />
-                      <option value="5407" label="Woven synthetic / polyester fabric" />
-                      <option value="998821" label="Textile processing job work" />
-                    </datalist>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', marginBottom: 2 }}>
-                      Rate / Meter (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="e.g. 42.50"
-                      value={weaverForm.ratePerMeter}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '32px', fontSize: '0.85rem', fontWeight: 800, width: '100%', borderColor: '#0284c7' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                      GST Rate %
-                    </label>
-                    <select
-                      value={weaverForm.gstRate}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, gstRate: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
-                    >
-                      <option value="5">5% (Standard Textile Fabric)</option>
-                      <option value="12">12%</option>
-                      <option value="18">18%</option>
-                      <option value="0">0% (Nil / Exempt)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                      Payment Terms
-                    </label>
-                    <select
-                      value={weaverForm.paymentTerms}
-                      onChange={e => setWeaverForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
-                    >
-                      <option value="30 Days">30 Days Credit</option>
-                      <option value="15 Days">15 Days Credit</option>
-                      <option value="45 Days">45 Days Credit</option>
-                      <option value="60 Days">60 Days Credit</option>
-                      <option value="Immediate Cash">Immediate / Cash</option>
-                    </select>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#334155' }}>
+                        ⏳ Invoice Pending / Awaited
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        બિલ બાકી છે - પાછળથી આવશે (Will attach later)
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Live Financial Calculations Ribbon */}
-                <div style={{ marginTop: '0.65rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.76rem' }}>
-                    <span style={{ color: '#475569' }}>
-                      Qty: <strong style={{ color: '#0f172a' }}>{weaverFormSummary.totalMtrs} Mtr</strong>
-                    </span>
-                    <span style={{ color: '#475569' }}>
-                      Taxable: <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                    </span>
-                    <span style={{ color: '#475569' }}>
-                      GST ({weaverFormSummary.gstPct}%): <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                    </span>
+                {weaverForm.invoiceReceivedOption === 'pending' ? (
+                  <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <Clock size={18} color="#b45309" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ fontSize: '0.76rem', color: '#92400e', lineHeight: 1.5 }}>
+                      <strong>Invoice Pending (બિલ બાકી છે):</strong> Gray fabric will be added to warehouse stock immediately so delivery challans to mills for RFD processing can proceed without delay.
+                      <div style={{ marginTop: 4, fontSize: '0.72rem', color: '#b45309' }}>
+                        👉 When the weaver later sends the bill, click <strong>"Attach Bill"</strong> on this lot to enter the bill number, rate, and post directly to the Purchase Register.
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Invoice / Bill No
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. INV-2026/89"
+                          value={weaverForm.invoiceNo}
+                          onChange={e => setWeaverForm(prev => ({ ...prev, invoiceNo: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                      </div>
 
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a' }}>
-                    Total Invoice Value: <span style={{ fontSize: '1.05rem', color: '#059669' }}>₹{weaverFormSummary.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Invoice Date
+                        </label>
+                        <input
+                          type="date"
+                          value={weaverForm.invoiceDate}
+                          onChange={e => setWeaverForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          HSN Code
+                        </label>
+                        <input
+                          type="text"
+                          list="fabric-hsn-datalist"
+                          placeholder="5208"
+                          value={weaverForm.hsnCode}
+                          onChange={e => setWeaverForm(prev => ({ ...prev, hsnCode: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                        <datalist id="fabric-hsn-datalist">
+                          <option value="5208" label="Woven cotton gray fabric" />
+                          <option value="5407" label="Woven synthetic / polyester fabric" />
+                          <option value="998821" label="Textile processing job work" />
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', marginBottom: 2 }}>
+                          Rate / Meter (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g. 42.50"
+                          value={weaverForm.ratePerMeter}
+                          onChange={e => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.85rem', fontWeight: 800, width: '100%', borderColor: '#0284c7' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          GST Rate %
+                        </label>
+                        <select
+                          value={weaverForm.gstRate}
+                          onChange={e => setWeaverForm(prev => ({ ...prev, gstRate: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        >
+                          <option value="5">5% (Standard Textile Fabric)</option>
+                          <option value="12">12%</option>
+                          <option value="18">18%</option>
+                          <option value="0">0% (Nil / Exempt)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Payment Terms
+                        </label>
+                        <select
+                          value={weaverForm.paymentTerms}
+                          onChange={e => setWeaverForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        >
+                          <option value="30 Days">30 Days Credit</option>
+                          <option value="15 Days">15 Days Credit</option>
+                          <option value="45 Days">45 Days Credit</option>
+                          <option value="60 Days">60 Days Credit</option>
+                          <option value="Immediate Cash">Immediate / Cash</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Live Financial Calculations Ribbon */}
+                    <div style={{ marginTop: '0.65rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.76rem' }}>
+                        <span style={{ color: '#475569' }}>
+                          Qty: <strong style={{ color: '#0f172a' }}>{weaverFormSummary.totalMtrs} Mtr</strong>
+                        </span>
+                        <span style={{ color: '#475569' }}>
+                          Taxable: <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        </span>
+                        <span style={{ color: '#475569' }}>
+                          GST ({weaverFormSummary.gstPct}%): <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a' }}>
+                        Total Invoice Value: <span style={{ fontSize: '1.05rem', color: '#059669' }}>₹{weaverFormSummary.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -6722,6 +7155,266 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem', background: '#0284c7' }}
                 >
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 🧾 MODAL: ATTACH WEAVER INVOICE TO PENDING GRAY LOT       */}
+      {/* ======================================================== */}
+      {attachingInvoiceLot && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '640px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={20} color="#b45309" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#0f172a' }}>
+                      Attach Weaver Invoice (બિલ એન્ટ્રી કરો)
+                    </h3>
+                    <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
+                      Lot {attachingInvoiceLot.lotNumber}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Enter commercial bill details received from the weaver and automatically post to Purchase Register.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setAttachingInvoiceLot(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Lot Summary Badge */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: '0.76rem' }}>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.7rem' }}>Weaver / Loom Owner:</span>
+                <strong style={{ color: '#0f172a' }}>{attachingInvoiceLot.weaverParty}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.7rem' }}>Delivery Challan:</span>
+                <strong style={{ color: '#0f172a' }}>{attachingInvoiceLot.weaverChallanNo || 'N/A'}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.7rem' }}>Quality & Quantity:</span>
+                <strong style={{ color: '#0284c7' }}>{attachingInvoiceLot.fabricQuality} — {attachingInvoiceLot.totalMeters.toFixed(1)} Mtr</strong> ({attachingInvoiceLot.tps?.length || 0} TPs)
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveAttachInvoice} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', marginBottom: 3 }}>
+                    Invoice / Bill No *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. INV-2026/89"
+                    value={attachInvoiceForm.invoiceNo}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, invoiceNo: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', marginBottom: 3 }}>
+                    Invoice Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={attachInvoiceForm.invoiceDate}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    HSN Code
+                  </label>
+                  <input
+                    type="text"
+                    list="attach-hsn-datalist"
+                    placeholder="5208"
+                    value={attachInvoiceForm.hsnCode}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, hsnCode: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                  <datalist id="attach-hsn-datalist">
+                    <option value="5208" label="Woven cotton gray fabric" />
+                    <option value="5407" label="Woven synthetic fabric" />
+                    <option value="998821" label="Textile jobwork" />
+                  </datalist>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#0284c7', marginBottom: 3 }}>
+                    Rate / Meter (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="e.g. 42.50"
+                    value={attachInvoiceForm.ratePerMeter}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.85rem', fontWeight: 800, width: '100%', borderColor: '#0284c7' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    GST Rate %
+                  </label>
+                  <select
+                    value={attachInvoiceForm.gstRate}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, gstRate: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  >
+                    <option value="5">5% (Standard Textile Fabric)</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                    <option value="0">0% (Nil / Exempt)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                  Payment Terms
+                </label>
+                <select
+                  value={attachInvoiceForm.paymentTerms}
+                  onChange={e => setAttachInvoiceForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                  className="input-field"
+                  style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                >
+                  <option value="30 Days">30 Days Credit</option>
+                  <option value="15 Days">15 Days Credit</option>
+                  <option value="45 Days">45 Days Credit</option>
+                  <option value="60 Days">60 Days Credit</option>
+                  <option value="Immediate Cash">Immediate / Cash</option>
+                </select>
+              </div>
+
+              {/* Live Financial Calculations Ribbon */}
+              {(() => {
+                const roundMtrs = parseFloat(attachingInvoiceLot.totalMeters.toFixed(2));
+                const rate = parseFloat(attachInvoiceForm.ratePerMeter) || 0;
+                const gstPct = parseFloat(attachInvoiceForm.gstRate) || 0;
+                const taxable = parseFloat((roundMtrs * rate).toFixed(2));
+                const gstAmt = parseFloat(((taxable * gstPct) / 100).toFixed(2));
+                const grand = Math.round(taxable + gstAmt);
+
+                return (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: '0.76rem' }}>
+                      <span style={{ color: '#166534' }}>
+                        Qty: <strong>{roundMtrs} Mtr</strong>
+                      </span>
+                      <span style={{ color: '#166534' }}>
+                        Taxable: <strong>₹{taxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </span>
+                      <span style={{ color: '#166534' }}>
+                        GST ({gstPct}%): <strong>₹{gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#15803d' }}>
+                      Invoice Total: <span style={{ fontSize: '1.1rem', color: '#166534' }}>₹{grand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Purchase Register Checkbox */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', fontWeight: 800, color: attachInvoiceForm.postToPurchase ? '#0369a1' : '#64748b', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={attachInvoiceForm.postToPurchase}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
+                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
+                  />
+                  Auto-Post to Purchase Register (ખરેદી ખાતું — Elite Digital Prints)
+                </label>
+                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2, marginLeft: 24 }}>
+                  Creates an inventory purchase voucher linked with Lot #{attachingInvoiceLot.lotNumber} and Weaver party.
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setAttachingInvoiceLot(null)}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    padding: '0.45rem 1.25rem',
+                    fontSize: '0.82rem',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    border: 'none',
+                    color: '#fff',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Check size={16} /> Save & Attach Invoice
                 </button>
               </div>
             </form>
