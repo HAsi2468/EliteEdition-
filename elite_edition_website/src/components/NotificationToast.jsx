@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X, Bell, Trash2, CheckCheck, BellRing, ExternalLink } from 'lucide-react';
 import { webPushClient } from '../services/webPushClient';
 
@@ -308,7 +308,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     });
 
     return groups;
-  }, [history, filterTab]);
+  }, [history, filterTab, isOpen]);
 
   const toggleSelectGroup = (itemIds, e) => {
     if (e) e.stopPropagation();
