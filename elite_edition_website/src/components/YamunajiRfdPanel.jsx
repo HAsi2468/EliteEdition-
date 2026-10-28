@@ -34,7 +34,6 @@ import {
   Settings,
   Edit2,
   Sliders,
-  RotateCcw,
   MapPin,
   Phone,
   User,
@@ -56,170 +55,10 @@ const STORAGE_CLEAN_SLATE_KEY = 'yamunaji_clean_slate_20261028_cleared';
 // DEFAULT MASTER CONFIGURATIONS (SURAT TEXTILES)
 // ==========================================
 export const DEFAULT_CONFIGS = {
-  weavers: [
-    {
-      name: 'Maruti Weaving Works',
-      gst: '24AABCM1234F1Z8',
-      address: 'Plot No. 42-45, Phase-2, GIDC Pandesara',
-      city: 'Surat, Gujarat - 394221',
-      phone: '+91 98251 12345',
-      contactPerson: 'Hareshbhai Patel',
-      broker: 'Ramesh Dalal (Textile Agent)',
-      notes: 'Specialist in 14kg Viscose & Modal Satin weaving'
-    },
-    {
-      name: 'Harikrishna Textiles',
-      gst: '24AAACH9876K1Z3',
-      address: 'Shed No. 12, Bamroli Road, Khatodara GIDC',
-      city: 'Surat, Gujarat - 395002',
-      phone: '+91 98240 54321',
-      contactPerson: 'Mukeshbhai Radadiya',
-      broker: 'Kishorebhai (Direct)',
-      notes: 'Premium 60s Cambric & Pure Linen specialist'
-    },
-    {
-      name: 'Shivam Loom Industries',
-      gst: '24AAKFS4412L1Z9',
-      address: 'Survey 108/B, Anjana Farm, Ring Road',
-      city: 'Surat, Gujarat - 395003',
-      phone: '+91 98980 11223',
-      contactPerson: 'Pravinbhai Savani',
-      broker: 'Shyam Agency',
-      notes: 'High-speed airjet looms, prompt delivery'
-    },
-    {
-      name: 'Radha Krishna Weaving',
-      gst: '24AAGFR7721M1Z4',
-      address: 'Plot 78, Road No. 6, Sachin GIDC',
-      city: 'Surat, Gujarat - 394230',
-      phone: '+91 97234 88990',
-      contactPerson: 'Ghanshyambhai Vaghasiya',
-      broker: 'Direct Weaver',
-      notes: 'Viscose Crepe & Georgette weaving'
-    },
-    {
-      name: 'Shreeji Textiles',
-      gst: '24AALPS3344P1Z2',
-      address: 'Plot 15, Ved Road Industrial Area, Katargam',
-      city: 'Surat, Gujarat - 395004',
-      phone: '+91 98790 66778',
-      contactPerson: 'Dineshbhai Patel',
-      broker: 'Jalaram Brokerage',
-      notes: 'Organza & Gold Weave specialist'
-    },
-    {
-      name: 'Gopi Loom Mills',
-      gst: '24AAJFG5566Q1Z6',
-      address: 'Block 201, Palsana Industrial Park, NH-48',
-      city: 'Surat, Gujarat - 394315',
-      phone: '+91 98255 33445',
-      contactPerson: 'Bharatbhai Dobariya',
-      broker: 'Ramesh Dalal',
-      notes: 'Heavy Cotton Twill & Dola Silk'
-    },
-    {
-      name: 'Omkar Weavers',
-      gst: '24AAUPO9988R1Z1',
-      address: 'Plot 89, Pipodara GIDC, Surat',
-      city: 'Surat, Gujarat - 394110',
-      phone: '+91 99090 44556',
-      contactPerson: 'Ashokbhai Sutariya',
-      broker: 'Direct',
-      notes: 'Chanderi Silk & Viscose Weaves'
-    },
-    {
-      name: 'Pooja Textiles (Katargam)',
-      gst: '24AABCP1122S1Z7',
-      address: 'Near Gajera Circle, Laxmi Enclave, Katargam',
-      city: 'Surat, Gujarat - 395004',
-      phone: '+91 98253 77889',
-      contactPerson: 'Sanjaybhai Gondaliya',
-      broker: 'Bhavna Textiles Agency',
-      notes: 'Prompt delivery, high-grade quality inspection'
-    }
-  ],
-  qualities: [
-    'Pure Viscose Rayon 14kg',
-    'Pure Modal Satin 60s',
-    'Cotton 60x60 Cambric',
-    'Organza Viscose Gold Weave',
-    'Chanderi Silk 50gm',
-    'Pure Linen Slub 60s',
-    'Viscose Crepe 80gm',
-    'Georgette 60gm Pure',
-    'Heavy Cotton Twill 200 GSM',
-    'Dola Silk Heavy 80gm',
-    'Tissue Silk Zari'
-  ],
-  mills: [
-    {
-      name: 'Shree Radhe Bleaching & Dyeing Processors',
-      gst: '24AAACR1234A1Z5',
-      address: 'Plot 112-116, Road No. 12, Sachin GIDC',
-      city: 'Surat, Gujarat - 394230',
-      phone: '+91 98250 11999',
-      contactPerson: 'Maheshbhai (Mill Manager)',
-      processTypes: 'RFD Bleaching, Scouring & Heat Setting',
-      notes: 'Turnaround: 2-3 Days. Loss/Shrinkage avg 2.5-3%'
-    },
-    {
-      name: 'Vrundavan Mills Pvt Ltd',
-      gst: '24AABCV5678B1Z0',
-      address: 'Block 402, GIDC Pandesara, Opp. Water Tank',
-      city: 'Surat, Gujarat - 394221',
-      phone: '+91 98241 88776',
-      contactPerson: 'Kishorebhai Desai',
-      processTypes: 'Mercerizing & RFD Bleaching, Bio Wash',
-      notes: 'Specialist for 60s Cambric & Pure Modal'
-    },
-    {
-      name: 'Ganesh Textile Processors',
-      gst: '24AAACG9012C1Z8',
-      address: 'Plot 55, Kadodara Road, Palsana GIDC',
-      city: 'Surat, Gujarat - 394317',
-      phone: '+91 99798 22334',
-      contactPerson: 'Rajubhai Kothari',
-      processTypes: 'Soft Finish & Wash RFD, Stenter Finishing',
-      notes: 'Fast delivery for urgent job card requirements'
-    },
-    {
-      name: 'Shree Ambika Processing Mill',
-      gst: '24AAACA3456D1Z3',
-      address: 'Survey 245, Bhestan-Jiaav Road, Surat',
-      city: 'Surat, Gujarat - 395023',
-      phone: '+91 98256 66554',
-      contactPerson: 'Chandreshbhai Shah',
-      processTypes: 'High Tensile Heat Setting, Scouring',
-      notes: 'Zero shrinkage calibration on viscose rayon'
-    },
-    {
-      name: 'Bhagwati Dyeing House',
-      gst: '24AAACB7890E1Z1',
-      address: 'Plot 18, Road No. 3, Hojiwala Industrial Estate',
-      city: 'Surat, Gujarat - 394230',
-      phone: '+91 98795 44332',
-      contactPerson: 'Girishbhai Parmar',
-      processTypes: 'Bio Wash & Zero Shrinkage Finish',
-      notes: 'Continuous bleaching range (CBR)'
-    },
-    {
-      name: 'Navkar Processing Mills',
-      gst: '24AAACN2345F1Z6',
-      address: 'Plot 72, Sachin-Magdalla Road, Surat',
-      city: 'Surat, Gujarat - 394230',
-      phone: '+91 98258 99001',
-      contactPerson: 'Anandbhai Mehta',
-      processTypes: 'Viscose Crepe & Chanderi RFD processing',
-      notes: 'High consistency white whiteness index'
-    }
-  ],
-  processes: [
-    'RFD Bleaching, Scouring & Heat Setting',
-    'Mercerizing & RFD Bleaching',
-    'Soft Finish & Wash RFD',
-    'High Tensile Heat Setting',
-    'Bio Wash & Zero Shrinkage Finish'
-  ]
+  weavers: [],
+  qualities: [],
+  mills: [],
+  processes: []
 };
 
 // ==========================================
@@ -228,12 +67,6 @@ export const DEFAULT_CONFIGS = {
 export const normalizeParty = (item, defaultCity = 'Surat, Gujarat') => {
   if (!item) return { name: '', gst: '', address: '', city: defaultCity, phone: '', contactPerson: '', broker: '', processTypes: '', notes: '' };
   if (typeof item === 'string') {
-    const defaultMatch = (DEFAULT_CONFIGS.weavers || []).concat(DEFAULT_CONFIGS.mills || []).find(
-      d => typeof d === 'object' && d.name.toLowerCase() === item.toLowerCase()
-    );
-    if (defaultMatch) {
-      return { ...defaultMatch };
-    }
     return {
       name: item,
       gst: '',
@@ -283,19 +116,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         const p = JSON.parse(saved);
         if (p && typeof p === 'object') {
           return {
-            weavers: Array.isArray(p.weavers) && p.weavers.length > 0 
-              ? p.weavers.map(w => normalizeParty(w)) 
-              : DEFAULT_CONFIGS.weavers,
-            qualities: Array.isArray(p.qualities) && p.qualities.length > 0 ? p.qualities : DEFAULT_CONFIGS.qualities,
-            mills: Array.isArray(p.mills) && p.mills.length > 0 
-              ? p.mills.map(m => normalizeParty(m)) 
-              : DEFAULT_CONFIGS.mills,
-            processes: Array.isArray(p.processes) && p.processes.length > 0 ? p.processes : DEFAULT_CONFIGS.processes
+            weavers: Array.isArray(p.weavers) ? p.weavers.map(w => normalizeParty(w)) : [],
+            qualities: Array.isArray(p.qualities) ? p.qualities : [],
+            mills: Array.isArray(p.mills) ? p.mills.map(m => normalizeParty(m)) : [],
+            processes: Array.isArray(p.processes) ? p.processes : []
           };
         }
       }
     } catch (e) {}
-    return DEFAULT_CONFIGS;
+    return {
+      weavers: [],
+      qualities: [],
+      mills: [],
+      processes: []
+    };
   });
 
   // Save Configs on Change
@@ -684,27 +518,24 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       type: 'danger'
     });
     if (confirmed) {
-      setConfigs(prev => ({
-        ...prev,
-        [settingsActiveTab]: prev[settingsActiveTab].filter((_, idx) => idx !== index)
-      }));
-    }
-  };
-
-  const handleResetMasterTabDefaults = async () => {
-    const confirmed = await triggerEliteConfirm({
-      title: 'Reset Defaults',
-      message: `Reset all ${settingsActiveTab} back to standard Surat factory defaults?`,
-      confirmText: 'Reset',
-      cancelText: 'Cancel',
-      type: 'warning'
-    });
-    if (confirmed) {
-      setConfigs(prev => ({
-        ...prev,
-        [settingsActiveTab]: DEFAULT_CONFIGS[settingsActiveTab]
-      }));
-      triggerEliteAlert(`Reset ${settingsActiveTab} to default values.`, 'Reset Complete');
+      setConfigs(prev => {
+        const currentList = prev[settingsActiveTab] || [];
+        const updated = currentList.filter((it, idx) => {
+          if (idx === index) return false;
+          if (typeof it === 'object' && typeof item === 'object' && it.name && item.name) {
+            return it.name.trim().toLowerCase() !== item.name.trim().toLowerCase();
+          }
+          if (typeof it === 'string' && typeof item === 'string') {
+            return it.trim().toLowerCase() !== item.trim().toLowerCase();
+          }
+          return true;
+        });
+        return {
+          ...prev,
+          [settingsActiveTab]: updated
+        };
+      });
+      triggerEliteAlert(`"${itemName}" removed from master list.`, 'Item Removed');
     }
   };
 
@@ -3906,19 +3737,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
             )}
 
-            {/* Modal Footer with Reset Defaults */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={handleResetMasterTabDefaults}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.76rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #fde68a' }}
-                >
-                  <RotateCcw size={13} /> Restore Default {settingsActiveTab}
-                </button>
-              </div>
-
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
               <button
                 type="button"
                 onClick={() => { setShowSettingsModal(false); setEditingItemIndex(null); }}
