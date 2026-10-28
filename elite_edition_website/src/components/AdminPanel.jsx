@@ -2950,6 +2950,9 @@ export default function AdminPanel() {
                                              cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
                                              cat === 'Elite Edition' ? '🏢 Elite Edition' :
                                              cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
+                                             cat === 'Sobise' ? '👗 Sobise' :
+                                             cat === 'Ethno wear' ? '🥻 Ethno wear' :
+                                             cat === 'Yamunaji' ? '🧵 Yamunaji' :
                                              cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
                                              cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
 

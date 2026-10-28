@@ -30,12 +30,16 @@ export const AVAILABLE_SCREENS = [
   // Elite Edition (Company)
   { id: 'ee_dashboard', label: 'Elite Edition: Dashboard Overview', category: 'Elite Edition' },
   { id: 'ee_invoices', label: 'Elite Edition: Invoices & GST Billing', category: 'Elite Edition' },
+  { id: 'ee_expenses', label: 'Elite Edition: Expense Ledger', category: 'Elite Edition' },
+  { id: 'ee_raw_materials', label: 'Elite Edition: Raw Materials', category: 'Elite Edition' },
   { id: 'ee_complaints', label: 'Elite Edition: Complaints Module', category: 'Elite Edition' },
   { id: 'ee_settings', label: 'Elite Edition: Company Settings', category: 'Elite Edition' },
 
   // Elite Fabtex (Company)
   { id: 'ef_dashboard', label: 'Elite Fabtex: Dashboard Overview', category: 'Elite Fabtex' },
   { id: 'ef_invoices', label: 'Elite Fabtex: Invoices & GST Billing', category: 'Elite Fabtex' },
+  { id: 'ef_expenses', label: 'Elite Fabtex: Expense Ledger', category: 'Elite Fabtex' },
+  { id: 'ef_raw_materials', label: 'Elite Fabtex: Raw Materials', category: 'Elite Fabtex' },
   { id: 'ef_complaints', label: 'Elite Fabtex: Complaints Module', category: 'Elite Fabtex' },
   { id: 'ef_settings', label: 'Elite Fabtex: Company Settings', category: 'Elite Fabtex' },
 
@@ -43,6 +47,7 @@ export const AVAILABLE_SCREENS = [
   { id: 'so_dashboard', label: 'Sobise: Dashboard Overview', category: 'Sobise' },
   { id: 'so_invoices', label: 'Sobise: Finance & GST Billing', category: 'Sobise' },
   { id: 'so_expenses', label: 'Sobise: Expense Ledger', category: 'Sobise' },
+  { id: 'so_raw_materials', label: 'Sobise: Raw Materials', category: 'Sobise' },
   { id: 'so_complaints', label: 'Sobise: Complaints Module', category: 'Sobise' },
   { id: 'so_settings', label: 'Sobise: Company Settings', category: 'Sobise' },
 
@@ -50,11 +55,14 @@ export const AVAILABLE_SCREENS = [
   { id: 'ew_dashboard', label: 'Ethno wear: Dashboard Overview', category: 'Ethno wear' },
   { id: 'ew_invoices', label: 'Ethno wear: Invoices & GST Billing', category: 'Ethno wear' },
   { id: 'ew_expenses', label: 'Ethno wear: Expense Ledger', category: 'Ethno wear' },
+  { id: 'ew_raw_materials', label: 'Ethno wear: Raw Materials', category: 'Ethno wear' },
   { id: 'ew_complaints', label: 'Ethno wear: Complaints Module', category: 'Ethno wear' },
   { id: 'ew_settings', label: 'Ethno wear: Company Settings', category: 'Ethno wear' },
 
   // Yamunaji (Company)
   { id: 'yj_dashboard', label: 'Yamunaji: Dashboard Overview', category: 'Yamunaji' },
+  { id: 'yj_rfd', label: 'Yamunaji: Fabric Process', category: 'Yamunaji' },
+  { id: 'yj_raw_materials', label: 'Yamunaji: Raw Materials', category: 'Yamunaji' },
   { id: 'yj_invoices', label: 'Yamunaji: Invoices & GST Billing', category: 'Yamunaji' },
   { id: 'yj_expenses', label: 'Yamunaji: Expense Ledger', category: 'Yamunaji' },
   { id: 'yj_complaints', label: 'Yamunaji: Complaints Module', category: 'Yamunaji' },
@@ -90,7 +98,9 @@ export const AVAILABLE_SCREENS = [
   { id: 'stitching_jobcards', label: 'Elite Stitching: Job Card Tracking', category: 'Elite Stitching' },
   { id: 'stitching_design', label: 'Elite Stitching: Design Room', category: 'Elite Stitching' },
   { id: 'stitching_fabric', label: 'Elite Stitching: Fabric Challans', category: 'Elite Stitching' },
+  { id: 'es_raw_materials', label: 'Elite Stitching: Raw Materials', category: 'Elite Stitching' },
   { id: 'es_complaints', label: 'Elite Stitching: Complaints Module', category: 'Elite Stitching' },
+  { id: 'es_expenses', label: 'Elite Stitching: Expense Ledger', category: 'Elite Stitching' },
   { id: 'stitching_settings', label: 'Elite Stitching: Settings', category: 'Elite Stitching' },
 ];
 
