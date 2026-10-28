@@ -42,11 +42,13 @@ import {
   Lock
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
+import EnterpriseEmptyState from './common/EnterpriseEmptyState';
 
 const STORAGE_GRAY_KEY = 'yamunaji_gray_lots_data';
 const STORAGE_MILL_CHALLAN_KEY = 'yamunaji_mill_challans_data';
 const STORAGE_RFD_KEY = 'yamunaji_rfd_lots_data';
 const STORAGE_CONFIGS_KEY = 'yamunaji_master_configurations';
+const STORAGE_CLEAN_SLATE_KEY = 'yamunaji_clean_slate_20261028_cleared';
 
 // ==========================================
 // DEFAULT MASTER CONFIGURATIONS (SURAT TEXTILES)
@@ -299,18 +301,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(configs)); } catch (e) {}
   }, [configs]);
 
-  // Data States (Clean slate, filters out any legacy dummy/seed lots)
+  // Data States (Clean slate, auto-clears previous test/demo lots)
   const [grayLots, setGrayLots] = useState(() => {
     try {
+      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') {
+        localStorage.removeItem(STORAGE_GRAY_KEY);
+        localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
+        localStorage.removeItem(STORAGE_RFD_KEY);
+        localStorage.setItem(STORAGE_CLEAN_SLATE_KEY, 'true');
+        return [];
+      }
       const saved = localStorage.getItem(STORAGE_GRAY_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p)) {
-          return p.filter(l => 
-            !l.id?.startsWith('GRAY-LOT-2026-') && 
-            !['GRAY-2026-001', 'GRAY-2026-002', 'GRAY-2026-003', 'GRAY-2026-004', 'GRAY-2026-005'].includes(l.lotNumber)
-          );
-        }
+        if (Array.isArray(p)) return p;
       }
     } catch (e) {}
     return [];
@@ -318,12 +322,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const [millChallans, setMillChallans] = useState(() => {
     try {
+      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') return [];
       const saved = localStorage.getItem(STORAGE_MILL_CHALLAN_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p)) {
-          return p.filter(c => c.id !== 'MILL-CH-101' && c.challanNo !== 'MILL-CH-101');
-        }
+        if (Array.isArray(p)) return p;
       }
     } catch (e) {}
     return [];
@@ -331,16 +334,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const [rfdLots, setRfdLots] = useState(() => {
     try {
+      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') return [];
       const saved = localStorage.getItem(STORAGE_RFD_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p)) {
-          return p.filter(r => r.id !== 'YJ-RFD-2026-001' && r.lotNumber !== 'YJ-RFD-2026-001');
-        }
+        if (Array.isArray(p)) return p;
       }
     } catch (e) {}
     return [];
   });
+
+  // Ensure clean slate on component mount
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') {
+        localStorage.removeItem(STORAGE_GRAY_KEY);
+        localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
+        localStorage.removeItem(STORAGE_RFD_KEY);
+        localStorage.setItem(STORAGE_CLEAN_SLATE_KEY, 'true');
+        setGrayLots([]);
+        setMillChallans([]);
+        setRfdLots([]);
+      }
+    } catch (e) {}
+  }, []);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -428,7 +445,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     ]
   });
 
-  // Filters for Mill Outward Challans List
+  // Unified Multi-Filter States (Date, Quality, Weaver, Mill, Status, Search)
+  const [datePreset, setDatePreset] = useState('all'); // 'all' | 'today' | 'this_week' | 'this_month' | 'custom'
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selectedWeaver, setSelectedWeaver] = useState('all');
+  const [selectedQuality, setSelectedQuality] = useState('all');
+  const [selectedMill, setSelectedMill] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all'); // 'all' | 'in_warehouse' | 'at_mill' | 'closed'
   const [millQualityFilter, setMillQualityFilter] = useState('all');
   const [millSearchQuery, setMillSearchQuery] = useState('');
 
@@ -1021,20 +1045,185 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setShowMillChallanModal(true);
   };
 
-  // Filtered Mill Outward Challans for table list
+  // ==========================================
+  // UNIFIED MULTI-FILTER ENGINE & DATASETS
+  // ==========================================
+  const matchesDateRange = (itemDateStr) => {
+    if (!itemDateStr) return true;
+    const itemDate = new Date(itemDateStr);
+    if (isNaN(itemDate.getTime())) return true;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (datePreset === 'today') {
+      const d = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate());
+      return d.getTime() === today.getTime();
+    }
+    if (datePreset === 'this_week') {
+      const startOfWeek = new Date(today);
+      const day = today.getDay();
+      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      return itemDate >= startOfWeek;
+    }
+    if (datePreset === 'this_month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      return itemDate >= startOfMonth;
+    }
+    if (datePreset === 'custom' || dateFrom || dateTo) {
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (itemDate < from) return false;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (itemDate > to) return false;
+      }
+      return true;
+    }
+    return true;
+  };
+
+  const availableWeaverOptions = useMemo(() => {
+    const set = new Set();
+    (configs.weavers || []).forEach(w => {
+      const name = typeof w === 'string' ? w : w?.name;
+      if (name) set.add(name);
+    });
+    grayLots.forEach(l => {
+      if (l.weaverParty) set.add(l.weaverParty);
+    });
+    return Array.from(set).sort();
+  }, [configs.weavers, grayLots]);
+
+  const availableQualityOptions = useMemo(() => {
+    const set = new Set();
+    (configs.qualities || []).forEach(q => {
+      if (q) set.add(q);
+    });
+    grayLots.forEach(l => {
+      if (l.fabricQuality) set.add(l.fabricQuality);
+    });
+    millChallans.forEach(c => {
+      if (c.fabricQuality) set.add(c.fabricQuality);
+    });
+    return Array.from(set).sort();
+  }, [configs.qualities, grayLots, millChallans]);
+
+  const availableMillOptions = useMemo(() => {
+    const set = new Set();
+    (configs.mills || []).forEach(m => {
+      const name = typeof m === 'string' ? m : m?.name;
+      if (name) set.add(name);
+    });
+    millChallans.forEach(c => {
+      if (c.millParty) set.add(c.millParty);
+    });
+    return Array.from(set).sort();
+  }, [configs.mills, millChallans]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery.trim()) count++;
+    if (datePreset !== 'all' || dateFrom || dateTo) count++;
+    if (selectedWeaver !== 'all') count++;
+    if (selectedQuality !== 'all') count++;
+    if (selectedMill !== 'all') count++;
+    if (selectedStatus !== 'all') count++;
+    return count;
+  }, [searchQuery, datePreset, dateFrom, dateTo, selectedWeaver, selectedQuality, selectedMill, selectedStatus]);
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setDatePreset('all');
+    setDateFrom('');
+    setDateTo('');
+    setSelectedWeaver('all');
+    setSelectedQuality('all');
+    setSelectedMill('all');
+    setSelectedStatus('all');
+    setMillQualityFilter('all');
+    setMillSearchQuery('');
+  };
+
+  // Filtered Gray Fabric Lots
+  const filteredGrayLots = useMemo(() => {
+    return grayLots.filter(lot => {
+      if (!matchesDateRange(lot.inwardDate)) return false;
+      if (selectedWeaver !== 'all' && lot.weaverParty !== selectedWeaver) return false;
+      if (selectedQuality !== 'all' && lot.fabricQuality !== selectedQuality) return false;
+
+      if (selectedStatus !== 'all') {
+        const availableTps = (lot.tps || []).filter(t => t.status === 'In Stock');
+        const inWarehouseMtr = availableTps.reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
+        const atMillMtr = (lot.tps || []).filter(t => t.status === 'Sent to Mill').reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
+
+        if (selectedStatus === 'in_warehouse' && inWarehouseMtr <= 0) return false;
+        if (selectedStatus === 'at_mill' && atMillMtr <= 0) return false;
+        if (selectedStatus === 'closed' && inWarehouseMtr > 0) return false;
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matchLot = lot.lotNumber && lot.lotNumber.toLowerCase().includes(q);
+        const matchWeaver = lot.weaverParty && lot.weaverParty.toLowerCase().includes(q);
+        const matchChallan = lot.weaverChallanNo && String(lot.weaverChallanNo).toLowerCase().includes(q);
+        const matchQuality = lot.fabricQuality && lot.fabricQuality.toLowerCase().includes(q);
+        const matchTps = (lot.tps || []).some(t => String(t.tpNo || '').toLowerCase().includes(q) || String(t.srNo || '').includes(q));
+        if (!matchLot && !matchWeaver && !matchChallan && !matchQuality && !matchTps) return false;
+      }
+      return true;
+    });
+  }, [grayLots, datePreset, dateFrom, dateTo, selectedWeaver, selectedQuality, selectedStatus, searchQuery]);
+
+  // Filtered Mill Outward Challans
   const filteredMillChallans = useMemo(() => {
     return millChallans.filter(ch => {
-      const matchQuality = millQualityFilter === 'all' || ch.fabricQuality === millQualityFilter;
-      const q = millSearchQuery.trim().toLowerCase();
-      const matchSearch = !q ||
-        (ch.challanNo && ch.challanNo.toLowerCase().includes(q)) ||
-        (ch.millParty && ch.millParty.toLowerCase().includes(q)) ||
-        (ch.processRequired && ch.processRequired.toLowerCase().includes(q)) ||
-        (ch.vehicleNo && ch.vehicleNo.toLowerCase().includes(q)) ||
-        (ch.fabricQuality && ch.fabricQuality.toLowerCase().includes(q));
-      return matchQuality && matchSearch;
+      if (!matchesDateRange(ch.challanDate)) return false;
+      if (selectedMill !== 'all' && ch.millParty !== selectedMill) return false;
+      if (selectedQuality !== 'all' && ch.fabricQuality !== selectedQuality) return false;
+      if (millQualityFilter !== 'all' && ch.fabricQuality !== millQualityFilter) return false;
+
+      if (selectedStatus !== 'all') {
+        const isClosed = ch.isClosed || ch.status === 'Fully Received';
+        if (selectedStatus === 'closed' && !isClosed) return false;
+        if (selectedStatus === 'open' && isClosed) return false;
+      }
+
+      const q = (searchQuery || millSearchQuery).trim().toLowerCase();
+      if (q) {
+        const matchNo = ch.challanNo && ch.challanNo.toLowerCase().includes(q);
+        const matchMill = ch.millParty && ch.millParty.toLowerCase().includes(q);
+        const matchProcess = ch.processRequired && ch.processRequired.toLowerCase().includes(q);
+        const matchVehicle = ch.vehicleNo && ch.vehicleNo.toLowerCase().includes(q);
+        const matchQuality = ch.fabricQuality && ch.fabricQuality.toLowerCase().includes(q);
+        if (!matchNo && !matchMill && !matchProcess && !matchVehicle && !matchQuality) return false;
+      }
+      return true;
     });
-  }, [millChallans, millQualityFilter, millSearchQuery]);
+  }, [millChallans, datePreset, dateFrom, dateTo, selectedMill, selectedQuality, millQualityFilter, selectedStatus, searchQuery, millSearchQuery]);
+
+  // Filtered RFD Processed Lots
+  const filteredRfdLots = useMemo(() => {
+    return rfdLots.filter(lot => {
+      if (!matchesDateRange(lot.receivedDate)) return false;
+      if (selectedMill !== 'all' && lot.millParty !== selectedMill) return false;
+      if (selectedQuality !== 'all' && lot.fabricQuality !== selectedQuality) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matchLot = lot.lotNumber && lot.lotNumber.toLowerCase().includes(q);
+        const matchMill = lot.millParty && lot.millParty.toLowerCase().includes(q);
+        const matchChallan = lot.millChallanNo && String(lot.millChallanNo).toLowerCase().includes(q);
+        const matchQuality = lot.fabricQuality && lot.fabricQuality.toLowerCase().includes(q);
+        if (!matchLot && !matchMill && !matchChallan && !matchQuality) return false;
+      }
+      return true;
+    });
+  }, [rfdLots, datePreset, dateFrom, dateTo, selectedMill, selectedQuality, searchQuery]);
 
   const handleCreateMillChallan = (e) => {
     e.preventDefault();
@@ -1756,7 +1945,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
-                Yamunaji — Fabric Operations & Challans
+                Yamunaji — Fabric Process
               </h2>
               <span
                 style={{
@@ -2020,6 +2209,273 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             </div>
           </div>
 
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 🔍 UNIFIED MULTI-FILTER BAR (DATE + QUALITY + WEAVER + SEARCH) */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          <div
+            className="glass-panel"
+            style={{
+              padding: '0.875rem 1rem',
+              marginBottom: '1rem',
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              {/* Left: Quick Date Presets & Custom Pickers */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('all'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'all' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'all' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'all' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'all' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    All Dates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('today'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'today' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'today' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'today' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'today' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('this_week'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'this_week' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'this_week' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'this_week' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'this_week' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    This Week
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('this_month'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'this_month' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'this_month' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'this_month' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'this_month' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    This Month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDatePreset('custom')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'custom' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'custom' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'custom' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'custom' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    Custom Range
+                  </button>
+                </div>
+
+                {/* Inline Date Range Picker */}
+                {datePreset === 'custom' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.74rem', padding: '0 6px' }}
+                      title="Date From"
+                    />
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>to</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.74rem', padding: '0 6px' }}
+                      title="Date To"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Reset Data Button */}
+              <button
+                type="button"
+                onClick={handleResetToCleanSlate}
+                className="btn-secondary"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#dc2626',
+                  borderColor: '#fca5a5',
+                  background: '#fef2f2',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '6px'
+                }}
+                title="Clear all lots and challans from memory and start fresh"
+              >
+                <Trash2 size={12} /> Clear Screen Data
+              </button>
+            </div>
+
+            {/* Second Row: Dropdown Filters & Search */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
+              {/* Keyword Search */}
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder={graySubTab === 'weaver_inward' ? "Search Lot, Weaver, Challan #..." : "Search Challan #, Mill, Vehicle..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input-field"
+                  style={{ paddingLeft: '30px', height: '32px', fontSize: '0.78rem', width: '100%' }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Quality Filter */}
+              <select
+                value={selectedQuality}
+                onChange={(e) => setSelectedQuality(e.target.value)}
+                className="input-field"
+                style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+              >
+                <option value="all">All Fabric Qualities</option>
+                {availableQualityOptions.map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+
+              {/* Weaver Filter (shown in weaver inward tab) */}
+              {graySubTab === 'weaver_inward' && screenMode === 'gray' && (
+                <select
+                  value={selectedWeaver}
+                  onChange={(e) => setSelectedWeaver(e.target.value)}
+                  className="input-field"
+                  style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+                >
+                  <option value="all">All Weavers / Loom Owners</option>
+                  {availableWeaverOptions.map(w => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Mill Filter (shown in mill outward and rfd tab) */}
+              {(graySubTab === 'mill_outward' || screenMode === 'rfd') && (
+                <select
+                  value={selectedMill}
+                  onChange={(e) => setSelectedMill(e.target.value)}
+                  className="input-field"
+                  style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+                >
+                  <option value="all">All Processing Mills</option>
+                  {availableMillOptions.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Status Filter */}
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="input-field"
+                style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+              >
+                <option value="all">All Stock Statuses</option>
+                {graySubTab === 'weaver_inward' ? (
+                  <>
+                    <option value="in_warehouse">In Warehouse (Available)</option>
+                    <option value="at_mill">At Mill (Sent Outward)</option>
+                    <option value="closed">Fully Cleared / Dispatched</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="open">Active / Pending Inward</option>
+                    <option value="closed">Fully Received / Closed</option>
+                  </>
+                )}
+              </select>
+
+              {/* Reset Filters Action */}
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="btn-secondary"
+                  style={{
+                    height: '32px',
+                    padding: '0 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#2563eb',
+                    borderColor: '#bfdbfe',
+                    background: '#eff6ff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <RotateCcw size={12} /> Reset ({activeFilterCount})
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* ======================================================== */}
           {/* 📋 SUB-TAB 1: WEAVER INWARD & GRAY FABRIC LOTS           */}
           {/* ======================================================== */}
@@ -2033,18 +2489,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                     Each lot contains full TP breakdown (Sr No, TP No, TP Mtr). Click "View TPs" to inspect all pieces.
                   </p>
-                </div>
-
-                <div style={{ position: 'relative', width: 260 }}>
-                  <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input
-                    type="text"
-                    placeholder="Search Lot, Weaver, Challan..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-field"
-                    style={{ paddingLeft: '32px', height: '34px', fontSize: '0.8rem', width: '100%' }}
-                  />
                 </div>
               </div>
 
@@ -2066,7 +2510,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     </tr>
                   </thead>
                   <tbody>
-                    {grayLots.map(lot => {
+                    {filteredGrayLots.length === 0 ? (
+                      <tr>
+                        <td colSpan="11" style={{ padding: '1.5rem 0.5rem' }}>
+                          {grayLots.length === 0 ? (
+                            <EnterpriseEmptyState
+                              icon={Boxes}
+                              title="Clean Slate — Ready for First Inward"
+                              description="All test data has been cleared. Click '+ New Weaver Gray Inward' to record incoming fabric lots with individual roll meterages."
+                              actionLabel="+ New Weaver Gray Inward"
+                              onAction={() => setShowWeaverInwardModal(true)}
+                            />
+                          ) : (
+                            <EnterpriseEmptyState
+                              icon={Search}
+                              title="No Fabric Lots Found"
+                              description="No gray fabric lots match your selected date range or filter settings."
+                              actionLabel="Reset All Filters"
+                              onAction={handleResetFilters}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredGrayLots.map(lot => {
                       const availableTps = (lot.tps || []).filter(t => t.status === 'In Stock');
                       const inWarehouseMtr = availableTps.reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
 
@@ -2165,7 +2632,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           </td>
                         </tr>
                       );
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -2187,38 +2654,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* Quality Filter */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
-                      Quality:
-                    </label>
-                    <select
-                      value={millQualityFilter}
-                      onChange={(e) => setMillQualityFilter(e.target.value)}
-                      className="input-field"
-                      style={{ height: '34px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
-                    >
-                      <option value="all">All Fabric Qualities</option>
-                      {(configs.qualities || []).map(q => (
-                        <option key={q} value={q}>{q}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Search Input */}
-                  <div style={{ position: 'relative', width: 220 }}>
-                    <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                    <input
-                      type="text"
-                      placeholder="Search Challan, Mill, Vehicle..."
-                      value={millSearchQuery}
-                      onChange={(e) => setMillSearchQuery(e.target.value)}
-                      className="input-field"
-                      style={{ paddingLeft: '30px', height: '34px', fontSize: '0.78rem', width: '100%' }}
-                    />
-                  </div>
-
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
                   <button
                     onClick={() => openMillChallanModal()}
                     className="btn-primary"
@@ -2254,7 +2690,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredMillChallans.map(ch => {
+                    {filteredMillChallans.length === 0 ? (
+                      <tr>
+                        <td colSpan="11" style={{ padding: '1.5rem 0.5rem' }}>
+                          {millChallans.length === 0 ? (
+                            <EnterpriseEmptyState
+                              icon={ClipboardList}
+                              title="No Mill Delivery Challans"
+                              description="No outward challans sent to mills yet. Click '+ Create Challan for Mill' to dispatch gray fabric rolls to dye houses."
+                              actionLabel="+ Create Challan for Mill"
+                              onAction={() => openMillChallanModal()}
+                            />
+                          ) : (
+                            <EnterpriseEmptyState
+                              icon={Search}
+                              title="No Challans Match Filters"
+                              description="No outward challans match your selected date range or filter criteria."
+                              actionLabel="Reset All Filters"
+                              onAction={handleResetFilters}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredMillChallans.map(ch => {
                       const sentMtr = parseFloat(ch.totalMeters) || 0;
                       const chRfdLots = rfdLots.filter(l => l.sourceChallanId === ch.id || (ch.challanNo && l.millChallanNo === ch.challanNo));
                       const chReceivedMtrs = chRfdLots.reduce((sum, l) => sum + (parseFloat(l.receivedRfdMeters) || 0), 0);
@@ -2799,21 +3258,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         )}
                       </React.Fragment>
                     );
-                    })}
-                    {filteredMillChallans.length === 0 && (
-                      <tr>
-                        <td colSpan={10} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>
-                            No Mill Outward Challans Found
-                          </div>
-                          <div style={{ fontSize: '0.78rem' }}>
-                            {millQualityFilter !== 'all' || millSearchQuery
-                              ? 'Try clearing the quality filter or search query.'
-                              : 'Create your first delivery challan to send gray fabric pieces to the processing mill.'}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -2902,6 +3347,229 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             </div>
           </div>
 
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 🔍 UNIFIED MULTI-FILTER BAR (DATE + QUALITY + MILL + SEARCH)   */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          <div
+            className="glass-panel"
+            style={{
+              padding: '0.875rem 1rem',
+              marginBottom: '1rem',
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              {/* Left: Quick Date Presets & Custom Pickers */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('all'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'all' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'all' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'all' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'all' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    All Dates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('today'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'today' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'today' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'today' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'today' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('this_week'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'this_week' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'this_week' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'this_week' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'this_week' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    This Week
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDatePreset('this_month'); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'this_month' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'this_month' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'this_month' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'this_month' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    This Month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDatePreset('custom')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: datePreset === 'custom' ? 800 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: datePreset === 'custom' ? '#ffffff' : 'transparent',
+                      color: datePreset === 'custom' ? '#0f172a' : '#64748b',
+                      cursor: 'pointer',
+                      boxShadow: datePreset === 'custom' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    Custom Range
+                  </button>
+                </div>
+
+                {datePreset === 'custom' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.74rem', padding: '0 6px' }}
+                      title="Date From"
+                    />
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>to</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.74rem', padding: '0 6px' }}
+                      title="Date To"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Reset Data Button */}
+              <button
+                type="button"
+                onClick={handleResetToCleanSlate}
+                className="btn-secondary"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#dc2626',
+                  borderColor: '#fca5a5',
+                  background: '#fef2f2',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '6px'
+                }}
+                title="Clear all lots and challans from memory and start fresh"
+              >
+                <Trash2 size={12} /> Clear Screen Data
+              </button>
+            </div>
+
+            {/* Second Row: Dropdown Filters & Search */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Search RFD Lot, Mill, Challan #..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input-field"
+                  style={{ paddingLeft: '30px', height: '32px', fontSize: '0.78rem', width: '100%' }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              <select
+                value={selectedQuality}
+                onChange={(e) => setSelectedQuality(e.target.value)}
+                className="input-field"
+                style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+              >
+                <option value="all">All Fabric Qualities</option>
+                {availableQualityOptions.map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedMill}
+                onChange={(e) => setSelectedMill(e.target.value)}
+                className="input-field"
+                style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+              >
+                <option value="all">All Processing Mills</option>
+                {availableMillOptions.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="btn-secondary"
+                  style={{
+                    height: '32px',
+                    padding: '0 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#2563eb',
+                    borderColor: '#bfdbfe',
+                    background: '#eff6ff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <RotateCcw size={12} /> Reset ({activeFilterCount})
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* RFD Inventory Table */}
           <div className="glass-panel" style={{ padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -2952,7 +3620,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   </tr>
                 </thead>
                 <tbody>
-                  {rfdLots.map(lot => {
+                  {filteredRfdLots.length === 0 ? (
+                    <tr>
+                      <td colSpan="12" style={{ padding: '1.5rem 0.5rem' }}>
+                        {rfdLots.length === 0 ? (
+                          <EnterpriseEmptyState
+                            icon={Layers}
+                            title="Clean Slate — Ready for RFD Inward"
+                            description="No RFD fabric lots exist in the system. Click '+ Inward RFD Lot' or inward from an outward mill challan to record received fabric."
+                            actionLabel="+ Inward RFD Lot"
+                            onAction={() => handleOpenInwardRfdModal()}
+                          />
+                        ) : (
+                          <EnterpriseEmptyState
+                            icon={Search}
+                            title="No RFD Lots Found"
+                            description="No RFD lots match your selected date range or filter settings."
+                            actionLabel="Reset All Filters"
+                            onAction={handleResetFilters}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRfdLots.map(lot => {
                     const balance = Math.max(0, lot.receivedRfdMeters - (lot.issuedMeters || 0));
                     const isHighShortage = (lot.shrinkagePercent || 0) > 4.0;
                     const rolls = lot.receivedRollsCount || (lot.tps ? lot.tps.length : 1);
@@ -3108,19 +3799,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                       </tr>
                     );
-                  })}
-                  {rfdLots.length === 0 && (
-                    <tr>
-                      <td colSpan={12} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>
-                          No Processed RFD Lots Found
-                        </div>
-                        <div style={{ fontSize: '0.78rem' }}>
-                          Click <strong>"+ Inward RFD Lot (Total Mtr & Shortage)"</strong> above or receive from a Mill Challan to log processed fabric.
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                  }))}
                 </tbody>
               </table>
             </div>

@@ -157,6 +157,8 @@ export const ROUTE_ALIASES = {
   'yj': { tab: 'yj_invoices', dept: 'yamunaji' },
   'yj_rfd': { tab: 'yj_rfd', dept: 'yamunaji' },
   'rfd': { tab: 'yj_rfd', dept: 'yamunaji' },
+  'fabric_process': { tab: 'yj_rfd', dept: 'yamunaji' },
+  'fabric-process': { tab: 'yj_rfd', dept: 'yamunaji' },
   'yamunaji_rfd': { tab: 'yj_rfd', dept: 'yamunaji' },
   'yj_dashboard': { tab: 'yj_dashboard', dept: 'yamunaji' },
   'yj_settings': { tab: 'yj_settings', dept: 'yamunaji' },
@@ -2945,7 +2947,7 @@ export default function App() {
                     {activeDepartment === 'yamunaji' && (
                       <>
                         <button onClick={() => { setActiveTab('yj_rfd'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_rfd' ? 'active' : ''}`}>
-                          RFD Fabric
+                          Fabric Process
                         </button>
                         <button onClick={() => { setActiveTab('yj_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_raw_materials' ? 'active' : ''}`}>
                           Raw Materials
@@ -3259,7 +3261,7 @@ export default function App() {
                       renderNavItem('yj_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
                     }
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_rfd')) &&
-                      renderNavItem('yj_rfd', 'RFD', Layers, null, 'RFD')
+                      renderNavItem('yj_rfd', 'Fabric Process', Layers, null, 'Fabric Process')
                     }
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_raw_materials')) &&
                       renderNavItem('yj_raw_materials', 'Raw Materials', PackageCheck, null, 'Raw Materials')
