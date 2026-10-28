@@ -409,6 +409,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     shortageMeters: '',
     receivedRollsCount: '',
     isChallanClosed: true, // true = 0 mtr left at mill; false = partial receipt
+    isChallanClosedUserOverridden: false,
     notes: ''
   });
 
@@ -1344,6 +1345,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         shortageMeters: '',
         receivedRollsCount: String(challan.totalTps || ''),
         isChallanClosed: true,
+        isChallanClosedUserOverridden: false,
         notes: `Received from Mill Challan ${challan.challanNo}`
       });
     } else {
@@ -1360,6 +1362,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         shortageMeters: '',
         receivedRollsCount: '',
         isChallanClosed: true,
+        isChallanClosedUserOverridden: false,
         notes: ''
       });
     }
@@ -1409,6 +1412,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       shortageMeters: '',
       receivedRollsCount: String(ch.totalTps || ''),
       isChallanClosed: true,
+      isChallanClosedUserOverridden: false,
       notes: `Received from Mill Challan ${ch.challanNo}`
     }));
   };
@@ -5676,14 +5680,13 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         } else if (!isNaN(inputShortageMtr)) {
           modalShortageMtr = inputShortageMtr;
           modalShortagePct = modalGraySent > 0 ? parseFloat(((inputShortageMtr / modalGraySent) * 100).toFixed(2)) : 0;
-        } else if (modalReceivedRfd > 0 && modalGraySent > modalReceivedRfd) {
+        } else if (modalReceivedRfd > 0 && modalGraySent > modalReceivedRfd && inwardRfdForm.isChallanClosed) {
           modalShortageMtr = parseFloat((modalGraySent - modalReceivedRfd).toFixed(1));
           modalShortagePct = parseFloat(((modalShortageMtr / modalGraySent) * 100).toFixed(2));
         }
 
-        const modalStillAtMill = inwardRfdForm.isChallanClosed
-          ? 0
-          : Math.max(0, parseFloat((modalGraySent - (modalReceivedRfd + modalShortageMtr)).toFixed(1)));
+        const calculatedStillAtMill = Math.max(0, parseFloat((modalGraySent - (modalReceivedRfd + modalShortageMtr)).toFixed(1)));
+        const modalStillAtMill = inwardRfdForm.isChallanClosed ? 0 : calculatedStillAtMill;
         const isHighShortage = modalShortagePct > 4.0;
 
         return (
@@ -5891,7 +5894,28 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         step="0.1"
                         className="input-field"
                         value={inwardRfdForm.graySentMeters}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, graySentMeters: e.target.value })}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const gSent = parseFloat(val) || 0;
+                          const rec = parseFloat(inwardRfdForm.receivedRfdMeters) || 0;
+                          let sMtr = parseFloat(inwardRfdForm.shortageMeters);
+                          const sPct = parseFloat(inwardRfdForm.shortagePercent);
+                          if (isNaN(sMtr) && !isNaN(sPct) && gSent > 0) {
+                            sMtr = parseFloat(((gSent * sPct) / 100).toFixed(1));
+                          } else if (isNaN(sMtr)) {
+                            sMtr = 0;
+                          }
+                          const rem = Math.max(0, parseFloat((gSent - (rec + sMtr)).toFixed(1)));
+                          let newClosed = inwardRfdForm.isChallanClosed;
+                          if (!inwardRfdForm.isChallanClosedUserOverridden && gSent > 0 && rec > 0) {
+                            newClosed = rem <= 0.5;
+                          }
+                          setInwardRfdForm(prev => ({
+                            ...prev,
+                            graySentMeters: val,
+                            isChallanClosed: newClosed
+                          }));
+                        }}
                         required
                         placeholder="e.g. 5000.0"
                         style={{ width: '100%', padding: '0.5rem 0.7rem', fontSize: '0.9rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: 6, background: '#ffffff' }}
@@ -5913,18 +5937,30 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         onChange={e => {
                           const val = e.target.value;
                           const recVal = parseFloat(val);
+                          const gSent = parseFloat(inwardRfdForm.graySentMeters) || 0;
+
                           let newShortagePct = inwardRfdForm.shortagePercent;
                           let newShortageMtr = inwardRfdForm.shortageMeters;
-                          if (!isNaN(recVal) && recVal > 0 && modalGraySent > 0) {
-                            const diff = Math.max(0, modalGraySent - recVal);
-                            newShortageMtr = String(parseFloat(diff.toFixed(1)));
-                            newShortagePct = String(parseFloat(((diff / modalGraySent) * 100).toFixed(2)));
+                          let sMtrNum = parseFloat(newShortageMtr);
+                          const sPctNum = parseFloat(newShortagePct);
+                          if (isNaN(sMtrNum) && !isNaN(sPctNum) && gSent > 0) {
+                            sMtrNum = parseFloat(((gSent * sPctNum) / 100).toFixed(1));
+                            newShortageMtr = String(sMtrNum);
+                          } else if (isNaN(sMtrNum)) {
+                            sMtrNum = 0;
+                          }
+
+                          const rem = Math.max(0, parseFloat((gSent - ((isNaN(recVal) ? 0 : recVal) + sMtrNum)).toFixed(1)));
+                          let newClosed = inwardRfdForm.isChallanClosed;
+                          if (!inwardRfdForm.isChallanClosedUserOverridden && gSent > 0 && !isNaN(recVal) && recVal > 0) {
+                            newClosed = rem <= 0.5;
                           }
                           setInwardRfdForm(prev => ({
                             ...prev,
                             receivedRfdMeters: val,
                             shortageMeters: newShortageMtr,
-                            shortagePercent: newShortagePct
+                            shortagePercent: newShortagePct,
+                            isChallanClosed: newClosed
                           }));
                         }}
                         required
@@ -5986,20 +6022,24 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           onChange={e => {
                             const pctVal = e.target.value;
                             const pct = parseFloat(pctVal);
+                            const gSent = parseFloat(inwardRfdForm.graySentMeters) || 0;
+                            const recVal = parseFloat(inwardRfdForm.receivedRfdMeters) || 0;
                             let newLossMtr = '';
-                            let newRecMtr = inwardRfdForm.receivedRfdMeters;
-                            if (!isNaN(pct) && modalGraySent > 0) {
-                              const loss = parseFloat(((modalGraySent * pct) / 100).toFixed(1));
-                              newLossMtr = String(loss);
-                              if (!newRecMtr || parseFloat(newRecMtr) <= 0) {
-                                newRecMtr = String(Math.max(0, parseFloat((modalGraySent - loss).toFixed(1))));
-                              }
+                            let sMtrNum = 0;
+                            if (!isNaN(pct) && gSent > 0) {
+                              sMtrNum = parseFloat(((gSent * pct) / 100).toFixed(1));
+                              newLossMtr = String(sMtrNum);
+                            }
+                            const rem = Math.max(0, parseFloat((gSent - (recVal + sMtrNum)).toFixed(1)));
+                            let newClosed = inwardRfdForm.isChallanClosed;
+                            if (!inwardRfdForm.isChallanClosedUserOverridden && gSent > 0 && recVal > 0) {
+                              newClosed = rem <= 0.5;
                             }
                             setInwardRfdForm(prev => ({
                               ...prev,
                               shortagePercent: pctVal,
                               shortageMeters: newLossMtr,
-                              receivedRfdMeters: newRecMtr
+                              isChallanClosed: newClosed
                             }));
                           }}
                           placeholder="e.g. 4.4"
@@ -6034,16 +6074,54 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                 {/* Mill Challan Delivery Status & Still at Mill Check */}
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.9rem', background: '#fafbfc' }}>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem' }}>
-                    Delivery Status & Mill Remaining Balance
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Delivery Status & Mill Remaining Balance
+                    </label>
+                    <div>
+                      {!inwardRfdForm.isChallanClosedUserOverridden ? (
+                        <span style={{ fontSize: '0.68rem', color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: 4, fontWeight: 700, border: '1px solid #bae6fd' }}>
+                          ⚡ Auto-calculated from meters
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                            Manual Override
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const autoClosed = calculatedStillAtMill <= 0.5;
+                              setInwardRfdForm(prev => ({
+                                ...prev,
+                                isChallanClosed: autoClosed,
+                                isChallanClosedUserOverridden: false
+                              }));
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#0284c7',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Reset to Auto
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: inwardRfdForm.isChallanClosed ? '#059669' : '#64748b' }}>
                       <input
                         type="radio"
                         name="challanDeliveryStatus"
                         checked={inwardRfdForm.isChallanClosed}
-                        onChange={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: true })}
+                        onChange={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: true, isChallanClosedUserOverridden: true })}
                       />
                       ✓ Complete Delivery (Challan Closed — 0 Mtr Left at Mill)
                     </label>
@@ -6053,9 +6131,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         type="radio"
                         name="challanDeliveryStatus"
                         checked={!inwardRfdForm.isChallanClosed}
-                        onChange={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: false })}
+                        onChange={() => setInwardRfdForm({ ...inwardRfdForm, isChallanClosed: false, isChallanClosedUserOverridden: true })}
                       />
-                      ⏳ Partial Delivery (Fabric Still Remaining at Processing Mill)
+                      ⏳ Partial Delivery (Fabric Still Remaining at Processing Mill{calculatedStillAtMill > 0 ? `: ${calculatedStillAtMill} Mtr` : ''})
                     </label>
                   </div>
                 </div>
