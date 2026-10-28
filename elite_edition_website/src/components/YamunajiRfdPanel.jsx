@@ -342,9 +342,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     paymentTerms: '30 Days',
     postToPurchase: true,
     tps: [
-      { srNo: 1, tpNo: '', tpMtr: '' }
+      { srNo: 1, tpNo: 'TP-1', tpMtr: '' }
     ]
   });
+
+  // Direct numeric row count input state for auto-adding TP rows instantly
+  const [tpCountInput, setTpCountInput] = useState('');
 
   // Standard ERP Multi-Filter States (DateRangePicker + UnifiedFilterPopover)
   const [datePreset, setDatePreset] = useState('all');
@@ -723,12 +726,44 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     });
   };
 
+  // Auto-generate rows when user inputs number of received TPs
+  const handleSetTpRowCount = (val) => {
+    setTpCountInput(val);
+    const count = parseInt(val, 10);
+    if (isNaN(count) || count < 1) {
+      return;
+    }
+    const safeCount = Math.min(Math.max(count, 1), 500);
+    setWeaverForm(prev => {
+      const current = [...prev.tps];
+      if (current.length === safeCount) return prev;
+      if (current.length < safeCount) {
+        const needed = safeCount - current.length;
+        const newRows = [];
+        for (let i = 0; i < needed; i++) {
+          const nextSr = current.length + i + 1;
+          newRows.push({
+            srNo: nextSr,
+            tpNo: `TP-${nextSr}`,
+            tpMtr: ''
+          });
+        }
+        return { ...prev, tps: [...current, ...newRows] };
+      } else {
+        const trimmed = current.slice(0, safeCount).map((item, idx) => ({ ...item, srNo: idx + 1 }));
+        return { ...prev, tps: trimmed };
+      }
+    });
+  };
+
   const handleAddTpRow = () => {
     setWeaverForm(prev => {
       const nextSr = prev.tps.length + 1;
+      const updated = [...prev.tps, { srNo: nextSr, tpNo: `TP-${nextSr}`, tpMtr: '' }];
+      setTpCountInput(String(updated.length));
       return {
         ...prev,
-        tps: [...prev.tps, { srNo: nextSr, tpNo: '', tpMtr: '' }]
+        tps: updated
       };
     });
   };
@@ -738,16 +773,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       const updated = [...prev.tps];
       for (let i = 0; i < count; i++) {
         const nextSr = updated.length + 1;
-        updated.push({ srNo: nextSr, tpNo: '', tpMtr: '' });
+        updated.push({ srNo: nextSr, tpNo: `TP-${nextSr}`, tpMtr: '' });
       }
+      setTpCountInput(String(updated.length));
       return { ...prev, tps: updated };
     });
   };
 
   const handleClearAllTps = () => {
+    setTpCountInput('1');
     setWeaverForm(prev => ({
       ...prev,
-      tps: [{ srNo: 1, tpNo: '', tpMtr: '' }]
+      tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: '' }]
     }));
   };
 
@@ -755,7 +792,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setWeaverForm(prev => {
       const filtered = prev.tps.filter((_, idx) => idx !== index);
       const reIndexed = filtered.map((item, idx) => ({ ...item, srNo: idx + 1 }));
-      return { ...prev, tps: reIndexed.length > 0 ? reIndexed : [{ srNo: 1, tpNo: '', tpMtr: '' }] };
+      const result = reIndexed.length > 0 ? reIndexed : [{ srNo: 1, tpNo: 'TP-1', tpMtr: '' }];
+      setTpCountInput(String(result.length));
+      return { ...prev, tps: result };
     });
   };
 
@@ -792,6 +831,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return {
       totalMtrs: roundMtrs,
       totalTps: filledTps,
+      filledTps,
       avgMtr: filledTps > 0 ? (totalMtrs / filledTps).toFixed(2) : 0,
       rate,
       gstPct,
@@ -1052,9 +1092,10 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       paymentTerms: '30 Days',
       postToPurchase: true,
       tps: [
-        { srNo: 1, tpNo: '', tpMtr: '' }
+        { srNo: 1, tpNo: 'TP-1', tpMtr: '' }
       ]
     });
+    setTpCountInput('');
 
     let successMsg = `Gray Fabric Lot ${lotNumber} (${validTps.length} TPs, ${roundMtrs.toFixed(1)} Mtr) successfully inwarded!`;
     if (isPending) {
@@ -4978,21 +5019,21 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 740,
-              maxHeight: '92vh',
+              maxWidth: 1240,
+              maxHeight: '94vh',
               overflowY: 'auto',
               background: '#ffffff',
-              borderRadius: 14,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              padding: '1.5rem',
+              borderRadius: 16,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '1.25rem 1.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem'
+              gap: '0.85rem'
             }}
           >
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <div style={{ width: 38, height: 38, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Boxes size={22} color="#0284c7" />
                 </div>
@@ -5001,9 +5042,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
                       + Inward Gray Fabric from Weaver
                     </h3>
+                    <span style={{ fontSize: '0.7rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
+                      Warehouse Stock Inward
+                    </span>
                   </div>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Select weaver & quality from masters. Enter individual TP Numbers & TP Meters. Press Enter to add next row.
+                    Enter weaver & quality on the left. Put number of received TPs on the right to auto-generate roll rows instantly.
                   </span>
                 </div>
               </div>
@@ -5015,407 +5059,37 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </button>
             </div>
 
-            {/* Inward Form */}
+            {/* Inward Form - 2 Column Split Layout */}
             <form onSubmit={handleSaveWeaverInward} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {/* Header Fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Lot Number (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={`GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`}
-                    value={weaverForm.lotNumber}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, lotNumber: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Inward Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={weaverForm.inwardDate}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, inwardDate: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              {/* Weaver Party & Challan */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
-                      Weaver / Loom Owner Name *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => { setSettingsActiveTab('weavers'); setShowSettingsModal(true); }}
-                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ⚙️ Manage Weavers
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <input
-                      type="text"
-                      required
-                      list="weavers-master-datalist"
-                      placeholder="Select or enter weaver name..."
-                      value={weaverForm.weaverParty}
-                      onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverParty: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                    />
-                    <datalist id="weavers-master-datalist">
-                      {(configs.weavers || []).map((w, idx) => {
-                        const party = normalizeParty(w);
-                        return (
-                          <option
-                            key={idx}
-                            value={party.name}
-                            label={party.gst ? `GST: ${party.gst} | ${party.address || party.city}` : ''}
-                          />
-                        );
-                      })}
-                    </datalist>
-
-                    {selectedWeaverDetails && (
-                      <div style={{ fontSize: '0.72rem', background: '#f8fafc', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', color: '#475569', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {selectedWeaverDetails.gst && (
-                          <span style={{ fontWeight: 800, color: '#16a34a' }}>
-                            GSTIN: {selectedWeaverDetails.gst}
-                          </span>
-                        )}
-                        {selectedWeaverDetails.address && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <MapPin size={11} color="#0284c7" /> {selectedWeaverDetails.address}, {selectedWeaverDetails.city}
-                          </span>
-                        )}
-                        {selectedWeaverDetails.phone && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <Phone size={11} color="#16a34a" /> {selectedWeaverDetails.phone}
-                          </span>
-                        )}
-                        {selectedWeaverDetails.broker && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <Briefcase size={11} color="#64748b" /> Agent: {selectedWeaverDetails.broker}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Weaver Gray Challan No
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. CH-8901"
-                    value={weaverForm.weaverChallanNo}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverChallanNo: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              {/* Fabric Quality & Rate per Meter from Master Settings */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
-                      Fabric Quality *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => { setSettingsActiveTab('qualities'); setShowSettingsModal(true); }}
-                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ⚙️ Manage Qualities
-                    </button>
-                  </div>
-                  <select
-                    value={weaverForm.fabricQuality}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                    required
-                  >
-                    <option value="">-- Select Fabric Quality * --</option>
-                    {(configs.qualities || []).map(q => (
-                      <option key={q} value={q}>{q}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Rate / Mtr (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter rate per meter..."
-                    value={weaverForm.ratePerMeter}
-                    onChange={(e) => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              {/* 📊 TP ENTRY TABLE (SR NO AUTO, TP NO, TP MTR) */}
-              <div style={{ marginTop: '0.5rem', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ background: '#f8fafc', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Hash size={15} color="#0284c7" />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                      TP (Piece) Breakdown Entries
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleAddMultipleTpRows(10)}
-                      className="btn-secondary"
-                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
-                    >
-                      + Add 10 Rows
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddMultipleTpRows(5)}
-                      className="btn-secondary"
-                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
-                    >
-                      + Add 5 Rows
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAddTpRow}
-                      className="btn-primary"
-                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px', background: '#0ea5e9', border: 'none' }}
-                    >
-                      + Add Row
-                    </button>
-                    {weaverForm.tps.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={handleClearAllTps}
-                        style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                        title="Clear all rows and reset to 1 empty row"
-                      >
-                        Reset Rows
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* TP Rows Scrollable Area */}
-                <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '6px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '6px 8px', width: 70 }}>Sr. No</th>
-                        <th style={{ padding: '6px 8px' }}>TP No.</th>
-                        <th style={{ padding: '6px 8px' }}>TP Meter (Mtr) *</th>
-                        <th style={{ padding: '6px 8px', width: 40, textAlign: 'center' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weaverForm.tps.map((tp, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #f8fafc' }}>
-                          <td style={{ padding: '5px 8px', fontWeight: 800, color: '#64748b' }}>
-                            {tp.srNo}
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              type="text"
-                              value={tp.tpNo}
-                              onChange={(e) => handleTpChange(idx, 'tpNo', e.target.value)}
-                              placeholder={`TP-${idx + 1}`}
-                              className="input-field"
-                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              id={`tp-mtr-input-${idx}`}
-                              type="text"
-                              inputMode="decimal"
-                              value={tp.tpMtr}
-                              onChange={(e) => handleTpChange(idx, 'tpMtr', e.target.value)}
-                              onKeyDown={(e) => handleTpKeyDown(e, idx)}
-                              placeholder="e.g. 102.5"
-                              className="input-field"
-                              style={{ height: '30px', fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', width: '100%' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px', textAlign: 'center' }}>
-                            {weaverForm.tps.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveTpRow(idx)}
-                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* TP Summary Footer */}
-                <div style={{ background: '#f1f5f9', padding: '8px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: '0.76rem', color: '#475569' }}>
-                    Total TPs Entered: <strong style={{ color: '#0284c7' }}>{weaverFormSummary.totalTps}</strong>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
-                    Grand Total: <span style={{ color: '#0284c7', fontSize: '1rem' }}>{weaverFormSummary.totalMtrs}</span> Mtr
-                  </div>
-                </div>
-              </div>
-
-              {/* 🧾 INVOICE & PURCHASE REGISTER INTEGRATION */}
-              <div style={{
-                border: weaverForm.invoiceReceivedOption === 'pending' ? '1.5px solid #f59e0b' : '1.5px solid #0284c7',
-                borderRadius: 10,
-                background: weaverForm.invoiceReceivedOption === 'pending' ? '#fffdf7' : '#f8fafc',
-                padding: '0.85rem 1rem',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <FileText size={16} color={weaverForm.invoiceReceivedOption === 'pending' ? '#d97706' : '#0284c7'} />
-                    <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
-                      Weaver Invoice Status (બિલની વિગત)
-                    </span>
-                    <span style={{
-                      fontSize: '0.68rem',
-                      background: weaverForm.invoiceReceivedOption === 'pending' ? '#fef3c7' : '#e0f2fe',
-                      color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#0369a1',
-                      padding: '2px 8px',
-                      borderRadius: 6,
-                      fontWeight: 800
-                    }}>
-                      {weaverForm.invoiceReceivedOption === 'pending' ? '⏳ Bill Pending (બિલ બાકી)' : '✓ Bill Received (બિલ મળેલ)'}
-                    </span>
-                  </div>
-
-                  {weaverForm.invoiceReceivedOption === 'received' && (
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 800, color: weaverForm.postToPurchase ? '#0369a1' : '#64748b', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={weaverForm.postToPurchase}
-                        onChange={e => setWeaverForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
-                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
-                      />
-                      Auto-Post to Purchase Register (ખરેદી ખાતું)
-                    </label>
-                  )}
-                </div>
-
-                {/* Option Selector: Received with Challan vs Pending / Arrives Later */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
-                  <div
-                    onClick={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'received' }))}
-                    style={{
-                      border: weaverForm.invoiceReceivedOption === 'received' ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                      background: weaverForm.invoiceReceivedOption === 'received' ? '#eff6ff' : '#ffffff',
-                      borderRadius: 8,
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="weaverInvoiceOption"
-                      checked={weaverForm.invoiceReceivedOption === 'received'}
-                      onChange={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'received' }))}
-                      style={{ cursor: 'pointer', accentColor: '#0284c7' }}
-                    />
-                    <div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: weaverForm.invoiceReceivedOption === 'received' ? '#0369a1' : '#334155' }}>
-                        📄 Invoice Received with Challan
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        ચલણ સાથે બિલ આવેલ છે — Enter invoice now
-                      </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+                  gap: '1.25rem',
+                  alignItems: 'start'
+                }}
+              >
+                {/* ⬅️ LEFT COLUMN: All Details & Invoice Integration */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {/* Card 1: Lot & Weaver Details */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.2rem' }}>
+                      <Boxes size={15} color="#0284c7" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                        Lot Identification & Weaver
+                      </span>
                     </div>
-                  </div>
 
-                  <div
-                    onClick={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'pending' }))}
-                    style={{
-                      border: weaverForm.invoiceReceivedOption === 'pending' ? '2px solid #f59e0b' : '1px solid #cbd5e1',
-                      background: weaverForm.invoiceReceivedOption === 'pending' ? '#fffbeb' : '#ffffff',
-                      borderRadius: 8,
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="weaverInvoiceOption"
-                      checked={weaverForm.invoiceReceivedOption === 'pending'}
-                      onChange={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'pending' }))}
-                      style={{ cursor: 'pointer', accentColor: '#f59e0b' }}
-                    />
-                    <div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#334155' }}>
-                        ⏳ Invoice Pending / Awaited
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        બિલ બાકી છે - પાછળથી આવશે (Will attach later)
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {weaverForm.invoiceReceivedOption === 'pending' ? (
-                  <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <Clock size={18} color="#b45309" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <div style={{ fontSize: '0.76rem', color: '#92400e', lineHeight: 1.5 }}>
-                      <strong>Invoice Pending (બિલ બાકી છે):</strong> Gray fabric will be added to warehouse stock immediately so delivery challans to mills for RFD processing can proceed without delay.
-                      <div style={{ marginTop: 4, fontSize: '0.72rem', color: '#b45309' }}>
-                        👉 When the weaver later sends the bill, click <strong>"Attach Bill"</strong> on this lot to enter the bill number, rate, and post directly to the Purchase Register.
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          Invoice / Bill No
+                          Lot Number (Optional)
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. INV-2026/89"
-                          value={weaverForm.invoiceNo}
-                          onChange={e => setWeaverForm(prev => ({ ...prev, invoiceNo: e.target.value }))}
+                          placeholder={`GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`}
+                          value={weaverForm.lotNumber}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, lotNumber: e.target.value }))}
                           className="input-field"
                           style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
                         />
@@ -5423,135 +5097,619 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          Invoice Date
+                          Inward Date *
                         </label>
                         <input
                           type="date"
-                          value={weaverForm.invoiceDate}
-                          onChange={e => setWeaverForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
+                          required
+                          value={weaverForm.inwardDate}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, inwardDate: e.target.value }))}
                           className="input-field"
                           style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
                         />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.65rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                            Weaver / Loom Owner Name *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => { setSettingsActiveTab('weavers'); setShowSettingsModal(true); }}
+                            style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            ⚙️ Manage
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          list="weavers-master-datalist"
+                          placeholder="Select or enter weaver name..."
+                          value={weaverForm.weaverParty}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverParty: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                        <datalist id="weavers-master-datalist">
+                          {(configs.weavers || []).map((w, idx) => {
+                            const party = normalizeParty(w);
+                            return (
+                              <option
+                                key={idx}
+                                value={party.name}
+                                label={party.gst ? `GST: ${party.gst} | ${party.address || party.city}` : ''}
+                              />
+                            );
+                          })}
+                        </datalist>
+
+                        {selectedWeaverDetails && (
+                          <div style={{ marginTop: 4, fontSize: '0.7rem', background: '#ffffff', padding: '3px 6px', borderRadius: 5, border: '1px solid #cbd5e1', color: '#475569', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {selectedWeaverDetails.gst && (
+                              <span style={{ fontWeight: 800, color: '#16a34a' }}>GSTIN: {selectedWeaverDetails.gst}</span>
+                            )}
+                            {selectedWeaverDetails.city && (
+                              <span style={{ color: '#0284c7' }}>📍 {selectedWeaverDetails.city}</span>
+                            )}
+                            {selectedWeaverDetails.phone && (
+                              <span>📞 {selectedWeaverDetails.phone}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          HSN Code
+                          Weaver Gray Challan No
                         </label>
                         <input
                           type="text"
-                          list="fabric-hsn-datalist"
-                          placeholder="5208"
-                          value={weaverForm.hsnCode}
-                          onChange={e => setWeaverForm(prev => ({ ...prev, hsnCode: e.target.value }))}
+                          placeholder="e.g. CH-8901"
+                          value={weaverForm.weaverChallanNo}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverChallanNo: e.target.value }))}
                           className="input-field"
                           style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
                         />
-                        <datalist id="fabric-hsn-datalist">
-                          <option value="5208" label="Woven cotton gray fabric" />
-                          <option value="5407" label="Woven synthetic / polyester fabric" />
-                          <option value="998821" label="Textile processing job work" />
-                        </datalist>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.65rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                            Fabric Quality *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => { setSettingsActiveTab('qualities'); setShowSettingsModal(true); }}
+                            style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            ⚙️ Manage
+                          </button>
+                        </div>
+                        <select
+                          value={weaverForm.fabricQuality}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                          required
+                        >
+                          <option value="">-- Select Fabric Quality * --</option>
+                          {(configs.qualities || []).map(q => (
+                            <option key={q} value={q}>{q}</option>
+                          ))}
+                        </select>
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', marginBottom: 2 }}>
-                          Rate / Meter (₹) *
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Rate / Mtr (₹)
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           placeholder="e.g. 42.50"
                           value={weaverForm.ratePerMeter}
-                          onChange={e => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
                           className="input-field"
-                          style={{ height: '32px', fontSize: '0.85rem', fontWeight: 800, width: '100%', borderColor: '#0284c7' }}
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
                         />
                       </div>
+                    </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          GST Rate %
+                          Rack / Warehouse Location (Optional)
                         </label>
-                        <select
-                          value={weaverForm.gstRate}
-                          onChange={e => setWeaverForm(prev => ({ ...prev, gstRate: e.target.value }))}
+                        <input
+                          type="text"
+                          placeholder="e.g. Rack A-04"
+                          value={weaverForm.rackLocation}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, rackLocation: e.target.value }))}
                           className="input-field"
                           style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
-                        >
-                          <option value="5">5% (Standard Textile Fabric)</option>
-                          <option value="12">12%</option>
-                          <option value="18">18%</option>
-                          <option value="0">0% (Nil / Exempt)</option>
-                        </select>
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Remarks / Notes
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Optional remarks..."
+                          value={weaverForm.remarks}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, remarks: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Weaver Commercial Invoice Details */}
+                  <div style={{
+                    border: weaverForm.invoiceReceivedOption === 'pending' ? '1.5px solid #f59e0b' : '1.5px solid #0284c7',
+                    borderRadius: 10,
+                    background: weaverForm.invoiceReceivedOption === 'pending' ? '#fffdf7' : '#f8fafc',
+                    padding: '0.85rem 1rem',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.65rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <FileText size={16} color={weaverForm.invoiceReceivedOption === 'pending' ? '#d97706' : '#0284c7'} />
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                          Weaver Commercial Invoice Status
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          background: weaverForm.invoiceReceivedOption === 'pending' ? '#fef3c7' : '#e0f2fe',
+                          color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#0369a1',
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          fontWeight: 800
+                        }}>
+                          {weaverForm.invoiceReceivedOption === 'pending' ? '⏳ Bill Pending' : '✓ Bill Received'}
+                        </span>
                       </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          Payment Terms
+                      {weaverForm.invoiceReceivedOption === 'received' && (
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: 800, color: weaverForm.postToPurchase ? '#0369a1' : '#64748b', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={weaverForm.postToPurchase}
+                            onChange={e => setWeaverForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
+                            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#0284c7' }}
+                          />
+                          Auto-Post Purchase
                         </label>
-                        <select
-                          value={weaverForm.paymentTerms}
-                          onChange={e => setWeaverForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                          className="input-field"
-                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
-                        >
-                          <option value="30 Days">30 Days Credit</option>
-                          <option value="15 Days">15 Days Credit</option>
-                          <option value="45 Days">45 Days Credit</option>
-                          <option value="60 Days">60 Days Credit</option>
-                          <option value="Immediate Cash">Immediate / Cash</option>
-                        </select>
+                      )}
+                    </div>
+
+                    {/* Radio Options: Received with Challan vs Pending / Arrives Later */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div
+                        onClick={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'received' }))}
+                        style={{
+                          border: weaverForm.invoiceReceivedOption === 'received' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                          background: weaverForm.invoiceReceivedOption === 'received' ? '#eff6ff' : '#ffffff',
+                          borderRadius: 8,
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="weaverInvoiceOption"
+                          checked={weaverForm.invoiceReceivedOption === 'received'}
+                          onChange={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'received' }))}
+                          style={{ cursor: 'pointer', accentColor: '#0284c7' }}
+                        />
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: weaverForm.invoiceReceivedOption === 'received' ? '#0369a1' : '#334155' }}>
+                            📄 Bill Received
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#64748b' }}>
+                            ચલણ સાથે બિલ મળેલ છે
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        onClick={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'pending' }))}
+                        style={{
+                          border: weaverForm.invoiceReceivedOption === 'pending' ? '2px solid #f59e0b' : '1px solid #cbd5e1',
+                          background: weaverForm.invoiceReceivedOption === 'pending' ? '#fffbeb' : '#ffffff',
+                          borderRadius: 8,
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="weaverInvoiceOption"
+                          checked={weaverForm.invoiceReceivedOption === 'pending'}
+                          onChange={() => setWeaverForm(prev => ({ ...prev, invoiceReceivedOption: 'pending' }))}
+                          style={{ cursor: 'pointer', accentColor: '#f59e0b' }}
+                        />
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#334155' }}>
+                            ⏳ Bill Pending
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#64748b' }}>
+                            બિલ બાકી છે - પાછળથી આવશે
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Live Financial Calculations Ribbon */}
-                    <div style={{ marginTop: '0.65rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.76rem' }}>
-                        <span style={{ color: '#475569' }}>
-                          Qty: <strong style={{ color: '#0f172a' }}>{weaverFormSummary.totalMtrs} Mtr</strong>
-                        </span>
-                        <span style={{ color: '#475569' }}>
-                          Taxable: <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                        </span>
-                        <span style={{ color: '#475569' }}>
-                          GST ({weaverFormSummary.gstPct}%): <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                        </span>
+                    {weaverForm.invoiceReceivedOption === 'pending' ? (
+                      <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <Clock size={16} color="#b45309" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ fontSize: '0.74rem', color: '#92400e', lineHeight: 1.45 }}>
+                          <strong>Invoice Pending (બિલ બાકી):</strong> Fabric is inwarded to stock now so mill dispatch won't be delayed. You can attach the bill later with 1-click.
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.55rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                              Invoice No
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. INV-2026/89"
+                              value={weaverForm.invoiceNo}
+                              onChange={e => setWeaverForm(prev => ({ ...prev, invoiceNo: e.target.value }))}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            />
+                          </div>
 
-                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a' }}>
-                        Total Invoice Value: <span style={{ fontSize: '1.05rem', color: '#059669' }}>₹{weaverFormSummary.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                              Invoice Date
+                            </label>
+                            <input
+                              type="date"
+                              value={weaverForm.invoiceDate}
+                              onChange={e => setWeaverForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                              HSN Code
+                            </label>
+                            <input
+                              type="text"
+                              list="fabric-hsn-datalist"
+                              placeholder="5208"
+                              value={weaverForm.hsnCode}
+                              onChange={e => setWeaverForm(prev => ({ ...prev, hsnCode: e.target.value }))}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                              GST Rate %
+                            </label>
+                            <select
+                              value={weaverForm.gstRate}
+                              onChange={e => setWeaverForm(prev => ({ ...prev, gstRate: e.target.value }))}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            >
+                              <option value="5">5% (Textile Fabric)</option>
+                              <option value="12">12%</option>
+                              <option value="18">18%</option>
+                              <option value="0">0% (Nil)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                              Payment Terms
+                            </label>
+                            <select
+                              value={weaverForm.paymentTerms}
+                              onChange={e => setWeaverForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            >
+                              <option value="30 Days">30 Days</option>
+                              <option value="15 Days">15 Days</option>
+                              <option value="45 Days">45 Days</option>
+                              <option value="60 Days">60 Days</option>
+                              <option value="Immediate Cash">Cash</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Live Financial Calculations Ribbon */}
+                        <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.74rem' }}>
+                            <span style={{ color: '#475569' }}>
+                              Taxable: <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                            </span>
+                            <span style={{ color: '#475569' }}>
+                              GST ({weaverFormSummary.gstPct}%): <strong style={{ color: '#0f172a' }}>₹{weaverFormSummary.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#16a34a' }}>
+                            Total Bill: <span style={{ fontSize: '0.96rem', color: '#059669' }}>₹{weaverFormSummary.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* ➡️ RIGHT COLUMN: TP Breakdown Entries Table */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 12,
+                  padding: '0.85rem 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}>
+                  {/* Header with Title and the User's requested Auto-Generate Input */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.55rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Hash size={16} color="#0284c7" />
+                      <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
+                        TP (Piece) Breakdown Entries
+                      </span>
+                      <span style={{ fontSize: '0.7rem', background: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: 4, fontWeight: 800 }}>
+                        {weaverForm.tps.length} Rows
+                      </span>
                     </div>
-                  </>
-                )}
+
+                    {/* ⚡ DIRECT INPUT FIELD: Type number of received TPs to auto-add rows! */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#eff6ff', border: '1.5px solid #38bdf8', padding: '3px 8px', borderRadius: 8 }}>
+                      <label htmlFor="received-tp-auto-count" style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0369a1', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        📦 Received TPs / Rolls:
+                      </label>
+                      <input
+                        id="received-tp-auto-count"
+                        type="number"
+                        min="1"
+                        max="500"
+                        placeholder="e.g. 25"
+                        value={tpCountInput !== '' ? tpCountInput : weaverForm.tps.length}
+                        onChange={(e) => handleSetTpRowCount(e.target.value)}
+                        style={{
+                          width: '68px',
+                          height: '28px',
+                          fontSize: '0.85rem',
+                          fontWeight: 900,
+                          color: '#0284c7',
+                          textAlign: 'center',
+                          background: '#ffffff',
+                          border: '1.5px solid #0284c7',
+                          borderRadius: 6,
+                          outline: 'none'
+                        }}
+                        title="Put the number of received TPs here (e.g. 25) to auto-add that exact number of rows immediately!"
+                      />
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0369a1' }}>TPs</span>
+                    </div>
+                  </div>
+
+                  {/* Quick Presets / Actions toolbar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#64748b' }}>
+                    <span>Type meters and press <kbd style={{ background: '#e2e8f0', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>Enter ↵</kbd> to jump to next TP.</span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddMultipleTpRows(5)}
+                        className="btn-secondary"
+                        style={{ padding: '2px 7px', fontSize: '0.7rem', height: '24px' }}
+                        title="Add 5 more rows"
+                      >
+                        +5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddMultipleTpRows(10)}
+                        className="btn-secondary"
+                        style={{ padding: '2px 7px', fontSize: '0.7rem', height: '24px' }}
+                        title="Add 10 more rows"
+                      >
+                        +10
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddTpRow}
+                        className="btn-secondary"
+                        style={{ padding: '2px 7px', fontSize: '0.7rem', height: '24px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0' }}
+                        title="Add 1 row"
+                      >
+                        +1 Row
+                      </button>
+                      {weaverForm.tps.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={handleClearAllTps}
+                          style={{ padding: '2px 7px', fontSize: '0.7rem', height: '24px', background: 'none', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}
+                          title="Reset rows to 1"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scrollable Table of TPs */}
+                  <div style={{
+                    maxHeight: '430px',
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    background: '#ffffff'
+                  }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 3, background: '#f8fafc' }}>
+                        <tr style={{ textAlign: 'left', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1.5px solid #cbd5e1' }}>
+                          <th style={{ padding: '7px 8px', width: 60, textAlign: 'center' }}>Sr</th>
+                          <th style={{ padding: '7px 8px', width: 140 }}>TP No.</th>
+                          <th style={{ padding: '7px 8px' }}>TP Meter (Mtr) *</th>
+                          <th style={{ padding: '7px 8px', width: 36, textAlign: 'center' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weaverForm.tps.map((tp, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                            <td style={{ padding: '5px 8px', fontWeight: 800, color: '#64748b', textAlign: 'center' }}>
+                              {tp.srNo}
+                            </td>
+                            <td style={{ padding: '5px 8px' }}>
+                              <input
+                                type="text"
+                                value={tp.tpNo}
+                                onChange={(e) => handleTpChange(idx, 'tpNo', e.target.value)}
+                                placeholder={`TP-${idx + 1}`}
+                                className="input-field"
+                                style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                              />
+                            </td>
+                            <td style={{ padding: '5px 8px' }}>
+                              <input
+                                id={`tp-mtr-input-${idx}`}
+                                type="text"
+                                inputMode="decimal"
+                                value={tp.tpMtr}
+                                onChange={(e) => handleTpChange(idx, 'tpMtr', e.target.value)}
+                                onKeyDown={(e) => handleTpKeyDown(e, idx)}
+                                placeholder="e.g. 102.5"
+                                className="input-field"
+                                style={{
+                                  height: '30px',
+                                  fontSize: '0.84rem',
+                                  fontWeight: 800,
+                                  color: '#0f172a',
+                                  width: '100%',
+                                  background: tp.tpMtr ? '#f0fdf4' : '#ffffff',
+                                  borderColor: tp.tpMtr ? '#86efac' : '#cbd5e1'
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                              {weaverForm.tps.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveTpRow(idx)}
+                                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}
+                                  title="Delete this row"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* TP Live Summary Bar */}
+                  <div style={{
+                    background: '#f1f5f9',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.78rem'
+                  }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                      <span>
+                        Filled Pieces: <strong style={{ color: '#0284c7' }}>{weaverFormSummary.filledTps || weaverFormSummary.totalTps}</strong> / {weaverForm.tps.length}
+                      </span>
+                      {weaverFormSummary.filledTps > 0 && (
+                        <span style={{ color: '#64748b' }}>
+                          Avg: <strong>{(weaverFormSummary.totalMtrs / weaverFormSummary.filledTps).toFixed(1)} Mtr/TP</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
+                      Total Gray: <span style={{ color: '#0284c7', fontSize: '1.08rem' }}>{weaverFormSummary.totalMtrs}</span> Mtr
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowWeaverInwardModal(false)}
-                  className="btn-secondary"
-                  style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  style={{
-                    padding: '0.45rem 1.25rem',
-                    fontSize: '0.82rem',
-                    background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Check size={16} /> Save Gray Fabric Inward
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>Quality: <strong style={{ color: '#0f172a' }}>{weaverForm.fabricQuality || 'Not Selected'}</strong></span>
+                  <span>•</span>
+                  <span>Total: <strong style={{ color: '#0284c7' }}>{weaverFormSummary.totalMtrs} Mtr</strong> ({weaverFormSummary.filledTps || 0} TPs)</span>
+                  <span>•</span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '2px 7px',
+                    borderRadius: 4,
+                    fontWeight: 800,
+                    background: weaverForm.invoiceReceivedOption === 'pending' ? '#fef3c7' : '#dcfce7',
+                    color: weaverForm.invoiceReceivedOption === 'pending' ? '#b45309' : '#15803d'
+                  }}>
+                    {weaverForm.invoiceReceivedOption === 'pending' ? '⏳ Bill Pending' : '✓ Bill Received'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.6rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowWeaverInwardModal(false)}
+                    className="btn-secondary"
+                    style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{
+                      padding: '0.45rem 1.35rem',
+                      fontSize: '0.84rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Check size={16} /> Save Gray Fabric Inward
+                  </button>
+                </div>
               </div>
             </form>
           </div>
