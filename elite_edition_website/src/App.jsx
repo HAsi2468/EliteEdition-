@@ -97,7 +97,8 @@ import {
   CheckSquare,
   Lock,
   Unlock,
-  Scale
+  Scale,
+  Plus
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -3619,7 +3620,7 @@ export default function App() {
           ) : activeTab === 'reports' ? (
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
           ) : activeTab === 'document_design_studio' ? (
-            <DocumentDesignStudio companyEntity={companyEntity || 'Elite Edition'} />
+            <DocumentDesignStudio companyEntity={activeDepartment || 'Elite Edition'} />
           ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' || activeTab === 'crm_profiles' || activeTab === 'crm_leads' ? (
             <CrmPanel currentUser={currentUser} initialSubTab={activeTab === 'crm_profiles' ? 'profiles' : 'leads'} />
           ) : activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' || activeTab === 'business_connection' ? (
