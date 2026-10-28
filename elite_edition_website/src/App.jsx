@@ -125,6 +125,7 @@ import { EnterpriseHUDThemeController } from './components/common/EnterpriseHUDT
 import { ChangelogDrawer } from './components/common/ChangelogDrawer';
 import { QuickTipPill } from './components/common/QuickTipPill';
 import { GuidedTourController } from './components/common/GuidedTourController';
+import GlobalQuickActions from './components/common/GlobalQuickActions';
 
 
 
@@ -466,6 +467,7 @@ export default function App() {
   const [showCompanyQuickSheet, setShowCompanyQuickSheet] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
   // Global Ctrl/Cmd + K shortcut for Global Search
   useEffect(() => {
@@ -2300,6 +2302,27 @@ export default function App() {
               <OfflineSyncBadge />
               <button
                 type="button"
+                onClick={() => setShowQuickActions((prev) => !prev)}
+                className="btn-icon"
+                title="Quick Actions"
+                style={{
+                  minWidth: '36px',
+                  minHeight: '36px',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: '1px solid #bfdbfe',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={18} strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowGlobalSearch(true)}
                 className="btn-icon"
                 title="Global Search"
@@ -2495,6 +2518,29 @@ export default function App() {
           ) : (
             <>
               <OfflineSyncBadge />
+              <button
+                type="button"
+                onClick={() => setShowQuickActions((prev) => !prev)}
+                className="btn-primary"
+                title="Quick Actions (+)"
+                style={{
+                  minHeight: '30px',
+                  height: '30px',
+                  padding: '3px 9px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  boxShadow: '0 2px 5px rgba(37, 99, 235, 0.25)'
+                }}
+              >
+                <Plus size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                <span>Action</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowGlobalSearch(true)}
@@ -4271,6 +4317,20 @@ export default function App() {
 
       {/* Guided Feature Tour Controller */}
       <GuidedTourController />
+
+      {/* Global Quick Actions Speed-Dial Menu & Shortcuts */}
+      <GlobalQuickActions
+        isOpen={showQuickActions}
+        onClose={() => setShowQuickActions(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setMobileMenuOpen(false);
+        }}
+        onOpenBulkInward={() => setIsBulkInwardOpen(true)}
+        onOpenGlobalSearch={() => setShowGlobalSearch(true)}
+        onOpenNotifications={() => setShowNotificationDrawer(true)}
+        activeDepartment={activeDepartment}
+      />
 
       {/* Enterprise Floating Action Dock: UI Scale, Communication, Tasks & AI Reconcile */}
       <EnterpriseHUDThemeController 

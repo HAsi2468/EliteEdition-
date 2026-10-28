@@ -2490,3 +2490,54 @@ html, body {
   content-visibility: auto;
   contain-intrinsic-size: 340px 380px;
 }
+
+/* ═══════════════════════════════════════════════════
+   ENTERPRISE UI REFINEMENTS & MICRO-INTERACTIONS
+   Crisp Light Theme | High-Contrast | Smooth Elevation
+   ═══════════════════════════════════════════════════ */
+
+/* Universal Slim Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* High-Contrast Focused Inputs (Tactile Keyboard Progression) */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: none !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18) !important;
+}
+
+/* Enterprise Data Table Row Micro-Transitions */
+table tbody tr {
+  transition: background-color 0.12s ease;
+}
+table tbody tr:hover td {
+  background-color: #f8fafc;
+}
+
+/* Frosted Modal Backdrop Blur */
+.modal-backdrop,
+.drawer-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
