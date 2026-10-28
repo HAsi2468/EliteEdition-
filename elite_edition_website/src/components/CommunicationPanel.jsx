@@ -578,6 +578,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [deleteTargetMsg, setDeleteTargetMsg] = useState(null);
   const deleteTargetMsgId = deleteTargetMsg?.id || null;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [mediaPickerTab, setMediaPickerTab] = useState('emoji'); // 'emoji' | 'sticker' | 'gif'
   const [msgMenuUpward, setMsgMenuUpward] = useState({});
 
   useEffect(() => {
@@ -4344,6 +4345,119 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  const handleSendStickerOrGif = async (item, type = 'sticker') => {
+    if (!activeGroup?._id) {
+      alert('Please select a chat room first.');
+      return;
+    }
+    const senderId = currentUser?.id || currentUser?._id;
+    if (!senderId) {
+      alert('User session not loaded. Please log in again.');
+      return;
+    }
+
+    const url = typeof item === 'string' ? item : (item.url || item.previewUrl);
+    if (!url) return;
+    const title = typeof item === 'object' ? (item.title || item.name || type) : type;
+    const isSticker = type === 'sticker';
+    const label = isSticker ? `[Sticker: ${title}]` : `[GIF: ${title}]`;
+    const fileExt = isSticker ? 'svg' : 'gif';
+    const fileName = `${title.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.${fileExt}`;
+
+    const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    const attachmentPayload = {
+      fileUrl: url,
+      fileType: isSticker ? 'sticker' : 'gif',
+      fileName: fileName,
+      fileSize: 0
+    };
+
+    const messagePayload = {
+      roomId: activeGroup._id,
+      senderId,
+      clientMsgId,
+      content: label,
+      priority: 'normal',
+      replyTo: replyToMessage ? replyToMessage._id : undefined,
+      attachment: attachmentPayload,
+      type: isSticker ? 'sticker' : 'gif'
+    };
+
+    const tempId = 'temp_' + Date.now();
+    const tempMsg = {
+      _id: tempId,
+      clientMsgId,
+      roomId: activeGroup._id,
+      senderId: typeof currentUser === 'object' ? currentUser : { _id: senderId, name: 'You' },
+      content: label,
+      createdAt: new Date().toISOString(),
+      type: isSticker ? 'sticker' : 'gif',
+      msgType: 'human',
+      priority: 'normal',
+      replyTo: replyToMessage || undefined,
+      attachment: attachmentPayload,
+      readBy: [senderId],
+      isOptimistic: true,
+      sendFailed: false
+    };
+
+    setMessages((prev) => [...prev, tempMsg]);
+    setGroups((prevGroups) => {
+      return prevGroups.map((g) => {
+        if (String(g._id) === String(activeGroup._id)) {
+          return {
+            ...g,
+            lastMessage: tempMsg,
+            updatedAt: tempMsg.createdAt || new Date().toISOString()
+          };
+        }
+        return g;
+      });
+    });
+
+    isNearBottomRef.current = true;
+    setShowScrollBottom(false);
+    setUnreadBelowCount(0);
+    requestAnimationFrame(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+    });
+
+    setShowEmojiPicker(false);
+    setReplyToMessage(null);
+
+    try {
+      const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      if (res && res.success && res.data) {
+        const realMsg = { ...res.data, isOptimistic: false };
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(realMsg._id));
+          return mergeMessages(filtered, [realMsg]);
+        });
+        setGroups((prevGroups) => {
+          return prevGroups.map((g) => {
+            if (String(g._id) === String(activeGroup._id)) {
+              return {
+                ...g,
+                lastMessage: realMsg,
+                updatedAt: realMsg.createdAt || new Date().toISOString()
+              };
+            }
+            return g;
+          });
+        });
+      } else {
+        throw new Error(res?.message || 'Server did not acknowledge media saving');
+      }
+    } catch (err) {
+      console.warn('Send sticker/gif failed, falling back to socket emit:', err.message);
+      if (socket && socket.connected) {
+        socket.emit('send-message', messagePayload);
+      }
+    }
+  };
+
   const handleRetryFailedMessage = async (failedMsg) => {
     if (!failedMsg || !activeGroup?._id) return;
     const senderId = currentUser?.id || currentUser?._id;
@@ -6146,19 +6260,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       }
 
                     const isAudioMsg = msg.type === 'audio-voice' || (msg.attachment && msg.attachment.fileType === 'audio');
+                    const isStickerMsg = msg.type === 'sticker' || (msg.attachment && msg.attachment.fileType === 'sticker');
+                    const isGifMsg = msg.type === 'gif' || (msg.attachment && msg.attachment.fileType === 'gif');
                     const isRecordCard = msg.type === 'record-card' || Boolean(msg.activityMeta && msg.activityMeta.module);
                     const isPollMsg = msg.type === 'poll' || Boolean(msg.pollMeta && msg.pollMeta.question);
                     const isCallLog = msg.type === 'call-log' || Boolean(msg.activityMeta && msg.activityMeta.callType);
 
                     const rawAttName = msg.attachment?.fileName || (typeof msg.attachment?.fileUrl === 'string' ? msg.attachment.fileUrl.split('/').pop().split('?')[0] : '');
                     const isImageAttachment = Boolean(msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
-                      msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(rawAttName.toLowerCase())
+                      msg.attachment.fileType === 'image' || isStickerMsg || isGifMsg || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(rawAttName.toLowerCase())
                     ));
                     const isAutoAttachmentText = Boolean(
                       msg.attachment &&
                       typeof msg.content === 'string' &&
                       (!msg.content.trim() ||
                         /^Attached\s+/i.test(msg.content.trim()) ||
+                        /^\[(Sticker|GIF):/i.test(msg.content.trim()) ||
                         msg.content.trim().toLowerCase() === 'attached blob' ||
                         msg.content.trim().toLowerCase() === 'attached image' ||
                         msg.content.trim().toLowerCase() === 'attached file' ||
@@ -6167,7 +6284,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     const hasVisibleContent = Boolean(
                       typeof msg.content === 'string' && msg.content.trim() && (!msg.attachment || !isAutoAttachmentText)
                     );
-                    const isImageOnly = isImageAttachment && !hasVisibleContent && !msg.replyTo && !isRecordCard && !isPollMsg && !isCallLog;
+                    const isStickerOnly = isStickerMsg && !hasVisibleContent && !msg.replyTo && !isRecordCard && !isPollMsg && !isCallLog;
+                    const isImageOnly = (isImageAttachment || isGifMsg) && !hasVisibleContent && !msg.replyTo && !isRecordCard && !isPollMsg && !isCallLog && !isStickerOnly;
 
                     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.isAdmin;
                     const senderIdStr = String(typeof msg.senderId === 'object' ? (msg.senderId?._id || msg.senderId?.id) : (msg.senderId || ''));
@@ -6251,20 +6369,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               onTouchCancel={handleCancelMsgHold}
                               onContextMenu={(e) => handleOpenMsgMenu(e, msg._id)}
                               style={{
-                                background: msg.priority === 'urgent'
-                                  ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
-                                  : (isMe ? '#3874ff' : 'var(--bg-card, #ffffff)'),
+                                background: isStickerOnly
+                                  ? 'transparent'
+                                  : (msg.priority === 'urgent'
+                                      ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
+                                      : (isMe ? '#3874ff' : 'var(--bg-card, #ffffff)')),
                                 color: msg.priority === 'urgent'
                                   ? (isMe ? '#ffffff' : '#991b1b')
                                   : (isMe ? '#ffffff' : 'var(--text-primary, #141824)'),
-                                padding: isImageOnly ? '4px' : (isImageAttachment ? '4px 4px 8px 4px' : '10px 14px'),
-                                borderRadius: isImageOnly ? '10px' : '12px',
-                                border: msg.priority === 'urgent'
-                                  ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
-                                  : (isMe ? 'none' : '1px solid var(--border-light, #e3e6ed)'),
-                                boxShadow: msg.priority === 'urgent'
-                                  ? '0 3px 12px rgba(239,68,68,0.25)'
-                                  : (isMe ? '0 2px 8px rgba(56, 116, 255, 0.2)' : '0 1px 2px rgba(0,0,0,0.03)'),
+                                padding: isStickerOnly ? '2px' : (isImageOnly ? '4px' : (isImageAttachment ? '4px 4px 8px 4px' : '10px 14px')),
+                                borderRadius: isStickerOnly ? '0' : (isImageOnly ? '10px' : '12px'),
+                                border: isStickerOnly
+                                  ? 'none'
+                                  : (msg.priority === 'urgent'
+                                      ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
+                                      : (isMe ? 'none' : '1px solid var(--border-light, #e3e6ed)')),
+                                boxShadow: isStickerOnly
+                                  ? 'none'
+                                  : (msg.priority === 'urgent'
+                                      ? '0 3px 12px rgba(239,68,68,0.25)'
+                                      : (isMe ? '0 2px 8px rgba(56, 116, 255, 0.2)' : '0 1px 2px rgba(0,0,0,0.03)')),
                                 fontSize: '0.88rem',
                                 lineHeight: 1.5,
                                 wordBreak: 'break-word',
@@ -6273,7 +6397,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 maxWidth: '100%',
                                 boxSizing: 'border-box',
                                 position: 'relative',
-                                minWidth: isImageOnly ? '160px' : '75px'
+                                minWidth: isStickerOnly ? '120px' : (isImageOnly ? '160px' : '75px')
                               }}
                             >
                             {/* WhatsApp Down-Chevron Trigger */}
@@ -6933,9 +7057,125 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     fileNameDisplay = (fromUrl && !fromUrl.startsWith('blob')) ? fromUrl : 'Attachment';
                                   }
                                   const lowerName = fileNameDisplay.toLowerCase();
-                                  const isImg = msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
+                                  const isSticker = msg.type === 'sticker' || msg.attachment.fileType === 'sticker';
+                                  const isGif = msg.type === 'gif' || msg.attachment.fileType === 'gif' || lowerName.endsWith('.gif');
+                                  const isImg = !isSticker && !isGif && (msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|svg|bmp)$/i.test(lowerName));
                                   const isPdf = msg.attachment.fileType === 'pdf' || lowerName.endsWith('.pdf') || msg.attachment.mimeType === 'application/pdf';
                                   const isSheet = msg.attachment.fileType === 'spreadsheet' || /\.(xls|xlsx|csv)$/i.test(lowerName);
+
+                                  if (isSticker) {
+                                    const stickerUrl = msg.attachment.fileUrl;
+                                    return (
+                                      <div
+                                        style={{
+                                          position: 'relative',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          cursor: 'zoom-in',
+                                          padding: '2px',
+                                          lineHeight: 0
+                                        }}
+                                        onClick={() => {
+                                          setViewerZoom(1);
+                                          setViewerRotation(0);
+                                          setAttachmentViewer({
+                                            url: stickerUrl,
+                                            fileName: fileNameDisplay || 'Sticker',
+                                            fileType: 'image',
+                                            senderName: msg.senderId?.name || msg.senderName,
+                                            createdAt: msg.createdAt
+                                          });
+                                        }}
+                                        title="Click to zoom sticker"
+                                      >
+                                        <img
+                                          src={stickerUrl}
+                                          alt={fileNameDisplay || 'Sticker'}
+                                          loading="lazy"
+                                          className="phoenix-chat-sticker-img"
+                                          style={{
+                                            width: '135px',
+                                            height: '135px',
+                                            maxWidth: '150px',
+                                            maxHeight: '150px',
+                                            objectFit: 'contain',
+                                            display: 'block',
+                                            filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.14))'
+                                          }}
+                                          onError={(e) => {
+                                            console.warn('Sticker failed to load:', stickerUrl);
+                                          }}
+                                        />
+                                      </div>
+                                    );
+                                  }
+
+                                  if (isGif) {
+                                    const gifUrl = msg.attachment.fileUrl;
+                                    return (
+                                      <div
+                                        style={{
+                                          position: 'relative',
+                                          borderRadius: '10px',
+                                          overflow: 'hidden',
+                                          cursor: 'zoom-in',
+                                          lineHeight: 0,
+                                          maxWidth: '300px',
+                                          maxHeight: '280px',
+                                          background: 'rgba(0,0,0,0.04)',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        onClick={() => {
+                                          setViewerZoom(1);
+                                          setViewerRotation(0);
+                                          setAttachmentViewer({
+                                            url: gifUrl,
+                                            fileName: fileNameDisplay || 'GIF',
+                                            fileType: 'image',
+                                            senderName: msg.senderId?.name || msg.senderName,
+                                            createdAt: msg.createdAt
+                                          });
+                                        }}
+                                        title="Click to view GIF"
+                                      >
+                                        <img
+                                          src={gifUrl}
+                                          alt={fileNameDisplay || 'GIF'}
+                                          loading="lazy"
+                                          style={{
+                                            width: '100%',
+                                            maxWidth: '300px',
+                                            maxHeight: '280px',
+                                            borderRadius: '10px',
+                                            objectFit: 'cover',
+                                            display: 'block'
+                                          }}
+                                        />
+                                        <div
+                                          style={{
+                                            position: 'absolute',
+                                            bottom: '8px',
+                                            left: '8px',
+                                            background: 'rgba(15, 23, 42, 0.78)',
+                                            backdropFilter: 'blur(4px)',
+                                            color: '#ffffff',
+                                            fontSize: '0.66rem',
+                                            fontWeight: 800,
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            letterSpacing: '0.06em',
+                                            pointerEvents: 'none',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                          }}
+                                        >
+                                          GIF
+                                        </div>
+                                      </div>
+                                    );
+                                  }
 
                                   if (isImg) {
                                     return (
@@ -8009,23 +8249,108 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             )}
                           </div>
 
-                          <div style={{ position: 'relative' }}>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <button
                               type="button"
                               className="phoenix-toolbar-icon"
-                              title="Emoji Picker"
-                              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                              style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
+                              title="Emojis"
+                              onClick={() => {
+                                if (showEmojiPicker && mediaPickerTab === 'emoji') {
+                                  setShowEmojiPicker(false);
+                                } else {
+                                  setMediaPickerTab('emoji');
+                                  setShowEmojiPicker(true);
+                                }
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                minWidth: '30px',
+                                minHeight: '30px',
+                                background: showEmojiPicker && mediaPickerTab === 'emoji' ? '#eff6ff' : 'transparent',
+                                color: showEmojiPicker && mediaPickerTab === 'emoji' ? '#2563eb' : 'inherit'
+                              }}
                             >
                               <Smile size={16} />
                             </button>
 
+                            <button
+                              type="button"
+                              className="phoenix-toolbar-icon"
+                              title="Stickers"
+                              onClick={() => {
+                                if (showEmojiPicker && mediaPickerTab === 'sticker') {
+                                  setShowEmojiPicker(false);
+                                } else {
+                                  setMediaPickerTab('sticker');
+                                  setShowEmojiPicker(true);
+                                }
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                minWidth: '30px',
+                                minHeight: '30px',
+                                background: showEmojiPicker && mediaPickerTab === 'sticker' ? '#f5f3ff' : 'transparent',
+                                color: showEmojiPicker && mediaPickerTab === 'sticker' ? '#8b5cf6' : 'inherit'
+                              }}
+                            >
+                              <Sparkles size={15} color="#8b5cf6" />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="phoenix-toolbar-icon"
+                              title="Send GIF"
+                              onClick={() => {
+                                if (showEmojiPicker && mediaPickerTab === 'gif') {
+                                  setShowEmojiPicker(false);
+                                } else {
+                                  setMediaPickerTab('gif');
+                                  setShowEmojiPicker(true);
+                                }
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                minWidth: '30px',
+                                minHeight: '30px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: showEmojiPicker && mediaPickerTab === 'gif' ? '#fdf2f8' : 'transparent',
+                                borderRadius: '6px'
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '0.64rem',
+                                  fontWeight: 900,
+                                  background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+                                  WebkitBackgroundClip: 'text',
+                                  WebkitTextFillColor: 'transparent',
+                                  letterSpacing: '0.03em'
+                                }}
+                              >
+                                GIF
+                              </span>
+                            </button>
+
                             <EmojiPickerPopover
                               isOpen={showEmojiPicker}
+                              initialTab={mediaPickerTab}
                               onClose={() => setShowEmojiPicker(false)}
                               onSelectEmoji={(emo) => {
                                 setInputMessage((prev) => prev + emo);
                                 if (chatTextareaRef.current) chatTextareaRef.current.focus();
+                              }}
+                              onSelectSticker={(sticker) => {
+                                setShowEmojiPicker(false);
+                                handleSendStickerOrGif(sticker, 'sticker');
+                              }}
+                              onSelectGif={(gif) => {
+                                setShowEmojiPicker(false);
+                                handleSendStickerOrGif(gif, 'gif');
                               }}
                             />
                           </div>

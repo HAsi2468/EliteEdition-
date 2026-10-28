@@ -207,6 +207,8 @@ export default function GlobalQuickActions({
     }
   ];
 
+  if (!isOpen) return null;
+
   return (
     <div
       ref={menuRef}
@@ -221,7 +223,7 @@ export default function GlobalQuickActions({
         pointerEvents: 'auto'
       }}
     >
-      {/* Floating Action Menu Card */}
+      {/* Action Menu Card */}
       {isOpen && (
         <div
           style={{
@@ -268,18 +270,37 @@ export default function GlobalQuickActions({
                 Quick Actions
               </span>
             </div>
-            <span
-              style={{
-                fontSize: '0.6875rem',
-                color: '#64748b',
-                background: '#f1f5f9',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontWeight: 600
-              }}
-            >
-              Esc to close
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  color: '#64748b',
+                  background: '#f1f5f9',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontWeight: 600
+                }}
+              >
+                Esc
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                title="Close Quick Actions"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
 
           {/* Action Items List */}
@@ -368,38 +389,6 @@ export default function GlobalQuickActions({
           </div>
         </div>
       )}
-
-      {/* Floating Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        title={isOpen ? "Close Quick Actions (Esc)" : "Quick Actions (+)"}
-        style={{
-          width: '46px',
-          height: '46px',
-          borderRadius: '23px',
-          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-          color: '#ffffff',
-          border: 'none',
-          boxShadow: '0 8px 20px -2px rgba(37, 99, 235, 0.45), 0 2px 6px rgba(0, 0, 0, 0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease',
-          transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = isOpen ? 'rotate(45deg) scale(1.05)' : 'scale(1.06)';
-          e.currentTarget.style.boxShadow = '0 12px 24px -2px rgba(37, 99, 235, 0.55), 0 4px 8px rgba(0, 0, 0, 0.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
-          e.currentTarget.style.boxShadow = '0 8px 20px -2px rgba(37, 99, 235, 0.45), 0 2px 6px rgba(0, 0, 0, 0.08)';
-        }}
-      >
-        <Plus size={22} strokeWidth={2.5} />
-      </button>
 
       <style>{`
         @keyframes slideUpFade {

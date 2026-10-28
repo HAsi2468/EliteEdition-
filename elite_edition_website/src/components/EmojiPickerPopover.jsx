@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, Clock, Smile, ThumbsUp, Heart, Briefcase, AlertCircle, Coffee, Compass, Sparkles } from 'lucide-react';
+import {
+  Search, X, Clock, Smile, ThumbsUp, Heart, Briefcase, AlertCircle, Coffee, Compass,
+  Sparkles, Film, Layers, CheckCircle2, Send, ExternalLink, Link2, Image as ImageIcon
+} from 'lucide-react';
+import { STICKER_PACKS, STICKERS } from './chat/stickersData';
+import { GIF_CATEGORIES, CURATED_GIFS } from './chat/gifsData';
 
 const EMOJI_CATEGORIES = [
   {
@@ -384,11 +389,21 @@ export default function EmojiPickerPopover({
   isOpen,
   onClose,
   onSelectEmoji,
+  onSelectSticker,
+  onSelectGif,
+  initialTab = 'emoji',
   containerStyle = {}
 }) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'emoji'); // 'emoji' | 'sticker' | 'gif'
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('recent');
-  const [hoveredEmoji, setHoveredEmoji] = useState(null);
+  const [activeStickerPack, setActiveStickerPack] = useState('workplace');
+  const [activeGifCategory, setActiveGifCategory] = useState('all');
+  const [customGifUrl, setCustomGifUrl] = useState('');
+  const [showCustomUrlInput, setShowCustomUrlInput] = useState(false);
+  const [customUrlError, setCustomUrlError] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState(null);
+
   const [recentEmojis, setRecentEmojis] = useState(() => {
     try {
       const stored = localStorage.getItem('phoenix_chat_recent_emojis');
@@ -404,9 +419,12 @@ export default function EmojiPickerPopover({
   const categoryHeadersRef = useRef({});
   const searchInputRef = useRef(null);
 
-  // Focus search on open and listen for Escape key
+  // Sync initial tab when popover opens
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       setTimeout(() => {
         if (searchInputRef.current) searchInputRef.current.focus();
       }, 50);
@@ -422,13 +440,15 @@ export default function EmojiPickerPopover({
       return () => window.removeEventListener('keydown', handleEscape, true);
     } else {
       setSearchQuery('');
-      setHoveredEmoji(null);
+      setHoveredItem(null);
+      setShowCustomUrlInput(false);
+      setCustomGifUrl('');
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, initialTab, onClose]);
 
   // Handle emoji selection + save to recent
   const handlePickEmoji = (char, name) => {
-    onSelectEmoji(char);
+    if (onSelectEmoji) onSelectEmoji(char);
     setRecentEmojis((prev) => {
       const updated = [char, ...prev.filter((e) => e !== char)].slice(0, 32);
       try {
@@ -438,11 +458,47 @@ export default function EmojiPickerPopover({
     });
   };
 
-  // Build searchable index
+  // Handle Sticker selection
+  const handlePickSticker = (sticker) => {
+    if (onSelectSticker) {
+      onSelectSticker(sticker);
+    }
+    if (onClose) onClose();
+  };
+
+  // Handle GIF selection
+  const handlePickGif = (gif) => {
+    if (onSelectGif) {
+      onSelectGif(gif);
+    }
+    if (onClose) onClose();
+  };
+
+  // Send custom GIF URL
+  const handleSendCustomGif = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = customGifUrl.trim();
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) {
+      setCustomUrlError(true);
+      return;
+    }
+    setCustomUrlError(false);
+    if (onSelectGif) {
+      onSelectGif({
+        id: 'custom_' + Date.now(),
+        title: 'Animated GIF',
+        url: trimmed,
+        previewUrl: trimmed
+      });
+    }
+    setCustomGifUrl('');
+    setShowCustomUrlInput(false);
+    if (onClose) onClose();
+  };
+
+  // Build searchable index for emojis
   const filteredCategories = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    
-    // Map recent emojis to emoji objects
     const recentObjs = recentEmojis.map((char) => {
       for (const cat of EMOJI_CATEGORIES) {
         const match = cat.emojis.find((e) => e.char === char);
@@ -453,7 +509,6 @@ export default function EmojiPickerPopover({
 
     return EMOJI_CATEGORIES.map((cat) => {
       let emojis = cat.id === 'recent' ? recentObjs : cat.emojis;
-
       if (q) {
         emojis = emojis.filter(
           (e) =>
@@ -462,13 +517,41 @@ export default function EmojiPickerPopover({
             (e.tags && e.tags.some((t) => t.toLowerCase().includes(q)))
         );
       }
-
-      return {
-        ...cat,
-        emojis
-      };
+      return { ...cat, emojis };
     }).filter((cat) => cat.emojis.length > 0);
   }, [searchQuery, recentEmojis]);
+
+  // Build filtered stickers
+  const filteredStickers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      return STICKERS.filter((s) => {
+        return (
+          s.title.toLowerCase().includes(q) ||
+          (s.tags && s.tags.some((t) => t.toLowerCase().includes(q)))
+        );
+      });
+    }
+    return STICKERS.filter((s) => s.pack === activeStickerPack);
+  }, [searchQuery, activeStickerPack]);
+
+  // Build filtered GIFs
+  const filteredGifs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      return CURATED_GIFS.filter((g) => {
+        return (
+          g.title.toLowerCase().includes(q) ||
+          g.category.toLowerCase().includes(q) ||
+          (g.tags && g.tags.some((t) => t.toLowerCase().includes(q)))
+        );
+      });
+    }
+    if (activeGifCategory === 'all') {
+      return CURATED_GIFS;
+    }
+    return CURATED_GIFS.filter((g) => g.category === activeGifCategory);
+  }, [searchQuery, activeGifCategory]);
 
   const scrollToCategory = (catId) => {
     setActiveCategory(catId);
@@ -498,17 +581,17 @@ export default function EmojiPickerPopover({
         }}
       />
 
-      {/* Main Glassmorphic Emoji Container */}
+      {/* Main Glassmorphic Media Picker Container */}
       <div
         className="phoenix-emoji-popover"
         style={{
           position: 'absolute',
           bottom: 'calc(100% + 10px)',
           left: 0,
-          width: '350px',
+          width: '380px',
           maxWidth: 'calc(100vw - 24px)',
-          height: '420px',
-          maxHeight: 'min(420px, 70vh)',
+          height: '450px',
+          maxHeight: 'min(450px, 75vh)',
           background: '#ffffff',
           borderRadius: '16px',
           border: '1px solid #e2e8f0',
@@ -534,6 +617,39 @@ export default function EmojiPickerPopover({
               opacity: 1;
               transform: translateY(0) scale(1);
             }
+          }
+          .phoenix-media-top-tabs {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 4px;
+            gap: 4px;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .phoenix-media-tab-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+          .phoenix-media-tab-btn:hover {
+            color: #0f172a;
+            background: rgba(255, 255, 255, 0.6);
+          }
+          .phoenix-media-tab-btn.active {
+            background: #ffffff;
+            color: #2563eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
           }
           .phoenix-emoji-item {
             display: flex;
@@ -565,11 +681,11 @@ export default function EmojiPickerPopover({
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border: none;
             background: transparent;
-            border-radius: 8px;
+            border-radius: 6px;
             color: #64748b;
             cursor: pointer;
             transition: all 0.15s ease;
@@ -583,25 +699,133 @@ export default function EmojiPickerPopover({
             background: #eff6ff;
             color: #2563eb;
           }
-          .phoenix-emoji-scroll-body::-webkit-scrollbar {
+          .phoenix-sticker-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            background: #ffffff;
+            cursor: pointer;
+            transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+            user-select: none;
+            box-sizing: border-box;
+          }
+          .phoenix-sticker-card:hover {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            transform: translateY(-2px) scale(1.06);
+            box-shadow: 0 6px 14px -3px rgba(15, 23, 42, 0.12);
+            z-index: 5;
+          }
+          .phoenix-sticker-card:active {
+            transform: scale(0.96);
+          }
+          .phoenix-gif-card {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #0f172a;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .phoenix-gif-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.25);
+            z-index: 5;
+          }
+          .phoenix-pill-filter-chip {
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #64748b;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.14s ease;
+          }
+          .phoenix-pill-filter-chip:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+          }
+          .phoenix-pill-filter-chip.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+          }
+          .phoenix-media-scroll-body::-webkit-scrollbar {
             width: 6px;
           }
-          .phoenix-emoji-scroll-body::-webkit-scrollbar-track {
+          .phoenix-media-scroll-body::-webkit-scrollbar-track {
             background: transparent;
           }
-          .phoenix-emoji-scroll-body::-webkit-scrollbar-thumb {
+          .phoenix-media-scroll-body::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 4px;
           }
-          .phoenix-emoji-scroll-body::-webkit-scrollbar-thumb:hover {
+          .phoenix-media-scroll-body::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
           }
         `}</style>
 
-        {/* 1. Top Search Header */}
+        {/* 1. Top Segmented Tabs: Emoji | Stickers | GIFs */}
+        <div className="phoenix-media-top-tabs">
+          <button
+            type="button"
+            className={`phoenix-media-tab-btn ${activeTab === 'emoji' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('emoji');
+              setSearchQuery('');
+              setHoveredItem(null);
+            }}
+          >
+            <Smile size={14} />
+            <span>Emoji</span>
+          </button>
+          <button
+            type="button"
+            className={`phoenix-media-tab-btn ${activeTab === 'sticker' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('sticker');
+              setSearchQuery('');
+              setHoveredItem(null);
+            }}
+          >
+            <Sparkles size={14} color="#8b5cf6" />
+            <span>Stickers</span>
+            <span style={{ fontSize: '0.66rem', background: activeTab === 'sticker' ? '#ede9fe' : '#e2e8f0', color: activeTab === 'sticker' ? '#7c3aed' : '#64748b', padding: '1px 5px', borderRadius: '10px' }}>
+              {STICKERS.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`phoenix-media-tab-btn ${activeTab === 'gif' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('gif');
+              setSearchQuery('');
+              setHoveredItem(null);
+            }}
+          >
+            <Film size={14} color="#0284c7" />
+            <span>GIFs</span>
+            <span style={{ fontSize: '0.66rem', background: activeTab === 'gif' ? '#e0f2fe' : '#e2e8f0', color: activeTab === 'gif' ? '#0369a1' : '#64748b', padding: '1px 5px', borderRadius: '10px' }}>
+              {CURATED_GIFS.length}
+            </span>
+          </button>
+        </div>
+
+        {/* 2. Top Search Header */}
         <div
           style={{
-            padding: '10px 12px 8px 12px',
+            padding: '8px 12px 6px 12px',
             borderBottom: '1px solid #f1f5f9',
             background: '#ffffff',
             boxSizing: 'border-box'
@@ -623,7 +847,13 @@ export default function EmojiPickerPopover({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search all emojis..."
+              placeholder={
+                activeTab === 'emoji'
+                  ? 'Search emojis...'
+                  : activeTab === 'sticker'
+                  ? 'Search stickers (approved, done, textile)...'
+                  : 'Search GIFs (celebrate, thumbs up, rush)...'
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -659,159 +889,513 @@ export default function EmojiPickerPopover({
           </div>
         </div>
 
-        {/* 2. Category Tab Navigation Bar */}
-        {!searchQuery && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 10px',
-              borderBottom: '1px solid #f1f5f9',
-              background: '#fafafa',
-              boxSizing: 'border-box'
-            }}
-          >
-            {EMOJI_CATEGORIES.map((cat) => {
-              const IconComp = cat.icon;
-              const isActive = activeCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  title={cat.name}
-                  onClick={() => scrollToCategory(cat.id)}
-                  className={`phoenix-emoji-cat-btn ${isActive ? 'active' : ''}`}
-                >
-                  <IconComp size={16} />
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* ============================================================== */}
+        {/* TAB 1: EMOJI CONTENT                                            */}
+        {/* ============================================================== */}
+        {activeTab === 'emoji' && (
+          <>
+            {/* Category Tab Navigation Bar */}
+            {!searchQuery && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 10px',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: '#fafafa',
+                  boxSizing: 'border-box'
+                }}
+              >
+                {EMOJI_CATEGORIES.map((cat) => {
+                  const IconComp = cat.icon;
+                  const isActive = activeCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      title={cat.name}
+                      onClick={() => scrollToCategory(cat.id)}
+                      className={`phoenix-emoji-cat-btn ${isActive ? 'active' : ''}`}
+                    >
+                      <IconComp size={15} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-        {/* 3. Scrollable Emoji Grid Body */}
-        <div
-          ref={scrollRef}
-          className="phoenix-emoji-scroll-body"
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '8px 12px',
-            boxSizing: 'border-box'
-          }}
-        >
-          {filteredCategories.length === 0 ? (
+            {/* Scrollable Emoji Grid Body */}
             <div
+              ref={scrollRef}
+              className="phoenix-media-scroll-body"
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#94a3b8',
-                gap: '8px',
-                padding: '24px 0'
+                flex: 1,
+                overflowY: 'auto',
+                padding: '8px 12px',
+                boxSizing: 'border-box'
               }}
             >
-              <Smile size={32} style={{ opacity: 0.5 }} />
-              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>No emojis found</div>
-              <div style={{ fontSize: '0.74rem' }}>Try searching for &quot;fire&quot;, &quot;star&quot;, or &quot;done&quot;</div>
-            </div>
-          ) : (
-            filteredCategories.map((cat) => (
-              <div
-                key={cat.id}
-                ref={(el) => {
-                  categoryHeadersRef.current[cat.id] = el;
-                }}
-                style={{ marginBottom: '14px' }}
-              >
-                {/* Category Section Header */}
+              {filteredCategories.length === 0 ? (
                 <div
                   style={{
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    color: '#64748b',
-                    padding: '4px 2px 6px 2px',
-                    position: 'sticky',
-                    top: 0,
-                    background: '#ffffff',
-                    zIndex: 2
+                    justifyContent: 'center',
+                    height: '100%',
+                    color: '#94a3b8',
+                    gap: '8px',
+                    padding: '24px 0'
                   }}
                 >
-                  <span>{cat.name}</span>
-                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
-                    {cat.emojis.length}
-                  </span>
+                  <Smile size={32} style={{ opacity: 0.5 }} />
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>No emojis found</div>
+                  <div style={{ fontSize: '0.74rem' }}>Try searching for &quot;fire&quot;, &quot;star&quot;, or &quot;done&quot;</div>
                 </div>
+              ) : (
+                filteredCategories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    ref={(el) => {
+                      categoryHeadersRef.current[cat.id] = el;
+                    }}
+                    style={{ marginBottom: '14px' }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        color: '#64748b',
+                        padding: '4px 2px 6px 2px',
+                        position: 'sticky',
+                        top: 0,
+                        background: '#ffffff',
+                        zIndex: 2
+                      }}
+                    >
+                      <span>{cat.name}</span>
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
+                        {cat.emojis.length}
+                      </span>
+                    </div>
 
-                {/* 8-Column Grid */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(8, 1fr)',
+                        gap: '3px',
+                        justifyItems: 'center'
+                      }}
+                    >
+                      {cat.emojis.map((item, idx) => (
+                        <button
+                          key={`${cat.id}-${item.char}-${idx}`}
+                          type="button"
+                          className="phoenix-emoji-item"
+                          title={item.name}
+                          onMouseEnter={() => setHoveredItem({ type: 'emoji', ...item })}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          onClick={() => handlePickEmoji(item.char, item.name)}
+                        >
+                          {item.char}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 2: STICKERS CONTENT                                        */}
+        {/* ============================================================== */}
+        {activeTab === 'sticker' && (
+          <>
+            {/* Sticker Pack Horizontal Filter Tabs */}
+            {!searchQuery && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 10px',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: '#fafafa',
+                  overflowX: 'auto',
+                  boxSizing: 'border-box'
+                }}
+              >
+                {STICKER_PACKS.map((pack) => {
+                  const isActive = activeStickerPack === pack.id;
+                  return (
+                    <button
+                      key={pack.id}
+                      type="button"
+                      className={`phoenix-pill-filter-chip ${isActive ? 'active' : ''}`}
+                      onClick={() => setActiveStickerPack(pack.id)}
+                    >
+                      {pack.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Sticker Grid Body */}
+            <div
+              className="phoenix-media-scroll-body"
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '10px',
+                boxSizing: 'border-box'
+              }}
+            >
+              {filteredStickers.length === 0 ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    color: '#94a3b8',
+                    gap: '8px',
+                    padding: '30px 0'
+                  }}
+                >
+                  <Sparkles size={32} style={{ opacity: 0.5, color: '#8b5cf6' }} />
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>No stickers match your search</div>
+                  <div style={{ fontSize: '0.74rem' }}>Try searching &quot;approved&quot;, &quot;rush&quot;, or &quot;textile&quot;</div>
+                </div>
+              ) : (
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(8, 1fr)',
-                    gap: '3px',
-                    justifyItems: 'center'
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: '10px'
                   }}
                 >
-                  {cat.emojis.map((item, idx) => (
-                    <button
-                      key={`${cat.id}-${item.char}-${idx}`}
-                      type="button"
-                      className="phoenix-emoji-item"
-                      title={item.name}
-                      onMouseEnter={() => setHoveredEmoji(item)}
-                      onMouseLeave={() => setHoveredEmoji(null)}
-                      onClick={() => handlePickEmoji(item.char, item.name)}
+                  {filteredStickers.map((sticker) => (
+                    <div
+                      key={sticker.id}
+                      className="phoenix-sticker-card"
+                      title={sticker.title}
+                      onMouseEnter={() => setHoveredItem({ type: 'sticker', ...sticker })}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handlePickSticker(sticker)}
                     >
-                      {item.char}
-                    </button>
+                      <img
+                        src={sticker.url}
+                        alt={sticker.title}
+                        loading="lazy"
+                        style={{
+                          width: '72px',
+                          height: '72px',
+                          objectFit: 'contain',
+                          display: 'block',
+                          filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.12))'
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: '#334155',
+                          marginTop: '4px',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '100%'
+                        }}
+                      >
+                        {sticker.title}
+                      </span>
+                    </div>
                   ))}
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              )}
+            </div>
+          </>
+        )}
 
-        {/* 4. Bottom Hover Preview Bar */}
+        {/* ============================================================== */}
+        {/* TAB 3: GIFS CONTENT                                            */}
+        {/* ============================================================== */}
+        {activeTab === 'gif' && (
+          <>
+            {/* GIF Category Chips & Custom URL Link */}
+            <div
+              style={{
+                padding: '6px 10px',
+                borderBottom: '1px solid #f1f5f9',
+                background: '#fafafa',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                boxSizing: 'border-box'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  overflowX: 'auto',
+                  flex: 1
+                }}
+              >
+                {GIF_CATEGORIES.map((cat) => {
+                  const isActive = activeGifCategory === cat.id && !searchQuery;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={`phoenix-pill-filter-chip ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveGifCategory(cat.id);
+                        setSearchQuery('');
+                      }}
+                    >
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCustomUrlInput(!showCustomUrlInput)}
+                style={{
+                  background: showCustomUrlInput ? '#eff6ff' : 'transparent',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '16px',
+                  padding: '3px 8px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: showCustomUrlInput ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  flexShrink: 0
+                }}
+                title="Paste a direct GIF link"
+              >
+                <Link2 size={12} />
+                <span>Custom Link</span>
+              </button>
+            </div>
+
+            {/* Custom GIF Link Bar (Expandable) */}
+            {showCustomUrlInput && (
+              <form
+                onSubmit={handleSendCustomGif}
+                style={{
+                  padding: '8px 10px',
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <input
+                  type="url"
+                  placeholder="Paste GIF URL (https://...gif)"
+                  value={customGifUrl}
+                  onChange={(e) => {
+                    setCustomGifUrl(e.target.value);
+                    setCustomUrlError(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '5px 8px',
+                    fontSize: '0.78rem',
+                    border: customUrlError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Send size={12} />
+                  <span>Send</span>
+                </button>
+              </form>
+            )}
+
+            {/* GIF Grid Body (2 columns responsive) */}
+            <div
+              className="phoenix-media-scroll-body"
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '10px',
+                boxSizing: 'border-box'
+              }}
+            >
+              {filteredGifs.length === 0 ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    color: '#94a3b8',
+                    gap: '8px',
+                    padding: '30px 0'
+                  }}
+                >
+                  <Film size={32} style={{ opacity: 0.5, color: '#0284c7' }} />
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>No GIFs match your search</div>
+                  <div style={{ fontSize: '0.74rem' }}>Try searching &quot;thumbs up&quot;, &quot;cheers&quot;, or &quot;work&quot;</div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '8px'
+                  }}
+                >
+                  {filteredGifs.map((gif) => (
+                    <div
+                      key={gif.id}
+                      className="phoenix-gif-card"
+                      style={{ height: '110px' }}
+                      onMouseEnter={() => setHoveredItem({ type: 'gif', ...gif })}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handlePickGif(gif)}
+                      title={gif.title}
+                    >
+                      <img
+                        src={gif.previewUrl || gif.url}
+                        alt={gif.title}
+                        loading="lazy"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block'
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '4px',
+                          left: '4px',
+                          background: 'rgba(15, 23, 42, 0.7)',
+                          color: '#ffffff',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          letterSpacing: '0.04em'
+                        }}
+                      >
+                        GIF
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* 4. Bottom Hover / Action Preview Bar */}
         <div
           style={{
-            height: '42px',
+            height: '40px',
             borderTop: '1px solid #f1f5f9',
             background: '#f8fafc',
             padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '8px',
             boxSizing: 'border-box'
           }}
         >
-          {hoveredEmoji ? (
+          {hoveredItem ? (
             <>
-              <span style={{ fontSize: '1.45rem', lineHeight: 1 }}>{hoveredEmoji.char}</span>
-              <div
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: '#1e293b',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {hoveredEmoji.name}
-              </div>
+              {hoveredItem.type === 'emoji' && (
+                <>
+                  <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>{hoveredItem.char}</span>
+                  <div
+                    style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      color: '#1e293b',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {hoveredItem.name}
+                  </div>
+                </>
+              )}
+              {hoveredItem.type === 'sticker' && (
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#7c3aed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Sparkles size={14} />
+                  <span>Click to send: <strong>{hoveredItem.title}</strong></span>
+                </div>
+              )}
+              {hoveredItem.type === 'gif' && (
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Film size={14} />
+                  <span>Click to send: <strong>{hoveredItem.title}</strong></span>
+                </div>
+              )}
             </>
           ) : (
             <div
               style={{
-                fontSize: '0.74rem',
+                fontSize: '0.73rem',
                 color: '#94a3b8',
                 display: 'flex',
                 alignItems: 'center',
@@ -819,7 +1403,13 @@ export default function EmojiPickerPopover({
               }}
             >
               <Sparkles size={13} style={{ color: '#3b82f6' }} />
-              <span>Click any emoji to insert • Search by name</span>
+              <span>
+                {activeTab === 'emoji'
+                  ? 'Click emoji to insert into message'
+                  : activeTab === 'sticker'
+                  ? 'Click any sticker to send directly'
+                  : 'Click any animated GIF to send directly'}
+              </span>
             </div>
           )}
         </div>
@@ -827,3 +1417,4 @@ export default function EmojiPickerPopover({
     </>
   );
 }
+

@@ -235,6 +235,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   const [history, setHistory] = useState(getNotificationHistory());
   const [permStatus, setPermStatus] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
   const [selectedNotifIds, setSelectedNotifIds] = useState([]);
+  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'unread' | 'alerts'
 
   const refreshHistory = () => setHistory(getNotificationHistory());
 
@@ -268,15 +269,12 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'unread' | 'alerts'
-
   const unreadCount = history.filter(h => !h.read).length;
   const alertCount = history.filter(h => h.type === 'danger' || h.type === 'warning' || (h.title && (h.title.toLowerCase().includes('alert') || h.title.toLowerCase().includes('error')))).length;
 
   // Smart deduplication & grouping of identical notifications
   const groupedNotifications = useMemo(() => {
+    if (!isOpen) return [];
     let list = history;
     if (filterTab === 'unread') {
       list = list.filter(h => !h.read);
@@ -384,6 +382,8 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
       return '';
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 1000001, display: 'flex', justifyContent: 'flex-end' }}>
