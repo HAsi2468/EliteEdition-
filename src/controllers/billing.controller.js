@@ -3440,7 +3440,7 @@ const getCompanySettings = async (req, res) => {
     config.challanDesign = { ...defaultChallanDesign, ...(config.challanDesign || {}) };
     config.reportDesign = { ...defaultReportDesign, ...(config.reportDesign || {}) };
 
-    if (!config.purchaseTypes || !Array.isArray(config.purchaseTypes) || config.purchaseTypes.length === 0) {
+    if (config.purchaseTypes === undefined || config.purchaseTypes === null || !Array.isArray(config.purchaseTypes)) {
       config.purchaseTypes = ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase'];
     }
 

@@ -83,6 +83,10 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     purchaseTypes: ''
   });
 
+  const [editingPurchaseTypeIndex, setEditingPurchaseTypeIndex] = useState(null);
+  const [editingPurchaseTypeValue, setEditingPurchaseTypeValue] = useState('');
+  const [purchaseTypeAutoSaving, setPurchaseTypeAutoSaving] = useState(false);
+
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'users', 'tags', 'design'
   const [designStudioMode, setDesignStudioMode] = useState('visual'); // 'visual' | 'classic'
   const [users, setUsers] = useState([]);
@@ -237,7 +241,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
           widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : ['36"', '44"', '58"', '64"'],
           passes: Array.isArray(res.data.passes) ? res.data.passes : [],
-          purchaseTypes: (Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0)
+          purchaseTypes: Array.isArray(res.data.purchaseTypes)
             ? res.data.purchaseTypes
             : ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
         }));
@@ -287,33 +291,117 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     setForm(f => ({ ...f, companyLogo: '' }));
   };
 
-  const handleAddTag = (field) => {
+  const handleAddTag = async (field) => {
     const val = (newTagInput[field] || '').trim();
     if (!val) return;
-    if (form[field]?.includes(val)) return;
-    setForm(f => ({ ...f, [field]: [...(f[field] || []), val] }));
+    if (form[field]?.includes(val)) {
+      triggerEliteAlert('Duplicate Item', `"${val}" is already present in ${field}.`, 'warning');
+      return;
+    }
+    const updatedList = [...(form[field] || []), val];
+    setForm(f => ({ ...f, [field]: updatedList }));
     setNewTagInput(t => ({ ...t, [field]: '' }));
+
+    if (field === 'purchaseTypes') setPurchaseTypeAutoSaving(true);
+    try {
+      await api.updateCompanySettings({
+        companyEntity,
+        [field]: updatedList
+      });
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings', field } }));
+      if (field === 'purchaseTypes') {
+        window.dispatchEvent(new CustomEvent('elite-company-settings-updated', { detail: { companyEntity, purchaseTypes: updatedList } }));
+      }
+    } catch (err) {
+      console.warn('Failed to auto-save tag to database:', err);
+    } finally {
+      if (field === 'purchaseTypes') {
+        setTimeout(() => setPurchaseTypeAutoSaving(false), 500);
+      }
+    }
   };
 
-  const handleRemoveTag = (field, tagToRemove) => {
-    setForm(f => ({ ...f, [field]: f[field].filter(t => t !== tagToRemove) }));
+  const handleRemoveTag = async (field, tagToRemove) => {
+    const updatedList = (form[field] || []).filter(t => t !== tagToRemove);
+    setForm(f => ({ ...f, [field]: updatedList }));
+
+    if (field === 'purchaseTypes') setPurchaseTypeAutoSaving(true);
+    try {
+      await api.updateCompanySettings({
+        companyEntity,
+        [field]: updatedList
+      });
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings', field } }));
+      if (field === 'purchaseTypes') {
+        window.dispatchEvent(new CustomEvent('elite-company-settings-updated', { detail: { companyEntity, purchaseTypes: updatedList } }));
+      }
+    } catch (err) {
+      console.warn('Failed to auto-save removed tag to database:', err);
+    } finally {
+      if (field === 'purchaseTypes') {
+        setTimeout(() => setPurchaseTypeAutoSaving(false), 500);
+      }
+    }
+  };
+
+  const handleStartEditPurchaseType = (idx, currentVal) => {
+    setEditingPurchaseTypeIndex(idx);
+    setEditingPurchaseTypeValue(currentVal);
+  };
+
+  const handleSaveEditPurchaseType = async (idx) => {
+    const newVal = editingPurchaseTypeValue.trim();
+    if (!newVal) {
+      setEditingPurchaseTypeIndex(null);
+      return;
+    }
+    const updatedList = [...(form.purchaseTypes || [])];
+    updatedList[idx] = newVal;
+    setForm(f => ({ ...f, purchaseTypes: updatedList }));
+    setEditingPurchaseTypeIndex(null);
+
+    setPurchaseTypeAutoSaving(true);
+    try {
+      await api.updateCompanySettings({
+        companyEntity,
+        purchaseTypes: updatedList
+      });
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings', field: 'purchaseTypes' } }));
+      window.dispatchEvent(new CustomEvent('elite-company-settings-updated', { detail: { companyEntity, purchaseTypes: updatedList } }));
+    } catch (err) {
+      console.warn('Failed to save edited purchase type:', err);
+    } finally {
+      setTimeout(() => setPurchaseTypeAutoSaving(false), 500);
+    }
+  };
+
+  const handleSavePurchaseTypesExplicitly = async () => {
+    setPurchaseTypeAutoSaving(true);
+    try {
+      await api.updateCompanySettings({
+        companyEntity,
+        purchaseTypes: form.purchaseTypes || []
+      });
+      triggerEliteAlert('Purchase Types Saved', `Successfully saved ${(form.purchaseTypes || []).length} purchase types for ${companyEntity}!`, 'success');
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings', field: 'purchaseTypes' } }));
+      window.dispatchEvent(new CustomEvent('elite-company-settings-updated', { detail: { companyEntity, purchaseTypes: form.purchaseTypes || [] } }));
+    } catch (err) {
+      triggerEliteAlert('Save Failed', err.message || 'Failed to save purchase types.', 'error');
+    } finally {
+      setPurchaseTypeAutoSaving(false);
+    }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       await api.updateCompanySettings({ ...form, companyEntity });
-      triggerEliteAlert({
-        title: 'Settings Saved',
-        message: `Company Settings for "${companyEntity}" updated successfully!`
-      });
+      triggerEliteAlert('Settings Saved', `Company Settings for "${companyEntity}" updated successfully!`, 'success');
       window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings' } }));
+      window.dispatchEvent(new CustomEvent('elite-company-settings-updated', { detail: { companyEntity, purchaseTypes: form.purchaseTypes } }));
     } catch (err) {
-      triggerEliteAlert({
-        title: 'Save Failed',
-        message: err.message || 'Failed to update company settings.'
-      });
+      triggerEliteAlert('Save Failed', err.message || 'Failed to update company settings.', 'error');
     } finally {
       setSaving(false);
     }
@@ -994,6 +1082,65 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                   const bg = isAst ? '#f5f3ff' : isExp ? '#fef3c7' : isInv ? '#eff6ff' : '#ffffff';
                   const color = isAst ? '#7c3aed' : isExp ? '#b45309' : isInv ? '#1d4ed8' : '#334155';
                   const border = isAst ? '#ddd6fe' : isExp ? '#fde68a' : isInv ? '#bfdbfe' : '#cbd5e1';
+
+                  if (editingPurchaseTypeIndex === idx) {
+                    return (
+                      <span
+                        key={idx}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 8px',
+                          borderRadius: '20px',
+                          background: '#ffffff',
+                          border: `2px solid #2563eb`,
+                          boxShadow: '0 2px 8px rgba(37,99,235,0.15)'
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={editingPurchaseTypeValue}
+                          onChange={e => setEditingPurchaseTypeValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveEditPurchaseType(idx);
+                            } else if (e.key === 'Escape') {
+                              setEditingPurchaseTypeIndex(null);
+                            }
+                          }}
+                          autoFocus
+                          style={{
+                            border: 'none',
+                            outline: 'none',
+                            fontSize: '0.84rem',
+                            fontWeight: 700,
+                            color: '#1e293b',
+                            width: '140px',
+                            background: 'transparent'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEditPurchaseType(idx)}
+                          title="Save change"
+                          style={{ background: '#22c55e', border: 'none', color: '#fff', borderRadius: '50%', width: '20px', height: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                        >
+                          <Check size={12} strokeWidth={3} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPurchaseTypeIndex(null)}
+                          title="Cancel"
+                          style={{ background: '#94a3b8', border: 'none', color: '#fff', borderRadius: '50%', width: '20px', height: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                        >
+                          <X size={12} strokeWidth={3} />
+                        </button>
+                      </span>
+                    );
+                  }
+
                   return (
                     <span
                       key={idx}
@@ -1014,8 +1161,25 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                       <span>{icon} {pt}</span>
                       <button
                         type="button"
+                        onClick={() => handleStartEditPurchaseType(idx, pt)}
+                        title={`Edit / Rename "${pt}"`}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          padding: '1px 3px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleRemoveTag('purchaseTypes', pt)}
-                        title={`Remove ${pt} for this company`}
+                        title={`Remove "${pt}" for this company`}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -1035,28 +1199,51 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
               )}
             </div>
 
-            {/* Input to add new type */}
-            <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '540px' }}>
-              <input
-                type="text"
-                value={newTagInput.purchaseTypes || ''}
-                onChange={e => setNewTagInput(t => ({ ...t, purchaseTypes: e.target.value }))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddTag('purchaseTypes');
-                  }
-                }}
-                placeholder="Add purchase type (e.g. Raw Material, Gray Fabric, Job Work...)"
-                className="form-control"
-              />
+            {/* Input to add new type + Save Button */}
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px', maxWidth: '520px' }}>
+                <input
+                  type="text"
+                  value={newTagInput.purchaseTypes || ''}
+                  onChange={e => setNewTagInput(t => ({ ...t, purchaseTypes: e.target.value }))}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag('purchaseTypes');
+                    }
+                  }}
+                  placeholder="Add purchase type (e.g. Raw Material, Gray Fabric, Job Work...)"
+                  className="form-control"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddTag('purchaseTypes')}
+                  className="btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.6rem 1.25rem', background: '#2563eb', borderColor: '#2563eb' }}
+                >
+                  <Plus size={16} /> Add Type
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => handleAddTag('purchaseTypes')}
-                className="btn-primary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.6rem 1.25rem', background: '#2563eb', borderColor: '#2563eb' }}
+                onClick={handleSavePurchaseTypesExplicitly}
+                disabled={purchaseTypeAutoSaving}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.6rem 1.1rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  color: purchaseTypeAutoSaving ? '#0284c7' : '#15803d',
+                  borderColor: purchaseTypeAutoSaving ? '#bae6fd' : '#bbf7d0',
+                  background: purchaseTypeAutoSaving ? '#f0f9ff' : '#f0fdf4'
+                }}
               >
-                <Plus size={16} /> Add Type
+                {purchaseTypeAutoSaving ? <RefreshCw className="spin" size={15} /> : <CheckCircle2 size={15} />}
+                {purchaseTypeAutoSaving ? 'Saving to Database...' : 'Save Types to Database'}
               </button>
             </div>
           </div>
