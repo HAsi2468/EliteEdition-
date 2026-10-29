@@ -1677,8 +1677,9 @@ export const api = {
   },
 
   // Raw Materials Inventory
-  async getRawMaterialTransactions() {
-    return request('/raw-materials/transactions');
+  async getRawMaterialTransactions(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/raw-materials/transactions${query ? `?${query}` : ''}`);
   },
 
   async getRawMaterialStock(params = {}) {

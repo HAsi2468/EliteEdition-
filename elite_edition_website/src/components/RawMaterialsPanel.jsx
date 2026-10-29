@@ -612,7 +612,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       if (stockRes.success && Array.isArray(stockRes.data)) {
         setStock(stockRes.data);
         if (!isDigitalPrint) {
-          const extraMaterials = [...new Set(stockRes.data.map(s => s.materialName).filter(Boolean))];
+          const extraMaterials = [...new Set(stockRes.data.map(s => s.materialName).filter(Boolean))]
+            .filter(name => !/(ink|sublimation|butter\s*paper|butterpaper|grando|printdot|cmyk)/i.test(name));
           if (extraMaterials.length > 0) {
             setMaterialsList(prev => [...new Set([...prev, ...extraMaterials])]);
           }
@@ -697,13 +698,39 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   };
 
   useEffect(() => {
+    // Clear previously cached stock and transactions when companyEntity changes
+    setStock([]);
+    setTransactions([]);
+    if (isDigitalPrint) {
+      setMaterialsList(['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink']);
+    } else {
+      const storageKey = `elite_custom_materials_${String(companyEntity || '').toLowerCase().replace(/\s+/g, '_')}`;
+      let saved = [];
+      try {
+        saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      } catch (e) {}
+      const defaultGarment = [
+        'Viscose Rayon Fabric',
+        'Cotton Fabric',
+        'Georgette Fabric',
+        'Polyester Sewing Thread',
+        'Buttons & Fasteners',
+        'Zippers & Sliders',
+        'Knitted / Woven Elastic',
+        'Laces & Borders',
+        'Fusing / Interlining',
+        'Brand Labels & Tags',
+        'Packaging Material'
+      ];
+      setMaterialsList([...new Set([...defaultGarment, ...saved])]);
+    }
     fetchData();
-  }, []);
+  }, [companyEntity]);
 
   useEffect(() => {
     const fetchStock = async () => {
       try {
-        const stockParams = {};
+        const stockParams = { companyEntity };
         if (stockPreset && stockPreset !== 'all') {
           const range = getDatePresetRange(stockPreset, customStockStart, customStockEnd);
           if (range.dateStart) stockParams.dateStart = range.dateStart;
@@ -719,7 +746,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       }
     };
     fetchStock();
-  }, [stockPreset, stockDateStart, stockDateEnd, customStockStart, customStockEnd]);
+  }, [stockPreset, stockDateStart, stockDateEnd, customStockStart, customStockEnd, companyEntity]);
 
   const isSublimationTab = (tab) => {
     const t = String(tab || '').trim().toLowerCase();
@@ -988,7 +1015,10 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     e.preventDefault();
     setLoading(true);
     try {
-      let payload = [...inwardItems];
+      let payload = [...inwardItems].map(item => ({
+        companyEntity: item.companyEntity || companyEntity || 'Elite Digital Print',
+        ...item
+      }));
       if (payload.length === 0) {
         const err = validateItem(inwardTab, inwardForm.qty, inwardForm.metersPerRoll, inwardForm.canSize);
         if (err) {
@@ -1007,6 +1037,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
         const vendorVal = (inwardForm.vendorName || '').trim() || 'ELITE EDITION';
 
         payload = [{
+          companyEntity: companyEntity || 'Elite Digital Print',
           materialName: matName,
           qty: Number(inwardForm.qty),
           unit: inwardForm.unit || (isInkTab ? 'Liters' : 'Rolls'),
@@ -1045,7 +1076,10 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     e.preventDefault();
     setLoading(true);
     try {
-      let payload = [...outwardItems];
+      let payload = [...outwardItems].map(item => ({
+        companyEntity: item.companyEntity || companyEntity || 'Elite Digital Print',
+        ...item
+      }));
       if (payload.length === 0) {
         const err = validateItem(outwardTab, outwardForm.qty, outwardForm.metersPerRoll, outwardForm.canSize);
         if (err) {
@@ -1063,6 +1097,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
         const mtrRoll = outwardForm.metersPerRoll ? Number(outwardForm.metersPerRoll) : (isPaper ? 1000 : '');
 
         payload = [{
+          companyEntity: companyEntity || 'Elite Digital Print',
           materialName: matName,
           qty: Number(outwardForm.qty),
           unit: outwardForm.unit || (isInkTab ? 'Liters' : 'Rolls'),
@@ -1743,10 +1778,10 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               const printdotItems = stock.filter(item => isPrintdotItem(item));
               const otherItems = stock.filter(item => !isPaperItem(item) && !isGrandoItem(item) && !isPrintdotItem(item));
 
-              const showPaper = (isDigitalPrint || paperItems.length > 0) && (stockMaterialType === 'All' || matchesMaterialType('Sublimation Paper', stockMaterialType) || matchesMaterialType('Butter Paper', stockMaterialType));
-              const showGrando = (isDigitalPrint || grandoItems.length > 0) && (stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Grando Ink');
-              const showPrintdot = (isDigitalPrint || printdotItems.length > 0) && (stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Printdot Ink');
-              const showOther = stockMaterialType === 'All' || (!showPaper && !showGrando && !showPrintdot);
+              const showPaper = isDigitalPrint && (stockMaterialType === 'All' || matchesMaterialType('Sublimation Paper', stockMaterialType) || matchesMaterialType('Butter Paper', stockMaterialType));
+              const showGrando = isDigitalPrint && (stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Grando Ink');
+              const showPrintdot = isDigitalPrint && (stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Printdot Ink');
+              const showOther = !isDigitalPrint || stockMaterialType === 'All' || (!showPaper && !showGrando && !showPrintdot);
 
               const CMYK_SPECS = [
                 { key: 'Cyan', code: 'C', name: 'Cyan (C)', colorVal: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)', border: 'rgba(6, 182, 212, 0.35)' },

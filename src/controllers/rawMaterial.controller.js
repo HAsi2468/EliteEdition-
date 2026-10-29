@@ -29,7 +29,7 @@ const formatMaterialDetails = (t) => {
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
-    const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
+    const compEntity = (req.body && !Array.isArray(req.body) ? req.body.companyEntity : null) || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
       const docs = req.body.map((item) => {
         const {
@@ -42,7 +42,7 @@ const createInward = async (req, res) => {
         }
         return {
           type: 'INWARD',
-          companyEntity: companyEntity || compEntity,
+          companyEntity: companyEntity || req.query.companyEntity || compEntity,
           challanNo,
           vendorName,
           materialName,
@@ -113,7 +113,7 @@ const createInward = async (req, res) => {
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
-    const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
+    const compEntity = (req.body && !Array.isArray(req.body) ? req.body.companyEntity : null) || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
       const docs = req.body.map(item => {
         const {
@@ -126,7 +126,7 @@ const createOutward = async (req, res) => {
         }
         return {
           type: 'OUTWARD',
-          companyEntity: companyEntity || compEntity,
+          companyEntity: companyEntity || req.query.companyEntity || compEntity,
           jobNo,
           partyName,
           materialName,
@@ -187,14 +187,14 @@ const createOutward = async (req, res) => {
 };
 
 const buildRawCompFilter = (companyEntity) => {
-  if (!companyEntity || companyEntity === 'all') {
+  const norm = companyEntity ? String(companyEntity).trim() : 'Elite Digital Print';
+  if (norm.toLowerCase() === 'all') {
     return {};
   }
-  const norm = String(companyEntity).trim();
-  if (['Elite Digital Print', 'Elite Digital Prints', 'EDP'].includes(norm)) {
+  if (['Elite Digital Print', 'Elite Digital Prints', 'EDP'].some(c => c.toLowerCase() === norm.toLowerCase())) {
     return {
       $or: [
-        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+        { companyEntity: { $regex: /^(Elite Digital Print|Elite Digital Prints|EDP)$/i } },
         { companyEntity: { $exists: false } },
         { companyEntity: null },
         { companyEntity: '' }
@@ -202,8 +202,9 @@ const buildRawCompFilter = (companyEntity) => {
     };
   }
   // Garment companies: strict companyEntity isolation and block any digital print consumables
+  const escaped = norm.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
   return {
-    companyEntity: norm,
+    companyEntity: { $regex: new RegExp(`^${escaped}$`, 'i') },
     materialName: { $not: /(ink|sublimation|butter\s*paper|butterpaper|grando|printdot|cmyk)/i }
   };
 };
