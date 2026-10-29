@@ -895,7 +895,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       try {
         let nextPurNo = '';
         try {
-          const numRes = await api.getNextPurchaseNo('Elite Digital Prints');
+          const numRes = await api.getNextPurchaseNo(companyEntity);
           if (numRes && (numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data)) {
             nextPurNo = numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data;
           }
@@ -917,7 +917,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         else dueDateObj.setDate(dueDateObj.getDate() + 30);
 
         const purchasePayload = {
-          companyEntity: 'Elite Digital Prints',
+          companyEntity,
           purchaseNo: nextPurNo,
           billNo: (weaverForm.invoiceNo || weaverForm.weaverChallanNo || lotNumber).trim(),
           purchaseType: 'inventory',
@@ -991,7 +991,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
         // Sync with local cache for EliteBillingDepartment
         try {
-          const cacheKey = 'elite_purchases_Elite Digital Prints';
+          const cacheKey = `elite_purchases_${companyEntity}`;
           const cached = localStorage.getItem(cacheKey);
           let currentList = cached ? JSON.parse(cached) : [];
           if (!Array.isArray(currentList)) currentList = [];
@@ -1148,7 +1148,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       try {
         let nextPurNo = '';
         try {
-          const numRes = await api.getNextPurchaseNo('Elite Digital Prints');
+          const numRes = await api.getNextPurchaseNo(companyEntity);
           if (numRes && (numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data)) {
             nextPurNo = numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data;
           }
@@ -1169,7 +1169,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         const normWeaver = weaverDetails ? normalizeParty(weaverDetails) : null;
 
         const purchasePayload = {
-          companyEntity: 'Elite Digital Prints',
+          companyEntity,
           purchaseNo: nextPurNo,
           billNo: attachInvoiceForm.invoiceNo.trim(),
           purchaseType: 'inventory',
@@ -1239,7 +1239,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         createdPurchaseId = savedPur._id || savedPur.id || '';
 
         try {
-          const cacheKey = 'elite_purchases_Elite Digital Prints';
+          const cacheKey = `elite_purchases_${companyEntity}`;
           const cached = localStorage.getItem(cacheKey);
           let currentList = cached ? JSON.parse(cached) : [];
           if (!Array.isArray(currentList)) currentList = [];
@@ -2268,18 +2268,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       try {
         let nextPurNo = '';
         try {
-          const numRes = await api.getNextPurchaseNo('Elite Digital Prints');
+          const numRes = await api.getNextPurchaseNo(companyEntity);
           if (numRes && (numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data)) {
             nextPurNo = numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data;
           }
         } catch (numErr) {}
 
         if (!nextPurNo) {
-          nextPurNo = `PUR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+          const curYear = new Date().getFullYear();
+          nextPurNo = `PUR-${curYear}-${String(Date.now()).slice(-4)}`;
         }
 
         const purPayload = {
-          companyEntity: 'Elite Digital Prints',
+          companyEntity,
           purchaseNo: nextPurNo,
           billNo: (inwardRfdForm.invoiceNo || inwardRfdForm.millChallanNo || lotNumber).trim(),
           purchaseType: 'expense',
@@ -7549,7 +7550,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     onChange={e => setAttachInvoiceForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
                     style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
                   />
-                  Auto-Post to Purchase Register (Elite Digital Prints)
+                  Auto-Post to Purchase Register ({companyEntity})
                 </label>
                 <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2, marginLeft: 24 }}>
                   Creates an inventory purchase voucher linked with Lot #{attachingInvoiceLot.lotNumber} and Weaver party.
