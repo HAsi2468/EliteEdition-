@@ -356,15 +356,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             });
           }
 
-          // If mills or processes are still completely empty, initialize with standard Surat textile defaults
-          if (updatedConfigs.mills.length === 0 && STANDARD_SURAT_CONFIGS.mills.length > 0) {
-            updatedConfigs.mills = [...STANDARD_SURAT_CONFIGS.mills.map(m => normalizeParty(m))];
-            configsChanged = true;
-          }
-          if (updatedConfigs.processes.length === 0 && STANDARD_SURAT_CONFIGS.processes.length > 0) {
-            updatedConfigs.processes = [...STANDARD_SURAT_CONFIGS.processes];
-            configsChanged = true;
-          }
+
 
           // Ensure vendors and qualities from purchases are populated into master configs
           purchases.forEach(p => {
