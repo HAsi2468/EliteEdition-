@@ -299,6 +299,30 @@ export default function EliteBillingDepartment({
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('ALL');
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+  const [dynamicPurchaseTypes, setDynamicPurchaseTypes] = useState([
+    'Inventory Purchase',
+    'Expense Purchase',
+    'Asset Purchase'
+  ]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPurchaseTypes = async () => {
+      try {
+        const res = await api.getCompanySettings(companyEntity);
+        if (isMounted && res?.data?.purchaseTypes && Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
+          setDynamicPurchaseTypes(res.data.purchaseTypes);
+        }
+      } catch (err) {}
+    };
+    fetchPurchaseTypes();
+    const onRefresh = () => fetchPurchaseTypes();
+    window.addEventListener('elite-data-refresh', onRefresh);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('elite-data-refresh', onRefresh);
+    };
+  }, [companyEntity]);
 
   // Pagination states for invoices & purchases (25 default for low browser memory)
   const [invoicePage, setInvoicePage] = useState(1);
@@ -1440,8 +1464,14 @@ export default function EliteBillingDepartment({
 
       // 3.5. Purchase Type Filter
       if (purchaseTypeFilter && purchaseTypeFilter !== 'ALL') {
-        const pType = p.purchaseType || 'inventory';
-        if (pType !== purchaseTypeFilter) return false;
+        const pType = (p.purchaseType || 'inventory').toLowerCase();
+        const fType = purchaseTypeFilter.toLowerCase();
+        const matches = 
+          pType === fType ||
+          (pType === 'inventory' && /inventory/i.test(fType)) ||
+          (pType === 'expense' && /expense/i.test(fType)) ||
+          (pType === 'asset' && /asset/i.test(fType));
+        if (!matches) return false;
       }
 
       // 4. Date Range Filter
@@ -6059,9 +6089,19 @@ export default function EliteBillingDepartment({
                   style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
                 >
                   <option value="ALL">All Types</option>
-                  <option value="inventory">📦 Inventory Purchase</option>
-                  <option value="expense">💼 Expense Purchase</option>
-                  <option value="asset">🏛️ Asset Purchase</option>
+                  {dynamicPurchaseTypes.map((type, idx) => {
+                    const typeLabel = typeof type === 'string' ? type : type.name || type.label;
+                    const isInv = /inventory/i.test(typeLabel);
+                    const isExp = /expense/i.test(typeLabel);
+                    const isAst = /asset/i.test(typeLabel);
+                    const typeVal = isInv ? 'inventory' : isExp ? 'expense' : isAst ? 'asset' : typeLabel;
+                    const icon = isAst ? '🏛️' : isExp ? '💼' : isInv ? '📦' : /fabric|gray|yarn|textile/i.test(typeLabel) ? '🧵' : '🏷️';
+                    return (
+                      <option key={idx} value={typeVal}>
+                        {icon} {typeLabel}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -6240,11 +6280,11 @@ export default function EliteBillingDepartment({
                               fontWeight: 700,
                               padding: '2px 7px',
                               borderRadius: '4px',
-                              background: p.purchaseType === 'asset' ? '#f5f3ff' : p.purchaseType === 'expense' ? '#fef3c7' : '#eff6ff',
-                              color: p.purchaseType === 'asset' ? '#7c3aed' : p.purchaseType === 'expense' ? '#b45309' : '#1d4ed8',
-                              border: p.purchaseType === 'asset' ? '1px solid #ddd6fe' : p.purchaseType === 'expense' ? '1px solid #fde68a' : '1px solid #bfdbfe'
+                              background: /asset/i.test(p.purchaseType) ? '#f5f3ff' : /expense/i.test(p.purchaseType) ? '#fef3c7' : /inventory/i.test(p.purchaseType) ? '#eff6ff' : '#f1f5f9',
+                              color: /asset/i.test(p.purchaseType) ? '#7c3aed' : /expense/i.test(p.purchaseType) ? '#b45309' : /inventory/i.test(p.purchaseType) ? '#1d4ed8' : '#334155',
+                              border: /asset/i.test(p.purchaseType) ? '1px solid #ddd6fe' : /expense/i.test(p.purchaseType) ? '1px solid #fde68a' : /inventory/i.test(p.purchaseType) ? '1px solid #bfdbfe' : '1px solid #cbd5e1'
                             }}>
-                              {p.purchaseType === 'asset' ? '🏛️ Asset' : p.purchaseType === 'expense' ? '💼 Expense' : '📦 Inventory'}
+                              {/asset/i.test(p.purchaseType) ? '🏛️ Asset' : /expense/i.test(p.purchaseType) ? '💼 Expense' : /inventory/i.test(p.purchaseType) ? '📦 Inventory' : `🏷️ ${p.purchaseType || 'Purchase'}`}
                             </span>
                           </div>
                           {p.billNo && (
@@ -6490,15 +6530,25 @@ export default function EliteBillingDepartment({
                     style={{
                       ...inputStyle,
                       fontWeight: 700,
-                      color: purchaseForm.purchaseType === 'asset' ? '#7c3aed' : purchaseForm.purchaseType === 'expense' ? '#d97706' : '#2563eb',
-                      background: purchaseForm.purchaseType === 'asset' ? 'rgba(124, 58, 237, 0.08)' : purchaseForm.purchaseType === 'expense' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(37, 99, 235, 0.08)',
-                      border: purchaseForm.purchaseType === 'asset' ? '1px solid rgba(124, 58, 237, 0.35)' : purchaseForm.purchaseType === 'expense' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(37, 99, 235, 0.35)',
+                      color: /asset/i.test(purchaseForm.purchaseType) ? '#7c3aed' : /expense/i.test(purchaseForm.purchaseType) ? '#d97706' : '#2563eb',
+                      background: /asset/i.test(purchaseForm.purchaseType) ? 'rgba(124, 58, 237, 0.08)' : /expense/i.test(purchaseForm.purchaseType) ? 'rgba(245, 158, 11, 0.08)' : 'rgba(37, 99, 235, 0.08)',
+                      border: /asset/i.test(purchaseForm.purchaseType) ? '1px solid rgba(124, 58, 237, 0.35)' : /expense/i.test(purchaseForm.purchaseType) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(37, 99, 235, 0.35)',
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="inventory">📦 Inventory Purchase</option>
-                    <option value="expense">💼 Expense Purchase</option>
-                    <option value="asset">🏛️ Asset Purchase</option>
+                    {dynamicPurchaseTypes.map((type, idx) => {
+                      const typeLabel = typeof type === 'string' ? type : type.name || type.label;
+                      const isInv = /inventory/i.test(typeLabel);
+                      const isExp = /expense/i.test(typeLabel);
+                      const isAst = /asset/i.test(typeLabel);
+                      const typeVal = isInv ? 'inventory' : isExp ? 'expense' : isAst ? 'asset' : typeLabel;
+                      const icon = isAst ? '🏛️' : isExp ? '💼' : isInv ? '📦' : /fabric|gray|yarn|textile/i.test(typeLabel) ? '🧵' : '🏷️';
+                      return (
+                        <option key={idx} value={typeVal}>
+                          {icon} {typeLabel}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -7342,8 +7392,8 @@ export default function EliteBillingDepartment({
                       Vendor Bill: <strong style={{ color: '#0f172a' }}>{viewPurchaseModal.billNo}</strong>
                     </div>
                   )}
-                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: viewPurchaseModal.purchaseType === 'asset' ? '#7c3aed' : viewPurchaseModal.purchaseType === 'expense' ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
-                    Type: {viewPurchaseModal.purchaseType === 'asset' ? '🏛️ Asset Purchase' : viewPurchaseModal.purchaseType === 'expense' ? '💼 Expense Purchase' : '📦 Inventory Purchase'}
+                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: /asset/i.test(viewPurchaseModal.purchaseType) ? '#7c3aed' : /expense/i.test(viewPurchaseModal.purchaseType) ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
+                    Type: {/asset/i.test(viewPurchaseModal.purchaseType) ? '🏛️ Asset Purchase' : /expense/i.test(viewPurchaseModal.purchaseType) ? '💼 Expense Purchase' : /inventory/i.test(viewPurchaseModal.purchaseType) ? '📦 Inventory Purchase' : `🏷️ ${viewPurchaseModal.purchaseType}`}
                   </div>
                   {viewPurchaseModal.ourChallanNo && (
                     <div style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>

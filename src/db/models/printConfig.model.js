@@ -15,6 +15,10 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    purchaseTypes: {
+      type: [String],
+      default: ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase'],
+    },
     passes: {
       type: [String],
       default: [],

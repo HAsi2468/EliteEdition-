@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { 
   Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, 
   Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key, 
-  Lock, Check, X, Search, Edit2, Palette
+  Lock, Check, X, Search, Edit2, Palette, Package, Tag, Layers
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
@@ -70,7 +70,8 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     paperTypes: [],
     fabrics: [],
     widths: ['36"', '44"', '58"', '64"'],
-    passes: []
+    passes: [],
+    purchaseTypes: ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
   });
 
   const [newTagInput, setNewTagInput] = useState({
@@ -78,7 +79,8 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     paperTypes: '',
     fabrics: '',
     widths: '',
-    passes: ''
+    passes: '',
+    purchaseTypes: ''
   });
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'users', 'tags', 'design'
@@ -234,7 +236,10 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           paperTypes: Array.isArray(res.data.paperTypes) ? res.data.paperTypes : [],
           fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
           widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : ['36"', '44"', '58"', '64"'],
-          passes: Array.isArray(res.data.passes) ? res.data.passes : []
+          passes: Array.isArray(res.data.passes) ? res.data.passes : [],
+          purchaseTypes: (Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0)
+            ? res.data.purchaseTypes
+            : ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
         }));
       }
     } catch (err) {
@@ -303,6 +308,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
         title: 'Settings Saved',
         message: `Company Settings for "${companyEntity}" updated successfully!`
       });
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings' } }));
     } catch (err) {
       triggerEliteAlert({
         title: 'Save Failed',
@@ -661,8 +667,8 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
         </div>
       )}
 
-      {/* FORM FOR PROFILE AND TAGS */}
-      {(activeTab === 'profile' || activeTab === 'tags') && (
+      {/* FORM FOR PROFILE */}
+      {activeTab === 'profile' && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Company Logo & Letterhead Header */}
         <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid ${accentColor}` }}>
@@ -952,6 +958,261 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           </button>
         </div>
       </form>
+      )}
+
+      {/* TAB 3: DYNAMIC DROPDOWNS & TAGS */}
+      {activeTab === 'tags' && (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Purchase Types Dynamic Manager */}
+          <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid #2563eb` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1d4ed8', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <Package size={18} /> Type of Purchase (Dynamic Per Company)
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Configure the purchase types available in Purchase Register & Billing for <strong>{companyEntity}</strong>. If a company doesn't need a type, simply remove it. Add any custom types needed.
+                </p>
+              </div>
+              <span style={{ fontSize: '0.78rem', background: '#dbeafe', color: '#1e40af', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                {(form.purchaseTypes || []).length} Active Types
+              </span>
+            </div>
+
+            {/* List of active purchase types */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1.25rem', minHeight: '40px', padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              {(form.purchaseTypes || []).length === 0 ? (
+                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', padding: '4px' }}>
+                  No purchase types configured. Add a type below.
+                </span>
+              ) : (
+                (form.purchaseTypes || []).map((pt, idx) => {
+                  const isInv = /inventory/i.test(pt);
+                  const isExp = /expense/i.test(pt);
+                  const isAst = /asset/i.test(pt);
+                  const icon = isAst ? '🏛️' : isExp ? '💼' : isInv ? '📦' : /fabric|gray|yarn|textile/i.test(pt) ? '🧵' : '🏷️';
+                  const bg = isAst ? '#f5f3ff' : isExp ? '#fef3c7' : isInv ? '#eff6ff' : '#ffffff';
+                  const color = isAst ? '#7c3aed' : isExp ? '#b45309' : isInv ? '#1d4ed8' : '#334155';
+                  const border = isAst ? '#ddd6fe' : isExp ? '#fde68a' : isInv ? '#bfdbfe' : '#cbd5e1';
+                  return (
+                    <span
+                      key={idx}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        background: bg,
+                        color: color,
+                        border: `1px solid ${border}`,
+                        fontWeight: 700,
+                        fontSize: '0.84rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                      }}
+                    >
+                      <span>{icon} {pt}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag('purchaseTypes', pt)}
+                        title={`Remove ${pt} for this company`}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: '1px 3px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input to add new type */}
+            <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '540px' }}>
+              <input
+                type="text"
+                value={newTagInput.purchaseTypes || ''}
+                onChange={e => setNewTagInput(t => ({ ...t, purchaseTypes: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTag('purchaseTypes');
+                  }
+                }}
+                placeholder="Add purchase type (e.g. Raw Material, Gray Fabric, Job Work...)"
+                className="form-control"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddTag('purchaseTypes')}
+                className="btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.6rem 1.25rem', background: '#2563eb', borderColor: '#2563eb' }}
+              >
+                <Plus size={16} /> Add Type
+              </button>
+            </div>
+          </div>
+
+          {/* Fabrics & Qualities Dynamic Manager */}
+          <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid #10b981` }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#059669', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <Layers size={18} /> Fabric Qualities
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Dynamic fabric qualities dropdown options for <strong>{companyEntity}</strong>.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1.25rem', minHeight: '40px', padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              {(form.fabrics || []).length === 0 ? (
+                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', padding: '4px' }}>No fabrics configured.</span>
+              ) : (
+                (form.fabrics || []).map((fab, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '5px 12px',
+                      borderRadius: '20px',
+                      background: '#f0fdf4',
+                      color: '#166534',
+                      border: '1px solid #bbf7d0',
+                      fontWeight: 600,
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    <span>{fab}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag('fabrics', fab)}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '1px 3px' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '540px' }}>
+              <input
+                type="text"
+                value={newTagInput.fabrics || ''}
+                onChange={e => setNewTagInput(t => ({ ...t, fabrics: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTag('fabrics');
+                  }
+                }}
+                placeholder="Add fabric quality (e.g. Pure Viscose, Cotton Cambric...)"
+                className="form-control"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddTag('fabrics')}
+                className="btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.6rem 1.25rem', background: '#10b981', borderColor: '#10b981' }}
+              >
+                <Plus size={16} /> Add Fabric
+              </button>
+            </div>
+          </div>
+
+          {/* Product Categories */}
+          <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid #8b5cf6` }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#7c3aed', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <Tag size={18} /> Product & Item Categories
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Item categories used across Invoicing, Purchases and Product Catalog for <strong>{companyEntity}</strong>.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1.25rem', minHeight: '40px', padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              {(form.categories || []).length === 0 ? (
+                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', padding: '4px' }}>No categories configured.</span>
+              ) : (
+                (form.categories || []).map((cat, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '5px 12px',
+                      borderRadius: '20px',
+                      background: '#f5f3ff',
+                      color: '#6d28d9',
+                      border: '1px solid #ddd6fe',
+                      fontWeight: 600,
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    <span>{cat}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag('categories', cat)}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '1px 3px' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '540px' }}>
+              <input
+                type="text"
+                value={newTagInput.categories || ''}
+                onChange={e => setNewTagInput(t => ({ ...t, categories: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTag('categories');
+                  }
+                }}
+                placeholder="Add category (e.g. Sarees, Kurtis, Digital Print, Gray Fabric...)"
+                className="form-control"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddTag('categories')}
+                className="btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.6rem 1.25rem', background: '#8b5cf6', borderColor: '#8b5cf6' }}
+              >
+                <Plus size={16} /> Add Category
+              </button>
+            </div>
+          </div>
+
+          {/* Save Action */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-primary"
+              style={{
+                padding: '0.85rem 3rem',
+                fontSize: '1rem',
+                fontWeight: 800,
+                background: `linear-gradient(135deg, ${accentColor} 0%, #4c1d95 100%)`,
+                borderColor: accentColor,
+                boxShadow: `0 4px 18px ${accentColor}40`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.6rem'
+              }}
+            >
+              {saving ? <RefreshCw className="spin" size={18} /> : <CheckCircle2 size={18} />} Save All Company Settings
+            </button>
+          </div>
+        </form>
       )}
 
       {/* TAB 4: VISUAL DOCUMENT & INVOICE DESIGN STUDIO */}

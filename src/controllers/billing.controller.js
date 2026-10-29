@@ -3398,7 +3398,8 @@ const getCompanySettings = async (req, res) => {
         passes: masterConfig.passes || ['1 Pass', '2 Pass'],
         expenseInCategories: masterConfig.expenseInCategories || ['Petty Cash Top-up', 'Client Payment / Advance', 'Scrap / Waste Sale', 'Refund / Cashback', 'Other Receipt'],
         expenseOutCategories: masterConfig.expenseOutCategories || ['Machine Maintenance & Service', 'Ink & Consumables', 'Spare Parts & Repairs', 'Paper & Transfer Film', 'Tea & Refreshments', 'Carriage & Freight', 'Salary / Daily Wages', 'Electricity & Utility', 'Stationery & Office', 'Other Expense'],
-        expensePaymentModes: masterConfig.expensePaymentModes || ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other']
+        expensePaymentModes: masterConfig.expensePaymentModes || ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other'],
+        purchaseTypes: ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
       });
     }
     const defaultChallanDesign = {
@@ -3438,6 +3439,10 @@ const getCompanySettings = async (req, res) => {
 
     config.challanDesign = { ...defaultChallanDesign, ...(config.challanDesign || {}) };
     config.reportDesign = { ...defaultReportDesign, ...(config.reportDesign || {}) };
+
+    if (!config.purchaseTypes || !Array.isArray(config.purchaseTypes) || config.purchaseTypes.length === 0) {
+      config.purchaseTypes = ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase'];
+    }
 
     res.json({ success: true, data: config });
   } catch (error) {
