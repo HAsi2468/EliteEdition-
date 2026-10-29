@@ -8,7 +8,6 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
-  RefreshCw,
   FileText,
   Download,
   Trash2,
@@ -2996,32 +2995,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           </div>
         </div>
 
-        {/* Master Action Controls: Sync DB + Settings + Mode Switcher */}
+        {/* Master Action Controls: Settings + Mode Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* 🔄 SYNC DB BUTTON */}
-          <button
-            onClick={() => syncFromBackend(true)}
-            disabled={isSyncing}
-            className="btn-secondary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#0f172a',
-              fontWeight: 800,
-              fontSize: '0.82rem',
-              cursor: isSyncing ? 'not-allowed' : 'pointer',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-            }}
-            title="Reload and verify all latest lots, challans & masters directly from MongoDB Atlas"
-          >
-            <RefreshCw size={15} color="#0284c7" style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
-            {isSyncing ? 'Syncing...' : 'Sync DB'}
-          </button>
 
           {/* ⚙️ SETTINGS BUTTON */}
           <button
