@@ -236,6 +236,10 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
       const backendSettings = (settingsRes.status === 'fulfilled' && settingsRes.value?.data) ? settingsRes.value.data : {};
 
+      if (backendSettings.purchaseTypes && Array.isArray(backendSettings.purchaseTypes) && backendSettings.purchaseTypes.length > 0) {
+        setDynamicPurchaseTypes(backendSettings.purchaseTypes);
+      }
+
       // 1. Synchronize Gray Lots from MongoDB Atlas (backendSettings.grayLots)
       setGrayLots(prev => {
         let updated = [...prev];
@@ -257,7 +261,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         // 2. Also recover any purchases from Billing Register not yet in grayLots
         if (purchases.length > 0) {
           purchases.forEach(p => {
-            const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
+            const isGrayPurchase = p.purchaseType === 'inventory' || p.purchaseType === 'Inventory Purchase' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
             if (!isGrayPurchase) return;
 
             const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
@@ -302,6 +306,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 gstAmount: taxAmt,
                 grandTotal: totalAmt,
                 paymentTerms: p.terms || '30 Days',
+                purchaseType: p.purchaseType === 'inventory' ? 'Inventory Purchase' : (p.purchaseType || 'Inventory Purchase'),
                 postToPurchase: true,
                 purchaseNo: p.purchaseNo || 'YJP-01',
                 purchaseId: p._id || '',
@@ -520,6 +525,34 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // Filter for gray lots: 'all' | 'pending' | 'invoiced'
   const [grayInvoiceFilter, setGrayInvoiceFilter] = useState('all');
 
+  // Dynamic Company Purchase Types (synced with CompanySettings)
+  const [dynamicPurchaseTypes, setDynamicPurchaseTypes] = useState([
+    'Inventory Purchase',
+    'Expense Purchase',
+    'Asset Purchase'
+  ]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPurchaseTypes = async () => {
+      try {
+        const res = await api.getCompanySettings(companyEntity);
+        if (isMounted && res?.data?.purchaseTypes && Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
+          setDynamicPurchaseTypes(res.data.purchaseTypes);
+        }
+      } catch (err) {}
+    };
+    fetchPurchaseTypes();
+    const onRefresh = () => fetchPurchaseTypes();
+    window.addEventListener('elite-data-refresh', onRefresh);
+    window.addEventListener('elite-company-settings-updated', onRefresh);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('elite-data-refresh', onRefresh);
+      window.removeEventListener('elite-company-settings-updated', onRefresh);
+    };
+  }, [companyEntity]);
+
   // Modal state for attaching an invoice to an existing lot that was received with "Invoice Pending"
   const [attachingInvoiceLot, setAttachingInvoiceLot] = useState(null);
   const [attachInvoiceForm, setAttachInvoiceForm] = useState({
@@ -529,6 +562,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     ratePerMeter: '',
     gstRate: '5',
     paymentTerms: '30 Days',
+    purchaseType: 'Inventory Purchase',
     postToPurchase: true
   });
 
@@ -549,6 +583,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     hsnCode: '5208',
     gstRate: '5',
     paymentTerms: '30 Days',
+    purchaseType: 'Inventory Purchase',
     postToPurchase: true,
     tps: [
       { srNo: 1, tpNo: '', tpMtr: '' }
@@ -1143,7 +1178,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           companyEntity,
           purchaseNo: nextPurNo,
           billNo: (weaverForm.invoiceNo || weaverForm.weaverChallanNo || lotNumber).trim(),
-          purchaseType: 'inventory',
+          purchaseType: weaverForm.purchaseType || 'Inventory Purchase',
           ourChallanNo: lotNumber,
           date: weaverForm.invoiceDate || weaverForm.inwardDate,
           dueDate: dueDateObj.toISOString().split('T')[0],
@@ -1254,6 +1289,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       gstAmount: isPending ? 0 : gstAmt,
       grandTotal: isPending ? 0 : totalInvAmt,
       paymentTerms: weaverForm.paymentTerms || '30 Days',
+      purchaseType: weaverForm.purchaseType || 'Inventory Purchase',
       postToPurchase: !isPending && weaverForm.postToPurchase,
       purchaseNo: createdPurchaseNo || null,
       purchaseId: createdPurchaseId || null,
@@ -1321,6 +1357,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       hsnCode: '5208',
       gstRate: '5',
       paymentTerms: '30 Days',
+      purchaseType: 'Inventory Purchase',
       postToPurchase: true,
       tps: [
         { srNo: 1, tpNo: '', tpMtr: '' }
@@ -1340,6 +1377,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // Open modal to attach invoice for a pending lot
   const handleOpenAttachInvoice = (lot) => {
     setAttachingInvoiceLot(lot);
+    let initialPurType = lot.purchaseType;
+    if (!initialPurType || initialPurType === 'inventory') initialPurType = 'Inventory Purchase';
+    else if (initialPurType === 'expense') initialPurType = 'Expense Purchase';
+    else if (initialPurType === 'asset') initialPurType = 'Asset Purchase';
+
     setAttachInvoiceForm({
       invoiceNo: lot.invoiceNo || '',
       invoiceDate: lot.invoiceDate || new Date().toISOString().split('T')[0],
@@ -1347,6 +1389,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       ratePerMeter: lot.ratePerMeter > 0 ? String(lot.ratePerMeter) : '',
       gstRate: String(lot.gstRate !== undefined ? lot.gstRate : '5'),
       paymentTerms: lot.paymentTerms || '30 Days',
+      purchaseType: initialPurType,
       postToPurchase: true
     });
   };
@@ -1403,7 +1446,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           companyEntity,
           purchaseNo: nextPurNo,
           billNo: attachInvoiceForm.invoiceNo.trim(),
-          purchaseType: 'inventory',
+          purchaseType: attachInvoiceForm.purchaseType || 'Inventory Purchase',
           ourChallanNo: attachingInvoiceLot.lotNumber,
           date: attachInvoiceForm.invoiceDate,
           dueDate: dueDateObj.toISOString().split('T')[0],
@@ -1497,6 +1540,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           gstAmount: gstAmt,
           grandTotal: totalInvAmt,
           paymentTerms: attachInvoiceForm.paymentTerms || '30 Days',
+          purchaseType: attachInvoiceForm.purchaseType || 'Inventory Purchase',
           invoiceStatus: 'Invoiced',
           purchaseNo: createdPurchaseNo || l.purchaseNo || null,
           purchaseId: createdPurchaseId || l.purchaseId || null
@@ -2232,6 +2276,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // ==========================================
   const handleOpenEditGrayLot = (lot) => {
     setEditingGrayLot(lot);
+    let initialPurType = lot.purchaseType;
+    if (!initialPurType || initialPurType === 'inventory') initialPurType = 'Inventory Purchase';
+    else if (initialPurType === 'expense') initialPurType = 'Expense Purchase';
+    else if (initialPurType === 'asset') initialPurType = 'Asset Purchase';
+
     setEditGrayLotForm({
       lotNumber: lot.lotNumber || '',
       inwardDate: lot.inwardDate || '',
@@ -2244,6 +2293,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       hsnCode: lot.hsnCode || '5208',
       gstRate: lot.gstRate !== undefined ? lot.gstRate : '5',
       paymentTerms: lot.paymentTerms || '30 Days',
+      purchaseType: initialPurType,
       purchaseNo: lot.purchaseNo || '',
       purchaseId: lot.purchaseId || '',
       notes: lot.notes || lot.remarks || '',
@@ -2285,6 +2335,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           billNo: (editGrayLotForm.invoiceNo || editGrayLotForm.weaverChallanNo || editGrayLotForm.lotNumber).trim(),
           date: editGrayLotForm.invoiceDate || editGrayLotForm.inwardDate,
           vendorName: editGrayLotForm.weaverParty,
+          purchaseType: editGrayLotForm.purchaseType || 'Inventory Purchase',
           items: [{
             itemName: `${editGrayLotForm.fabricQuality} (Gray Fabric)`,
             fabric: editGrayLotForm.fabricQuality,
@@ -2336,6 +2387,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           gstAmount: gstAmt,
           grandTotal: totalInvAmt,
           paymentTerms: editGrayLotForm.paymentTerms || '30 Days',
+          purchaseType: editGrayLotForm.purchaseType || 'Inventory Purchase',
           remarks: editGrayLotForm.notes,
           notes: editGrayLotForm.notes,
           tps: validTps,
@@ -5695,6 +5747,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                           <div>
                             <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                              Type of Purchase
+                            </label>
+                            <select
+                              value={weaverForm.purchaseType || (dynamicPurchaseTypes[0] || 'Inventory Purchase')}
+                              onChange={e => setWeaverForm(prev => ({ ...prev, purchaseType: e.target.value }))}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%', background: '#fff' }}
+                            >
+                              {dynamicPurchaseTypes.map((type, idx) => (
+                                <option key={idx} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
                               GST Rate %
                             </label>
                             <select
@@ -5706,7 +5774,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               <option value="5">5% (Textile Fabric)</option>
                               <option value="12">12%</option>
                               <option value="18">18%</option>
-                              <option value="0">0% (Nil)</option>
+                              <option value="0% (Nil)">0% (Nil)</option>
                             </select>
                           </div>
 
@@ -7454,7 +7522,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Type of Purchase
+                    </label>
+                    <select
+                      className="input-field"
+                      value={editGrayLotForm.purchaseType || (dynamicPurchaseTypes[0] || 'Inventory Purchase')}
+                      onChange={e => setEditGrayLotForm({ ...editGrayLotForm, purchaseType: e.target.value })}
+                      style={{ width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.78rem', border: '1px solid #cbd5e1', borderRadius: 5, background: '#fff' }}
+                    >
+                      {dynamicPurchaseTypes.map((type, idx) => (
+                        <option key={idx} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
                       GST Rate %
@@ -7774,22 +7857,40 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                  Payment Terms
-                </label>
-                <select
-                  value={attachInvoiceForm.paymentTerms}
-                  onChange={e => setAttachInvoiceForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                  className="input-field"
-                  style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                >
-                  <option value="30 Days">30 Days Credit</option>
-                  <option value="15 Days">15 Days Credit</option>
-                  <option value="45 Days">45 Days Credit</option>
-                  <option value="60 Days">60 Days Credit</option>
-                  <option value="Immediate Cash">Immediate / Cash</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Type of Purchase
+                  </label>
+                  <select
+                    value={attachInvoiceForm.purchaseType || (dynamicPurchaseTypes[0] || 'Inventory Purchase')}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, purchaseType: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%', background: '#fff' }}
+                  >
+                    {dynamicPurchaseTypes.map((type, idx) => (
+                      <option key={idx} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Payment Terms
+                  </label>
+                  <select
+                    value={attachInvoiceForm.paymentTerms}
+                    onChange={e => setAttachInvoiceForm(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  >
+                    <option value="30 Days">30 Days Credit</option>
+                    <option value="15 Days">15 Days Credit</option>
+                    <option value="45 Days">45 Days Credit</option>
+                    <option value="60 Days">60 Days Credit</option>
+                    <option value="Immediate Cash">Immediate / Cash</option>
+                  </select>
+                </div>
               </div>
 
               {/* Live Financial Calculations Ribbon */}
