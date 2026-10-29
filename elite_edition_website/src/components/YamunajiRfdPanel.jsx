@@ -305,7 +305,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 postToPurchase: true,
                 purchaseNo: p.purchaseNo || 'YJP-01',
                 purchaseId: p._id || '',
-                tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
+                tps: [{ srNo: 1, tpNo: '1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
               };
 
               updated.unshift(recoveredLot);
@@ -551,7 +551,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     paymentTerms: '30 Days',
     postToPurchase: true,
     tps: [
-      { srNo: 1, tpNo: 'TP-1', tpMtr: '' }
+      { srNo: 1, tpNo: '', tpMtr: '' }
     ]
   });
 
@@ -967,7 +967,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           const nextSr = current.length + i + 1;
           newRows.push({
             srNo: nextSr,
-            tpNo: `TP-${nextSr}`,
+            tpNo: '',
             tpMtr: ''
           });
         }
@@ -982,7 +982,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const handleAddTpRow = () => {
     setWeaverForm(prev => {
       const nextSr = prev.tps.length + 1;
-      const updated = [...prev.tps, { srNo: nextSr, tpNo: `TP-${nextSr}`, tpMtr: '' }];
+      const updated = [...prev.tps, { srNo: nextSr, tpNo: '', tpMtr: '' }];
       setTpCountInput(String(updated.length));
       return {
         ...prev,
@@ -996,7 +996,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       const updated = [...prev.tps];
       for (let i = 0; i < count; i++) {
         const nextSr = updated.length + 1;
-        updated.push({ srNo: nextSr, tpNo: `TP-${nextSr}`, tpMtr: '' });
+        updated.push({ srNo: nextSr, tpNo: '', tpMtr: '' });
       }
       setTpCountInput(String(updated.length));
       return { ...prev, tps: updated };
@@ -1007,7 +1007,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setTpCountInput('1');
     setWeaverForm(prev => ({
       ...prev,
-      tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: '' }]
+      tps: [{ srNo: 1, tpNo: '', tpMtr: '' }]
     }));
   };
 
@@ -1015,7 +1015,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setWeaverForm(prev => {
       const filtered = prev.tps.filter((_, idx) => idx !== index);
       const reIndexed = filtered.map((item, idx) => ({ ...item, srNo: idx + 1 }));
-      const result = reIndexed.length > 0 ? reIndexed : [{ srNo: 1, tpNo: 'TP-1', tpMtr: '' }];
+      const result = reIndexed.length > 0 ? reIndexed : [{ srNo: 1, tpNo: '', tpMtr: '' }];
       setTpCountInput(String(result.length));
       return { ...prev, tps: result };
     });
@@ -1323,7 +1323,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       paymentTerms: '30 Days',
       postToPurchase: true,
       tps: [
-        { srNo: 1, tpNo: 'TP-1', tpMtr: '' }
+        { srNo: 1, tpNo: '', tpMtr: '' }
       ]
     });
     setTpCountInput('');
@@ -5878,7 +5878,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                 type="text"
                                 value={tp.tpNo}
                                 onChange={(e) => handleTpChange(idx, 'tpNo', e.target.value)}
-                                placeholder={`TP-${idx + 1}`}
+                                placeholder="TP No."
                                 className="input-field"
                                 style={{ height: '28px', fontSize: '0.78rem', width: '100%', textAlign: 'center' }}
                               />
@@ -6379,7 +6379,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                 {tp.fabricQuality}
                               </td>
                               <td style={{ padding: '6px 8px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#0f172a' }}>
-                                TP-{tp.tpNo}
+                                {tp.tpNo}
                               </td>
                               <td style={{ padding: '6px 8px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#059669' }}>
                                 {tp.tpMtr} Mtr
