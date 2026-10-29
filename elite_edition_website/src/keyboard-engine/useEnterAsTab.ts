@@ -60,8 +60,14 @@ export function useEnterAsTab<T extends HTMLElement = HTMLFormElement>(
     if (/[+\-*/%]/.test(val)) {
       const result = evaluateMathExpression(val);
       if (result !== null) {
-        input.value = String(result);
-        // Dispatch synthetic React input & change events
+        // Use native property setter so React's synthetic event system tracks the value change
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (nativeSetter) {
+          nativeSetter.call(input, String(result));
+        } else {
+          input.value = String(result);
+        }
+        // Dispatch synthetic input & change events
         const inputEvt = new Event('input', { bubbles: true });
         const changeEvt = new Event('change', { bubbles: true });
         input.dispatchEvent(inputEvt);

@@ -3,6 +3,8 @@
  * Complies with strict TypeScript rules and enterprise ERP standards.
  */
 
+declare module '*.css';
+
 export const HOTKEY_PRIORITIES = {
   MODAL: 100,       // Highest: Modal dialogs, popovers, drawers
   CELL_EDIT: 80,    // Active cell inline editor in spreadsheet grids

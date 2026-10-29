@@ -96,6 +96,11 @@ function tokenize(expression: string): Token[] {
   return tokens;
 }
 
+interface FactorResult {
+  value: number;
+  isPercent: boolean;
+}
+
 class MathParser {
   private tokens: Token[];
   private pos = 0;
@@ -113,13 +118,13 @@ class MathParser {
   }
 
   public parse(): number {
-    const result = this.parseExpression();
-    return result;
+    return this.parseExpression();
   }
 
   // Expression: Term (('+' | '-') Term)*
   private parseExpression(): number {
-    let left = this.parseTerm();
+    const left = this.parseTerm();
+    let currentVal = left.isPercent ? left.value / 100 : left.value;
 
     while (this.pos < this.tokens.length) {
       const token = this.peek();
@@ -127,26 +132,28 @@ class MathParser {
         break;
       }
       this.consume();
-      let right = this.parseTerm();
+      const right = this.parseTerm();
 
-      // Handle percentage addition/subtraction: e.g. 1000 + 18% => 1000 + (1000 * 0.18)
-      if (this.peek()?.type === 'PERCENT') {
-        this.consume();
-        right = left * (right / 100);
+      // Percentage addition/subtraction: e.g. 1000 - 10% => 1000 - (1000 * 0.10)
+      let rVal: number;
+      if (right.isPercent) {
+        rVal = currentVal * (right.value / 100);
+      } else {
+        rVal = right.value;
       }
 
       if (token.value === '+') {
-        left += right;
+        currentVal += rVal;
       } else {
-        left -= right;
+        currentVal -= rVal;
       }
     }
 
-    return left;
+    return currentVal;
   }
 
   // Term: Factor (('*' | '/') Factor)*
-  private parseTerm(): number {
+  private parseTerm(): FactorResult {
     let left = this.parseFactor();
 
     while (this.pos < this.tokens.length) {
@@ -157,11 +164,12 @@ class MathParser {
       this.consume();
       const right = this.parseFactor();
 
+      const rVal = right.isPercent ? right.value / 100 : right.value;
       if (token.value === '*') {
-        left *= right;
+        left = { value: left.value * rVal, isPercent: false };
       } else {
-        if (right === 0) throw new Error('Division by zero');
-        left /= right;
+        if (rVal === 0) throw new Error('Division by zero');
+        left = { value: left.value / rVal, isPercent: false };
       }
     }
 
@@ -169,7 +177,7 @@ class MathParser {
   }
 
   // Factor: ('+' | '-')? (Number | '(' Expression ')')
-  private parseFactor(): number {
+  private parseFactor(): FactorResult {
     const token = this.peek();
     if (!token) throw new Error('Unexpected end of input');
 
@@ -177,17 +185,20 @@ class MathParser {
     if (token.type === 'OP' && (token.value === '-' || token.value === '+')) {
       this.consume();
       const factor = this.parseFactor();
-      return token.value === '-' ? -factor : factor;
+      return {
+        value: token.value === '-' ? -factor.value : factor.value,
+        isPercent: factor.isPercent,
+      };
     }
 
     if (token.type === 'NUMBER') {
       this.consume();
-      let val = parseFloat(token.value);
+      const val = parseFloat(token.value);
       if (this.peek()?.type === 'PERCENT') {
         this.consume();
-        val = val / 100;
+        return { value: val, isPercent: true };
       }
-      return val;
+      return { value: val, isPercent: false };
     }
 
     if (token.type === 'LPAREN') {
@@ -197,7 +208,11 @@ class MathParser {
       if (close && close.type === 'RPAREN') {
         this.consume(); // ')'
       }
-      return val;
+      if (this.peek()?.type === 'PERCENT') {
+        this.consume();
+        return { value: val, isPercent: true };
+      }
+      return { value: val, isPercent: false };
     }
 
     throw new Error(`Unexpected token: ${token.value}`);
