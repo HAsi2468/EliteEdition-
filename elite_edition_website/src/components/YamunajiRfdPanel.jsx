@@ -165,7 +165,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     };
   });
 
-  // Save Configs on Change
+  // Save Configs to Backend and LocalStorage
+  const saveConfigsToBackend = useCallback(async (cfg) => {
+    try {
+      localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(cfg));
+      await api.updateCompanySettings({
+        companyEntity,
+        weavers: cfg.weavers,
+        qualities: cfg.qualities,
+        mills: cfg.mills,
+        processes: cfg.processes
+      });
+    } catch (e) {
+      console.warn('Failed to sync master configs to backend:', e);
+    }
+  }, [companyEntity]);
+
   useEffect(() => {
     try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(configs)); } catch (e) {}
   }, [configs]);
@@ -204,88 +219,154 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return [];
   });
 
-  // Synchronize and recover Lots from Backend Database (BillingPurchase)
+  // Synchronize and recover Lots and Masters from Backend Database (BillingPurchase & CompanySettings)
   useEffect(() => {
     let isMounted = true;
     const syncFromBackend = async () => {
       try {
-        const res = await api.getBillingPurchases(companyEntity);
-        const purchases = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-        if (!isMounted || purchases.length === 0) return;
+        const [purchasesRes, settingsRes] = await Promise.allSettled([
+          api.getBillingPurchases(companyEntity),
+          api.getCompanySettings(companyEntity)
+        ]);
 
-        setGrayLots(prev => {
-          let updated = [...prev];
-          let changed = false;
+        const purchases = (purchasesRes.status === 'fulfilled' && purchasesRes.value?.data && Array.isArray(purchasesRes.value.data))
+          ? purchasesRes.value.data
+          : (purchasesRes.status === 'fulfilled' && Array.isArray(purchasesRes.value) ? purchasesRes.value : []);
 
-          purchases.forEach(p => {
-            const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
-            if (!isGrayPurchase) return;
+        const backendSettings = (settingsRes.status === 'fulfilled' && settingsRes.value?.data) ? settingsRes.value.data : {};
 
-            const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
-            const exists = updated.some(l => l.lotNumber === lotNum || (l.purchaseNo && l.purchaseNo === p.purchaseNo) || (l.purchaseId && l.purchaseId === p._id));
+        if (!isMounted) return;
 
-            if (!exists) {
-              const firstItem = p.items?.[0] || {};
-              const qty = parseFloat(p.quantity || firstItem.quantity || firstItem.qty || 0);
-              const rate = parseFloat(p.rate || firstItem.rate || firstItem.unitPrice || 0);
-              const totalAmt = parseFloat(p.totalAmount || p.grandTotal || 0);
-              const taxAmt = parseFloat(p.totalTax || p.taxAmount || 0);
-              const taxVal = parseFloat(p.taxableAmount || p.subtotal || 0);
-              const gst = parseFloat(p.gstRate || firstItem.taxRate || 5);
+        if (purchases.length > 0) {
+          setGrayLots(prev => {
+            let updated = [...prev];
+            let changed = false;
 
-              let tpCount = 1;
-              const tpMatch = (firstItem.description || p.notes || '').match(/(\d+)\s*TPs/i);
-              if (tpMatch && parseInt(tpMatch[1], 10) > 0) {
-                tpCount = parseInt(tpMatch[1], 10);
+            purchases.forEach(p => {
+              const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
+              if (!isGrayPurchase) return;
+
+              const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
+              const exists = updated.some(l => l.lotNumber === lotNum || (l.purchaseNo && l.purchaseNo === p.purchaseNo) || (l.purchaseId && l.purchaseId === p._id));
+
+              if (!exists) {
+                const firstItem = p.items?.[0] || {};
+                const qty = parseFloat(p.quantity || firstItem.quantity || firstItem.qty || 0);
+                const rate = parseFloat(p.rate || firstItem.rate || firstItem.unitPrice || 0);
+                const totalAmt = parseFloat(p.totalAmount || p.grandTotal || 0);
+                const taxAmt = parseFloat(p.totalTax || p.taxAmount || 0);
+                const taxVal = parseFloat(p.taxableAmount || p.subtotal || 0);
+                const gst = parseFloat(p.gstRate || firstItem.taxRate || 5);
+
+                let tpCount = 1;
+                const tpMatch = (firstItem.description || p.notes || '').match(/(\d+)\s*TPs/i);
+                if (tpMatch && parseInt(tpMatch[1], 10) > 0) {
+                  tpCount = parseInt(tpMatch[1], 10);
+                }
+
+                const recoveredLot = {
+                  id: lotNum,
+                  lotNumber: lotNum,
+                  inwardDate: p.date ? p.date.split('T')[0] : (p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+                  weaverParty: p.vendorName || p.vendor?.name || 'FABX TRENDZ',
+                  weaverChallanNo: firstItem.partyChallan || p.billNo || 'Direct Inward',
+                  fabricQuality: firstItem.fabric || firstItem.fabricName || firstItem.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || 'ARMANI SATIN 60"',
+                  totalTps: tpCount,
+                  totalMeters: qty,
+                  sentToMillMeters: 0,
+                  ratePerMeter: rate,
+                  status: 'In Stock',
+                  rackLocation: '',
+                  remarks: p.notes || '',
+                  invoiceStatus: 'Invoiced',
+                  invoiceReceivedOption: 'received',
+                  invoiceNo: p.billNo || '',
+                  invoiceDate: p.date ? p.date.split('T')[0] : null,
+                  hsnCode: firstItem.hsnCode || '5208',
+                  gstRate: gst,
+                  taxableAmount: taxVal,
+                  gstAmount: taxAmt,
+                  grandTotal: totalAmt,
+                  paymentTerms: p.terms || '30 Days',
+                  postToPurchase: true,
+                  purchaseNo: p.purchaseNo || 'YJP-01',
+                  purchaseId: p._id || '',
+                  tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
+                };
+
+                updated.unshift(recoveredLot);
+                changed = true;
               }
+            });
 
-              const recoveredLot = {
-                id: lotNum,
-                lotNumber: lotNum,
-                inwardDate: p.date ? p.date.split('T')[0] : (p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
-                weaverParty: p.vendorName || p.vendor?.name || 'FABX TRENDZ',
-                weaverChallanNo: firstItem.partyChallan || p.billNo || 'Direct Inward',
-                fabricQuality: firstItem.fabric || firstItem.fabricName || firstItem.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || 'ARMANI SATIN 60"',
-                totalTps: tpCount,
-                totalMeters: qty,
-                sentToMillMeters: 0,
-                ratePerMeter: rate,
-                status: 'In Stock',
-                rackLocation: '',
-                remarks: p.notes || '',
-                invoiceStatus: 'Invoiced',
-                invoiceReceivedOption: 'received',
-                invoiceNo: p.billNo || '',
-                invoiceDate: p.date ? p.date.split('T')[0] : null,
-                hsnCode: firstItem.hsnCode || '5208',
-                gstRate: gst,
-                taxableAmount: taxVal,
-                gstAmount: taxAmt,
-                grandTotal: totalAmt,
-                paymentTerms: p.terms || '30 Days',
-                postToPurchase: true,
-                purchaseNo: p.purchaseNo || 'YJP-01',
-                purchaseId: p._id || '',
-                tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
-              };
-
-              updated.unshift(recoveredLot);
-              changed = true;
+            if (changed) {
+              try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
+              return updated;
             }
+            return prev;
           });
+        }
 
-          if (changed) {
-            try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
-            return updated;
-          }
-          return prev;
-        });
-
-        // Ensure vendors and qualities from purchases are populated into master configs
+        // Synchronize and restore Master Configurations (Weavers, Qualities, Mills, Process Types) from MongoDB
         setConfigs(prev => {
           let updatedConfigs = { ...prev };
           let configsChanged = false;
 
+          // Merge backend saved mills
+          if (Array.isArray(backendSettings.mills) && backendSettings.mills.length > 0) {
+            backendSettings.mills.forEach(m => {
+              const mName = getPartyName(m).trim();
+              if (mName && !updatedConfigs.mills.some(em => getPartyName(em).toLowerCase() === mName.toLowerCase())) {
+                updatedConfigs.mills = [...updatedConfigs.mills, normalizeParty(m)];
+                configsChanged = true;
+              }
+            });
+          }
+
+          // Merge backend saved processes
+          if (Array.isArray(backendSettings.processes) && backendSettings.processes.length > 0) {
+            backendSettings.processes.forEach(pr => {
+              const prName = typeof pr === 'string' ? pr.trim() : (pr.name || '').trim();
+              if (prName && !updatedConfigs.processes.some(ep => (typeof ep === 'string' ? ep : ep.name || '').toLowerCase() === prName.toLowerCase())) {
+                updatedConfigs.processes = [...updatedConfigs.processes, prName];
+                configsChanged = true;
+              }
+            });
+          }
+
+          // Merge backend saved weavers
+          if (Array.isArray(backendSettings.weavers) && backendSettings.weavers.length > 0) {
+            backendSettings.weavers.forEach(w => {
+              const wName = getPartyName(w).trim();
+              if (wName && !updatedConfigs.weavers.some(ew => getPartyName(ew).toLowerCase() === wName.toLowerCase())) {
+                updatedConfigs.weavers = [...updatedConfigs.weavers, normalizeParty(w)];
+                configsChanged = true;
+              }
+            });
+          }
+
+          // Merge backend saved qualities
+          if (Array.isArray(backendSettings.qualities) && backendSettings.qualities.length > 0) {
+            backendSettings.qualities.forEach(q => {
+              const qName = typeof q === 'string' ? q.trim() : (q.name || '').trim();
+              if (qName && !updatedConfigs.qualities.some(eq => (typeof eq === 'string' ? eq : eq.name || '').toLowerCase() === qName.toLowerCase())) {
+                updatedConfigs.qualities = [...updatedConfigs.qualities, qName];
+                configsChanged = true;
+              }
+            });
+          }
+
+          // If mills or processes are still completely empty, initialize with standard Surat textile defaults
+          if (updatedConfigs.mills.length === 0 && STANDARD_SURAT_CONFIGS.mills.length > 0) {
+            updatedConfigs.mills = [...STANDARD_SURAT_CONFIGS.mills.map(m => normalizeParty(m))];
+            configsChanged = true;
+          }
+          if (updatedConfigs.processes.length === 0 && STANDARD_SURAT_CONFIGS.processes.length > 0) {
+            updatedConfigs.processes = [...STANDARD_SURAT_CONFIGS.processes];
+            configsChanged = true;
+          }
+
+          // Ensure vendors and qualities from purchases are populated into master configs
           purchases.forEach(p => {
             const vName = (p.vendorName || p.vendor?.name || '').trim();
             if (vName && !updatedConfigs.weavers.some(w => getPartyName(w).toLowerCase() === vName.toLowerCase())) {
@@ -315,13 +396,21 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
           if (configsChanged) {
             try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updatedConfigs)); } catch (e) {}
+            // Sync to backend MongoDB
+            api.updateCompanySettings({
+              companyEntity,
+              weavers: updatedConfigs.weavers,
+              qualities: updatedConfigs.qualities,
+              mills: updatedConfigs.mills,
+              processes: updatedConfigs.processes
+            }).catch(() => {});
             return updatedConfigs;
           }
           return prev;
         });
 
       } catch (err) {
-        console.warn('Could not sync lots from backend:', err);
+        console.warn('Could not sync lots and configs from backend:', err);
       }
     };
 
@@ -644,7 +733,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         list[partyModalIndex] = cleanParty;
       }
       const updated = { ...prev, [partyModalType]: list };
-      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+      saveConfigsToBackend(updated);
       return updated;
     });
 
@@ -673,7 +762,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         ...prev,
         [settingsActiveTab]: updatedList
       };
-      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+      saveConfigsToBackend(updated);
       return updated;
     });
     setNewSettingInput('');
@@ -694,7 +783,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             ...prev,
             [settingsActiveTab]: updatedList
           };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+          saveConfigsToBackend(updated);
           return updated;
         });
       }
@@ -748,7 +837,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           mills: mergedMills,
           processes: mergedProcesses
         };
-        try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+        saveConfigsToBackend(updated);
         return updated;
       });
       triggerEliteAlert('Standard Surat textile presets loaded successfully!', 'Defaults Loaded');
@@ -771,7 +860,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         updatedList[index] = val;
       }
       const updated = { ...prev, [settingsActiveTab]: updatedList };
-      try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+      saveConfigsToBackend(updated);
       return updated;
     });
     setEditingItemIndex(null);
@@ -805,7 +894,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           ...prev,
           [settingsActiveTab]: updatedList
         };
-        try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
+        saveConfigsToBackend(updated);
         return updated;
       });
       triggerEliteAlert(`"${itemName}" removed from master list.`, 'Item Removed');

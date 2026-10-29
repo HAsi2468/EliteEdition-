@@ -299,6 +299,23 @@ const printConfigSchema = new mongoose.Schema(
       type: String,
       default: 'System operations are temporarily paused by Administrator for routine maintenance. Please wait, operations will resume automatically.',
     },
+    // Textile Masters (Yamunaji Fabric Process)
+    weavers: {
+      type: Array,
+      default: [],
+    },
+    qualities: {
+      type: [String],
+      default: [],
+    },
+    mills: {
+      type: Array,
+      default: [],
+    },
+    processes: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
