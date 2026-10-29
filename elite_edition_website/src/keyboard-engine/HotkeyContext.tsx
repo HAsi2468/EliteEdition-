@@ -138,7 +138,8 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const isAlt = e.altKey;
 
       const isFKey = /^f([1-9]|1[0-2])$/i.test(rawKey);
-      const isBrowserSave = isCtrlOrMeta && (key === 's' || key === 'a');
+      const inInput = isTextInputActive();
+      const isBrowserSave = isCtrlOrMeta && (key === 's' || (key === 'a' && !inInput));
       const isBrowserPrint = isCtrlOrMeta && key === 'p';
       const isBrowserSearch = isCtrlOrMeta && (key === 'k' || key === 'e');
       const isSavePrint = isCtrlOrMeta && key === 'enter';
@@ -174,7 +175,7 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // 3. Question mark (?) shortcut for cheat sheet when not in an editable text input
-      if ((e.key === '?' || (e.shiftKey && e.key === '/')) && !isTextInputActive()) {
+      if ((e.key === '?' || (e.shiftKey && e.key === '/')) && !inInput) {
         e.preventDefault();
         setIsCheatSheetOpen((prev) => !prev);
         return;
@@ -185,8 +186,6 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .filter((h) => !h.disabled)
         .sort((a, b) => (b.priority ?? HOTKEY_PRIORITIES.GLOBAL) - (a.priority ?? HOTKEY_PRIORITIES.GLOBAL));
 
-      const inInput = isTextInputActive();
-
       for (const def of registered) {
         if (matchesCombo(e, def.combo)) {
           const priority = def.priority ?? HOTKEY_PRIORITIES.GLOBAL;
@@ -194,8 +193,11 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // If user is inside an input, only allow:
           // - High priority handlers (>= 50: INPUT, CELL_EDIT, MODAL)
           // - OR explicit function keys (F1-F12)
-          // - OR Ctrl/Cmd/Alt shortcuts (Ctrl+S, Ctrl+Enter, Alt+C, etc.)
+          // - OR Ctrl/Cmd/Alt shortcuts (Ctrl+S, Ctrl+Enter, Alt+C, etc.), excluding Ctrl+A (Select All)
           if (inInput && priority < HOTKEY_PRIORITIES.INPUT) {
+            if (isCtrlOrMeta && key === 'a') {
+              continue;
+            }
             const hasModifier = e.ctrlKey || e.metaKey || e.altKey || isFKey;
             if (!hasModifier) {
               continue;
@@ -240,9 +242,12 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // 7. Direct Sidebar Module Jump (Alt + 1..9)
-      if (e.altKey && !isCtrlOrMeta && /^[1-9]$/.test(e.key)) {
-        const activated = activateSidebarModule(Number(e.key) - 1);
+      // 7. Direct Sidebar Module Jump (Alt + 1..9, supporting macOS Option via e.code)
+      const altDigitMatch = e.altKey && !isCtrlOrMeta
+        ? (/^[1-9]$/.test(e.key) ? Number(e.key) : (/^Digit([1-9])$/.test(e.code || '') ? Number(e.code.slice(5)) : 0))
+        : 0;
+      if (altDigitMatch >= 1 && altDigitMatch <= 9) {
+        const activated = activateSidebarModule(altDigitMatch - 1);
         if (activated) {
           e.preventDefault();
           e.stopPropagation();
@@ -250,8 +255,8 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // 8. Focus Sidebar (Alt + S or F10)
-      if ((e.altKey && key === 's') || upperKey === 'F10') {
+      // 8. Focus Sidebar (Alt + S or F10, supporting macOS Option+S via e.code)
+      if ((e.altKey && (key === 's' || e.code === 'KeyS')) || upperKey === 'F10') {
         const focused = focusSidebar();
         if (focused) {
           e.preventDefault();
@@ -268,7 +273,7 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
-      // 10. Universal Pane Cycler (F6: Sidebar <-> Main Content <-> Search)
+      // 10. Universal Pane Cycler (Shift + F6 or F6 fallback: Sidebar <-> Main Content <-> Search)
       if (upperKey === 'F6') {
         const cycled = cyclePanes();
         if (cycled) {
@@ -324,7 +329,7 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       window.removeEventListener('blur', clearAltMode);
       window.removeEventListener('click', clearAltMode);
     };
-  }, [triggerHierarchicalEsc, isAltModeActive]);
+  }, [triggerHierarchicalEsc]);
 
   return (
     <HotkeyContext.Provider

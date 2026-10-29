@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building, Receipt, Settings, Sparkles, Layers, ShieldCheck, Plus, ArrowRight } from 'lucide-react';
 import EliteBillingDepartment from './EliteBillingDepartment';
 import CompanySettingsPanel from './CompanySettingsPanel';
+import { getCompanyById } from '../config/companiesConfig';
 
 export default function CompanyDevelopmentWorkspace({ companyEntity = 'Elite Edition', activeTab = 'invoices', onTabChange }) {
-  const [subTab, setSubTab] = useState(activeTab === 'settings' ? 'settings' : 'invoices');
+  const [subTab, setSubTab] = useState(activeTab === 'settings' || String(activeTab).endsWith('_settings') ? 'settings' : 'invoices');
 
-  const isEdition = companyEntity === 'Elite Edition';
-  const themeColor = isEdition ? '#8b5cf6' : '#10b981';
-  const prefix = isEdition ? 'EE-2627-' : 'EF-2627-';
+  useEffect(() => {
+    setSubTab(activeTab === 'settings' || String(activeTab).endsWith('_settings') ? 'settings' : 'invoices');
+  }, [activeTab]);
+
+  const company = getCompanyById(companyEntity);
+  const themeColor = company.badgeColor || '#8b5cf6';
+  const prefix = company.invoicePrefix || `${company.code || 'EE'}-2627-`;
+  const invoicesTabId = company.invoicesTab || `${(company.code || 'ee').toLowerCase()}_invoices`;
+  const settingsTabId = company.settingsTab || `${(company.code || 'ee').toLowerCase()}_settings`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 'calc(100vh - 70px)' }}>
@@ -68,7 +75,7 @@ export default function CompanyDevelopmentWorkspace({ companyEntity = 'Elite Edi
         {/* Company Quick Sub-Tabs */}
         <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.25)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
           <button
-            onClick={() => { setSubTab('invoices'); if (onTabChange) onTabChange(isEdition ? 'ee_invoices' : 'ef_invoices'); }}
+            onClick={() => { setSubTab('invoices'); if (onTabChange) onTabChange(invoicesTabId); }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -88,7 +95,7 @@ export default function CompanyDevelopmentWorkspace({ companyEntity = 'Elite Edi
           </button>
 
           <button
-            onClick={() => { setSubTab('settings'); if (onTabChange) onTabChange(isEdition ? 'ee_settings' : 'ef_settings'); }}
+            onClick={() => { setSubTab('settings'); if (onTabChange) onTabChange(settingsTabId); }}
             style={{
               display: 'flex',
               alignItems: 'center',

@@ -14,7 +14,7 @@ const SHORTCUT_DATABASE: ShortcutCategory[] = [
       { key: '?', description: 'Open this Shortcut Cheat Sheet' },
       { key: 'Alt (Hold/Tap)', description: 'Toggle visual mnemonic key badges on buttons' },
       { key: 'Esc', description: 'Hierarchical Cancel (Close dropdown -> Exit edit -> Close modal)' },
-      { key: 'F6', description: 'Universal Pane Cycler (Sidebar ↔ Main Content ↔ Search)' },
+      { key: 'Shift + F6', description: 'Universal Pane Cycler (Sidebar ↔ Main Content ↔ Search)' },
       { key: '/ or Ctrl + F', description: 'Quick focus search / filter on active screen' },
       { key: 'F2', description: 'Change Voucher / Period Date' },
     ],

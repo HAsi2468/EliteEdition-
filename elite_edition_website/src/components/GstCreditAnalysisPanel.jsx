@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calculator,
   ArrowUpRight,
@@ -24,8 +24,8 @@ import {
   ChevronDown,
   Truck
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { normalizeCompanyId } from '../config/companiesConfig';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import Gstr1Table12Panel from './Gstr1Table12Panel';
 import GtaFreightRcmPanel from './GtaFreightRcmPanel';
@@ -81,6 +81,13 @@ export default function GstCreditAnalysisPanel({
   const [partyTypeFilter, setPartyTypeFilter] = useState('ALL'); // 'ALL', 'B2B', 'B2C'
   const [taxRateFilter, setTaxRateFilter] = useState('ALL'); // 'ALL', '0', '5', '12', '18', '28'
   const [isExporting, setIsExporting] = useState(false);
+
+  // Sync entityFilter when parent companyEntity prop changes
+  useEffect(() => {
+    if (companyEntity) {
+      setEntityFilter(companyEntity);
+    }
+  }, [companyEntity]);
 
   // Compute Active Reporting Period Date Boundaries
   const dateRange = useMemo(() => {
@@ -239,9 +246,11 @@ export default function GstCreditAnalysisPanel({
 
       // Entity
       if (entityFilter !== 'ALL') {
+        const invNorm = normalizeCompanyId(inv.companyEntity);
+        const filtNorm = normalizeCompanyId(entityFilter);
         const invEnt = String(inv.companyEntity || '').toLowerCase();
         const filtEnt = String(entityFilter || '').toLowerCase();
-        if (!invEnt.includes(filtEnt) && !filtEnt.includes(invEnt)) return false;
+        if (invNorm !== filtNorm && !invEnt.includes(filtEnt) && !filtEnt.includes(invEnt)) return false;
       }
 
       // Party Type (B2B / B2C)
@@ -273,9 +282,11 @@ export default function GstCreditAnalysisPanel({
 
       // Entity
       if (entityFilter !== 'ALL') {
+        const purNorm = normalizeCompanyId(pur.companyEntity);
+        const filtNorm = normalizeCompanyId(entityFilter);
         const purEnt = String(pur.companyEntity || '').toLowerCase();
         const filtEnt = String(entityFilter || '').toLowerCase();
-        if (!purEnt.includes(filtEnt) && !filtEnt.includes(purEnt)) return false;
+        if (purNorm !== filtNorm && !purEnt.includes(filtEnt) && !filtEnt.includes(purEnt)) return false;
       }
 
       // Party Type
@@ -461,9 +472,10 @@ export default function GstCreditAnalysisPanel({
   }, [filteredInvoices, filteredPurchases]);
 
   // ── EXCEL EXPORT FUNCTIONALITY ─────────────────────────────────────────────
-  const handleExportExcel = (mode = 'comprehensive') => {
+  const handleExportExcel = async (mode = 'comprehensive') => {
     try {
       setIsExporting(true);
+      const XLSX = await import('xlsx');
       const wb = XLSX.utils.book_new();
       const periodLabel = dateRange.labelText.replace(/[^a-zA-Z0-9_-]/g, '_');
 

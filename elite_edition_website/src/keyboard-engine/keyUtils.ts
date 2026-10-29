@@ -38,9 +38,19 @@ export function eventToCombo(e: KeyboardEvent): string {
   if (e.altKey) parts.push('alt');
   if (e.shiftKey) parts.push('shift');
 
-  let key = e.key.toLowerCase();
+  let key = (e.key || '').toLowerCase();
   if (key === 'escape') key = 'esc';
   if (key === ' ') key = 'space';
+
+  // On macOS, Option (Alt) + Key/Digit produces special characters (e.g., 'ß', '¡', '™').
+  // Normalize via physical key code so Alt+A..Z and Alt+0..9 work cross-platform.
+  if (e.altKey && e.code) {
+    if (/^Key[A-Z]$/.test(e.code)) {
+      key = e.code.slice(3).toLowerCase();
+    } else if (/^Digit[0-9]$/.test(e.code)) {
+      key = e.code.slice(5);
+    }
+  }
 
   // If the key itself is a modifier, don't append it again
   if (!['control', 'meta', 'alt', 'shift'].includes(key)) {
