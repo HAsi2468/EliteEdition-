@@ -332,21 +332,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
         // 3. Synchronize Mill Outward Challans from MongoDB Atlas
         if (Array.isArray(backendSettings.millChallans) && backendSettings.millChallans.length > 0) {
-          setMillChallans(prev => {
-            let updated = [...prev];
-            let changed = false;
-            backendSettings.millChallans.forEach(bCh => {
-              if (!updated.some(c => c.id === bCh.id || (c.challanNo && c.challanNo === bCh.challanNo))) {
-                updated.push(bCh);
-                changed = true;
-              }
-            });
-            if (changed) {
-              try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updated)); } catch (e) {}
-              return updated;
-            }
-            return prev;
-          });
+          setMillChallans(backendSettings.millChallans);
+          try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(backendSettings.millChallans)); } catch (e) {}
         }
 
         // 4. Synchronize RFD Inward Lots from MongoDB Atlas
@@ -373,48 +360,32 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           let updatedConfigs = { ...prev };
           let configsChanged = false;
 
-          // Merge backend saved mills
+          // Backend saved mills (authoritative)
           if (Array.isArray(backendSettings.mills) && backendSettings.mills.length > 0) {
-            backendSettings.mills.forEach(m => {
-              const mName = getPartyName(m).trim();
-              if (mName && !updatedConfigs.mills.some(em => getPartyName(em).toLowerCase() === mName.toLowerCase())) {
-                updatedConfigs.mills = [...updatedConfigs.mills, normalizeParty(m)];
-                configsChanged = true;
-              }
-            });
+            updatedConfigs.mills = backendSettings.mills.map(normalizeParty);
+            configsChanged = true;
           }
 
-          // Merge backend saved processes
+          // Backend saved processes (authoritative)
           if (Array.isArray(backendSettings.processes) && backendSettings.processes.length > 0) {
-            backendSettings.processes.forEach(pr => {
-              const prName = typeof pr === 'string' ? pr.trim() : (pr.name || '').trim();
-              if (prName && !updatedConfigs.processes.some(ep => (typeof ep === 'string' ? ep : ep.name || '').toLowerCase() === prName.toLowerCase())) {
-                updatedConfigs.processes = [...updatedConfigs.processes, prName];
-                configsChanged = true;
-              }
-            });
+            updatedConfigs.processes = backendSettings.processes
+              .map(pr => typeof pr === 'string' ? pr.trim() : (pr.name || '').trim())
+              .filter(Boolean);
+            configsChanged = true;
           }
 
-          // Merge backend saved weavers
+          // Backend saved weavers (authoritative)
           if (Array.isArray(backendSettings.weavers) && backendSettings.weavers.length > 0) {
-            backendSettings.weavers.forEach(w => {
-              const wName = getPartyName(w).trim();
-              if (wName && !updatedConfigs.weavers.some(ew => getPartyName(ew).toLowerCase() === wName.toLowerCase())) {
-                updatedConfigs.weavers = [...updatedConfigs.weavers, normalizeParty(w)];
-                configsChanged = true;
-              }
-            });
+            updatedConfigs.weavers = backendSettings.weavers.map(normalizeParty);
+            configsChanged = true;
           }
 
-          // Merge backend saved qualities
+          // Backend saved qualities (authoritative)
           if (Array.isArray(backendSettings.qualities) && backendSettings.qualities.length > 0) {
-            backendSettings.qualities.forEach(q => {
-              const qName = typeof q === 'string' ? q.trim() : (q.name || '').trim();
-              if (qName && !updatedConfigs.qualities.some(eq => (typeof eq === 'string' ? eq : eq.name || '').toLowerCase() === qName.toLowerCase())) {
-                updatedConfigs.qualities = [...updatedConfigs.qualities, qName];
-                configsChanged = true;
-              }
-            });
+            updatedConfigs.qualities = backendSettings.qualities
+              .map(q => typeof q === 'string' ? q.trim() : (q.name || '').trim())
+              .filter(Boolean);
+            configsChanged = true;
           }
 
           // Ensure vendors and qualities from purchases are populated into master configs
@@ -447,18 +418,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
           if (configsChanged) {
             try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updatedConfigs)); } catch (e) {}
-            // Sync to backend MongoDB
-            api.updateCompanySettings({
-              companyEntity,
-              weavers: updatedConfigs.weavers,
-              qualities: updatedConfigs.qualities,
-              mills: updatedConfigs.mills,
-              processes: updatedConfigs.processes
-            }).catch(() => {});
             return updatedConfigs;
           }
           return prev;
         });
+
 
         isInitialSyncDone.current = true;
       } catch (err) {
