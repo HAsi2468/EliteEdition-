@@ -4656,7 +4656,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.5rem', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', background: '#f8fafc' }}>
                   {(configs[settingsActiveTab] || []).length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
-                      No items configured for {settingsActiveTab === 'qualities' ? 'Fabric Qualities' : 'Process Types'}. Type a name above and click "+ Add to Master", or click "⚡ Load Standard Surat Preset" below.
+                      No items configured for {settingsActiveTab === 'qualities' ? 'Fabric Qualities' : 'Process Types'}. Type a name above and click "+ Add to Master".
                     </div>
                   ) : (
                     (configs[settingsActiveTab] || []).map((item, idx) => {
@@ -4737,29 +4737,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
             )}
 
-            {/* Modal Footer with Save & Close and Preset Loader */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={handleRestoreStandardDefaults}
-                className="btn-secondary"
-                style={{
-                  padding: '0.45rem 0.9rem',
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  color: '#0284c7',
-                  borderColor: '#bae6fd',
-                  background: '#f0f9ff',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  borderRadius: 8
-                }}
-                title="Populate standard Surat textile presets for Weavers, Mills, Qualities & Processes"
-              >
-                <Sliders size={13} /> ⚡ Load Standard Surat Preset
-              </button>
-
+            {/* Modal Footer with Save & Close */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
               <button
                 type="button"
                 onClick={handleCloseSettingsModal}
