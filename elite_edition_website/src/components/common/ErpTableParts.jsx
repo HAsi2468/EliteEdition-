@@ -47,14 +47,28 @@ export function ErpTh({
     }
   };
 
+  const handleHeaderClick = () => {
+    if (!onSortChange || !columnKey || hideSort) return;
+    if (!isSorted) {
+      onSortChange({ columnKey, order: 'asc' });
+    } else if (isAsc) {
+      onSortChange({ columnKey, order: 'desc' });
+    } else {
+      onSortChange({ columnKey, order: null });
+    }
+  };
+
   const justifyMap = {
     left: 'flex-start',
     center: 'center',
     right: 'flex-end',
   };
 
+  const titleText = typeof children === 'string' ? children : columnKey;
+
   return (
     <th
+      onClick={handleHeaderClick}
       style={{
         position: 'sticky',
         top: 0,
@@ -62,14 +76,17 @@ export function ErpTh({
         padding: '0.45rem 0.65rem',
         fontSize: '0.73rem',
         fontWeight: 700,
-        color: '#475569',
+        color: isSorted ? '#1e293b' : '#475569',
         textTransform: 'uppercase',
         letterSpacing: '0.03em',
-        background: '#f8fafc',
-        borderBottom: '2px solid #e2e8f0',
+        background: isSorted ? '#f1f5f9' : '#f8fafc',
+        borderBottom: isSorted ? '2px solid #3b82f6' : '2px solid #e2e8f0',
         whiteSpace: 'nowrap',
         textAlign: align,
         width,
+        cursor: columnKey && !hideSort ? 'pointer' : 'default',
+        userSelect: 'none',
+        transition: 'background 0.15s ease',
         ...style,
       }}
       className={className}
@@ -79,72 +96,75 @@ export function ErpTh({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '0.35rem',
+          gap: '0.3rem',
           justifyContent: justifyMap[align] || 'flex-start',
           width: '100%',
         }}
       >
         <span>{children}</span>
         {!hideSort && columnKey && (
-          <div
+          <span
             style={{
               display: 'inline-flex',
-              flexDirection: 'row',
+              flexDirection: 'column',
+              justifyContent: 'center',
               alignItems: 'center',
               gap: '1px',
-              marginLeft: '0.2rem',
-              background: isSorted ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0, 0, 0, 0.04)',
-              borderRadius: '4px',
-              padding: '1px 2px',
+              marginLeft: '0.15rem',
+              lineHeight: 1,
+              userSelect: 'none',
+              flexShrink: 0,
             }}
           >
             <button
               type="button"
               onClick={handleAscClick}
-              title={`Sort ${typeof children === 'string' ? children : columnKey} Ascending`}
+              title={`Sort ${titleText} Ascending`}
+              aria-label={`Sort ${titleText} Ascending`}
               style={{
                 border: 'none',
-                background: isAsc ? '#2563eb' : 'transparent',
-                color: isAsc ? '#ffffff' : '#94a3b8',
+                background: isAsc ? 'rgba(37, 99, 235, 0.18)' : 'transparent',
                 borderRadius: '2px',
-                width: '14px',
-                height: '14px',
-                display: 'inline-flex',
+                padding: '1px 2px',
+                width: '12px',
+                height: '7px',
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '9px',
                 cursor: 'pointer',
-                lineHeight: 1,
-                padding: 0,
-                transition: 'all 0.15s ease',
+                lineHeight: 0,
+                transition: 'all 0.12s ease',
               }}
             >
-              ▲
+              <svg width="7" height="4" viewBox="0 0 7 4" fill="none" style={{ display: 'block' }}>
+                <path d="M3.5 0.5L6.5 3.5H0.5L3.5 0.5Z" fill={isAsc ? '#2563eb' : '#94a3b8'} />
+              </svg>
             </button>
             <button
               type="button"
               onClick={handleDescClick}
-              title={`Sort ${typeof children === 'string' ? children : columnKey} Descending`}
+              title={`Sort ${titleText} Descending`}
+              aria-label={`Sort ${titleText} Descending`}
               style={{
                 border: 'none',
-                background: isDesc ? '#2563eb' : 'transparent',
-                color: isDesc ? '#ffffff' : '#94a3b8',
+                background: isDesc ? 'rgba(37, 99, 235, 0.18)' : 'transparent',
                 borderRadius: '2px',
-                width: '14px',
-                height: '14px',
-                display: 'inline-flex',
+                padding: '1px 2px',
+                width: '12px',
+                height: '7px',
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '9px',
                 cursor: 'pointer',
-                lineHeight: 1,
-                padding: 0,
-                transition: 'all 0.15s ease',
+                lineHeight: 0,
+                transition: 'all 0.12s ease',
               }}
             >
-              ▼
+              <svg width="7" height="4" viewBox="0 0 7 4" fill="none" style={{ display: 'block' }}>
+                <path d="M3.5 3.5L0.5 0.5H6.5L3.5 3.5Z" fill={isDesc ? '#2563eb' : '#94a3b8'} />
+              </svg>
             </button>
-          </div>
+          </span>
         )}
       </div>
     </th>
