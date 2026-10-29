@@ -50,7 +50,6 @@ const STORAGE_GRAY_KEY = 'yamunaji_gray_lots_data';
 const STORAGE_MILL_CHALLAN_KEY = 'yamunaji_mill_challans_data';
 const STORAGE_RFD_KEY = 'yamunaji_rfd_lots_data';
 const STORAGE_CONFIGS_KEY = 'yamunaji_master_configurations';
-const STORAGE_CLEAN_SLATE_KEY = 'yamunaji_clean_slate_20261028_cleared';
 
 // ==========================================
 // DEFAULT MASTER CONFIGURATIONS (SURAT TEXTILES)
@@ -171,20 +170,13 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(configs)); } catch (e) {}
   }, [configs]);
 
-  // Data States (Clean slate, auto-clears previous test/demo lots)
+  // Data States (loaded from localStorage and synchronized with backend BillingPurchase)
   const [grayLots, setGrayLots] = useState(() => {
     try {
-      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') {
-        localStorage.removeItem(STORAGE_GRAY_KEY);
-        localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
-        localStorage.removeItem(STORAGE_RFD_KEY);
-        localStorage.setItem(STORAGE_CLEAN_SLATE_KEY, 'true');
-        return [];
-      }
       const saved = localStorage.getItem(STORAGE_GRAY_KEY);
       if (saved) {
         const p = JSON.parse(saved);
-        if (Array.isArray(p)) return p;
+        if (Array.isArray(p) && p.length > 0) return p;
       }
     } catch (e) {}
     return [];
@@ -192,7 +184,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const [millChallans, setMillChallans] = useState(() => {
     try {
-      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') return [];
       const saved = localStorage.getItem(STORAGE_MILL_CHALLAN_KEY);
       if (saved) {
         const p = JSON.parse(saved);
@@ -204,7 +195,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const [rfdLots, setRfdLots] = useState(() => {
     try {
-      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') return [];
       const saved = localStorage.getItem(STORAGE_RFD_KEY);
       if (saved) {
         const p = JSON.parse(saved);
@@ -214,20 +204,134 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return [];
   });
 
-  // Ensure clean slate on component mount
+  // Synchronize and recover Lots from Backend Database (BillingPurchase)
   useEffect(() => {
-    try {
-      if (localStorage.getItem(STORAGE_CLEAN_SLATE_KEY) !== 'true') {
-        localStorage.removeItem(STORAGE_GRAY_KEY);
-        localStorage.removeItem(STORAGE_MILL_CHALLAN_KEY);
-        localStorage.removeItem(STORAGE_RFD_KEY);
-        localStorage.setItem(STORAGE_CLEAN_SLATE_KEY, 'true');
-        setGrayLots([]);
-        setMillChallans([]);
-        setRfdLots([]);
+    let isMounted = true;
+    const syncFromBackend = async () => {
+      try {
+        const res = await api.getBillingPurchases(companyEntity);
+        const purchases = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+        if (!isMounted || purchases.length === 0) return;
+
+        setGrayLots(prev => {
+          let updated = [...prev];
+          let changed = false;
+
+          purchases.forEach(p => {
+            const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
+            if (!isGrayPurchase) return;
+
+            const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
+            const exists = updated.some(l => l.lotNumber === lotNum || (l.purchaseNo && l.purchaseNo === p.purchaseNo) || (l.purchaseId && l.purchaseId === p._id));
+
+            if (!exists) {
+              const firstItem = p.items?.[0] || {};
+              const qty = parseFloat(p.quantity || firstItem.quantity || firstItem.qty || 0);
+              const rate = parseFloat(p.rate || firstItem.rate || firstItem.unitPrice || 0);
+              const totalAmt = parseFloat(p.totalAmount || p.grandTotal || 0);
+              const taxAmt = parseFloat(p.totalTax || p.taxAmount || 0);
+              const taxVal = parseFloat(p.taxableAmount || p.subtotal || 0);
+              const gst = parseFloat(p.gstRate || firstItem.taxRate || 5);
+
+              let tpCount = 1;
+              const tpMatch = (firstItem.description || p.notes || '').match(/(\d+)\s*TPs/i);
+              if (tpMatch && parseInt(tpMatch[1], 10) > 0) {
+                tpCount = parseInt(tpMatch[1], 10);
+              }
+
+              const recoveredLot = {
+                id: lotNum,
+                lotNumber: lotNum,
+                inwardDate: p.date ? p.date.split('T')[0] : (p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+                weaverParty: p.vendorName || p.vendor?.name || 'FABX TRENDZ',
+                weaverChallanNo: firstItem.partyChallan || p.billNo || 'Direct Inward',
+                fabricQuality: firstItem.fabric || firstItem.fabricName || firstItem.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || 'ARMANI SATIN 60"',
+                totalTps: tpCount,
+                totalMeters: qty,
+                sentToMillMeters: 0,
+                ratePerMeter: rate,
+                status: 'In Stock',
+                rackLocation: '',
+                remarks: p.notes || '',
+                invoiceStatus: 'Invoiced',
+                invoiceReceivedOption: 'received',
+                invoiceNo: p.billNo || '',
+                invoiceDate: p.date ? p.date.split('T')[0] : null,
+                hsnCode: firstItem.hsnCode || '5208',
+                gstRate: gst,
+                taxableAmount: taxVal,
+                gstAmount: taxAmt,
+                grandTotal: totalAmt,
+                paymentTerms: p.terms || '30 Days',
+                postToPurchase: true,
+                purchaseNo: p.purchaseNo || 'YJP-01',
+                purchaseId: p._id || '',
+                tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
+              };
+
+              updated.unshift(recoveredLot);
+              changed = true;
+            }
+          });
+
+          if (changed) {
+            try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          }
+          return prev;
+        });
+
+        // Ensure vendors and qualities from purchases are populated into master configs
+        setConfigs(prev => {
+          let updatedConfigs = { ...prev };
+          let configsChanged = false;
+
+          purchases.forEach(p => {
+            const vName = (p.vendorName || p.vendor?.name || '').trim();
+            if (vName && !updatedConfigs.weavers.some(w => getPartyName(w).toLowerCase() === vName.toLowerCase())) {
+              const newWeaver = {
+                name: vName,
+                gst: p.vendor?.gstin || '',
+                address: p.vendor?.billingAddress || p.vendor?.address || '',
+                city: p.vendor?.city || 'Surat, Gujarat',
+                phone: p.vendor?.phone || '',
+                contactPerson: '',
+                broker: '',
+                processTypes: '',
+                notes: 'Auto-synced from purchase records'
+              };
+              updatedConfigs.weavers = [...updatedConfigs.weavers, newWeaver];
+              configsChanged = true;
+            }
+
+            p.items?.forEach(it => {
+              const qName = (it.fabric || it.fabricName || it.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || '').trim();
+              if (qName && !updatedConfigs.qualities.some(q => q.toLowerCase() === qName.toLowerCase())) {
+                updatedConfigs.qualities = [...updatedConfigs.qualities, qName];
+                configsChanged = true;
+              }
+            });
+          });
+
+          if (configsChanged) {
+            try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updatedConfigs)); } catch (e) {}
+            return updatedConfigs;
+          }
+          return prev;
+        });
+
+      } catch (err) {
+        console.warn('Could not sync lots from backend:', err);
       }
-    } catch (e) {}
-  }, []);
+    };
+
+    syncFromBackend();
+    window.addEventListener('elite-data-refresh', syncFromBackend);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('elite-data-refresh', syncFromBackend);
+    };
+  }, [companyEntity]);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
