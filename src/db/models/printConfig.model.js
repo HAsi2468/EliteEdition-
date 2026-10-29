@@ -316,6 +316,19 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Textile Lots & Challans (Yamunaji Fabric Process)
+    grayLots: {
+      type: Array,
+      default: [],
+    },
+    millChallans: {
+      type: Array,
+      default: [],
+    },
+    rfdLots: {
+      type: Array,
+      default: [],
+    },
   },
   {
     timestamps: true,

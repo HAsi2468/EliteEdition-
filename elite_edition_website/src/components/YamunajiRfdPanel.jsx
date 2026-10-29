@@ -219,6 +219,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return [];
   });
 
+  const isInitialSyncDone = useRef(false);
+
   // Synchronize and recover Lots and Masters from Backend Database (BillingPurchase & CompanySettings)
   useEffect(() => {
     let isMounted = true;
@@ -237,11 +239,31 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
         if (!isMounted) return;
 
-        if (purchases.length > 0) {
-          setGrayLots(prev => {
-            let updated = [...prev];
-            let changed = false;
+        // 1. Synchronize Gray Lots from MongoDB Atlas (backendSettings.grayLots)
+        setGrayLots(prev => {
+          let updated = [...prev];
+          let changed = false;
 
+          if (Array.isArray(backendSettings.grayLots) && backendSettings.grayLots.length > 0) {
+            backendSettings.grayLots.forEach(bLot => {
+              const idx = updated.findIndex(l => (l.lotNumber && l.lotNumber === bLot.lotNumber) || (l.id && l.id === bLot.id));
+              if (idx >= 0) {
+                const cur = updated[idx];
+                const backendTpCount = Array.isArray(bLot.tps) ? bLot.tps.length : 0;
+                const localTpCount = Array.isArray(cur.tps) ? cur.tps.length : 0;
+                if (backendTpCount >= localTpCount) {
+                  updated[idx] = { ...cur, ...bLot };
+                  changed = true;
+                }
+              } else {
+                updated.push(bLot);
+                changed = true;
+              }
+            });
+          }
+
+          // 2. Also recover any purchases from Billing Register not yet in grayLots
+          if (purchases.length > 0) {
             purchases.forEach(p => {
               const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
               if (!isGrayPurchase) return;
@@ -298,16 +320,55 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 changed = true;
               }
             });
+          }
 
+          if (changed) {
+            updated.sort((a, b) => (b.lotNumber || '').localeCompare(a.lotNumber || ''));
+            try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          }
+          return prev;
+        });
+
+        // 3. Synchronize Mill Outward Challans from MongoDB Atlas
+        if (Array.isArray(backendSettings.millChallans) && backendSettings.millChallans.length > 0) {
+          setMillChallans(prev => {
+            let updated = [...prev];
+            let changed = false;
+            backendSettings.millChallans.forEach(bCh => {
+              if (!updated.some(c => c.id === bCh.id || (c.challanNo && c.challanNo === bCh.challanNo))) {
+                updated.push(bCh);
+                changed = true;
+              }
+            });
             if (changed) {
-              try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
+              try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updated)); } catch (e) {}
               return updated;
             }
             return prev;
           });
         }
 
-        // Synchronize and restore Master Configurations (Weavers, Qualities, Mills, Process Types) from MongoDB
+        // 4. Synchronize RFD Inward Lots from MongoDB Atlas
+        if (Array.isArray(backendSettings.rfdLots) && backendSettings.rfdLots.length > 0) {
+          setRfdLots(prev => {
+            let updated = [...prev];
+            let changed = false;
+            backendSettings.rfdLots.forEach(bLot => {
+              if (!updated.some(l => l.id === bLot.id || (l.lotNumber && l.lotNumber === bLot.lotNumber))) {
+                updated.push(bLot);
+                changed = true;
+              }
+            });
+            if (changed) {
+              try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(updated)); } catch (e) {}
+              return updated;
+            }
+            return prev;
+          });
+        }
+
+        // 5. Synchronize and restore Master Configurations (Weavers, Qualities, Mills, Process Types) from MongoDB
         setConfigs(prev => {
           let updatedConfigs = { ...prev };
           let configsChanged = false;
@@ -356,8 +417,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             });
           }
 
-
-
           // Ensure vendors and qualities from purchases are populated into master configs
           purchases.forEach(p => {
             const vName = (p.vendorName || p.vendor?.name || '').trim();
@@ -401,6 +460,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           return prev;
         });
 
+        isInitialSyncDone.current = true;
       } catch (err) {
         console.warn('Could not sync lots and configs from backend:', err);
       }
@@ -556,7 +616,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     notes: ''
   });
 
-  // Sync Data to LocalStorage
+  // Sync Data to LocalStorage & MongoDB Atlas
   useEffect(() => {
     try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(grayLots)); } catch (e) {}
   }, [grayLots]);
@@ -568,6 +628,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   useEffect(() => {
     try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(rfdLots)); } catch (e) {}
   }, [rfdLots]);
+
+  // Strict Background Synchronization to MongoDB Atlas
+  useEffect(() => {
+    if (!isInitialSyncDone.current) return;
+    const timer = setTimeout(() => {
+      api.updateCompanySettings({
+        companyEntity,
+        grayLots,
+        millChallans,
+        rfdLots
+      }).catch(err => console.warn('Background sync lots to MongoDB Atlas:', err));
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [grayLots, millChallans, rfdLots, companyEntity]);
 
   // Aggregate Metrics
   const grayStats = useMemo(() => {
@@ -1228,36 +1302,44 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }))
     };
 
-    setGrayLots(prev => [newGrayLot, ...prev]);
+    // Check if lotNumber already exists (e.g. re-entering or updating)
+    let updatedLots;
+    const existsIndex = grayLots.findIndex(l => l.lotNumber === lotNumber || l.id === lotNumber);
+    if (existsIndex >= 0) {
+      updatedLots = grayLots.map((l, i) => i === existsIndex ? { ...l, ...newGrayLot, id: l.id } : l);
+    } else {
+      updatedLots = [newGrayLot, ...grayLots];
+    }
+
+    setGrayLots(updatedLots);
+    try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedLots)); } catch (e) {}
     setShowWeaverInwardModal(false);
 
     // Auto-save weaver party to master configs if not yet present
+    let updatedWeavers = configs.weavers || [];
     const enteredWeaver = weaverForm.weaverParty.trim();
-    if (enteredWeaver) {
-      setConfigs(prev => {
-        const list = prev.weavers || [];
-        if (!list.some(w => getPartyName(w).toLowerCase() === enteredWeaver.toLowerCase())) {
-          const updated = { ...prev, weavers: [...list, normalizeParty(enteredWeaver)] };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
-          return updated;
-        }
-        return prev;
-      });
+    if (enteredWeaver && !updatedWeavers.some(w => getPartyName(w).toLowerCase() === enteredWeaver.toLowerCase())) {
+      updatedWeavers = [...updatedWeavers, normalizeParty(enteredWeaver)];
     }
 
     // Auto-save fabric quality to master configs if not yet present
+    let updatedQualities = configs.qualities || [];
     const enteredQuality = (weaverForm.fabricQuality || '').trim();
-    if (enteredQuality) {
-      setConfigs(prev => {
-        const list = prev.qualities || [];
-        if (!list.some(q => q.toLowerCase() === enteredQuality.toLowerCase())) {
-          const updated = { ...prev, qualities: [...list, enteredQuality] };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
-          return updated;
-        }
-        return prev;
-      });
+    if (enteredQuality && !updatedQualities.some(q => q.toLowerCase() === enteredQuality.toLowerCase())) {
+      updatedQualities = [...updatedQualities, enteredQuality];
     }
+
+    const nextConfigs = { ...configs, weavers: updatedWeavers, qualities: updatedQualities };
+    setConfigs(nextConfigs);
+    try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(nextConfigs)); } catch (err) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      grayLots: updatedLots,
+      weavers: updatedWeavers,
+      qualities: updatedQualities
+    }).catch(err => console.error('Failed to save Gray Lot to MongoDB Atlas:', err));
 
     // Reset Form to clean slate
     setWeaverForm({
@@ -1971,7 +2053,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       notes: millChallanForm.notes.trim()
     };
 
-    setGrayLots(prev => prev.map(lot => {
+    const updatedGrayLots = grayLots.map(lot => {
       let lotHasSent = false;
       let additionalSentMtrs = 0;
 
@@ -2000,38 +2082,41 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         };
       }
       return lot;
-    }));
+    });
 
-    setMillChallans(prev => [newChallan, ...prev]);
+    const updatedMillChallans = [newChallan, ...millChallans];
+    setGrayLots(updatedGrayLots);
+    setMillChallans(updatedMillChallans);
+    try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
+    try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updatedMillChallans)); } catch (e) {}
     setShowMillChallanModal(false);
 
     // Auto-save mill party to master configs if not yet present
+    let updatedMills = configs.mills || [];
     const enteredMill = millChallanForm.millParty.trim();
-    if (enteredMill) {
-      setConfigs(prev => {
-        const list = prev.mills || [];
-        if (!list.some(m => getPartyName(m).toLowerCase() === enteredMill.toLowerCase())) {
-          const updated = { ...prev, mills: [...list, normalizeParty(enteredMill)] };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
-          return updated;
-        }
-        return prev;
-      });
+    if (enteredMill && !updatedMills.some(m => getPartyName(m).toLowerCase() === enteredMill.toLowerCase())) {
+      updatedMills = [...updatedMills, normalizeParty(enteredMill)];
     }
 
     // Auto-save process required to master configs if entered and not present
+    let updatedProcesses = configs.processes || [];
     const enteredProcess = (millChallanForm.processRequired || '').trim();
-    if (enteredProcess) {
-      setConfigs(prev => {
-        const list = prev.processes || [];
-        if (!list.some(p => p.toLowerCase() === enteredProcess.toLowerCase())) {
-          const updated = { ...prev, processes: [...list, enteredProcess] };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
-          return updated;
-        }
-        return prev;
-      });
+    if (enteredProcess && !updatedProcesses.some(p => p.toLowerCase() === enteredProcess.toLowerCase())) {
+      updatedProcesses = [...updatedProcesses, enteredProcess];
     }
+
+    const nextMillConfigs = { ...configs, mills: updatedMills, processes: updatedProcesses };
+    setConfigs(nextMillConfigs);
+    try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(nextMillConfigs)); } catch (err) {}
+
+    // STRICT PERSISTENCE: Save both updatedGrayLots and updatedMillChallans directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      grayLots: updatedGrayLots,
+      millChallans: updatedMillChallans,
+      mills: updatedMills,
+      processes: updatedProcesses
+    }).catch(err => console.error('Failed to save Mill Challan to MongoDB Atlas:', err));
 
     setMillChallanForm({
       challanNo: '',
@@ -2075,7 +2160,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const oldChallanNo = editingMillChallan.challanNo;
     const newChallanNo = editChallanForm.challanNo.trim();
 
-    setMillChallans(prev => prev.map(ch => {
+    const updatedMillChallans = millChallans.map(ch => {
       if (ch.id === editingMillChallan.id) {
         return {
           ...ch,
@@ -2088,11 +2173,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         };
       }
       return ch;
-    }));
+    });
 
+    let updatedGrayLots = grayLots;
     // If Challan # was updated, synchronize TPs in grayLots
     if (oldChallanNo && newChallanNo && oldChallanNo !== newChallanNo) {
-      setGrayLots(prev => prev.map(lot => ({
+      updatedGrayLots = grayLots.map(lot => ({
         ...lot,
         tps: (lot.tps || []).map(tp => {
           if (tp.millChallanNo === oldChallanNo) {
@@ -2100,8 +2186,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           }
           return tp;
         })
-      })));
+      }));
+      setGrayLots(updatedGrayLots);
+      try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
     }
+
+    setMillChallans(updatedMillChallans);
+    try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updatedMillChallans)); } catch (e) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      millChallans: updatedMillChallans,
+      grayLots: updatedGrayLots
+    }).catch(err => console.error('Failed to update Mill Challan in MongoDB Atlas:', err));
 
     triggerEliteAlert(`Challan ${newChallanNo} updated successfully!`, 'Challan Updated');
     setEditingMillChallan(null);
@@ -2118,10 +2216,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     });
     if (!confirmed) return;
 
+    let updatedGrayLots = grayLots;
     // 1. Revert TPs in grayLots back to 'In Stock'
     if (ch.tps && ch.tps.length > 0) {
       const challanTpNos = new Set(ch.tps.map(t => String(t.tpNo)));
-      setGrayLots(prev => prev.map(lot => {
+      updatedGrayLots = grayLots.map(lot => {
         let lotChanged = false;
         let restoredMtr = 0;
         const updatedTps = (lot.tps || []).map(tp => {
@@ -2144,11 +2243,23 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           };
         }
         return lot;
-      }));
+      });
+      setGrayLots(updatedGrayLots);
+      try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
     }
 
     // 2. Remove challan from millChallans
-    setMillChallans(prev => prev.filter(c => c.id !== ch.id));
+    const updatedMillChallans = millChallans.filter(c => c.id !== ch.id);
+    setMillChallans(updatedMillChallans);
+    try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updatedMillChallans)); } catch (e) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      millChallans: updatedMillChallans,
+      grayLots: updatedGrayLots
+    }).catch(err => console.error('Failed to delete Mill Challan in MongoDB Atlas:', err));
+
     triggerEliteAlert(`Mill Challan ${ch.challanNo} deleted successfully. TPs returned to warehouse stock.`, 'Challan Deleted');
   };
 
@@ -2243,7 +2354,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
     }
 
-    setGrayLots(prev => prev.map(l => {
+    const updatedGrayLots = grayLots.map(l => {
       if (l.id === editingGrayLot.id) {
         return {
           ...l,
@@ -2271,7 +2382,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         };
       }
       return l;
-    }));
+    });
+
+    setGrayLots(updatedGrayLots);
+    try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      grayLots: updatedGrayLots
+    }).catch(upErr => console.error('Failed to update Gray Lot in MongoDB Atlas:', upErr));
 
     triggerEliteAlert(`Gray Lot ${editGrayLotForm.lotNumber} updated successfully!`, 'Lot Updated');
     setEditingGrayLot(null);
@@ -2296,7 +2416,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     });
     if (!confirmed) return;
 
-    setGrayLots(prev => prev.filter(l => l.id !== lot.id));
+    const updatedGrayLots = grayLots.filter(l => l.id !== lot.id);
+    setGrayLots(updatedGrayLots);
+    try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      grayLots: updatedGrayLots
+    }).catch(delErr => console.error('Failed to delete Gray Lot in MongoDB Atlas:', delErr));
+
     triggerEliteAlert(`Gray Lot ${lot.lotNumber} deleted successfully.`, 'Lot Deleted');
   };
 
@@ -2543,39 +2672,32 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       purchaseId: createdPurchaseId || null
     };
 
-    setRfdLots(prev => [newRfdLot, ...prev]);
+    const updatedRfdLots = [newRfdLot, ...rfdLots];
+    setRfdLots(updatedRfdLots);
+    try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(updatedRfdLots)); } catch (e) {}
 
     // Auto-save mill party to master configs if not yet present
+    let updatedMills = configs.mills || [];
     const enteredMill = (inwardRfdForm.millParty || '').trim();
-    if (enteredMill) {
-      setConfigs(prev => {
-        const list = prev.mills || [];
-        if (!list.some(m => getPartyName(m).toLowerCase() === enteredMill.toLowerCase())) {
-          const updated = { ...prev, mills: [...list, normalizeParty(enteredMill)] };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
-          return updated;
-        }
-        return prev;
-      });
+    if (enteredMill && !updatedMills.some(m => getPartyName(m).toLowerCase() === enteredMill.toLowerCase())) {
+      updatedMills = [...updatedMills, normalizeParty(enteredMill)];
     }
 
     // Auto-save fabric quality to master configs if not yet present
+    let updatedQualities = configs.qualities || [];
     const enteredQuality = (inwardRfdForm.fabricQuality || '').trim();
-    if (enteredQuality) {
-      setConfigs(prev => {
-        const list = prev.qualities || [];
-        if (!list.some(q => q.toLowerCase() === enteredQuality.toLowerCase())) {
-          const updated = { ...prev, qualities: [...list, enteredQuality] };
-          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updated)); } catch (err) {}
-          return updated;
-        }
-        return prev;
-      });
+    if (enteredQuality && !updatedQualities.some(q => q.toLowerCase() === enteredQuality.toLowerCase())) {
+      updatedQualities = [...updatedQualities, enteredQuality];
     }
 
+    const nextRfdConfigs = { ...configs, mills: updatedMills, qualities: updatedQualities };
+    setConfigs(nextRfdConfigs);
+    try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(nextRfdConfigs)); } catch (err) {}
+
+    let updatedMillChallans = millChallans;
     // Update Mill Challan status & pending meters
     if (inwardRfdForm.sourceChallanId) {
-      setMillChallans(prev => prev.map(ch => {
+      updatedMillChallans = millChallans.map(ch => {
         if (ch.id === inwardRfdForm.sourceChallanId) {
           const isClosed = inwardRfdForm.isChallanClosed || stillAtMill <= 0;
           return {
@@ -2585,8 +2707,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           };
         }
         return ch;
-      }));
+      });
+      setMillChallans(updatedMillChallans);
+      try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updatedMillChallans)); } catch (e) {}
     }
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      rfdLots: updatedRfdLots,
+      millChallans: updatedMillChallans,
+      mills: updatedMills,
+      qualities: updatedQualities
+    }).catch(err => console.error('Failed to save RFD Lot to MongoDB Atlas:', err));
 
     setShowInwardRfdModal(false);
     setInwardRfdForm({
@@ -2649,7 +2782,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     e.preventDefault();
     if (!editingRfdLot || !editRfdLotForm) return;
 
-    setRfdLots(prev => prev.map(l => {
+    const updatedRfdLots = rfdLots.map(l => {
       if (l.id === editingRfdLot.id) {
         const graySent = parseFloat(editRfdLotForm.graySentMeters) || 0;
         const receivedRfd = parseFloat(editRfdLotForm.receivedRfdMeters) || 0;
@@ -2678,7 +2811,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         };
       }
       return l;
-    }));
+    });
+
+    setRfdLots(updatedRfdLots);
+    try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(updatedRfdLots)); } catch (e) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      rfdLots: updatedRfdLots
+    }).catch(err => console.error('Failed to update RFD Lot in MongoDB Atlas:', err));
 
     triggerEliteAlert(`RFD Lot ${editRfdLotForm.lotNumber} updated successfully!`, 'Lot Updated');
     setEditingRfdLot(null);
@@ -2695,7 +2837,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     });
     if (!confirmed) return;
 
-    setRfdLots(prev => prev.filter(l => l.id !== lot.id));
+    const updatedRfdLots = rfdLots.filter(l => l.id !== lot.id);
+    setRfdLots(updatedRfdLots);
+    try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(updatedRfdLots)); } catch (e) {}
+
+    // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
+    api.updateCompanySettings({
+      companyEntity,
+      rfdLots: updatedRfdLots
+    }).catch(err => console.error('Failed to delete RFD Lot in MongoDB Atlas:', err));
+
     triggerEliteAlert(`RFD Lot ${lot.lotNumber} deleted successfully.`, 'Lot Deleted');
   };
 
