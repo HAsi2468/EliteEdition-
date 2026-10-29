@@ -5018,35 +5018,36 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           <div
             className="glass-panel"
             style={{
-              width: '100%',
-              maxWidth: 1240,
-              maxHeight: '94vh',
-              overflowY: 'auto',
+              width: '96vw',
+              maxWidth: 1260,
+              height: 'min(92vh, 880px)',
+              maxHeight: '92vh',
+              overflow: 'hidden',
               background: '#ffffff',
               borderRadius: 16,
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              padding: '1.25rem 1.5rem',
+              padding: '1rem 1.25rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.85rem'
+              gap: '0.65rem'
             }}
           >
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.6rem', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Boxes size={22} color="#0284c7" />
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Boxes size={20} color="#0284c7" />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
                       + Inward Gray Fabric from Weaver
                     </h3>
                     <span style={{ fontSize: '0.7rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
                       Warehouse Stock Inward
                     </span>
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                     Enter weaver & quality on the left. Put number of received TPs on the right to auto-generate roll rows instantly.
                   </span>
                 </div>
@@ -5060,17 +5061,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             </div>
 
             {/* Inward Form - 2 Column Split Layout */}
-            <form onSubmit={handleSaveWeaverInward} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <form onSubmit={handleSaveWeaverInward} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-                  gap: '1.25rem',
-                  alignItems: 'start'
+                  gridTemplateColumns: 'minmax(360px, 1fr) minmax(420px, 1.15fr)',
+                  gap: '1rem',
+                  flex: 1,
+                  minHeight: 0
                 }}
               >
                 {/* ⬅️ LEFT COLUMN: All Details & Invoice Integration */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', height: '100%', minHeight: 0, overflowY: 'auto', paddingRight: '6px' }}>
                   {/* Card 1: Lot & Weaver Details */}
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.2rem' }}>
@@ -5471,14 +5473,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   background: '#ffffff',
                   border: '1.5px solid #cbd5e1',
                   borderRadius: 12,
-                  padding: '0.85rem 1rem',
+                  padding: '0.75rem 0.85rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.65rem',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                  gap: '0.5rem',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  height: '100%',
+                  minHeight: 0
                 }}>
                   {/* Header with Title and the User's requested Auto-Generate Input */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.55rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.45rem', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Hash size={16} color="#0284c7" />
                       <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
@@ -5521,7 +5525,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   </div>
 
                   {/* Quick Presets / Actions toolbar */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#64748b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#64748b', flexShrink: 0 }}>
                     <span>Type meters and press <kbd style={{ background: '#e2e8f0', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>Enter ↵</kbd> to jump to next TP.</span>
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button
@@ -5564,40 +5568,41 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     </div>
                   </div>
 
-                  {/* Scrollable Table of TPs */}
+                  {/* Scrollable Table of TPs with flexible height */}
                   <div style={{
-                    maxHeight: '430px',
+                    flex: 1,
+                    minHeight: 0,
                     overflowY: 'auto',
                     border: '1px solid #e2e8f0',
                     borderRadius: 8,
                     background: '#ffffff'
                   }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 3, background: '#f8fafc' }}>
-                        <tr style={{ textAlign: 'left', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1.5px solid #cbd5e1' }}>
-                          <th style={{ padding: '7px 8px', width: 60, textAlign: 'center' }}>Sr</th>
-                          <th style={{ padding: '7px 8px', width: 140 }}>TP No.</th>
-                          <th style={{ padding: '7px 8px' }}>TP Meter (Mtr) *</th>
-                          <th style={{ padding: '7px 8px', width: 36, textAlign: 'center' }}></th>
+                        <tr style={{ textAlign: 'left', color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase', borderBottom: '1.5px solid #cbd5e1' }}>
+                          <th style={{ padding: '6px 6px', width: 44, textAlign: 'center' }}>Sr</th>
+                          <th style={{ padding: '6px 6px', width: 105, textAlign: 'center' }}>TP No.</th>
+                          <th style={{ padding: '6px 12px', textAlign: 'right' }}>TP Meter (Mtr) *</th>
+                          <th style={{ padding: '6px 6px', width: 36, textAlign: 'center' }}></th>
                         </tr>
                       </thead>
                       <tbody>
                         {weaverForm.tps.map((tp, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                            <td style={{ padding: '5px 8px', fontWeight: 800, color: '#64748b', textAlign: 'center' }}>
+                            <td style={{ padding: '3px 6px', fontWeight: 800, color: '#64748b', textAlign: 'center', fontSize: '0.76rem' }}>
                               {tp.srNo}
                             </td>
-                            <td style={{ padding: '5px 8px' }}>
+                            <td style={{ padding: '3px 6px' }}>
                               <input
                                 type="text"
                                 value={tp.tpNo}
                                 onChange={(e) => handleTpChange(idx, 'tpNo', e.target.value)}
                                 placeholder={`TP-${idx + 1}`}
                                 className="input-field"
-                                style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                                style={{ height: '28px', fontSize: '0.78rem', width: '100%', textAlign: 'center' }}
                               />
                             </td>
-                            <td style={{ padding: '5px 8px' }}>
+                            <td style={{ padding: '3px 6px' }}>
                               <input
                                 id={`tp-mtr-input-${idx}`}
                                 type="text"
@@ -5608,17 +5613,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                                 placeholder="e.g. 102.5"
                                 className="input-field"
                                 style={{
-                                  height: '30px',
+                                  height: '28px',
                                   fontSize: '0.84rem',
                                   fontWeight: 800,
                                   color: '#0f172a',
                                   width: '100%',
+                                  textAlign: 'right',
+                                  paddingRight: '12px',
+                                  fontVariantNumeric: 'tabular-nums',
                                   background: tp.tpMtr ? '#f0fdf4' : '#ffffff',
                                   borderColor: tp.tpMtr ? '#86efac' : '#cbd5e1'
                                 }}
                               />
                             </td>
-                            <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                            <td style={{ padding: '3px 6px', textAlign: 'center' }}>
                               {weaverForm.tps.length > 1 && (
                                 <button
                                   type="button"
@@ -5639,15 +5647,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   {/* TP Live Summary Bar */}
                   <div style={{
                     background: '#f1f5f9',
-                    padding: '8px 12px',
+                    padding: '6px 10px',
                     borderRadius: 8,
                     border: '1px solid #cbd5e1',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    fontSize: '0.78rem'
+                    fontSize: '0.76rem',
+                    flexShrink: 0
                   }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       <span>
                         Filled Pieces: <strong style={{ color: '#0284c7' }}>{weaverFormSummary.filledTps || weaverFormSummary.totalTps}</strong> / {weaverForm.tps.length}
                       </span>
@@ -5658,15 +5667,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       )}
                     </div>
 
-                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
-                      Total Gray: <span style={{ color: '#0284c7', fontSize: '1.08rem' }}>{weaverFormSummary.totalMtrs}</span> Mtr
+                    <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                      Total Gray: <span style={{ color: '#0284c7', fontSize: '1.04rem' }}>{weaverFormSummary.totalMtrs}</span> Mtr
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', flexShrink: 0, borderTop: '1px solid #e2e8f0', paddingTop: '0.65rem', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <span>Quality: <strong style={{ color: '#0f172a' }}>{weaverForm.fabricQuality || 'Not Selected'}</strong></span>
                   <span>•</span>
