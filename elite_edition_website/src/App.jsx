@@ -2127,9 +2127,9 @@ export default function App() {
   }
 
   return (
-    <div style={styles.appContainer} className="app-container">
-      {/* Zero-Mouse Enterprise Keyboard Navigation Quickstart Banner */}
-      <KeyboardNavOnboardingBanner />
+    <div style={{ ...styles.appContainer, paddingBottom: isMobile ? 'var(--app-padding, 12px)' : '44px' }} className="app-container">
+      {/* Zero-Mouse Enterprise Keyboard Navigation Quickstart Banner (Desktop Only) */}
+      {!isMobile && <KeyboardNavOnboardingBanner />}
 
       {/* Admin Notice Banner when System is Locked for Non-Admin Staff */}
       {isSystemLocked && isSuperOrAdmin && (
@@ -4495,8 +4495,8 @@ export default function App() {
       {/* Global Shortcut Cheat Sheet Modal (?) */}
       <ShortcutCheatSheetModal />
 
-      {/* Persistent Dynamic Hotkey HUD Dock */}
-      <HotkeyHUD />
+      {/* Persistent Dynamic Hotkey HUD Dock (Desktop Only) */}
+      {!isMobile && <HotkeyHUD />}
     </div>
   );
 }

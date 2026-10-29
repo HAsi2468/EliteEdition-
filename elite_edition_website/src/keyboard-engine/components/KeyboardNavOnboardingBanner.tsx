@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHotkeysContext } from '../HotkeyContext';
 
 export const KeyboardNavOnboardingBanner: React.FC = () => {
@@ -11,6 +11,19 @@ export const KeyboardNavOnboardingBanner: React.FC = () => {
     }
   });
 
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches;
+  });
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
+    };
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const handleDismiss = () => {
     setIsDismissed(true);
     try {
@@ -18,7 +31,7 @@ export const KeyboardNavOnboardingBanner: React.FC = () => {
     } catch {}
   };
 
-  if (isDismissed) return null;
+  if (isDismissed || isMobile) return null;
 
   return (
     <div className="erp-kb-onboarding-banner" role="region" aria-label="Keyboard Navigation Quickstart Guide">

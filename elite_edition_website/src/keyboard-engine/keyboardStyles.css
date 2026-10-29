@@ -287,3 +287,14 @@ body[data-erp-alt-mode="true"] .erp-mnemonic-badge {
   right: 6px;
 }
 
+/* 7. Mobile Phone & Touch Device Suppression
+   Completely suppress keyboard shortcut status docks, banners, and mnemonic badges on phones and touchscreens */
+@media (max-width: 768px), (pointer: coarse) {
+  .erp-hotkey-hud,
+  .erp-kb-onboarding-banner,
+  .erp-mnemonic-badge {
+    display: none !important;
+  }
+}
+
+

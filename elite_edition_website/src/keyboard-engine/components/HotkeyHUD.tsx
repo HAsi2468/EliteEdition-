@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHotkeysContext } from '../HotkeyContext';
 import { ShortcutHint } from '../types';
 
@@ -14,6 +14,21 @@ export const HotkeyHUD: React.FC<HotkeyHUDProps> = ({ defaultHints = [] }) => {
     isKeyboardLockActive,
     toggleKeyboardLock,
   } = useHotkeysContext();
+
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches;
+  });
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
+    };
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  if (isMobile) return null;
 
   // Combine default fallback hints with dynamically registered context hints
   const displayHints = activeHudHints.length > 0 ? activeHudHints : defaultHints;
