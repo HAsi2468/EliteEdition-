@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api, getBaseUrl } from '../services/api';
-import TablePaginationBar from './common/TablePaginationBar';
 import { 
   BarChart2, 
   FileText, 
@@ -115,10 +114,7 @@ export default function ReportsCenter({ department }) {
     return [];
   }, [reportData]);
 
-  const paginatedReportItems = useMemo(() => {
-    const start = (reportPage - 1) * reportPageSize;
-    return rawReportItems.slice(start, start + reportPageSize);
-  }, [rawReportItems, reportPage, reportPageSize]);
+  const paginatedReportItems = rawReportItems;
 
   // Sharing states
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1285,18 +1281,6 @@ export default function ReportsCenter({ department }) {
                     ))}
                   </tbody>
                 </table>
-                <TablePaginationBar
-                  page={reportPage}
-                  totalItems={rawReportItems.length}
-                  pageSize={reportPageSize}
-                  onPageChange={setReportPage}
-                  onPageSizeChange={(newSize) => {
-                    setReportPageSize(newSize);
-                    setReportPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="stock items"
-                />
               </>
             )}
 
@@ -1352,18 +1336,6 @@ export default function ReportsCenter({ department }) {
                     })}
                   </tbody>
                 </table>
-                <TablePaginationBar
-                  page={reportPage}
-                  totalItems={rawReportItems.length}
-                  pageSize={reportPageSize}
-                  onPageChange={setReportPage}
-                  onPageSizeChange={(newSize) => {
-                    setReportPageSize(newSize);
-                    setReportPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="inward records"
-                />
               </>
             )}
 
@@ -1420,18 +1392,6 @@ export default function ReportsCenter({ department }) {
                     })}
                   </tbody>
                 </table>
-                <TablePaginationBar
-                  page={reportPage}
-                  totalItems={rawReportItems.length}
-                  pageSize={reportPageSize}
-                  onPageChange={setReportPage}
-                  onPageSizeChange={(newSize) => {
-                    setReportPageSize(newSize);
-                    setReportPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="outward records"
-                />
               </>
             )}
 
@@ -1473,18 +1433,6 @@ export default function ReportsCenter({ department }) {
                     ))}
                   </tbody>
                 </table>
-                <TablePaginationBar
-                  page={reportPage}
-                  totalItems={rawReportItems.length}
-                  pageSize={reportPageSize}
-                  onPageChange={setReportPage}
-                  onPageSizeChange={(newSize) => {
-                    setReportPageSize(newSize);
-                    setReportPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="sales rows"
-                />
               </>
             )}
 

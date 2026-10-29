@@ -19,7 +19,6 @@ import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import QuickActionMenu from './common/QuickActionMenu';
 import { SmartActionGroup } from './common/SmartActionGroup';
-import TablePaginationBar from './common/TablePaginationBar';
 import * as XLSX from 'xlsx';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
@@ -1488,10 +1487,7 @@ export default function EliteBillingDepartment({
     });
   }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseTypeFilter, purchaseDateRange]);
 
-  const paginatedPurchases = useMemo(() => {
-    const start = (purchasePage - 1) * purchasePageSize;
-    return filteredPurchases.slice(start, start + purchasePageSize);
-  }, [filteredPurchases, purchasePage, purchasePageSize]);
+  const paginatedPurchases = filteredPurchases;
 
   const totalPurchaseValue = filteredPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
   const totalInwardQty = filteredPurchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
@@ -4248,12 +4244,8 @@ export default function EliteBillingDepartment({
                   }
                   return true;
                 });
-              const paginatedInvoices = displayedInvoices.slice(
-                (invoicePage - 1) * invoicePageSize,
-                invoicePage * invoicePageSize
-              );
+              const paginatedInvoices = displayedInvoices;
               return (
-                <>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
@@ -4558,19 +4550,6 @@ export default function EliteBillingDepartment({
                 )}
               </tbody>
             </table>
-            <TablePaginationBar
-              page={invoicePage}
-              totalItems={displayedInvoices.length}
-              pageSize={invoicePageSize}
-              onPageChange={setInvoicePage}
-              onPageSizeChange={(newSize) => {
-                setInvoicePageSize(newSize);
-                setInvoicePage(1);
-              }}
-              pageSizeOptions={[25, 50, 100]}
-              itemName="invoices"
-            />
-          </>
           );
         })()}
       </div>
@@ -6446,18 +6425,6 @@ export default function EliteBillingDepartment({
               </tbody>
             </table>
           </div>
-          <TablePaginationBar
-            page={purchasePage}
-            totalItems={filteredPurchases.length}
-            pageSize={purchasePageSize}
-            onPageChange={setPurchasePage}
-            onPageSizeChange={(newSize) => {
-              setPurchasePageSize(newSize);
-              setPurchasePage(1);
-            }}
-            pageSizeOptions={[25, 50, 100]}
-            itemName="purchases"
-          />
         </div>
       )}
 

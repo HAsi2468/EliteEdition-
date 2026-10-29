@@ -14,7 +14,6 @@ import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
-import TablePaginationBar from './common/TablePaginationBar';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -1190,31 +1189,12 @@ export default function InventoryGrid({
     });
   }, [outwardChallans, outwardSearchTerm, outwardChallanSortField, outwardChallanSortOrder]);
 
-  // Sliced paginated datasets to keep DOM size and browser memory usage small
-  const paginatedOverviewItems = useMemo(() => {
-    const start = (overviewPage - 1) * overviewPageSize;
-    return filteredOverviewItems.slice(start, start + overviewPageSize);
-  }, [filteredOverviewItems, overviewPage, overviewPageSize]);
-
-  const paginatedInwardChallans = useMemo(() => {
-    const start = (inwardChallanPage - 1) * inwardChallanPageSize;
-    return filteredInwardChallans.slice(start, start + inwardChallanPageSize);
-  }, [filteredInwardChallans, inwardChallanPage, inwardChallanPageSize]);
-
-  const paginatedInwardItems = useMemo(() => {
-    const start = (inwardItemPage - 1) * inwardItemPageSize;
-    return filteredInwardItems.slice(start, start + inwardItemPageSize);
-  }, [filteredInwardItems, inwardItemPage, inwardItemPageSize]);
-
-  const paginatedOutwardChallans = useMemo(() => {
-    const start = (outwardChallanPage - 1) * outwardChallanPageSize;
-    return filteredOutwardChallans.slice(start, start + outwardChallanPageSize);
-  }, [filteredOutwardChallans, outwardChallanPage, outwardChallanPageSize]);
-
-  const paginatedOutwardItems = useMemo(() => {
-    const start = (outwardItemPage - 1) * outwardItemPageSize;
-    return filteredOutwardItems.slice(start, start + outwardItemPageSize);
-  }, [filteredOutwardItems, outwardItemPage, outwardItemPageSize]);
+  // Direct full datasets for smooth natural scrolling
+  const paginatedOverviewItems = filteredOverviewItems;
+  const paginatedInwardChallans = filteredInwardChallans;
+  const paginatedInwardItems = filteredInwardItems;
+  const paginatedOutwardChallans = filteredOutwardChallans;
+  const paginatedOutwardItems = filteredOutwardItems;
 
   const handlePrintOutwardChallan = (challan) => {
     if (!challan) return;
@@ -2153,18 +2133,6 @@ export default function InventoryGrid({
                 </table>
               )}
             </div>
-            <TablePaginationBar
-              page={overviewPage}
-              totalItems={filteredOverviewItems.length}
-              pageSize={overviewPageSize}
-              onPageChange={setOverviewPage}
-              onPageSizeChange={(newSize) => {
-                setOverviewPageSize(newSize);
-                setOverviewPage(1);
-              }}
-              pageSizeOptions={[25, 50, 100]}
-              itemName="inventory items"
-            />
           </div>
         </>
       )}
@@ -2813,18 +2781,6 @@ export default function InventoryGrid({
                     </tbody>
                   </table>
                 </div>
-                <TablePaginationBar
-                  page={inwardChallanPage}
-                  totalItems={filteredInwardChallans.length}
-                  pageSize={inwardChallanPageSize}
-                  onPageChange={setInwardChallanPage}
-                  onPageSizeChange={(newSize) => {
-                    setInwardChallanPageSize(newSize);
-                    setInwardChallanPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="inward challans"
-                />
               </>
             )
           ) : (
@@ -3079,18 +3035,6 @@ export default function InventoryGrid({
                     </tbody>
                   </table>
                 </div>
-                <TablePaginationBar
-                  page={inwardItemPage}
-                  totalItems={filteredInwardItems.length}
-                  pageSize={inwardItemPageSize}
-                  onPageChange={setInwardItemPage}
-                  onPageSizeChange={(newSize) => {
-                    setInwardItemPageSize(newSize);
-                    setInwardItemPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="inward items"
-                />
               </>
             )
           )}
@@ -3715,18 +3659,6 @@ export default function InventoryGrid({
                     </tbody>
                   </table>
                 </div>
-                <TablePaginationBar
-                  page={outwardChallanPage}
-                  totalItems={filteredOutwardChallans.length}
-                  pageSize={outwardChallanPageSize}
-                  onPageChange={setOutwardChallanPage}
-                  onPageSizeChange={(newSize) => {
-                    setOutwardChallanPageSize(newSize);
-                    setOutwardChallanPage(1);
-                  }}
-                  pageSizeOptions={[25, 50, 100]}
-                  itemName="outward challans"
-                />
               </>
             )
           ) : filteredOutwardItems.length === 0 ? (
@@ -3935,18 +3867,6 @@ export default function InventoryGrid({
                   </tbody>
                 </table>
               </div>
-              <TablePaginationBar
-                page={outwardItemPage}
-                totalItems={filteredOutwardItems.length}
-                pageSize={outwardItemPageSize}
-                onPageChange={setOutwardItemPage}
-                onPageSizeChange={(newSize) => {
-                  setOutwardItemPageSize(newSize);
-                  setOutwardItemPage(1);
-                }}
-                pageSizeOptions={[25, 50, 100]}
-                itemName="outward items"
-              />
             </>
           )}
           </div>
