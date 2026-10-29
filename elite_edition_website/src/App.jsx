@@ -127,6 +127,13 @@ import { ChangelogDrawer } from './components/common/ChangelogDrawer';
 import { QuickTipPill } from './components/common/QuickTipPill';
 import { GuidedTourController } from './components/common/GuidedTourController';
 import GlobalQuickActions from './components/common/GlobalQuickActions';
+import {
+  HotkeyHUD,
+  ShortcutCheatSheetModal,
+  KeyboardNavOnboardingBanner,
+  useHotkeys,
+  VoucherEntryExample,
+} from './keyboard-engine';
 
 
 
@@ -189,6 +196,8 @@ export const ROUTE_ALIASES = {
   'yj_raw_materials': { tab: 'yj_raw_materials', dept: 'yamunaji' },
   'es_raw_materials': { tab: 'es_raw_materials', dept: 'stitching' },
   'eo_raw_materials': { tab: 'eo_raw_materials', dept: 'elite_online' },
+  'voucher': { tab: 'voucher_entry', dept: null },
+  'voucher_entry': { tab: 'voucher_entry', dept: null },
   'admin': { tab: 'admin', dept: null }
 };
 
@@ -472,29 +481,92 @@ export default function App() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
 
-  // Global Ctrl/Cmd + K shortcut for Global Search
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
+  // Global Priority-Based Hotkey Dispatcher Registrations
+  useHotkeys([
+    {
+      combo: 'ctrl+k',
+      handler: () => {
         setShowGlobalSearch((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Global Alt + E shortcut for Company Switcher
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.altKey && e.key.toLowerCase() === 'e') {
-        e.preventDefault();
+        return true;
+      },
+      priority: 10,
+      description: 'Universal Search',
+    },
+    {
+      combo: 'alt+e',
+      handler: () => {
         setShowCompanyQuickSheet((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+        return true;
+      },
+      priority: 10,
+      description: 'Company Switcher',
+    },
+    {
+      combo: 'alt+v',
+      handler: () => {
+        setActiveTab('voucher_entry');
+        return true;
+      },
+      priority: 10,
+      description: 'Interactive Voucher Entry Engine',
+    },
+    {
+      combo: 'f4',
+      handler: () => {
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Contra Voucher Mode', 'info');
+        }
+        return true;
+      },
+      priority: 10,
+      description: 'Contra Voucher',
+    },
+    {
+      combo: 'f5',
+      handler: () => {
+        setActiveTab('ee_expenses');
+        return true;
+      },
+      priority: 10,
+      description: 'Payment Voucher / Expenses',
+    },
+    {
+      combo: 'f6',
+      handler: () => {
+        setActiveTab('ee_invoices');
+        return true;
+      },
+      priority: 10,
+      description: 'Receipts Voucher',
+    },
+    {
+      combo: 'f7',
+      handler: () => {
+        setActiveTab('reconciliation');
+        return true;
+      },
+      priority: 10,
+      description: 'Journal Voucher / Reconciliation',
+    },
+    {
+      combo: 'f8',
+      handler: () => {
+        setActiveTab('voucher_entry');
+        return true;
+      },
+      priority: 10,
+      description: 'Sales Voucher',
+    },
+    {
+      combo: 'f9',
+      handler: () => {
+        setActiveTab('inventory');
+        return true;
+      },
+      priority: 10,
+      description: 'Purchase Voucher',
+    },
+  ]);
 
   // Dynamically bind Multi-Entity Visual Accents to document :root
   useEffect(() => {
@@ -1999,6 +2071,9 @@ export default function App() {
 
   return (
     <div style={styles.appContainer} className="app-container">
+      {/* Zero-Mouse Enterprise Keyboard Navigation Quickstart Banner */}
+      <KeyboardNavOnboardingBanner />
+
       {/* Admin Notice Banner when System is Locked for Non-Admin Staff */}
       {isSystemLocked && isSuperOrAdmin && (
         <div style={styles.adminSystemLockBanner}>
@@ -3605,6 +3680,8 @@ export default function App() {
             <CrmPanel currentUser={currentUser} initialSubTab={activeTab === 'crm_profiles' ? 'profiles' : 'leads'} />
           ) : activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' || activeTab === 'business_connection' ? (
             <BusinessConnectionPanel currentUser={currentUser} />
+          ) : activeTab === 'voucher_entry' || activeTab === 'sales_voucher_entry' ? (
+            <VoucherEntryExample />
           ) : activeTab.startsWith('jobcards') ? (
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'ee_dashboard' ? (
@@ -4328,6 +4405,12 @@ export default function App() {
 
       {/* Undo Toast Container */}
       <UndoToastContainer />
+
+      {/* Global Shortcut Cheat Sheet Modal (?) */}
+      <ShortcutCheatSheetModal />
+
+      {/* Persistent Dynamic Hotkey HUD Dock */}
+      <HotkeyHUD />
     </div>
   );
 }
@@ -4348,6 +4431,7 @@ const styles = {
     maxWidth: '1280px',
     margin: '0 auto',
     padding: 'var(--app-padding, 12px)',
+    paddingBottom: '44px',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',

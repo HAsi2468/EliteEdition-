@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import { SocketProvider } from './contexts/SocketContext.jsx'
 import { RootErrorBoundary } from './components/RootErrorBoundary'
+import { HotkeyProvider } from './keyboard-engine'
 import { installGlobalDialogInterceptors } from './services/dialogService.js'
 import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
 import { initERPTelemetry } from './telemetry/deviceTelemetry'
@@ -41,7 +42,9 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <RootErrorBoundary>
       <SocketProvider>
-        <App />
+        <HotkeyProvider>
+          <App />
+        </HotkeyProvider>
       </SocketProvider>
     </RootErrorBoundary>
   </StrictMode>,
