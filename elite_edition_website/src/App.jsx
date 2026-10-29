@@ -2521,28 +2521,6 @@ export default function App() {
           ) : (
             <>
               <OfflineSyncBadge />
-              <button
-                type="button"
-                onClick={() => setShowQuickActions((prev) => !prev)}
-                className="btn-primary"
-                title="Quick Actions (+)"
-                style={{
-                  minHeight: '30px',
-                  height: '30px',
-                  padding: '3px 9px',
-                  fontSize: '0.74rem',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                  boxShadow: '0 2px 5px rgba(37, 99, 235, 0.25)'
-                }}
-              >
-                <Plus size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                <span>Action</span>
-              </button>
 
               <button
                 type="button"
