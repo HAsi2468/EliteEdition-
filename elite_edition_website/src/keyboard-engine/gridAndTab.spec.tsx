@@ -119,3 +119,33 @@ describe('useGridNavigation', () => {
     expect(result.current.activeCell).toEqual({ row: 2, col: 0 });
   });
 });
+
+describe('MnemonicBadge Resiliency', () => {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <HotkeyProvider>{children}</HotkeyProvider>
+  );
+
+  it('renders safely without throwing when accessKeyChar is undefined or keyChar is used', async () => {
+    const { MnemonicBadge } = await import('./components/MnemonicBadge');
+    const { render } = await import('@testing-library/react');
+
+    // 1. Undefined prop - should never throw TypeError
+    expect(() => {
+      render(<MnemonicBadge alwaysVisible={true} />, { wrapper });
+    }).not.toThrow();
+
+    // 2. Using keyChar prop
+    const { container: c1 } = render(
+      <MnemonicBadge keyChar="1" alwaysVisible={true} />,
+      { wrapper }
+    );
+    expect(c1.textContent).toBe('1');
+
+    // 3. Using accessKeyChar prop
+    const { container: c2 } = render(
+      <MnemonicBadge accessKeyChar="s" alwaysVisible={true} />,
+      { wrapper }
+    );
+    expect(c2.textContent).toBe('S');
+  });
+});

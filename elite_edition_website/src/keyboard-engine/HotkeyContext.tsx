@@ -56,9 +56,11 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Deduplicate by key and sort by priority
     const mapByKey = new Map<string, ShortcutHint>();
     allHints.forEach((h) => {
-      const existing = mapByKey.get(h.key.toUpperCase());
+      const hintKey = String(h?.key || '').toUpperCase();
+      if (!hintKey) return;
+      const existing = mapByKey.get(hintKey);
       if (!existing || (h.priority || 0) >= (existing.priority || 0)) {
-        mapByKey.set(h.key.toUpperCase(), h);
+        mapByKey.set(hintKey, h);
       }
     });
 
@@ -129,18 +131,20 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 1. Intercept Browser Collisions (F1-F12, Ctrl+S, Ctrl+P, Ctrl+K, Ctrl+Enter, Alt+[Key])
-      const key = e.key.toLowerCase();
+      const rawKey = e.key || '';
+      const key = rawKey.toLowerCase();
+      const upperKey = rawKey.toUpperCase();
       const isCtrlOrMeta = e.ctrlKey || e.metaKey;
       const isAlt = e.altKey;
 
-      const isFKey = /^f([1-9]|1[0-2])$/i.test(e.key);
+      const isFKey = /^f([1-9]|1[0-2])$/i.test(rawKey);
       const isBrowserSave = isCtrlOrMeta && (key === 's' || key === 'a');
       const isBrowserPrint = isCtrlOrMeta && key === 'p';
       const isBrowserSearch = isCtrlOrMeta && (key === 'k' || key === 'e');
       const isSavePrint = isCtrlOrMeta && key === 'enter';
 
       // Always block default unwanted OS/browser actions for ERP critical hotkeys
-      if (isFKey && e.key.toUpperCase() !== 'F5' && e.key.toUpperCase() !== 'F12') {
+      if (isFKey && upperKey !== 'F5' && upperKey !== 'F12') {
         // Block default F1 (Help), F3 (Search), F7 (Caret), F11 etc.
         e.preventDefault();
       }
@@ -247,7 +251,7 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // 8. Focus Sidebar (Alt + S or F10)
-      if ((e.altKey && key === 's') || e.key.toUpperCase() === 'F10') {
+      if ((e.altKey && key === 's') || upperKey === 'F10') {
         const focused = focusSidebar();
         if (focused) {
           e.preventDefault();
@@ -265,7 +269,7 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // 10. Universal Pane Cycler (F6: Sidebar <-> Main Content <-> Search)
-      if (e.key.toUpperCase() === 'F6') {
+      if (upperKey === 'F6') {
         const cycled = cyclePanes();
         if (cycled) {
           e.preventDefault();

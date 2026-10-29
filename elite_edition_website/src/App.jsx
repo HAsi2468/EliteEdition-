@@ -3269,7 +3269,7 @@ export default function App() {
                         if (!isActive) e.currentTarget.style.background = 'transparent';
                       }}
                     >
-                      {itemShortcutNum && <MnemonicBadge keyChar={String(itemShortcutNum)} />}
+                      {!isMobile && itemShortcutNum && <MnemonicBadge accessKeyChar={String(itemShortcutNum)} />}
                       <NavIcon
                         size={20}
                         color={customColor || (isActive ? '#2563eb' : '#64748b')}
@@ -3330,7 +3330,7 @@ export default function App() {
                       if (!isActive) e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    {itemShortcutNum && <MnemonicBadge keyChar={String(itemShortcutNum)} />}
+                    {!isMobile && itemShortcutNum && <MnemonicBadge accessKeyChar={String(itemShortcutNum)} />}
                     <NavIcon size={17} color={customColor || (isActive ? '#2563eb' : '#64748b')} style={{ flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{label}</span>
                   </button>
