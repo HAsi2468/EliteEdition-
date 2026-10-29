@@ -3447,12 +3447,12 @@ const getCompanySettings = async (req, res) => {
 
 const updateCompanySettings = async (req, res) => {
   try {
-    const { companyEntity = 'Elite Online' } = req.body;
+    const { companyEntity = 'Elite Online', ...otherFields } = req.body;
     const PrintConfig = require('../db/models/printConfig.model');
     const updated = await PrintConfig.findOneAndUpdate(
       { companyEntity },
-      { ...req.body, companyEntity },
-      { new: true, upsert: true }
+      { $set: { ...otherFields, companyEntity } },
+      { new: true, upsert: true, returnDocument: 'after' }
     );
     res.json({ success: true, data: updated });
   } catch (error) {

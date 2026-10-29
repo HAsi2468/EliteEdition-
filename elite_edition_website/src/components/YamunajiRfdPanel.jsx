@@ -219,224 +219,225 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return [];
   });
 
+  const [isSyncing, setIsSyncing] = useState(false);
   const isInitialSyncDone = useRef(false);
 
   // Synchronize and recover Lots and Masters from Backend Database (BillingPurchase & CompanySettings)
-  useEffect(() => {
-    let isMounted = true;
-    const syncFromBackend = async () => {
-      try {
-        const [purchasesRes, settingsRes] = await Promise.allSettled([
-          api.getBillingPurchases(companyEntity),
-          api.getCompanySettings(companyEntity)
-        ]);
+  const syncFromBackend = useCallback(async (isManual = false) => {
+    setIsSyncing(true);
+    try {
+      const [purchasesRes, settingsRes] = await Promise.allSettled([
+        api.getBillingPurchases(companyEntity),
+        api.getCompanySettings(companyEntity)
+      ]);
 
-        const purchases = (purchasesRes.status === 'fulfilled' && purchasesRes.value?.data && Array.isArray(purchasesRes.value.data))
-          ? purchasesRes.value.data
-          : (purchasesRes.status === 'fulfilled' && Array.isArray(purchasesRes.value) ? purchasesRes.value : []);
+      const purchases = (purchasesRes.status === 'fulfilled' && purchasesRes.value?.data && Array.isArray(purchasesRes.value.data))
+        ? purchasesRes.value.data
+        : (purchasesRes.status === 'fulfilled' && Array.isArray(purchasesRes.value) ? purchasesRes.value : []);
 
-        const backendSettings = (settingsRes.status === 'fulfilled' && settingsRes.value?.data) ? settingsRes.value.data : {};
+      const backendSettings = (settingsRes.status === 'fulfilled' && settingsRes.value?.data) ? settingsRes.value.data : {};
 
-        if (!isMounted) return;
+      // 1. Synchronize Gray Lots from MongoDB Atlas (backendSettings.grayLots)
+      setGrayLots(prev => {
+        let updated = [...prev];
+        let changed = false;
 
-        // 1. Synchronize Gray Lots from MongoDB Atlas (backendSettings.grayLots)
-        setGrayLots(prev => {
+        if (Array.isArray(backendSettings.grayLots) && backendSettings.grayLots.length > 0) {
+          backendSettings.grayLots.forEach(bLot => {
+            const idx = updated.findIndex(l => (l.lotNumber && l.lotNumber === bLot.lotNumber) || (l.id && l.id === bLot.id));
+            if (idx >= 0) {
+              updated[idx] = { ...updated[idx], ...bLot };
+              changed = true;
+            } else {
+              updated.push(bLot);
+              changed = true;
+            }
+          });
+        }
+
+        // 2. Also recover any purchases from Billing Register not yet in grayLots
+        if (purchases.length > 0) {
+          purchases.forEach(p => {
+            const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
+            if (!isGrayPurchase) return;
+
+            const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
+            const exists = updated.some(l => l.lotNumber === lotNum || (l.purchaseNo && l.purchaseNo === p.purchaseNo) || (l.purchaseId && l.purchaseId === p._id));
+
+            if (!exists) {
+              const firstItem = p.items?.[0] || {};
+              const qty = parseFloat(p.quantity || firstItem.quantity || firstItem.qty || 0);
+              const rate = parseFloat(p.rate || firstItem.rate || firstItem.unitPrice || 0);
+              const totalAmt = parseFloat(p.totalAmount || p.grandTotal || 0);
+              const taxAmt = parseFloat(p.totalTax || p.taxAmount || 0);
+              const taxVal = parseFloat(p.taxableAmount || p.subtotal || 0);
+              const gst = parseFloat(p.gstRate || firstItem.taxRate || 5);
+
+              let tpCount = 1;
+              const tpMatch = (firstItem.description || p.notes || '').match(/(\d+)\s*TPs/i);
+              if (tpMatch && parseInt(tpMatch[1], 10) > 0) {
+                tpCount = parseInt(tpMatch[1], 10);
+              }
+
+              const recoveredLot = {
+                id: lotNum,
+                lotNumber: lotNum,
+                inwardDate: p.date ? p.date.split('T')[0] : (p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+                weaverParty: p.vendorName || p.vendor?.name || 'FABX TRENDZ',
+                weaverChallanNo: firstItem.partyChallan || p.billNo || 'Direct Inward',
+                fabricQuality: firstItem.fabric || firstItem.fabricName || firstItem.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || 'ARMANI SATIN 60"',
+                totalTps: tpCount,
+                totalMeters: qty,
+                sentToMillMeters: 0,
+                ratePerMeter: rate,
+                status: 'In Stock',
+                rackLocation: '',
+                remarks: p.notes || '',
+                invoiceStatus: 'Invoiced',
+                invoiceReceivedOption: 'received',
+                invoiceNo: p.billNo || '',
+                invoiceDate: p.date ? p.date.split('T')[0] : null,
+                hsnCode: firstItem.hsnCode || '5208',
+                gstRate: gst,
+                taxableAmount: taxVal,
+                gstAmount: taxAmt,
+                grandTotal: totalAmt,
+                paymentTerms: p.terms || '30 Days',
+                postToPurchase: true,
+                purchaseNo: p.purchaseNo || 'YJP-01',
+                purchaseId: p._id || '',
+                tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
+              };
+
+              updated.unshift(recoveredLot);
+              changed = true;
+            }
+          });
+        }
+
+        if (changed) {
+          updated.sort((a, b) => (b.lotNumber || '').localeCompare(a.lotNumber || ''));
+          try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
+          return updated;
+        }
+        return prev;
+      });
+
+      // 3. Synchronize Mill Outward Challans from MongoDB Atlas
+      if (Array.isArray(backendSettings.millChallans) && backendSettings.millChallans.length > 0) {
+        setMillChallans(backendSettings.millChallans);
+        try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(backendSettings.millChallans)); } catch (e) {}
+      }
+
+      // 4. Synchronize RFD Inward Lots from MongoDB Atlas
+      if (Array.isArray(backendSettings.rfdLots) && backendSettings.rfdLots.length > 0) {
+        setRfdLots(prev => {
           let updated = [...prev];
           let changed = false;
-
-          if (Array.isArray(backendSettings.grayLots) && backendSettings.grayLots.length > 0) {
-            backendSettings.grayLots.forEach(bLot => {
-              const idx = updated.findIndex(l => (l.lotNumber && l.lotNumber === bLot.lotNumber) || (l.id && l.id === bLot.id));
-              if (idx >= 0) {
-                const cur = updated[idx];
-                const backendTpCount = Array.isArray(bLot.tps) ? bLot.tps.length : 0;
-                const localTpCount = Array.isArray(cur.tps) ? cur.tps.length : 0;
-                if (backendTpCount >= localTpCount) {
-                  updated[idx] = { ...cur, ...bLot };
-                  changed = true;
-                }
-              } else {
-                updated.push(bLot);
-                changed = true;
-              }
-            });
-          }
-
-          // 2. Also recover any purchases from Billing Register not yet in grayLots
-          if (purchases.length > 0) {
-            purchases.forEach(p => {
-              const isGrayPurchase = p.purchaseType === 'inventory' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
-              if (!isGrayPurchase) return;
-
-              const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
-              const exists = updated.some(l => l.lotNumber === lotNum || (l.purchaseNo && l.purchaseNo === p.purchaseNo) || (l.purchaseId && l.purchaseId === p._id));
-
-              if (!exists) {
-                const firstItem = p.items?.[0] || {};
-                const qty = parseFloat(p.quantity || firstItem.quantity || firstItem.qty || 0);
-                const rate = parseFloat(p.rate || firstItem.rate || firstItem.unitPrice || 0);
-                const totalAmt = parseFloat(p.totalAmount || p.grandTotal || 0);
-                const taxAmt = parseFloat(p.totalTax || p.taxAmount || 0);
-                const taxVal = parseFloat(p.taxableAmount || p.subtotal || 0);
-                const gst = parseFloat(p.gstRate || firstItem.taxRate || 5);
-
-                let tpCount = 1;
-                const tpMatch = (firstItem.description || p.notes || '').match(/(\d+)\s*TPs/i);
-                if (tpMatch && parseInt(tpMatch[1], 10) > 0) {
-                  tpCount = parseInt(tpMatch[1], 10);
-                }
-
-                const recoveredLot = {
-                  id: lotNum,
-                  lotNumber: lotNum,
-                  inwardDate: p.date ? p.date.split('T')[0] : (p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
-                  weaverParty: p.vendorName || p.vendor?.name || 'FABX TRENDZ',
-                  weaverChallanNo: firstItem.partyChallan || p.billNo || 'Direct Inward',
-                  fabricQuality: firstItem.fabric || firstItem.fabricName || firstItem.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || 'ARMANI SATIN 60"',
-                  totalTps: tpCount,
-                  totalMeters: qty,
-                  sentToMillMeters: 0,
-                  ratePerMeter: rate,
-                  status: 'In Stock',
-                  rackLocation: '',
-                  remarks: p.notes || '',
-                  invoiceStatus: 'Invoiced',
-                  invoiceReceivedOption: 'received',
-                  invoiceNo: p.billNo || '',
-                  invoiceDate: p.date ? p.date.split('T')[0] : null,
-                  hsnCode: firstItem.hsnCode || '5208',
-                  gstRate: gst,
-                  taxableAmount: taxVal,
-                  gstAmount: taxAmt,
-                  grandTotal: totalAmt,
-                  paymentTerms: p.terms || '30 Days',
-                  postToPurchase: true,
-                  purchaseNo: p.purchaseNo || 'YJP-01',
-                  purchaseId: p._id || '',
-                  tps: [{ srNo: 1, tpNo: 'TP-1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
-                };
-
-                updated.unshift(recoveredLot);
-                changed = true;
-              }
-            });
-          }
-
+          backendSettings.rfdLots.forEach(bLot => {
+            if (!updated.some(l => l.id === bLot.id || (l.lotNumber && l.lotNumber === bLot.lotNumber))) {
+              updated.push(bLot);
+              changed = true;
+            }
+          });
           if (changed) {
-            updated.sort((a, b) => (b.lotNumber || '').localeCompare(a.lotNumber || ''));
-            try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updated)); } catch (e) {}
+            try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(updated)); } catch (e) {}
             return updated;
           }
           return prev;
         });
+      }
 
-        // 3. Synchronize Mill Outward Challans from MongoDB Atlas
-        if (Array.isArray(backendSettings.millChallans) && backendSettings.millChallans.length > 0) {
-          setMillChallans(backendSettings.millChallans);
-          try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(backendSettings.millChallans)); } catch (e) {}
+      // 5. Synchronize and restore Master Configurations (Weavers, Qualities, Mills, Process Types) from MongoDB
+      setConfigs(prev => {
+        let updatedConfigs = { ...prev };
+        let configsChanged = false;
+
+        // Backend saved mills (authoritative)
+        if (Array.isArray(backendSettings.mills) && backendSettings.mills.length > 0) {
+          updatedConfigs.mills = backendSettings.mills.map(normalizeParty);
+          configsChanged = true;
         }
 
-        // 4. Synchronize RFD Inward Lots from MongoDB Atlas
-        if (Array.isArray(backendSettings.rfdLots) && backendSettings.rfdLots.length > 0) {
-          setRfdLots(prev => {
-            let updated = [...prev];
-            let changed = false;
-            backendSettings.rfdLots.forEach(bLot => {
-              if (!updated.some(l => l.id === bLot.id || (l.lotNumber && l.lotNumber === bLot.lotNumber))) {
-                updated.push(bLot);
-                changed = true;
-              }
-            });
-            if (changed) {
-              try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(updated)); } catch (e) {}
-              return updated;
-            }
-            return prev;
-          });
+        // Backend saved processes (authoritative)
+        if (Array.isArray(backendSettings.processes) && backendSettings.processes.length > 0) {
+          updatedConfigs.processes = backendSettings.processes
+            .map(pr => typeof pr === 'string' ? pr.trim() : (pr.name || '').trim())
+            .filter(Boolean);
+          configsChanged = true;
         }
 
-        // 5. Synchronize and restore Master Configurations (Weavers, Qualities, Mills, Process Types) from MongoDB
-        setConfigs(prev => {
-          let updatedConfigs = { ...prev };
-          let configsChanged = false;
+        // Backend saved weavers (authoritative)
+        if (Array.isArray(backendSettings.weavers) && backendSettings.weavers.length > 0) {
+          updatedConfigs.weavers = backendSettings.weavers.map(normalizeParty);
+          configsChanged = true;
+        }
 
-          // Backend saved mills (authoritative)
-          if (Array.isArray(backendSettings.mills) && backendSettings.mills.length > 0) {
-            updatedConfigs.mills = backendSettings.mills.map(normalizeParty);
+        // Backend saved qualities (authoritative)
+        if (Array.isArray(backendSettings.qualities) && backendSettings.qualities.length > 0) {
+          updatedConfigs.qualities = backendSettings.qualities
+            .map(q => typeof q === 'string' ? q.trim() : (q.name || '').trim())
+            .filter(Boolean);
+          configsChanged = true;
+        }
+
+        // Ensure vendors and qualities from purchases are populated into master configs
+        purchases.forEach(p => {
+          const vName = (p.vendorName || p.vendor?.name || '').trim();
+          if (vName && !updatedConfigs.weavers.some(w => getPartyName(w).toLowerCase() === vName.toLowerCase())) {
+            const newWeaver = {
+              name: vName,
+              gst: p.vendor?.gstin || '',
+              address: p.vendor?.billingAddress || p.vendor?.address || '',
+              city: p.vendor?.city || 'Surat, Gujarat',
+              phone: p.vendor?.phone || '',
+              contactPerson: '',
+              broker: '',
+              processTypes: '',
+              notes: 'Auto-synced from purchase records'
+            };
+            updatedConfigs.weavers = [...updatedConfigs.weavers, newWeaver];
             configsChanged = true;
           }
 
-          // Backend saved processes (authoritative)
-          if (Array.isArray(backendSettings.processes) && backendSettings.processes.length > 0) {
-            updatedConfigs.processes = backendSettings.processes
-              .map(pr => typeof pr === 'string' ? pr.trim() : (pr.name || '').trim())
-              .filter(Boolean);
-            configsChanged = true;
-          }
-
-          // Backend saved weavers (authoritative)
-          if (Array.isArray(backendSettings.weavers) && backendSettings.weavers.length > 0) {
-            updatedConfigs.weavers = backendSettings.weavers.map(normalizeParty);
-            configsChanged = true;
-          }
-
-          // Backend saved qualities (authoritative)
-          if (Array.isArray(backendSettings.qualities) && backendSettings.qualities.length > 0) {
-            updatedConfigs.qualities = backendSettings.qualities
-              .map(q => typeof q === 'string' ? q.trim() : (q.name || '').trim())
-              .filter(Boolean);
-            configsChanged = true;
-          }
-
-          // Ensure vendors and qualities from purchases are populated into master configs
-          purchases.forEach(p => {
-            const vName = (p.vendorName || p.vendor?.name || '').trim();
-            if (vName && !updatedConfigs.weavers.some(w => getPartyName(w).toLowerCase() === vName.toLowerCase())) {
-              const newWeaver = {
-                name: vName,
-                gst: p.vendor?.gstin || '',
-                address: p.vendor?.billingAddress || p.vendor?.address || '',
-                city: p.vendor?.city || 'Surat, Gujarat',
-                phone: p.vendor?.phone || '',
-                contactPerson: '',
-                broker: '',
-                processTypes: '',
-                notes: 'Auto-synced from purchase records'
-              };
-              updatedConfigs.weavers = [...updatedConfigs.weavers, newWeaver];
+          p.items?.forEach(it => {
+            const qName = (it.fabric || it.fabricName || it.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || '').trim();
+            if (qName && !updatedConfigs.qualities.some(q => q.toLowerCase() === qName.toLowerCase())) {
+              updatedConfigs.qualities = [...updatedConfigs.qualities, qName];
               configsChanged = true;
             }
-
-            p.items?.forEach(it => {
-              const qName = (it.fabric || it.fabricName || it.itemName?.replace(/\s*\(Gray Fabric\)/i, '') || '').trim();
-              if (qName && !updatedConfigs.qualities.some(q => q.toLowerCase() === qName.toLowerCase())) {
-                updatedConfigs.qualities = [...updatedConfigs.qualities, qName];
-                configsChanged = true;
-              }
-            });
           });
-
-          if (configsChanged) {
-            try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updatedConfigs)); } catch (e) {}
-            return updatedConfigs;
-          }
-          return prev;
         });
 
+        if (configsChanged) {
+          try { localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(updatedConfigs)); } catch (e) {}
+          return updatedConfigs;
+        }
+        return prev;
+      });
 
-        isInitialSyncDone.current = true;
-      } catch (err) {
-        console.warn('Could not sync lots and configs from backend:', err);
+      isInitialSyncDone.current = true;
+      if (isManual) {
+        triggerEliteAlert('Synchronized latest lots, challans & masters directly from MongoDB Atlas!', 'Database Synchronized');
       }
-    };
-
-    syncFromBackend();
-    window.addEventListener('elite-data-refresh', syncFromBackend);
-    return () => {
-      isMounted = false;
-      window.removeEventListener('elite-data-refresh', syncFromBackend);
-    };
+    } catch (err) {
+      console.warn('Could not sync lots and configs from backend:', err);
+      if (isManual) {
+        triggerEliteAlert('Failed to connect to backend database. Please check connection.', 'Sync Failed');
+      }
+    } finally {
+      setIsSyncing(false);
+    }
   }, [companyEntity]);
+
+  useEffect(() => {
+    syncFromBackend(false);
+    const onRefresh = () => syncFromBackend(false);
+    window.addEventListener('elite-data-refresh', onRefresh);
+    return () => {
+      window.removeEventListener('elite-data-refresh', onRefresh);
+    };
+  }, [syncFromBackend]);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -2995,8 +2996,33 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           </div>
         </div>
 
-        {/* Master Action Controls: Settings + Mode Switcher */}
+        {/* Master Action Controls: Sync DB + Settings + Mode Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* 🔄 SYNC DB BUTTON */}
+          <button
+            onClick={() => syncFromBackend(true)}
+            disabled={isSyncing}
+            className="btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#0f172a',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              cursor: isSyncing ? 'not-allowed' : 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+            }}
+            title="Reload and verify all latest lots, challans & masters directly from MongoDB Atlas"
+          >
+            <RefreshCw size={15} color="#0284c7" style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+            {isSyncing ? 'Syncing...' : 'Sync DB'}
+          </button>
+
           {/* ⚙️ SETTINGS BUTTON */}
           <button
             onClick={() => setShowSettingsModal(true)}
