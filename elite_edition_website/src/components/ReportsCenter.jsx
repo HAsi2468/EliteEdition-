@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api, getBaseUrl } from '../services/api';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import { 
   BarChart2, 
   FileText, 
@@ -114,7 +115,48 @@ export default function ReportsCenter({ department }) {
     return [];
   }, [reportData]);
 
-  const paginatedReportItems = rawReportItems;
+  const [reportSortState, setReportSortState] = useState({ columnKey: null, order: null });
+  const [selectedReportIds, setSelectedReportIds] = useState([]);
+
+  const handleToggleSelectAllReport = (visibleItems) => {
+    const visibleIds = visibleItems.map(i => i.sku || i.itemSKUCode || i.id || i._id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedReportIds.includes(id));
+    if (allSelected) {
+      setSelectedReportIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedReportIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectReport = (id) => {
+    setSelectedReportIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const sortedReportItems = useMemo(() => {
+    const list = [...rawReportItems];
+    if (reportSortState?.columnKey && reportSortState?.order) {
+      const { columnKey, order } = reportSortState;
+      list.sort((a, b) => {
+        let vA = a[columnKey] != null ? a[columnKey] : '';
+        let vB = b[columnKey] != null ? b[columnKey] : '';
+        if (typeof vA === 'number' && typeof vB === 'number') {
+          return order === 'asc' ? vA - vB : vB - vA;
+        }
+        const numA = Number(vA);
+        const numB = Number(vB);
+        if (!isNaN(numA) && !isNaN(numB) && vA !== '' && vB !== '') {
+          return order === 'asc' ? numA - numB : numB - numA;
+        }
+        const cmp = String(vA).localeCompare(String(vB), undefined, { numeric: true, sensitivity: 'base' });
+        return order === 'asc' ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [rawReportItems, reportSortState]);
+
+  const paginatedReportItems = sortedReportItems;
 
   // Sharing states
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1240,21 +1282,35 @@ export default function ReportsCenter({ department }) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Photo</th>
-                      <th>SKU Code</th>
-                      <th>Product Name</th>
-                      <th>Vendor</th>
-                      <th className="text-center">Sizes & Quantities</th>
-                      <th className="text-center">Total Stock</th>
-                      <th className="text-right">Purchase Price (Unit)</th>
-                      <th className="text-right">Purchase Value (Total)</th>
-                      <th className="text-right">Sale Price (Unit)</th>
-                      <th className="text-right">Sale Value (Total)</th>
+                      <MasterCheckboxTh
+                        allSelected={paginatedReportItems.length > 0 && paginatedReportItems.every(i => selectedReportIds.includes(i.sku || i.itemSKUCode || i.id || i._id))}
+                        someSelected={paginatedReportItems.some(i => selectedReportIds.includes(i.sku || i.itemSKUCode || i.id || i._id))}
+                        onToggleAll={() => handleToggleSelectAllReport(paginatedReportItems)}
+                        totalCount={paginatedReportItems.length}
+                        title="Select All Rows"
+                      />
+                      <ErpTh hideSort>Photo</ErpTh>
+                      <ErpTh columnKey="sku" sortState={reportSortState} onSortChange={setReportSortState}>SKU Code</ErpTh>
+                      <ErpTh columnKey="itemName" sortState={reportSortState} onSortChange={setReportSortState}>Product Name</ErpTh>
+                      <ErpTh columnKey="party" sortState={reportSortState} onSortChange={setReportSortState}>Vendor</ErpTh>
+                      <ErpTh hideSort align="center">Sizes & Quantities</ErpTh>
+                      <ErpTh columnKey="total" sortState={reportSortState} onSortChange={setReportSortState} align="center">Total Stock</ErpTh>
+                      <ErpTh columnKey="purchasePrice" sortState={reportSortState} onSortChange={setReportSortState} align="right">Purchase Price (Unit)</ErpTh>
+                      <ErpTh columnKey="totalPurchaseAmount" sortState={reportSortState} onSortChange={setReportSortState} align="right">Purchase Value (Total)</ErpTh>
+                      <ErpTh columnKey="salePrice" sortState={reportSortState} onSortChange={setReportSortState} align="right">Sale Price (Unit)</ErpTh>
+                      <ErpTh columnKey="totalSellableAmount" sortState={reportSortState} onSortChange={setReportSortState} align="right">Sale Value (Total)</ErpTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedReportItems.map((item, idx) => (
-                      <tr key={item.sku || idx}>
+                    {paginatedReportItems.map((item, idx) => {
+                      const itemId = item.sku || item.itemSKUCode || item.id || item._id || idx;
+                      const isSelected = selectedReportIds.includes(itemId);
+                      return (
+                      <tr key={itemId} style={{ background: getRowHighlightStyle(isSelected) }}>
+                        <RowCheckboxTd
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectReport(itemId)}
+                        />
                         <td>
                           {item.imageUrl ? (
                             <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
@@ -1278,7 +1334,8 @@ export default function ReportsCenter({ department }) {
                         <td className="text-right" style={{ color: 'var(--primary)', fontWeight: '500' }}>{formatPrice(item.salePrice)}</td>
                         <td className="text-right" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{formatPrice(item.totalSellableAmount)}</td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </>

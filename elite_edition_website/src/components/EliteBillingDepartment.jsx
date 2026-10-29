@@ -19,6 +19,7 @@ import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import QuickActionMenu from './common/QuickActionMenu';
 import { SmartActionGroup } from './common/SmartActionGroup';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import * as XLSX from 'xlsx';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
@@ -258,6 +259,9 @@ export default function EliteBillingDepartment({
 
   // Multi-select for bulk Invoice PDF download
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const [invoiceSortState, setInvoiceSortState] = useState({ columnKey: 'date', order: 'desc' });
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState([]);
+  const [purchaseSortState, setPurchaseSortState] = useState({ columnKey: 'date', order: 'desc' });
   const [bulkDownloading, setBulkDownloading] = useState(false);
 
   // Auto open Expense create modal
@@ -1487,7 +1491,57 @@ export default function EliteBillingDepartment({
     });
   }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseTypeFilter, purchaseDateRange]);
 
-  const paginatedPurchases = filteredPurchases;
+  const paginatedPurchases = useMemo(() => {
+    const list = [...filteredPurchases];
+    if (purchaseSortState?.columnKey && purchaseSortState?.order) {
+      const { columnKey, order } = purchaseSortState;
+      list.sort((a, b) => {
+        let vA = '';
+        let vB = '';
+        if (columnKey === 'purchaseNo') {
+          vA = a.purchaseNo || a.billNo || '';
+          vB = b.purchaseNo || b.billNo || '';
+        } else if (columnKey === 'date') {
+          vA = new Date(a.date || a.createdAt || 0).getTime();
+          vB = new Date(b.date || b.createdAt || 0).getTime();
+          return order === 'asc' ? vA - vB : vB - vA;
+        } else if (columnKey === 'vendor') {
+          vA = a.vendorName || '';
+          vB = b.vendorName || '';
+        } else if (columnKey === 'items') {
+          vA = a.items?.length || 0;
+          vB = b.items?.length || 0;
+          return order === 'asc' ? vA - vB : vB - vA;
+        } else if (columnKey === 'quantity') {
+          vA = Number(a.quantity || 0);
+          vB = Number(b.quantity || 0);
+          return order === 'asc' ? vA - vB : vB - vA;
+        } else if (columnKey === 'grandTotal') {
+          vA = Number(a.grandTotal || a.totalAmount || 0);
+          vB = Number(b.grandTotal || b.totalAmount || 0);
+          return order === 'asc' ? vA - vB : vB - vA;
+        } else if (columnKey === 'paidAmount') {
+          vA = Number(a.paidAmount || 0);
+          vB = Number(b.paidAmount || 0);
+          return order === 'asc' ? vA - vB : vB - vA;
+        } else if (columnKey === 'balanceDue') {
+          const bTotalA = Number(a.grandTotal || a.totalAmount || 0);
+          const pAmtA = Number(a.paidAmount || 0);
+          vA = a.balanceDue != null ? Number(a.balanceDue) : Math.max(0, bTotalA - pAmtA);
+          const bTotalB = Number(b.grandTotal || b.totalAmount || 0);
+          const pAmtB = Number(b.paidAmount || 0);
+          vB = b.balanceDue != null ? Number(b.balanceDue) : Math.max(0, bTotalB - pAmtB);
+          return order === 'asc' ? vA - vB : vB - vA;
+        } else if (columnKey === 'status') {
+          vA = a.paymentStatus || '';
+          vB = b.paymentStatus || '';
+        }
+        const cmp = String(vA).localeCompare(String(vB), undefined, { numeric: true, sensitivity: 'base' });
+        return order === 'asc' ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [filteredPurchases, purchaseSortState]);
 
   const totalPurchaseValue = filteredPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
   const totalInwardQty = filteredPurchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
@@ -2624,6 +2678,22 @@ export default function EliteBillingDepartment({
 
   const handleToggleSelectInvoice = (id) => {
     setSelectedInvoiceIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAllPurchases = (visiblePurchases) => {
+    const visibleIds = visiblePurchases.map(p => p._id || p.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedPurchaseIds.includes(id));
+    if (allSelected) {
+      setSelectedPurchaseIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedPurchaseIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectPurchase = (id) => {
+    setSelectedPurchaseIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -4244,30 +4314,70 @@ export default function EliteBillingDepartment({
                   }
                   return true;
                 });
-              const paginatedInvoices = displayedInvoices;
+              const sortedInvoices = [...displayedInvoices];
+              if (invoiceSortState?.columnKey && invoiceSortState?.order) {
+                const { columnKey, order } = invoiceSortState;
+                sortedInvoices.sort((a, b) => {
+                  let vA = '';
+                  let vB = '';
+                  if (columnKey === 'invoiceNo') {
+                    vA = a.invoiceNo || '';
+                    vB = b.invoiceNo || '';
+                  } else if (columnKey === 'challanNo') {
+                    vA = a.ourChallanNo || (a.linkedChallanNos && a.linkedChallanNos[0]) || '';
+                    vB = b.ourChallanNo || (b.linkedChallanNos && b.linkedChallanNos[0]) || '';
+                  } else if (columnKey === 'customerName') {
+                    vA = a.customer?.businessName || a.customer?.name || '';
+                    vB = b.customer?.businessName || b.customer?.name || '';
+                  } else if (columnKey === 'date') {
+                    vA = new Date(a.invoiceDate || a.createdAt || 0).getTime();
+                    vB = new Date(b.invoiceDate || b.createdAt || 0).getTime();
+                    return order === 'asc' ? vA - vB : vB - vA;
+                  } else if (columnKey === 'grandTotal') {
+                    vA = Number(a.grandTotal || a.totalAmount || 0);
+                    vB = Number(b.grandTotal || b.totalAmount || 0);
+                    return order === 'asc' ? vA - vB : vB - vA;
+                  } else if (columnKey === 'paidAmount') {
+                    vA = Number(a.paidAmount || 0);
+                    vB = Number(b.paidAmount || 0);
+                    return order === 'asc' ? vA - vB : vB - vA;
+                  } else if (columnKey === 'balanceDue') {
+                    vA = Number(a.balanceDue != null ? a.balanceDue : ((a.grandTotal || 0) - (a.paidAmount || 0)));
+                    vB = Number(b.balanceDue != null ? b.balanceDue : ((b.grandTotal || 0) - (b.paidAmount || 0)));
+                    return order === 'asc' ? vA - vB : vB - vA;
+                  } else if (columnKey === 'status') {
+                    vA = a.status || '';
+                    vB = b.status || '';
+                  } else if (columnKey === 'createdBy') {
+                    vA = a.createdBy?.name || a.createdBy || '';
+                    vB = b.createdBy?.name || b.createdBy || '';
+                  }
+                  const cmp = String(vA).localeCompare(String(vB), undefined, { numeric: true, sensitivity: 'base' });
+                  return order === 'asc' ? cmp : -cmp;
+                });
+              }
+              const paginatedInvoices = sortedInvoices;
               return (
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                      <th style={{ padding: '0.75rem 0.5rem', width: '42px', textAlign: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
-                          onChange={() => handleToggleSelectAllInvoices(displayedInvoices)}
-                          style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
-                          title="Select All Invoices"
-                        />
-                      </th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Grand Total</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Paid Amount</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created By</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
+                    <tr>
+                      <MasterCheckboxTh
+                        allSelected={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
+                        someSelected={displayedInvoices.some(i => selectedInvoiceIds.includes(i._id))}
+                        onToggleAll={() => handleToggleSelectAllInvoices(displayedInvoices)}
+                        totalCount={displayedInvoices.length}
+                        title="Select All Invoices"
+                      />
+                      <ErpTh columnKey="invoiceNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Invoice No</ErpTh>
+                      <ErpTh columnKey="challanNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Challan No</ErpTh>
+                      <ErpTh columnKey="customerName" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Customer Name</ErpTh>
+                      <ErpTh columnKey="date" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Date</ErpTh>
+                      <ErpTh columnKey="grandTotal" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Grand Total</ErpTh>
+                      <ErpTh columnKey="paidAmount" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Paid Amount</ErpTh>
+                      <ErpTh columnKey="balanceDue" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Balance Due</ErpTh>
+                      <ErpTh columnKey="status" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="center">Status</ErpTh>
+                      <ErpTh columnKey="createdBy" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Created By</ErpTh>
+                      <ErpTh hideSort align="center">Actions</ErpTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -4299,15 +4409,11 @@ export default function EliteBillingDepartment({
                         const challanList = rawChallanStr ? rawChallanStr.split(',').map(s => s.trim()).filter(Boolean) : [];
 
                         return (
-                          <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: selectedInvoiceIds.includes(inv._id) ? 'rgba(124, 58, 237, 0.08)' : 'transparent' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                              <input
-                                type="checkbox"
-                                checked={selectedInvoiceIds.includes(inv._id)}
-                                onChange={() => handleToggleSelectInvoice(inv._id)}
-                                style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
-                              />
-                            </td>
+                          <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(selectedInvoiceIds.includes(inv._id)) }}>
+                            <RowCheckboxTd
+                              checked={selectedInvoiceIds.includes(inv._id)}
+                              onChange={() => handleToggleSelectInvoice(inv._id)}
+                            />
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle' }}>
                               <button
                                 onClick={() => setViewInvoiceModal(inv)}
@@ -6199,23 +6305,30 @@ export default function EliteBillingDepartment({
           <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem' }}>
-                  <th style={{ padding: '0.85rem 0.8rem' }}>Purchase No</th>
-                  <th style={{ padding: '0.85rem 0.8rem' }}>Date & Due</th>
-                  <th style={{ padding: '0.85rem 0.8rem' }}>Vendor / Supplier</th>
-                  <th style={{ padding: '0.85rem 0.8rem' }}>Items Breakdown</th>
-                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Qty / Mtr</th>
-                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Grand Total (₹)</th>
-                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Paid (₹)</th>
-                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Balance Due (₹)</th>
-                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'center' }}>Status</th>
-                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'center' }}>Actions</th>
+                <tr>
+                  <MasterCheckboxTh
+                    allSelected={filteredPurchases.length > 0 && filteredPurchases.every(p => selectedPurchaseIds.includes(p._id || p.id))}
+                    someSelected={filteredPurchases.some(p => selectedPurchaseIds.includes(p._id || p.id))}
+                    onToggleAll={() => handleToggleSelectAllPurchases(filteredPurchases)}
+                    totalCount={filteredPurchases.length}
+                    title="Select All Purchases"
+                  />
+                  <ErpTh columnKey="purchaseNo" sortState={purchaseSortState} onSortChange={setPurchaseSortState}>Purchase No</ErpTh>
+                  <ErpTh columnKey="date" sortState={purchaseSortState} onSortChange={setPurchaseSortState}>Date & Due</ErpTh>
+                  <ErpTh columnKey="vendor" sortState={purchaseSortState} onSortChange={setPurchaseSortState}>Vendor / Supplier</ErpTh>
+                  <ErpTh columnKey="items" sortState={purchaseSortState} onSortChange={setPurchaseSortState}>Items Breakdown</ErpTh>
+                  <ErpTh columnKey="quantity" sortState={purchaseSortState} onSortChange={setPurchaseSortState} align="right">Qty / Mtr</ErpTh>
+                  <ErpTh columnKey="grandTotal" sortState={purchaseSortState} onSortChange={setPurchaseSortState} align="right">Grand Total (₹)</ErpTh>
+                  <ErpTh columnKey="paidAmount" sortState={purchaseSortState} onSortChange={setPurchaseSortState} align="right">Paid (₹)</ErpTh>
+                  <ErpTh columnKey="balanceDue" sortState={purchaseSortState} onSortChange={setPurchaseSortState} align="right">Balance Due (₹)</ErpTh>
+                  <ErpTh columnKey="status" sortState={purchaseSortState} onSortChange={setPurchaseSortState} align="center">Status</ErpTh>
+                  <ErpTh hideSort align="center">Actions</ErpTh>
                 </tr>
               </thead>
               <tbody>
                 {filteredPurchases.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                       {hasActivePurchaseFilters ? (
                         <div>
                           <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#64748b' }}>
@@ -6250,7 +6363,11 @@ export default function EliteBillingDepartment({
                     const isPartial = p.paymentStatus === 'PARTIALLY_PAID' || p.paymentStatus === 'PARTIAL' || (paidAmt > 0 && balDue > 0);
 
                     return (
-                      <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
+                      <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b', background: getRowHighlightStyle(selectedPurchaseIds.includes(p._id || p.id)) }}>
+                        <RowCheckboxTd
+                          checked={selectedPurchaseIds.includes(p._id || p.id)}
+                          onChange={() => handleToggleSelectPurchase(p._id || p.id)}
+                        />
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 800, color: '#4f46e5', fontSize: '0.92rem' }}>{p.purchaseNo}</span>

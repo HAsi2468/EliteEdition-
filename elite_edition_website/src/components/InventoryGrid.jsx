@@ -14,6 +14,7 @@ import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -132,7 +133,34 @@ export default function InventoryGrid({
   const [stockStatusFilter, setStockStatusFilter] = useState('all'); // 'all', 'instock', 'lowstock', 'outofstock'
   const [sortField, setSortField] = useState('itemName');
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [selectedOverviewIds, setSelectedOverviewIds] = useState([]);
   const [updatingStockId, setUpdatingStockId] = useState(null);
+
+  const overviewSortState = useMemo(() => ({
+    columnKey: sortField,
+    order: sortOrder
+  }), [sortField, sortOrder]);
+
+  const handleOverviewSortChange = ({ columnKey, order }) => {
+    setSortField(columnKey);
+    setSortOrder(order || 'asc');
+  };
+
+  const handleToggleSelectAllOverview = (visibleItems) => {
+    const visibleIds = visibleItems.map(i => i._id || i.id || i.skuCode);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedOverviewIds.includes(id));
+    if (allSelected) {
+      setSelectedOverviewIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedOverviewIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectOverview = (id) => {
+    setSelectedOverviewIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
 
   // Pagination States (25 items per page default for lightweight client browser memory)
   const [overviewPage, setOverviewPage] = useState(1);
@@ -1968,63 +1996,21 @@ export default function InventoryGrid({
               ) : (
                 <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
-                    <tr style={styles.tableHeaderRow}>
-                      <th onClick={() => handleSort('itemName')} style={styles.thSort} title="Sort by Item Details">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>ITEM DETAILS</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'itemName' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'itemName' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleSort('skuCode')} style={styles.thSort} title="Sort by SKU Code">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>SKU CODE</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'skuCode' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'skuCode' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleSort('facility')} style={styles.thSort} title="Sort by Storage Facility">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>FACILITY</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'facility' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'facility' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleSort('party')} style={styles.thSort} title="Sort by Vendor / Brand">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>VENDOR / BRAND</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'party' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'party' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleSort('size')} style={styles.thSort} title="Sort by Size">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>SIZE</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'size' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'size' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleSort('purchasePrice')} style={{ ...styles.thSort, textAlign: 'right' }} title="Sort by Buy Price">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
-                          <span>BUY PRICE</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'purchasePrice' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'purchasePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleSort('currentlyAvailableStock')} style={{ ...styles.thSort, textAlign: 'center' }} title="Sort by Available Stock">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
-                          <span>AVAILABLE STOCK</span>
-                          <span style={{ fontSize: '0.75rem', color: sortField === 'currentlyAvailableStock' ? '#38bdf8' : '#94a3b8' }}>
-                            {sortField === 'currentlyAvailableStock' ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
+                    <tr>
+                      <MasterCheckboxTh
+                        allSelected={filteredOverviewItems.length > 0 && filteredOverviewItems.every(i => selectedOverviewIds.includes(i._id || i.id || i.skuCode))}
+                        someSelected={filteredOverviewItems.some(i => selectedOverviewIds.includes(i._id || i.id || i.skuCode))}
+                        onToggleAll={() => handleToggleSelectAllOverview(filteredOverviewItems)}
+                        totalCount={filteredOverviewItems.length}
+                        title="Select All Items"
+                      />
+                      <ErpTh columnKey="itemName" sortState={overviewSortState} onSortChange={handleOverviewSortChange}>Item Details</ErpTh>
+                      <ErpTh columnKey="skuCode" sortState={overviewSortState} onSortChange={handleOverviewSortChange}>SKU Code</ErpTh>
+                      <ErpTh columnKey="facility" sortState={overviewSortState} onSortChange={handleOverviewSortChange}>Facility</ErpTh>
+                      <ErpTh columnKey="party" sortState={overviewSortState} onSortChange={handleOverviewSortChange}>Vendor / Brand</ErpTh>
+                      <ErpTh columnKey="size" sortState={overviewSortState} onSortChange={handleOverviewSortChange}>Size</ErpTh>
+                      <ErpTh columnKey="purchasePrice" sortState={overviewSortState} onSortChange={handleOverviewSortChange} align="right">Buy Price</ErpTh>
+                      <ErpTh columnKey="currentlyAvailableStock" sortState={overviewSortState} onSortChange={handleOverviewSortChange} align="center">Available Stock</ErpTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -2048,8 +2034,15 @@ export default function InventoryGrid({
                         stockLabel = `${stock} Units (Low)`;
                       }
 
+                      const itemId = item._id || item.id || item.skuCode || idx;
+                      const isSelected = selectedOverviewIds.includes(itemId);
+
                       return (
-                        <tr key={item._id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        <tr key={item._id} style={{ borderBottom: '1px solid #e2e8f0', background: getRowHighlightStyle(isSelected, idx % 2 === 0 ? '#ffffff' : '#f8fafc') }}>
+                          <RowCheckboxTd
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectOverview(itemId)}
+                          />
                           <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.itemCell}>
                               <div style={styles.itemImgWrapper}>
