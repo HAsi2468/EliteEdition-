@@ -297,30 +297,32 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
+    const clearAltMode = () => {
+      if (altPressTimerRef.current) {
+        clearTimeout(altPressTimerRef.current);
+        altPressTimerRef.current = null;
+      }
+      setIsAltModeActive(false);
+      document.body.removeAttribute('data-erp-alt-mode');
+      isAltDownRef.current = false;
+    };
+
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
-        if (altPressTimerRef.current) {
-          clearTimeout(altPressTimerRef.current);
-          altPressTimerRef.current = null;
-        }
-        // If it was tapped quickly (<300ms), toggle alt mode; if held, release it
-        if (!isAltModeActive && isAltDownRef.current) {
-          setIsAltModeActive(true);
-          document.body.setAttribute('data-erp-alt-mode', 'true');
-        } else {
-          setIsAltModeActive(false);
-          document.body.removeAttribute('data-erp-alt-mode');
-        }
-        isAltDownRef.current = false;
+        clearAltMode();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
+    window.addEventListener('blur', clearAltMode);
+    window.addEventListener('click', clearAltMode);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
+      window.removeEventListener('blur', clearAltMode);
+      window.removeEventListener('click', clearAltMode);
     };
   }, [triggerHierarchicalEsc, isAltModeActive]);
 

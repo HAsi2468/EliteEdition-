@@ -30,7 +30,7 @@ export const MnemonicBadge: React.FC<MnemonicBadgeProps> = ({
       {children}
       <span
         className="erp-mnemonic-badge"
-        style={{ display: 'inline-block' }}
+        style={alwaysVisible ? { display: 'inline-block' } : undefined}
         aria-hidden="true"
       >
         {text}

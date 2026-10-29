@@ -281,10 +281,10 @@ body[data-erp-alt-mode="true"] .erp-mnemonic-badge {
   transform: translateY(-1px);
 }
 
-/* Sidebar Mnemonic Badge Positioning */
-#erp-sidebar-nav button .erp-mnemonic-badge {
-  top: 4px;
-  right: 6px;
+/* Sidebar Mnemonic Badge - strictly hidden on sidebar navigation buttons to keep menu clean */
+#erp-sidebar-nav button .erp-mnemonic-badge,
+[data-sidebar-nav="true"] .erp-mnemonic-badge {
+  display: none !important;
 }
 
 /* 7. Mobile Phone & Touch Device Suppression
