@@ -107,13 +107,18 @@ export function ErpTh({
             style={{
               display: 'inline-flex',
               flexDirection: 'column',
-              justifyContent: 'center',
               alignItems: 'center',
-              gap: '1px',
-              marginLeft: '0.15rem',
-              lineHeight: 1,
-              userSelect: 'none',
+              justifyContent: 'center',
+              gap: '2px',
+              marginLeft: '0.25rem',
+              width: '10px',
+              height: '14px',
+              maxHeight: '14px',
+              minHeight: '14px',
+              lineHeight: 0,
               flexShrink: 0,
+              verticalAlign: 'middle',
+              userSelect: 'none',
             }}
           >
             <button
@@ -122,22 +127,25 @@ export function ErpTh({
               title={`Sort ${titleText} Ascending`}
               aria-label={`Sort ${titleText} Ascending`}
               style={{
-                border: 'none',
-                background: isAsc ? 'rgba(37, 99, 235, 0.18)' : 'transparent',
-                borderRadius: '2px',
-                padding: '1px 2px',
-                width: '12px',
-                height: '7px',
+                all: 'unset',
+                boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                width: '10px',
+                height: '5px',
+                maxHeight: '5px',
                 cursor: 'pointer',
+                padding: 0,
+                margin: 0,
+                border: 'none',
+                background: 'transparent',
                 lineHeight: 0,
-                transition: 'all 0.12s ease',
+                flexShrink: 0,
               }}
             >
-              <svg width="7" height="4" viewBox="0 0 7 4" fill="none" style={{ display: 'block' }}>
-                <path d="M3.5 0.5L6.5 3.5H0.5L3.5 0.5Z" fill={isAsc ? '#2563eb' : '#94a3b8'} />
+              <svg width="8" height="5" viewBox="0 0 8 5" fill="none" style={{ display: 'block' }}>
+                <path d="M4 0.5L7.5 4.5H0.5L4 0.5Z" fill={isAsc ? '#2563eb' : '#cbd5e1'} />
               </svg>
             </button>
             <button
@@ -146,22 +154,25 @@ export function ErpTh({
               title={`Sort ${titleText} Descending`}
               aria-label={`Sort ${titleText} Descending`}
               style={{
-                border: 'none',
-                background: isDesc ? 'rgba(37, 99, 235, 0.18)' : 'transparent',
-                borderRadius: '2px',
-                padding: '1px 2px',
-                width: '12px',
-                height: '7px',
+                all: 'unset',
+                boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                width: '10px',
+                height: '5px',
+                maxHeight: '5px',
                 cursor: 'pointer',
+                padding: 0,
+                margin: 0,
+                border: 'none',
+                background: 'transparent',
                 lineHeight: 0,
-                transition: 'all 0.12s ease',
+                flexShrink: 0,
               }}
             >
-              <svg width="7" height="4" viewBox="0 0 7 4" fill="none" style={{ display: 'block' }}>
-                <path d="M3.5 3.5L0.5 0.5H6.5L3.5 3.5Z" fill={isDesc ? '#2563eb' : '#94a3b8'} />
+              <svg width="8" height="5" viewBox="0 0 8 5" fill="none" style={{ display: 'block' }}>
+                <path d="M4 4.5L0.5 0.5H7.5L4 4.5Z" fill={isDesc ? '#2563eb' : '#cbd5e1'} />
               </svg>
             </button>
           </span>
