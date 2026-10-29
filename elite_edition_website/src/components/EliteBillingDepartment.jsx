@@ -2758,6 +2758,13 @@ export default function EliteBillingDepartment({
     return 0;
   }, []);
 
+  const getInvoiceNetReceivable = useCallback((inv) => {
+    if (!inv) return 0;
+    const gross = inv.grandTotal != null ? Number(inv.grandTotal) : (inv.totalAmount != null ? Number(inv.totalAmount) : (getAmountWithoutGst ? getAmountWithoutGst(inv) : 0));
+    const tds = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : 0;
+    return Math.max(0, gross - tds);
+  }, [getAmountWithoutGst]);
+
   const periodStats = useMemo(() => {
     const totalInvoices = periodInvoices.length;
     let totalInvoiced = 0;
@@ -2770,16 +2777,15 @@ export default function EliteBillingDepartment({
     const todayStr = new Date().toISOString().split('T')[0];
 
     periodInvoices.forEach(inv => {
-      const amountExclGst = getAmountWithoutGst(inv);
-      const grandTotal = Number(inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount != null ? inv.totalAmount : amountExclGst));
+      const netReceivable = getInvoiceNetReceivable(inv);
       const paid = Number(inv.paidAmount || 0);
-      const balance = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, grandTotal - paid);
+      const effectiveTds = inv.enableTds ? Number(inv.tdsAmount || 0) : 0;
+      const balance = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, netReceivable - paid);
 
-      totalInvoiced += grandTotal;
+      totalInvoiced += netReceivable;
       totalPaid += paid;
       totalBalanceDue += balance;
-      const effectiveTds = inv.enableTds ? Number(inv.tdsAmount || 0) : 0;
-      if (inv.paymentStatus === 'PAID' || (grandTotal - effectiveTds - paid) <= 0) {
+      if (inv.paymentStatus === 'PAID' || (netReceivable - paid) <= 0) {
         paidCount++;
       } else {
         unpaidCount++;
@@ -2798,7 +2804,7 @@ export default function EliteBillingDepartment({
       unpaidCount,
       overdueCount
     };
-  }, [periodInvoices, getAmountWithoutGst]);
+  }, [periodInvoices, getInvoiceNetReceivable]);
 
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [signedCopyFilter, setSignedCopyFilter] = useState('All');
@@ -4102,7 +4108,7 @@ export default function EliteBillingDepartment({
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Invoiced</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Net Receivable</span>
                 <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontSize: '0.75rem' }}>🧾</span>
               </div>
               <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(periodStats.totalInvoiced)}</div>
@@ -4333,17 +4339,21 @@ export default function EliteBillingDepartment({
                     vA = new Date(a.invoiceDate || a.createdAt || 0).getTime();
                     vB = new Date(b.invoiceDate || b.createdAt || 0).getTime();
                     return order === 'asc' ? vA - vB : vB - vA;
-                  } else if (columnKey === 'grandTotal') {
-                    vA = Number(a.grandTotal || a.totalAmount || 0);
-                    vB = Number(b.grandTotal || b.totalAmount || 0);
+                  } else if (columnKey === 'grandTotal' || columnKey === 'netReceivable') {
+                    vA = getInvoiceNetReceivable(a);
+                    vB = getInvoiceNetReceivable(b);
                     return order === 'asc' ? vA - vB : vB - vA;
                   } else if (columnKey === 'paidAmount') {
                     vA = Number(a.paidAmount || 0);
                     vB = Number(b.paidAmount || 0);
                     return order === 'asc' ? vA - vB : vB - vA;
                   } else if (columnKey === 'balanceDue') {
-                    vA = Number(a.balanceDue != null ? a.balanceDue : ((a.grandTotal || 0) - (a.paidAmount || 0)));
-                    vB = Number(b.balanceDue != null ? b.balanceDue : ((b.grandTotal || 0) - (b.paidAmount || 0)));
+                    const getBal = (inv) => {
+                      const net = getInvoiceNetReceivable(inv);
+                      return Number(inv.balanceDue != null ? inv.balanceDue : Math.max(0, net - (inv.paidAmount || 0)));
+                    };
+                    vA = getBal(a);
+                    vB = getBal(b);
                     return order === 'asc' ? vA - vB : vB - vA;
                   } else if (columnKey === 'status') {
                     vA = a.status || '';
@@ -4372,7 +4382,7 @@ export default function EliteBillingDepartment({
                       <ErpTh columnKey="challanNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Challan No</ErpTh>
                       <ErpTh columnKey="customerName" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Customer Name</ErpTh>
                       <ErpTh columnKey="date" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Date</ErpTh>
-                      <ErpTh columnKey="grandTotal" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Grand Total</ErpTh>
+                      <ErpTh columnKey="netReceivable" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Net Receivable</ErpTh>
                       <ErpTh columnKey="paidAmount" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Paid Amount</ErpTh>
                       <ErpTh columnKey="balanceDue" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Balance Due</ErpTh>
                       <ErpTh columnKey="status" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="center">Status</ErpTh>
@@ -4457,18 +4467,27 @@ export default function EliteBillingDepartment({
                               {formatDateDDMMYYYY(inv.invoiceDate)}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount != null ? inv.totalAmount : getAmountWithoutGst(inv)))}
-                              {inv.enableTds && Number(inv.tdsAmount) > 0 && (
-                                <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
-                                  TDS: -₹ {Math.round(Number(inv.tdsAmount || 0)).toLocaleString('en-IN')} ({inv.tdsSection || '194C'})
-                                </div>
-                              )}
+                              {(() => {
+                                const gross = inv.grandTotal != null ? Number(inv.grandTotal) : (inv.totalAmount != null ? Number(inv.totalAmount) : (getAmountWithoutGst ? getAmountWithoutGst(inv) : 0));
+                                const tds = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : 0;
+                                const netRec = Math.max(0, gross - tds);
+                                return (
+                                  <>
+                                    <div style={{ fontWeight: 800 }}>{fmtINR(netRec)}</div>
+                                    {tds > 0 && (
+                                      <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
+                                        Gross: ₹{Math.round(gross).toLocaleString('en-IN')} (TDS -₹{Math.round(tds).toLocaleString('en-IN')})
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {fmtINR(inv.paidAmount)}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, (inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount || getAmountWithoutGst(inv))) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, (inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount || getAmountWithoutGst(inv))) - (inv.paidAmount || 0)))}
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, getInvoiceNetReceivable(inv) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, getInvoiceNetReceivable(inv) - (inv.paidAmount || 0)))}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
                               <span style={{
