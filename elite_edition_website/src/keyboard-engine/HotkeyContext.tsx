@@ -6,6 +6,14 @@ import {
   ShortcutHint,
 } from './types';
 import { matchesCombo, isTextInputActive } from './keyUtils';
+import {
+  switchActiveSubTab,
+  activateSidebarModule,
+  focusSidebar,
+  focusSearchInput,
+  cyclePanes,
+  handleGlobalEnterAsTab,
+} from './navigationHelpers';
 
 interface HotkeyContextValue {
   registerHotkey: (def: HotkeyDefinition) => () => void;
@@ -203,6 +211,84 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (handled !== false) {
             return;
           }
+        }
+      }
+
+      // 5. Universal Sub-Tab Switching (Alt + ArrowRight/Left or Ctrl + ]/[)
+      if ((e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) ||
+          (isCtrlOrMeta && (e.key === ']' || e.key === '['))) {
+        const direction = (e.key === 'ArrowRight' || e.key === ']') ? 'next' : 'prev';
+        const switched = switchActiveSubTab(direction);
+        if (switched) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 6. Direct Sub-Tab Jump (Ctrl + 1..9)
+      if (isCtrlOrMeta && !e.altKey && /^[1-9]$/.test(e.key)) {
+        const switched = switchActiveSubTab(Number(e.key) - 1);
+        if (switched) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 7. Direct Sidebar Module Jump (Alt + 1..9)
+      if (e.altKey && !isCtrlOrMeta && /^[1-9]$/.test(e.key)) {
+        const activated = activateSidebarModule(Number(e.key) - 1);
+        if (activated) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 8. Focus Sidebar (Alt + S or F10)
+      if ((e.altKey && key === 's') || e.key.toUpperCase() === 'F10') {
+        const focused = focusSidebar();
+        if (focused) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 9. Toggle Sidebar Collapse (Ctrl + B)
+      if (isCtrlOrMeta && key === 'b') {
+        window.dispatchEvent(new CustomEvent('elite:toggle-sidebar'));
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // 10. Universal Pane Cycler (F6: Sidebar <-> Main Content <-> Search)
+      if (e.key.toUpperCase() === 'F6') {
+        const cycled = cyclePanes();
+        if (cycled) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 11. Quick Search Focus (/ when outside inputs, or Ctrl + F)
+      if ((key === '/' && !inInput) || (isCtrlOrMeta && key === 'f')) {
+        e.preventDefault();
+        const focused = focusSearchInput();
+        if (!focused) {
+          window.dispatchEvent(new CustomEvent('elite:open-global-search'));
+        }
+        return;
+      }
+
+      // 12. Universal Fallback Enter-As-Tab with Inline Math Evaluation
+      if (e.key === 'Enter') {
+        const handledTab = handleGlobalEnterAsTab(e);
+        if (handledTab) {
+          return;
         }
       }
     };

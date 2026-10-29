@@ -262,3 +262,28 @@ body[data-erp-alt-mode="true"] .erp-mnemonic-badge {
   color: #0f172a;
   font-size: 0.72rem;
 }
+
+/* 6. Sidebar & Sub-Tab High-Contrast Focus Ring */
+#erp-sidebar-nav button:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: -1px !important;
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3) !important;
+}
+
+.ent-tab-btn:focus-visible,
+[role="tab"]:focus-visible,
+.inv-sub-tab-bar button:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 1px !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+/* Sidebar Mnemonic Badge Positioning */
+#erp-sidebar-nav button .erp-mnemonic-badge {
+  top: 4px;
+  right: 6px;
+}
+

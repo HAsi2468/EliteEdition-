@@ -20,10 +20,11 @@ export const HotkeyHUD: React.FC<HotkeyHUDProps> = ({ defaultHints = [] }) => {
 
   // Global base hints always accessible
   const fallbackHints: ShortcutHint[] = [
-    { key: 'Ctrl+K', label: 'Universal Search' },
-    { key: 'F2', label: 'Period / Date' },
+    { key: 'Alt+S', label: 'Sidebar Menu' },
+    { key: 'Alt+→/←', label: 'Sub-Tabs' },
+    { key: 'Enter', label: 'Next / Math Calc' },
+    { key: 'Ctrl+K', label: 'Search' },
     { key: 'Ctrl+S', label: 'Save / Accept' },
-    { key: 'Alt', label: 'Mnemonic Badges' },
     { key: 'Esc', label: 'Cancel / Back' },
     { key: '?', label: 'Cheat Sheet', action: openCheatSheet },
   ];

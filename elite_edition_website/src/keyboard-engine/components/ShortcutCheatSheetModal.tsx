@@ -14,7 +14,28 @@ const SHORTCUT_DATABASE: ShortcutCategory[] = [
       { key: '?', description: 'Open this Shortcut Cheat Sheet' },
       { key: 'Alt (Hold/Tap)', description: 'Toggle visual mnemonic key badges on buttons' },
       { key: 'Esc', description: 'Hierarchical Cancel (Close dropdown -> Exit edit -> Close modal)' },
+      { key: 'F6', description: 'Universal Pane Cycler (Sidebar ↔ Main Content ↔ Search)' },
+      { key: '/ or Ctrl + F', description: 'Quick focus search / filter on active screen' },
       { key: 'F2', description: 'Change Voucher / Period Date' },
+    ],
+  },
+  {
+    title: 'Side Panel & Sidebar Menu',
+    items: [
+      { key: 'Alt + S / F10', description: 'Focus left navigation sidebar menu' },
+      { key: 'Arrow Up / Down', description: 'Traverse sidebar menu modules' },
+      { key: 'Enter / Space', description: 'Activate focused sidebar module' },
+      { key: 'Alt + 1 .. Alt + 9', description: 'Direct jump to 1st..9th visible module in sidebar' },
+      { key: 'Ctrl + B', description: 'Toggle sidebar collapse / expand' },
+      { key: 'Esc / Arrow Right', description: 'Return focus from sidebar to main screen' },
+    ],
+  },
+  {
+    title: 'Sub-Screen & Sub-Tab Traversal',
+    items: [
+      { key: 'Alt + Right / Ctrl + ]', description: 'Switch to next sub-tab on active screen' },
+      { key: 'Alt + Left / Ctrl + [', description: 'Switch to previous sub-tab on active screen' },
+      { key: 'Ctrl + 1 .. Ctrl + 9', description: 'Direct jump to 1st..9th sub-tab on screen' },
     ],
   },
   {

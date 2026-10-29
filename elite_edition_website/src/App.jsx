@@ -133,6 +133,7 @@ import {
   KeyboardNavOnboardingBanner,
   useHotkeys,
   VoucherEntryExample,
+  MnemonicBadge,
 } from './keyboard-engine';
 
 
@@ -835,6 +836,62 @@ export default function App() {
       localStorage.setItem('sidebar_collapsed', String(next));
       return next;
     });
+  };
+
+  // Keyboard engine toggle listener for Ctrl+B
+  useEffect(() => {
+    const handleToggle = () => toggleSidebarCollapse();
+    window.addEventListener('elite:toggle-sidebar', handleToggle);
+    return () => window.removeEventListener('elite:toggle-sidebar', handleToggle);
+  }, []);
+
+  // Keyboard navigation for Left Navigation Sidebar (ArrowUp / ArrowDown / Enter / Space / Esc / ArrowRight)
+  const handleSidebarKeyDown = (e) => {
+    const navContainer = document.getElementById('erp-sidebar-nav');
+    if (!navContainer) return;
+
+    const buttons = Array.from(
+      navContainer.querySelectorAll('button[data-sidebar-nav="true"]:not([disabled])')
+    );
+    if (!buttons.length) return;
+
+    const activeIndex = buttons.indexOf(document.activeElement);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = activeIndex < buttons.length - 1 ? activeIndex + 1 : 0;
+      buttons[nextIndex]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = activeIndex > 0 ? activeIndex - 1 : buttons.length - 1;
+      buttons[prevIndex]?.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      buttons[0]?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      buttons[buttons.length - 1]?.focus();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (document.activeElement && typeof document.activeElement.click === 'function') {
+        document.activeElement.click();
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const content = document.getElementById('main-content-area');
+      if (content) {
+        const firstInteractive = content.querySelector('input:not([type="hidden"]):not([disabled]), button:not([disabled]), [tabindex="0"]');
+        if (firstInteractive) {
+          firstInteractive.focus();
+        } else {
+          content.focus();
+        }
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      const content = document.getElementById('main-content-area');
+      if (content) content.focus();
+    }
   };
 
   // Department permission helpers
@@ -3113,6 +3170,11 @@ export default function App() {
         {/* Left Navigation Sidebar - Hidden on Chat and Task Management */}
         {!['communication', 'workspace', 'task_management'].includes(activeTab) && (
         <aside
+          id="erp-sidebar-nav"
+          role="navigation"
+          aria-label="ERP Sidebar Navigation"
+          tabIndex={-1}
+          onKeyDown={handleSidebarKeyDown}
           style={{
             width: isSidebarCollapsed ? '68px' : '230px',
             flexShrink: 0,
@@ -3141,7 +3203,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleSidebarCollapse}
-                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                title={isSidebarCollapsed ? "Expand Sidebar (Ctrl + B)" : "Collapse Sidebar (Ctrl + B)"}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -3160,7 +3222,10 @@ export default function App() {
             </div>
 
             {(() => {
+              let navItemIndex = 0;
               const renderNavItem = (tabKey, label, IconComponent, customColor, shortLabel) => {
+                navItemIndex++;
+                const itemShortcutNum = navItemIndex <= 9 ? navItemIndex : null;
                 const isActive = activeTab === tabKey || (tabKey === 'jobcards_stitching_challan' && activeTab === 'jobcards_fabric');
                 const displayShort = shortLabel || label;
                 const NavIcon = IconComponent || FileText;
@@ -3170,8 +3235,12 @@ export default function App() {
                     <button
                       key={tabKey}
                       type="button"
+                      data-sidebar-nav="true"
+                      data-nav-tab={tabKey}
+                      tabIndex={isActive ? 0 : -1}
+                      aria-current={isActive ? 'page' : undefined}
                       onClick={() => handleNavClick(tabKey)}
-                      title={label}
+                      title={`${label} ${itemShortcutNum ? `(Alt + ${itemShortcutNum})` : ''}`}
                       className="sidebar-nav-collapsed-btn"
                       style={{
                         background: isActive ? '#eff6ff' : 'transparent',
@@ -3200,6 +3269,7 @@ export default function App() {
                         if (!isActive) e.currentTarget.style.background = 'transparent';
                       }}
                     >
+                      {itemShortcutNum && <MnemonicBadge keyChar={String(itemShortcutNum)} />}
                       <NavIcon
                         size={20}
                         color={customColor || (isActive ? '#2563eb' : '#64748b')}
@@ -3226,8 +3296,12 @@ export default function App() {
                   <button
                     key={tabKey}
                     type="button"
+                    data-sidebar-nav="true"
+                    data-nav-tab={tabKey}
+                    tabIndex={isActive ? 0 : -1}
+                    aria-current={isActive ? 'page' : undefined}
                     onClick={() => handleNavClick(tabKey)}
-                    title={label}
+                    title={`${label} ${itemShortcutNum ? `(Alt + ${itemShortcutNum})` : ''}`}
                     style={{
                       background: isActive ? '#eff6ff' : 'transparent',
                       border: 'none',
@@ -3246,7 +3320,8 @@ export default function App() {
                       transition: 'all 0.15s ease',
                       borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent',
                       whiteSpace: 'nowrap',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      position: 'relative'
                     }}
                     onMouseEnter={e => {
                       if (!isActive) e.currentTarget.style.background = '#f8fafc';
@@ -3255,8 +3330,9 @@ export default function App() {
                       if (!isActive) e.currentTarget.style.background = 'transparent';
                     }}
                   >
+                    {itemShortcutNum && <MnemonicBadge keyChar={String(itemShortcutNum)} />}
                     <NavIcon size={17} color={customColor || (isActive ? '#2563eb' : '#64748b')} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{label}</span>
                   </button>
                 );
               };
@@ -3544,6 +3620,10 @@ export default function App() {
               isSidebarCollapsed ? (
                 <button
                   type="button"
+                  data-sidebar-nav="true"
+                  data-nav-tab="admin"
+                  tabIndex={activeTab === 'admin' ? 0 : -1}
+                  aria-current={activeTab === 'admin' ? 'page' : undefined}
                   onClick={() => handleNavClick('admin')}
                   title="Admin Panel"
                   style={{
@@ -3575,6 +3655,10 @@ export default function App() {
               ) : (
                 <button
                   type="button"
+                  data-sidebar-nav="true"
+                  data-nav-tab="admin"
+                  tabIndex={activeTab === 'admin' ? 0 : -1}
+                  aria-current={activeTab === 'admin' ? 'page' : undefined}
                   onClick={() => handleNavClick('admin')}
                   title="Admin Panel"
                   style={{
@@ -3613,6 +3697,8 @@ export default function App() {
 
         {/* Right Content Panel */}
         <section
+          id="main-content-area"
+          tabIndex={-1}
           style={{
             ...styles.contentArea,
             ...(['communication', 'workspace', 'task_management'].includes(activeTab) ? {

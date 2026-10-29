@@ -10,6 +10,16 @@ export * from './types';
 // Core Utilities
 export { evaluateMathExpression } from './mathEvaluator';
 export { normalizeCombo, matchesCombo, isTextInputActive } from './keyUtils';
+export {
+  processInputMath,
+  handleGlobalEnterAsTab,
+  switchActiveSubTab,
+  focusSidebar,
+  focusMainContent,
+  focusSearchInput,
+  cyclePanes,
+  activateSidebarModule,
+} from './navigationHelpers';
 
 // Context & Priority Dispatcher
 export {
