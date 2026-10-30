@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const rawMaterialController = require('../../controllers/rawMaterial.controller');
 
+// Get stock overview on root and /stock
+router.get('/', rawMaterialController.getStockOverview);
+
 // Create new INWARD transaction
 router.post('/inward', rawMaterialController.createInward);
 

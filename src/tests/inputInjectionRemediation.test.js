@@ -124,7 +124,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       assert.strictEqual(res.body.status, 400);
       assert.ok(Array.isArray(res.body.details));
 
@@ -148,7 +148,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const emailError = res.body.details.find((d) => d.field === 'body.email');
       assert.ok(emailError, 'Expected validation error detail for body.email');
     });
@@ -183,7 +183,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       assert.strictEqual(res.body.status, 400);
 
       const adminError = res.body.details.find(
@@ -208,7 +208,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
     });
 
     it('should reject privilege elevation payload containing "isVerified": true or "permissions": ["*"]', async () => {
@@ -224,7 +224,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
     });
 
     it('should successfully accept valid profile update matching declared schema shape', async () => {
@@ -254,7 +254,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
 
       const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
       assert.ok(sortError, 'Expected validation error detail for query.sortBy');
@@ -267,7 +267,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
 
       const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
       assert.ok(sortError, 'Expected validation error detail for query.sortBy');
@@ -306,7 +306,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const limitError = res.body.details.find((d) => d.field === 'query.limit');
       assert.ok(limitError, 'Expected validation error for query.limit');
     });
@@ -316,7 +316,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const paramError = res.body.details.find((d) => d.field === 'params.userId');
       assert.ok(paramError, 'Expected validation error for params.userId');
     });
@@ -351,7 +351,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const paramError = res.body.details.find((d) => d.field === 'params.orderId');
       assert.ok(paramError, 'Expected validation error for params.orderId');
       assert.ok(paramError.message.includes('Invalid MongoDB ObjectId'));

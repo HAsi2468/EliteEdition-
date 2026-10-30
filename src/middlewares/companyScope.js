@@ -12,8 +12,8 @@ const {
  */
 function isUserSuperAdmin(user) {
   if (!user) return false;
-  if (user.isMainAdmin === true) return true;
-  if (user.role === 'super_admin') return true;
+  if (user.isMainAdmin === true || user.isAdmin === true) return true;
+  if (user.role === 'super_admin' || user.role === 'admin') return true;
   if (user.email === 'harshitsidapara2468@gmail.com') return true;
   if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length >= 5) return true;
   return false;
@@ -29,9 +29,10 @@ function isCompanyPermittedForUser(user, canonicalId) {
   const targetComp = getCompanyById(canonicalId);
   const targetAliases = [canonicalId, targetComp.name.toLowerCase(), targetComp.code.toLowerCase(), ...targetComp.aliases];
 
-  // Check user.company_id if set
-  if (user.company_id) {
-    const userCompNorm = normalizeCompanyId(user.company_id);
+  // Check user.company_id or user.companyId if set
+  const rawUserComp = user.company_id || user.companyId;
+  if (rawUserComp) {
+    const userCompNorm = normalizeCompanyId(rawUserComp);
     if (userCompNorm === canonicalId) return true;
   }
 

@@ -3375,7 +3375,7 @@ const getCompanySettings = async (req, res) => {
         prefix = 'EDP/26-27/';
         startNo = 223;
       }
-      config = await PrintConfig.create({
+      config = {
         companyEntity,
         companyName: isEE ? 'ELITE EDITION' : compName,
         invoicePrefix: prefix,
@@ -3400,7 +3400,7 @@ const getCompanySettings = async (req, res) => {
         expenseOutCategories: masterConfig.expenseOutCategories || ['Machine Maintenance & Service', 'Ink & Consumables', 'Spare Parts & Repairs', 'Paper & Transfer Film', 'Tea & Refreshments', 'Carriage & Freight', 'Salary / Daily Wages', 'Electricity & Utility', 'Stationery & Office', 'Other Expense'],
         expensePaymentModes: masterConfig.expensePaymentModes || ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other'],
         purchaseTypes: ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
-      });
+      };
     }
     const defaultChallanDesign = {
       title: 'DELIVERY CHALLAN',

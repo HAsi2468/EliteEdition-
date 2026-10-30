@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ResilientLifecycleManager } from '../services/resilientLifecycleManager';
 import { OfflineQueueManager, QueuedMutation } from '../services/offlineQueue';
 import { SilentAuthInterceptor } from '../services/authInterceptor';
+import { getInMemoryToken } from '../services/api';
 
 describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () => {
   beforeEach(() => {
@@ -60,12 +61,14 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
 
       global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
 
-      // First failure -> RECONNECTING
+      // 2 consecutive failures -> RECONNECTING
       await manager.probeNow('attempt-1');
+      await manager.probeNow('attempt-2');
       expect(manager.getState()).toBe('RECONNECTING');
 
-      // Second failure -> OFFLINE
-      await manager.probeNow('attempt-2');
+      // 4 consecutive failures -> OFFLINE
+      await manager.probeNow('attempt-3');
+      await manager.probeNow('attempt-4');
       expect(manager.getState()).toBe('OFFLINE');
     });
   });
@@ -197,9 +200,10 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
       expect(res2.status).toBe(200);
       expect(res3.status).toBe(200);
 
-      // Verify new tokens were committed to storage
-      expect(localStorage.getItem('elite_auth_token')).toBe('new_fresh_token');
-      expect(localStorage.getItem('elite_refresh_token')).toBe('new_refresh_token');
+      // Verify new access token was committed to in-memory session and localStorage was purged
+      expect(getInMemoryToken()).toBe('new_fresh_token');
+      expect(localStorage.getItem('elite_auth_token')).toBeNull();
+      expect(localStorage.getItem('elite_refresh_token')).toBeNull();
     });
 
     it('rejects queue and dispatches elite-session-expired if refresh token is genuinely invalid', async () => {

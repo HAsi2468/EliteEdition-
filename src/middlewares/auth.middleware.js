@@ -85,7 +85,7 @@ const requireAuth = async (req, res, next) => {
       try {
         if (mongoose.Types.ObjectId.isValid(userId)) {
           user = await User.findById(userId)
-            .select('_id companyId role isActive status name username email isMainAdmin isAdmin')
+            .select('_id companyId company_id allowedCompanies permissions department role isActive status name username email isMainAdmin isAdmin')
             .maxTimeMS(2500)
             .lean();
         }
