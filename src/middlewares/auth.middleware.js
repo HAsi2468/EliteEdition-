@@ -146,6 +146,8 @@ const requireAuth = async (req, res, next) => {
           username: decoded.username || 'user',
           email: decoded.email || '',
           companyId: decoded.companyId || null,
+          allowedCompanies: Array.isArray(decoded.allowedCompanies) ? decoded.allowedCompanies : [],
+          isMainAdmin: Boolean(decoded.isMainAdmin),
           isAdmin: decoded.role === 'admin' || decoded.role === 'super_admin' || decoded.isAdmin === true || decoded.isMainAdmin === true
         };
         // Cache briefly (15s) during DB recovery
@@ -192,7 +194,11 @@ const requireAuth = async (req, res, next) => {
       name: user.name || user.username,
       username: user.username,
       email: user.email,
-      isAdmin: user.role === 'admin' || user.role === 'super_admin' || user.isAdmin === true || user.isMainAdmin === true
+      allowedCompanies: Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0
+        ? user.allowedCompanies
+        : (Array.isArray(decoded.allowedCompanies) ? decoded.allowedCompanies : []),
+      isMainAdmin: Boolean(user.isMainAdmin || decoded.isMainAdmin),
+      isAdmin: user.role === 'admin' || user.role === 'super_admin' || user.isAdmin === true || user.isMainAdmin === true || decoded.isAdmin === true || decoded.isMainAdmin === true
     };
     req.userId = String(user._id);
 
