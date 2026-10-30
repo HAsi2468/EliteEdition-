@@ -44,9 +44,11 @@ const authIpLimiter = rateLimit({
 		return false;
 	},
 	handler: (req, res) => {
+		const msg = 'Too many login requests from this network. Please wait a few moments before trying again.';
 		return res.status(429).json({
 			code: 429,
-			error: 'Too many login requests from this network. Please wait a few moments before trying again.',
+			message: msg,
+			error: msg,
 		});
 	},
 });
@@ -75,9 +77,11 @@ const authAccountLimiter = rateLimit({
 		return false;
 	},
 	handler: (req, res) => {
+		const msg = 'Too many failed login attempts for this account. Access is temporarily locked for 15 minutes to protect your account.';
 		return res.status(429).json({
 			code: 429,
-			error: 'Too many failed login attempts for this account. Access is temporarily locked for 15 minutes to protect your account.',
+			message: msg,
+			error: msg,
 		});
 	},
 });

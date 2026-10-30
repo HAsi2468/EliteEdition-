@@ -4553,6 +4553,9 @@ const getWhiteFabricLogs = async (req, res) => {
   }
 };
 
+// In-flight burst deduplication map for White Fabric QA (BUG-054)
+const inFlightWhiteFabricQALocks = new Map();
+
 const createWhiteFabricLog = async (req, res) => {
   try {
     const body = req.body;
@@ -4573,6 +4576,16 @@ const createWhiteFabricLog = async (req, res) => {
     }
 
     // Deduplication guard against rapid burst-clicks (BUG-054)
+    const lockKey = `${String(body.challanNo || '').trim()}___${String(body.fabricQuality || '').trim()}___${String(body.lotNo || '').trim()}___${totalMtr}`;
+    if (inFlightWhiteFabricQALocks.has(lockKey)) {
+      const existing = await inFlightWhiteFabricQALocks.get(lockKey);
+      return res.status(200).json({
+        success: true,
+        data: existing,
+        message: 'Deduplicated: Identical White Fabric QA entry logged moments ago.'
+      });
+    }
+
     if (body.challanNo && body.fabricQuality) {
       const recentDuplicate = await WhiteFabricLog.findOne({
         challanNo: String(body.challanNo).trim(),
@@ -4589,12 +4602,20 @@ const createWhiteFabricLog = async (req, res) => {
       }
     }
 
-    const log = await WhiteFabricLog.create({
-      ...body,
-      totalMtr,
-      totalDefectMtr: parseFloat(totDefect.toFixed(2)),
-      usableFreshMtr: parseFloat(Math.max(0, totalMtr - totDefect).toFixed(2))
-    });
+    const creationPromise = (async () => {
+      const doc = await WhiteFabricLog.create({
+        ...body,
+        totalMtr,
+        totalDefectMtr: parseFloat(totDefect.toFixed(2)),
+        usableFreshMtr: parseFloat(Math.max(0, totalMtr - totDefect).toFixed(2))
+      });
+      return doc;
+    })();
+
+    inFlightWhiteFabricQALocks.set(lockKey, creationPromise);
+    setTimeout(() => inFlightWhiteFabricQALocks.delete(lockKey), 5000);
+
+    const log = await creationPromise;
     res.json({ success: true, data: log });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
