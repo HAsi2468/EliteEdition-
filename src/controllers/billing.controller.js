@@ -687,19 +687,47 @@ const createInvoice = async (req, res) => {
     }
 
     if (!invoiceData.invoiceSeq || !invoiceData.invoiceNo) {
+      let defaultPrefix = 'EDP/26-27/';
+      let defaultStartSeq = 223;
+      if (entity === 'Elite Edition') {
+        defaultPrefix = 'EE-2627-';
+        defaultStartSeq = 1;
+      } else if (entity === 'Elite Fabtex') {
+        defaultPrefix = 'EF-2627-';
+        defaultStartSeq = 1;
+      } else if (entity === 'Sobise') {
+        defaultPrefix = 'SO-2627-';
+        defaultStartSeq = 1;
+      } else if (entity === 'Elite Stitching') {
+        defaultPrefix = 'ES-2627-';
+        defaultStartSeq = 1;
+      } else if (entity === 'Elite Online') {
+        defaultPrefix = 'EO-2627-';
+        defaultStartSeq = 1;
+      } else if (entity === 'Ethno wear' || entity === 'ethno_wear') {
+        defaultPrefix = 'EW-2627-';
+        defaultStartSeq = 1;
+      } else if (entity === 'Yamunaji' || entity === 'yamunaji') {
+        defaultPrefix = 'YJ-2627-';
+        defaultStartSeq = 1;
+      }
+
       const PrintConfig = require('../db/models/printConfig.model');
       const config = await PrintConfig.findOne(filter).lean() || {};
-      const prefix = config.invoicePrefix || 'EDP/26-27/';
-      const startSeq = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : 223;
+      const prefix = config.invoicePrefix || defaultPrefix;
+      const startSeq = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : defaultStartSeq;
 
       const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
       const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, startSeq) : startSeq;
-      invoiceData.invoiceSeq = nextSeq;
-      
-      if (prefix.endsWith('/')) {
-        invoiceData.invoiceNo = `${prefix}${nextSeq}`;
-      } else {
-        invoiceData.invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+      if (!invoiceData.invoiceSeq) {
+        invoiceData.invoiceSeq = nextSeq;
+      }
+      if (!invoiceData.invoiceNo || !String(invoiceData.invoiceNo).trim()) {
+        if (prefix.endsWith('/')) {
+          invoiceData.invoiceNo = `${prefix}${invoiceData.invoiceSeq}`;
+        } else {
+          invoiceData.invoiceNo = `${prefix}${String(invoiceData.invoiceSeq).padStart(4, '0')}`;
+        }
       }
     }
 

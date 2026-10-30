@@ -59,9 +59,9 @@ function parseDateSafe(dateVal) {
 }
 
 // ── STATUTORY GST COMPLIANCE ENGINE FEATURE FLAGS ──
-// Table 12 HSN Summary is enabled; Freight GTA RCM is kept hidden until explicitly requested
+// Table 12 HSN Summary and Freight GTA RCM are enabled
 export const SHOW_TABLE_12_TAB = true;
-export const SHOW_GTA_FREIGHT_RCM_TAB = false;
+export const SHOW_GTA_FREIGHT_RCM_TAB = true;
 
 export default function GstCreditAnalysisPanel({
   invoices = [],

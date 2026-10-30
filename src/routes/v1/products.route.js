@@ -11,6 +11,7 @@ router.get('/clear-sales', async (req, res) => {
 });
 
 router.route('/')
+  .get(productsController.getAllProductsList)
   .post(productsController.createProduct);
 router.route('/list').get(productsController.getAllProductsList);
 router.route('/get_orders').get(getSalseList);

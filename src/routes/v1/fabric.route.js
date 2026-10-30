@@ -15,6 +15,7 @@ router.post('/import-stock', fabricController.importStock);
 router.get('/transactions', fabricController.getTransactions);
 
 // Get stock overview grouped by fabric quality
+router.get('/', fabricController.getStockOverview);
 router.get('/stock', fabricController.getStockOverview);
 
 // Get lot stock

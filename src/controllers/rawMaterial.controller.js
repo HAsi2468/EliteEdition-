@@ -33,11 +33,12 @@ const createInward = async (req, res) => {
     if (Array.isArray(req.body)) {
       const docs = req.body.map((item) => {
         const {
-          challanNo, vendorName, materialName, qty, unit, date, notes,
+          challanNo, vendorName, materialName, qty, quantity, unit, date, notes,
           panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
           category, shade, hsnCode, location, reorderLevel, unitPrice, totalAmount
         } = item;
-        if (!materialName || qty == null || qty < 0) {
+        const effectiveQty = qty != null ? qty : quantity;
+        if (!materialName || effectiveQty == null || effectiveQty < 0) {
           throw new Error('Material Name and a valid Quantity are required.');
         }
         return {
@@ -46,7 +47,7 @@ const createInward = async (req, res) => {
           challanNo,
           vendorName,
           materialName,
-          qty,
+          qty: effectiveQty,
           unit: unit || 'Meters',
           date: date ? new Date(date) : new Date(),
           notes,
@@ -69,12 +70,13 @@ const createInward = async (req, res) => {
     }
 
     const {
-      challanNo, vendorName, materialName, qty, unit, date, notes,
+      challanNo, vendorName, materialName, qty, quantity, unit, date, notes,
       panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
       category, shade, hsnCode, location, reorderLevel, unitPrice, totalAmount
     } = req.body;
+    const effectiveQty = qty != null ? qty : quantity;
 
-    if (!materialName || qty == null || qty < 0) {
+    if (!materialName || effectiveQty == null || effectiveQty < 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity are required.' });
     }
 
@@ -84,7 +86,7 @@ const createInward = async (req, res) => {
       challanNo,
       vendorName,
       materialName,
-      qty,
+      qty: effectiveQty,
       unit: unit || 'Meters',
       date: date ? new Date(date) : new Date(),
       notes,

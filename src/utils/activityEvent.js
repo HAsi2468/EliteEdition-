@@ -1,4 +1,5 @@
 const { ChatRoom, ChatMessage, user: User } = require('../db/models');
+const logger = require('../config/logger');
 
 let ioInstance = null;
 
@@ -74,16 +75,20 @@ async function publishActivity({
     const cleanActor = String(actorName || '').toLowerCase().trim();
     const cleanEntity = String(companyEntity || '').toUpperCase().trim();
     const cleanRef = String(recordRef || '').toUpperCase().trim();
+    const cleanDesc = String(description || '').toUpperCase();
     if (
       cleanActor === 'qa-automation' ||
       cleanActor.includes('qa-bot') ||
       cleanActor.includes('testing bot') ||
+      cleanActor.includes('argon e2e') ||
       cleanEntity === 'SANDBOX' ||
       cleanEntity === 'TEST' ||
       cleanEntity === 'SBX' ||
       cleanRef.startsWith('TEST-') ||
       cleanRef.startsWith('QA-') ||
-      cleanRef.includes('SANDBOX')
+      cleanRef.startsWith('AUDIT-') ||
+      cleanRef.includes('SANDBOX') ||
+      cleanDesc.includes('AUDIT_AUTO_CLEANUP')
     ) {
       logger.info(`[publishActivity] Skipping notification for Sandbox/QA event: ${module} #${recordRef}`);
       return null;
