@@ -26,7 +26,7 @@ router.delete('/:id/comments/:commentId', taskController.deleteComment);
 
 // Attachments (stored in Cloudflare R2)
 router.post('/:id/attachments', taskController.addAttachment);
-router.delete('/:id/attachments/:attachmentId', taskMutationIdempotency, taskController.deleteAttachment);
+router.delete('/:id/attachments/:attachmentId', taskController.deleteAttachment);
 
 module.exports = router;
 
