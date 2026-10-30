@@ -728,15 +728,20 @@ const getInventoryReport = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // 1. STOCK VALUE REPORT PDF — current stock snapshot
 // ─────────────────────────────────────────────────────────────
+const isWritableStream = (obj) => {
+  return obj && typeof obj === 'object' && typeof obj.write === 'function' && typeof obj.on === 'function';
+};
+
 const downloadStockValuePdf = async (req, res, targetStreamOverride = null) => {
   try {
     const { dateStart = '', dateEnd = '' } = req.query;
     const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `As of ${new Date().toLocaleDateString('en-IN')}`;
     logger.info('Generating Stock Value PDF');
 
+    const streamTarget = isWritableStream(targetStreamOverride) ? targetStreamOverride : null;
     const query = { party: { $ne: 'Uniware Channel Sync' } };
-    const count = targetStreamOverride ? 0 : await db.Inventory.countDocuments(query);
-    if (!targetStreamOverride && count > 5000) {
+    const count = streamTarget ? 0 : await db.Inventory.countDocuments(query);
+    if (!streamTarget && count > 5000) {
       logger.info(`Stock value dataset is large (${count} rows > 5,000 threshold). Offloading to async job queue.`);
       const enqueued = await asyncJobQueue.enqueue('STOCK_VALUE_PDF', { dateStart, dateEnd, count }, async (job, updateProgress) => {
         const reportsDir = ensureReportsDir();
@@ -767,12 +772,12 @@ const downloadStockValuePdf = async (req, res, targetStreamOverride = null) => {
     });
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
-    if (!targetStreamOverride) {
+    if (!streamTarget) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="Stock_Value_Report_${dateStart || 'today'}.pdf"`);
       doc.pipe(res);
     } else {
-      doc.pipe(targetStreamOverride);
+      doc.pipe(streamTarget);
     }
 
     drawPageHeader(doc, 'Stock Value Report', dateStr, 1);
@@ -787,11 +792,11 @@ const downloadStockValuePdf = async (req, res, targetStreamOverride = null) => {
     renderItems(doc, items, imageCache, 'Stock Value Report', dateStr, 1, COLS_VALUE, 'value');
     drawFooters(doc);
     doc.end();
-    if (targetStreamOverride) {
+    if (streamTarget) {
       await new Promise((resolve, reject) => {
-        targetStreamOverride.on('finish', resolve);
-        targetStreamOverride.on('close', resolve);
-        targetStreamOverride.on('error', reject);
+        streamTarget.on('finish', resolve);
+        streamTarget.on('close', resolve);
+        streamTarget.on('error', reject);
       });
     }
     logger.info('Stock Value PDF complete.');
@@ -819,8 +824,9 @@ const downloadStockInwardPdf = async (req, res, targetStreamOverride = null) => 
     const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `All Time Stock Inward`;
     logger.info('Generating Stock Inward PDF %s', dateStr);
 
-    const count = targetStreamOverride ? 0 : await db.Inventory.countDocuments(query);
-    if (!targetStreamOverride && count > 5000) {
+    const streamTarget = isWritableStream(targetStreamOverride) ? targetStreamOverride : null;
+    const count = streamTarget ? 0 : await db.Inventory.countDocuments(query);
+    if (!streamTarget && count > 5000) {
       logger.info(`Stock inward dataset is large (${count} rows > 5,000 threshold). Offloading to async job queue.`);
       const enqueued = await asyncJobQueue.enqueue('STOCK_INWARD_PDF', { dateStart, dateEnd, count }, async (job, updateProgress) => {
         const reportsDir = ensureReportsDir();
@@ -852,12 +858,12 @@ const downloadStockInwardPdf = async (req, res, targetStreamOverride = null) => 
     });
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
-    if (!targetStreamOverride) {
+    if (!streamTarget) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="Stock_Inward_Report_${dateStart || 'AllTime'}.pdf"`);
       doc.pipe(res);
     } else {
-      doc.pipe(targetStreamOverride);
+      doc.pipe(streamTarget);
     }
 
     drawPageHeader(doc, 'Stock Inward Report', dateStr, 1);
@@ -872,11 +878,11 @@ const downloadStockInwardPdf = async (req, res, targetStreamOverride = null) => 
     renderItems(doc, items, imageCache, 'Stock Inward Report', dateStr, 1, COLS_INWARD, 'inward');
     drawFooters(doc);
     doc.end();
-    if (targetStreamOverride) {
+    if (streamTarget) {
       await new Promise((resolve, reject) => {
-        targetStreamOverride.on('finish', resolve);
-        targetStreamOverride.on('close', resolve);
-        targetStreamOverride.on('error', reject);
+        streamTarget.on('finish', resolve);
+        streamTarget.on('close', resolve);
+        streamTarget.on('error', reject);
       });
     }
     logger.info('Stock Inward PDF complete.');
@@ -904,8 +910,9 @@ const downloadStockOutwardPdf = async (req, res, targetStreamOverride = null) =>
     const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `All Time Stock Outward`;
     logger.info('Generating Stock Outward PDF %s', dateStr);
 
-    const count = targetStreamOverride ? 0 : await db.StockOut.countDocuments(query);
-    if (!targetStreamOverride && count > 5000) {
+    const streamTarget = isWritableStream(targetStreamOverride) ? targetStreamOverride : null;
+    const count = streamTarget ? 0 : await db.StockOut.countDocuments(query);
+    if (!streamTarget && count > 5000) {
       logger.info(`Stock outward dataset is large (${count} rows > 5,000 threshold). Offloading to async job queue.`);
       const enqueued = await asyncJobQueue.enqueue('STOCK_OUTWARD_PDF', { dateStart, dateEnd, count }, async (job, updateProgress) => {
         const reportsDir = ensureReportsDir();
@@ -960,12 +967,12 @@ const downloadStockOutwardPdf = async (req, res, targetStreamOverride = null) =>
     });
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
-    if (!targetStreamOverride) {
+    if (!streamTarget) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="Stock_Outward_Report_${dateStart || 'AllTime'}.pdf"`);
       doc.pipe(res);
     } else {
-      doc.pipe(targetStreamOverride);
+      doc.pipe(streamTarget);
     }
 
     drawPageHeader(doc, 'Stock Outward Report', dateStr, 1);
@@ -981,11 +988,11 @@ const downloadStockOutwardPdf = async (req, res, targetStreamOverride = null) =>
     renderItems(doc, items, imageCache, 'Stock Outward Report', dateStr, 1, COLS_OUTWARD, 'outward');
     drawFooters(doc);
     doc.end();
-    if (targetStreamOverride) {
+    if (streamTarget) {
       await new Promise((resolve, reject) => {
-        targetStreamOverride.on('finish', resolve);
-        targetStreamOverride.on('close', resolve);
-        targetStreamOverride.on('error', reject);
+        streamTarget.on('finish', resolve);
+        streamTarget.on('close', resolve);
+        streamTarget.on('error', reject);
       });
     }
     logger.info('Stock Outward PDF complete.');

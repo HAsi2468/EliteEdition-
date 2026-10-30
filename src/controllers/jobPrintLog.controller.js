@@ -140,11 +140,17 @@ const createPrintLog = async (req, res) => {
       });
     }
 
-    // Target Overrun Guard: Prevent logging massive overruns (e.g. 1000m on 100m target)
+    // Target Overrun Guard: Prevent logging massive overruns (e.g. 1000m on 100m target or any meters on 0m target)
     const targetStr = targetJob.totalMtr || targetJob.consumption || '0';
     const targetMatch = String(targetStr).match(/[\d.]+/);
     const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
-    if (targetMtr > 0 && !req.body.overrideTarget) {
+    if (!req.body.overrideTarget) {
+      if (targetMtr <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Print Overrun Blocked: Job Card #${targetJob.jobNo} has a 0m target. Cannot log print meters on a zero-target job without supervisor override.`
+        });
+      }
       const existingLogs = await JobPrintLog.find({ jobCardId: targetJob._id }).select('meters').lean();
       const alreadyPrinted = existingLogs.reduce((sum, l) => sum + (Number(l.meters) || 0), 0);
       const projectedTotal = alreadyPrinted + numMeters;

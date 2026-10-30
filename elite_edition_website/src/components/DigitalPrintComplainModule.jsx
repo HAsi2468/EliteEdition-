@@ -477,14 +477,24 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
       triggerEliteAlert('Validation Error', 'Party Name is required.', 'warning');
       return;
     }
+    if (Number(formVal.expectedAmount) < 0 || Number(formVal.defectiveMeters) < 0) {
+      triggerEliteAlert('Validation Error', 'Claim amount and defective meters cannot be negative.', 'warning');
+      return;
+    }
+
+    const payload = {
+      ...formVal,
+      expectedAmount: Math.max(0, parseFloat(formVal.expectedAmount) || 0),
+      defectiveMeters: Math.max(0, parseFloat(formVal.defectiveMeters) || 0)
+    };
 
     setSaving(true);
     try {
       if (editingItem) {
-        await api.updateComplaint(editingItem._id, formVal);
+        await api.updateComplaint(editingItem._id, payload);
         triggerEliteAlert('Complaint Updated', `Ticket ${formVal.complaintNo} updated.`, 'success');
       } else {
-        await api.createComplaint(formVal);
+        await api.createComplaint(payload);
         triggerEliteAlert('Complaint Logged', `New ticket ${formVal.complaintNo} created.`, 'success');
       }
       setShowModal(false);

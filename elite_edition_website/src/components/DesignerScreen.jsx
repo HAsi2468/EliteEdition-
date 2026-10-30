@@ -487,6 +487,20 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Unified Filter Popover Categories Definition
   const sampleDesignFilters = useMemo(() => [
+    {
+      id: 'status',
+      label: 'Stage / Status',
+      icon: Clock,
+      multi: false,
+      options: [
+        { value: 'ALL', label: `All Stages (${stageCounts.all})` },
+        { value: 'DROW', label: `1. Drawing (${stageCounts.drow})` },
+        { value: 'CM', label: `2. Colour Match (${stageCounts.cm})` },
+        { value: 'STAGE_3', label: `3. Hold / Continue (${stageCounts.stage3})` },
+        { value: 'APPROVED', label: `4. Approved (${stageCounts.approved})` },
+        { value: 'REVISION', label: `5. Reject / Revisions (${stageCounts.revision})` }
+      ]
+    },
     ...(!isUserRestricted ? [{
       id: 'designer',
       label: 'Assign Design',
@@ -538,6 +552,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Normalized values for UnifiedFilterPopover
   const filterValues = useMemo(() => ({
+    status: stageTab && stageTab !== 'ALL' ? [stageTab] : [],
     designer: Array.isArray(selectedDesigner) ? selectedDesigner : (selectedDesigner && selectedDesigner !== 'All' ? [selectedDesigner] : []),
     colourMatcher: Array.isArray(selectedColourMatcher) ? selectedColourMatcher : (selectedColourMatcher && selectedColourMatcher !== 'All' ? [selectedColourMatcher] : []),
     fabric: Array.isArray(selectedFabric) ? selectedFabric : (selectedFabric && selectedFabric !== 'All' ? [selectedFabric] : []),
@@ -545,9 +560,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     machine: Array.isArray(selectedMachine) ? selectedMachine : (selectedMachine && selectedMachine !== 'All' ? [selectedMachine] : []),
     createdBy: Array.isArray(selectedCreatedBy) ? selectedCreatedBy : (selectedCreatedBy && selectedCreatedBy !== 'All' ? [selectedCreatedBy] : []),
     party: Array.isArray(partyFilter) ? partyFilter : (partyFilter && partyFilter !== 'All' ? [partyFilter] : [])
-  }), [selectedDesigner, selectedColourMatcher, selectedFabric, selectedPriority, selectedMachine, selectedCreatedBy, partyFilter]);
+  }), [stageTab, selectedDesigner, selectedColourMatcher, selectedFabric, selectedPriority, selectedMachine, selectedCreatedBy, partyFilter]);
 
   const handleFilterChange = (newVals) => {
+    if (newVals.status !== undefined) {
+      const sVal = Array.isArray(newVals.status) && newVals.status.length > 0 ? newVals.status[0] : (newVals.status || 'ALL');
+      setStageTab(sVal);
+    }
     setSelectedDesigner(newVals.designer || []);
     setSelectedColourMatcher(newVals.colourMatcher || []);
     setSelectedFabric(newVals.fabric || []);
@@ -558,6 +577,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   };
 
   const handleClearAllFilters = () => {
+    setStageTab('ALL');
     setSelectedDesigner([]);
     setSelectedColourMatcher([]);
     setSelectedFabric([]);

@@ -603,6 +603,24 @@ const createChallan = async (req, res) => {
     const initialTotals = computeTotals(details);
     const effectiveTotalMtrPre = initialTotals.totalMtr > 0 ? initialTotals.totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || 0);
 
+    // Deduplication window against rapid burst-clicks (BUG-053)
+    if (partyName && effectiveTotalMtrPre > 0) {
+      const recentChallan = await FabricChallan.findOne({
+        partyName: String(partyName).trim(),
+        fabricName: normFabric,
+        jobNo: jobNo ? String(jobNo).trim() : { $in: [null, ''] },
+        totalMtr: effectiveTotalMtrPre,
+        createdAt: { $gte: new Date(Date.now() - 3000) }
+      }).lean();
+      if (recentChallan) {
+        return res.status(200).json({
+          success: true,
+          data: recentChallan,
+          message: 'Deduplicated: Identical fabric challan generated moments ago.'
+        });
+      }
+    }
+
     const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
     let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
     let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;

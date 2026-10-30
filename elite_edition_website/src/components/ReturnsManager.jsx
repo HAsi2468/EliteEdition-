@@ -311,16 +311,16 @@ export default function ReturnsManager() {
     setLookupStatus('');
     try {
       const res = await api.lookupUniwareOrder({ code: targetCode, party });
-      if (res && res.data) {
+      if (res && res.data && res.data.matched) {
         if (res.data.displayOrderId) {
           setDisplayOrderId(res.data.displayOrderId);
         }
         if (res.data.sku) {
           setSku(res.data.sku);
         }
-        if (res.data.displayOrderId || res.data.sku) {
-          setLookupStatus(`Uniware Matched: Order ${res.data.displayOrderId || targetCode}${res.data.sku ? ` | SKU: ${res.data.sku}` : ''}`);
-        }
+        setLookupStatus(`Uniware Matched: Order ${res.data.displayOrderId || targetCode}${res.data.sku ? ` | SKU: ${res.data.sku}` : ''}`);
+      } else {
+        setLookupStatus(`No Uniware match found for "${targetCode}"`);
       }
     } catch (err) {
       console.warn('Uniware lookup error:', err.message);

@@ -414,7 +414,9 @@ const getStockOverview = async (req, res) => {
           paperQuality: paperGrade,
           color: groupColor,
           shade: t.shade || groupColor,
+          hsnCode: t.hsnCode || '',
           location: t.location || '',
+          notes: t.notes || '',
           reorderLevel: t.reorderLevel || 0,
           canSize: t.canSize || (isInk ? (groupColor === 'Cleaning Solution' ? 1 : 5) : null),
           metersPerRoll: t.metersPerRoll || (isPaper ? 1000 : null),
@@ -424,6 +426,10 @@ const getStockOverview = async (req, res) => {
           totalOutwardMtr: 0,
           unit: t.unit || (isInk ? 'Liters' : (isPaper ? 'Rolls' : 'Meters'))
         };
+      } else {
+        if (!map[key].hsnCode && t.hsnCode) map[key].hsnCode = t.hsnCode;
+        if (!map[key].location && t.location) map[key].location = t.location;
+        if (!map[key].notes && t.notes) map[key].notes = t.notes;
       }
 
       const qty = Number(t.qty) || 0;
@@ -439,8 +445,8 @@ const getStockOverview = async (req, res) => {
     }
 
     const stock = Object.values(map).map(item => {
-      item.currentStock = item.totalInward - item.totalOutward;
-      item.currentStockMtr = item.totalInwardMtr - item.totalOutwardMtr;
+      item.currentStock = Math.max(0, item.totalInward - item.totalOutward);
+      item.currentStockMtr = Math.max(0, item.totalInwardMtr - item.totalOutwardMtr);
       return item;
     }).sort((a, b) => {
       if (a.materialName !== b.materialName) return a.materialName.localeCompare(b.materialName);

@@ -188,6 +188,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challanLoadingMore, setChallanLoadingMore] = useState(false);
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
   const challanFiltersRef = useRef({ search: '', dateStart: defaultThisMonth.dateStart, dateEnd: defaultThisMonth.dateEnd, status: 'All' });
+  const isSubmittingChallanRef = useRef(false);
   const [challanDatePreset, setChallanDatePreset] = useState('this_month');
   const [challanDateStart, setChallanDateStart] = useState(defaultThisMonth.dateStart);
   const [challanDateEnd, setChallanDateEnd] = useState(defaultThisMonth.dateEnd);
@@ -1008,6 +1009,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const handleInwardSubmit = async (e) => {
     e.preventDefault();
     if (loading) return; // Prevent double submissions
+
+    const numQty = parseFloat(inwardForm.qty);
+    if (isNaN(numQty) || numQty <= 0) {
+      alert('Please enter a valid positive quantity (> 0 meters).');
+      return;
+    }
+    if (!inwardForm.fabricQuality || !String(inwardForm.fabricQuality).trim()) {
+      alert('Please select or specify Fabric Quality.');
+      return;
+    }
+
     if (duplicateInwardMatch) {
       alert(`⚠️ Duplicate Inward Blocked: Lot #${duplicateInwardMatch.lotNo} already exists for Vendor "${duplicateInwardMatch.vendorName}", Challan #${duplicateInwardMatch.challanNo || 'N/A'}, Fabric "${duplicateInwardMatch.fabricQuality}" (${duplicateInwardMatch.panna || 'Standard'}" - ${duplicateInwardMatch.qty}m on ${duplicateInwardMatch.date ? new Date(duplicateInwardMatch.date).toLocaleDateString('en-GB') : 'N/A'}). Duplicate entries are not permitted.`);
       return;
@@ -1036,6 +1048,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const handleOutwardSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+
+    const numOutQty = parseFloat(outwardForm.qty);
+    if (isNaN(numOutQty) || numOutQty <= 0) {
+      alert('Please enter a valid positive quantity (> 0 meters).');
+      return;
+    }
+    if (!outwardForm.fabricQuality || !String(outwardForm.fabricQuality).trim()) {
+      alert('Please select or specify Fabric Quality.');
+      return;
+    }
+
     setLoading(true);
     const cleanFabric = normalizeFabricName(outwardForm.fabricQuality, outwardForm.panna);
     const payload = { ...outwardForm, fabricQuality: cleanFabric || outwardForm.fabricQuality, department: department || 'digital_print' };
@@ -1056,6 +1080,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       alert(err.message);
     } finally {
       setLoading(false);
+      isSubmittingChallanRef.current = false;
     }
   };
 
@@ -1138,6 +1163,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       alert('Error creating lot transfer: ' + err.message);
     } finally {
       setLoading(false);
+      isSubmittingChallanRef.current = false;
     }
   };
 
@@ -1845,6 +1871,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const handleChallanSubmit = async (e, forceAdminOverride = false) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isSubmittingChallanRef.current) return;
+    isSubmittingChallanRef.current = true;
     setLoading(true);
     const cleanFabric = normalizeFabricName(challanForm.fabricName, challanForm.panna);
     try {
@@ -2101,6 +2129,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       }
     } finally {
       setLoading(false);
+      isSubmittingChallanRef.current = false;
     }
   };
 
@@ -2172,6 +2201,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       triggerEliteAlert('Reconciliation Error', err.message || 'Failed to reconcile challans.', 'error');
     } finally {
       setLoading(false);
+      isSubmittingChallanRef.current = false;
     }
   };
 
@@ -2459,6 +2489,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       alert('Failed to save Stock Adjustment: ' + err.message);
     } finally {
       setLoading(false);
+      isSubmittingChallanRef.current = false;
     }
   };
 

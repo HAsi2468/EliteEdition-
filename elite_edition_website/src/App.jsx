@@ -98,7 +98,8 @@ import {
   Lock,
   Unlock,
   Scale,
-  Plus
+  Plus,
+  HelpCircle
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -176,6 +177,8 @@ export const ROUTE_ALIASES = {
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_crm': { tab: 'jobcards_crm', dept: 'digital_print' },
   'crm': { tab: 'jobcards_crm', dept: 'digital_print' },
+  'jobcards_billing': { tab: 'jobcards_billing', dept: 'digital_print' },
+  'jobcards-billing': { tab: 'jobcards_billing', dept: 'digital_print' },
   'design': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'designs': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
@@ -194,17 +197,65 @@ export const ROUTE_ALIASES = {
   'workspace': { tab: 'workspace', dept: null },
   'raw_materials': { tab: 'raw_materials', dept: null },
   'raw-materials': { tab: 'raw_materials', dept: null },
-  'ee_raw_materials': { tab: 'ee_raw_materials', dept: 'elite_edition' },
-  'ef_raw_materials': { tab: 'ef_raw_materials', dept: 'elite_fabtex' },
-  'so_raw_materials': { tab: 'so_raw_materials', dept: 'sobise' },
-  'ew_raw_materials': { tab: 'ew_raw_materials', dept: 'ethno_wear' },
-  'yj_raw_materials': { tab: 'yj_raw_materials', dept: 'yamunaji' },
-  'es_raw_materials': { tab: 'es_raw_materials', dept: 'stitching' },
+  'eo-raw-materials': { tab: 'eo_raw_materials', dept: 'elite_online' },
   'eo_raw_materials': { tab: 'eo_raw_materials', dept: 'elite_online' },
+  'ee-raw-materials': { tab: 'ee_raw_materials', dept: 'elite_edition' },
+  'ee_raw_materials': { tab: 'ee_raw_materials', dept: 'elite_edition' },
+  'ef-raw-materials': { tab: 'ef_raw_materials', dept: 'elite_fabtex' },
+  'ef_raw_materials': { tab: 'ef_raw_materials', dept: 'elite_fabtex' },
+  'so-raw-materials': { tab: 'so_raw_materials', dept: 'sobise' },
+  'so_raw_materials': { tab: 'so_raw_materials', dept: 'sobise' },
+  'ew-raw-materials': { tab: 'ew_raw_materials', dept: 'ethno_wear' },
+  'ew_raw_materials': { tab: 'ew_raw_materials', dept: 'ethno_wear' },
+  'yj-raw-materials': { tab: 'yj_raw_materials', dept: 'yamunaji' },
+  'yj_raw_materials': { tab: 'yj_raw_materials', dept: 'yamunaji' },
+  'es-raw-materials': { tab: 'es_raw_materials', dept: 'stitching' },
+  'es_raw_materials': { tab: 'es_raw_materials', dept: 'stitching' },
+  'eo_invoices': { tab: 'eo_invoices', dept: 'elite_online' },
+  'eo_expenses': { tab: 'eo_expenses', dept: 'elite_online' },
   'voucher': { tab: 'voucher_entry', dept: null },
   'voucher_entry': { tab: 'voucher_entry', dept: null },
   'admin': { tab: 'admin', dept: null }
 };
+
+export const ALL_KNOWN_ERP_TABS = new Set([
+  'dashboard', 'workspace', 'communication', 'chat', 'task_management', 'tasks', 'task', 'task-manager',
+  'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
+  'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
+  'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
+  'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
+  'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+  'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials', 'yj_rfd',
+  'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials',
+  'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'eo_invoices',
+  'raw_materials', 'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master',
+  'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings', 'jobcards_stitching_challan',
+  'jobcards_stitching_settings', 'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry',
+  'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan',
+  'jobcards_complain', 'jobcards_complaints', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard',
+  'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm',
+  'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection',
+  'business_connection', 'complaint_dashboard', 'complaint_create', 'designer_screen', 'designer_module',
+  'designer', 'reconciliation', 'ledger-reconciliation', 'voucher', 'voucher_entry', 'stitching_jobcards',
+  'stitching_design', 'stitching_fabric', 'stitching_settings', 'stitching'
+]);
+
+export function getDepartmentForTab(tab) {
+  if (!tab) return null;
+  if (tab.startsWith('jobcards')) return 'digital_print';
+  if (tab === 'raw_materials') {
+    const saved = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_active_dept') || localStorage.getItem('elite_active_department')) : '';
+    return saved || 'digital_print';
+  }
+  if (tab.startsWith('es_') || tab.startsWith('stitching')) return 'stitching';
+  if (tab.startsWith('eo_') || ['inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'elite_online'].includes(tab)) return 'elite_online';
+  if (tab.startsWith('ee_')) return 'elite_edition';
+  if (tab.startsWith('ef_')) return 'elite_fabtex';
+  if (tab.startsWith('so_')) return 'sobise';
+  if (tab.startsWith('ew_')) return 'ethno_wear';
+  if (tab.startsWith('yj_')) return 'yamunaji';
+  return null;
+}
 
 export function parseHashRoute(hashStr = '') {
   const clean = (hashStr || '').replace(/^#\/?/, '').trim();
@@ -223,16 +274,42 @@ export function parseHashRoute(hashStr = '') {
 
 export function resolveActiveRoute(hashStr = '') {
   const { path, query, queryString } = parseHashRoute(hashStr);
-  const alias = ROUTE_ALIASES[path];
+  if (!path) return { tab: null, dept: null, query, queryString, path };
+
+  // Context-aware generic raw-materials hash routing
+  if (path === 'raw-materials' || path === 'raw_materials') {
+    const activeDept = query.dept || (typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_active_dept') || localStorage.getItem('elite_active_department')) : '');
+    if (activeDept === 'elite_online') return { tab: 'eo_raw_materials', dept: 'elite_online', query, queryString, path };
+    if (activeDept === 'elite_edition') return { tab: 'ee_raw_materials', dept: 'elite_edition', query, queryString, path };
+    if (activeDept === 'elite_fabtex') return { tab: 'ef_raw_materials', dept: 'elite_fabtex', query, queryString, path };
+    if (activeDept === 'sobise') return { tab: 'so_raw_materials', dept: 'sobise', query, queryString, path };
+    if (activeDept === 'ethno_wear') return { tab: 'ew_raw_materials', dept: 'ethno_wear', query, queryString, path };
+    if (activeDept === 'yamunaji') return { tab: 'yj_raw_materials', dept: 'yamunaji', query, queryString, path };
+    if (activeDept === 'stitching') return { tab: 'es_raw_materials', dept: 'stitching', query, queryString, path };
+    return { tab: 'raw_materials', dept: activeDept || null, query, queryString, path };
+  }
+
+  const alias = ROUTE_ALIASES[path] || ROUTE_ALIASES[path.replace(/-/g, '_')] || ROUTE_ALIASES[path.replace(/_/g, '-')];
   if (alias) {
     return { tab: alias.tab, dept: alias.dept, query, queryString, path };
   }
-  return { tab: path || null, dept: null, query, queryString, path };
+
+  // Check if it is a known system tab directly
+  const normalizedUnder = path.replace(/-/g, '_');
+  if (ALL_KNOWN_ERP_TABS.has(path) || ALL_KNOWN_ERP_TABS.has(normalizedUnder) || path.startsWith('jobcards_') || path.startsWith('jobcards-')) {
+    const tabName = ALL_KNOWN_ERP_TABS.has(normalizedUnder) ? normalizedUnder : (ALL_KNOWN_ERP_TABS.has(path) ? path : normalizedUnder);
+    const dept = getDepartmentForTab(tabName);
+    return { tab: tabName, dept, query, queryString, path };
+  }
+
+  // Check if valid screen or return 404 not-found
+  return { tab: 'not-found', dept: null, query, queryString, path, isNotFound: true };
 }
 
 export function getCanonicalHashForTab(tab, queryString = '') {
   let alias = tab;
   if (tab === 'task_management') alias = 'tasks';
+  else if (tab === 'jobcards_billing') alias = 'jobcards_billing';
   else if (tab === 'ee_invoices') alias = 'finance';
   else if (tab === 'jobcards_printing_log') alias = 'printing';
   else if (tab === 'jobcards_fusing_log') alias = 'fusing';
@@ -242,7 +319,14 @@ export function getCanonicalHashForTab(tab, queryString = '') {
   else if (tab === 'jobcards_list') alias = 'jobcards';
   else if (tab === 'jobcards_catalogue') alias = 'design';
   else if (tab === 'stock_ledger') alias = 'stock-ledger';
-  else if (tab === 'ee_raw_materials' || tab === 'ew_raw_materials' || tab === 'ef_raw_materials' || tab === 'so_raw_materials' || tab === 'es_raw_materials' || tab === 'eo_raw_materials' || tab === 'raw_materials') alias = 'raw-materials';
+  else if (tab === 'eo_raw_materials') alias = 'eo-raw-materials';
+  else if (tab === 'ee_raw_materials') alias = 'ee-raw-materials';
+  else if (tab === 'ef_raw_materials') alias = 'ef-raw-materials';
+  else if (tab === 'so_raw_materials') alias = 'so-raw-materials';
+  else if (tab === 'ew_raw_materials') alias = 'ew-raw-materials';
+  else if (tab === 'yj_raw_materials') alias = 'yj-raw-materials';
+  else if (tab === 'es_raw_materials') alias = 'es-raw-materials';
+  else if (tab === 'raw_materials') alias = 'raw-materials';
   return `#${alias}${queryString}`;
 }
 
@@ -3864,7 +3948,16 @@ export default function App() {
           ) : activeTab === 'eo_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Online" department="elite_online" />
           ) : activeTab === 'raw_materials' ? (
-            <RawMaterialsPanel companyEntity="Elite Digital Print" />
+            <RawMaterialsPanel companyEntity={
+              activeDepartment === 'elite_online' ? 'Elite Online' :
+              activeDepartment === 'elite_edition' ? 'Elite Edition' :
+              activeDepartment === 'elite_fabtex' ? 'Elite Fabtex' :
+              activeDepartment === 'sobise' ? 'Sobise' :
+              activeDepartment === 'ethno_wear' ? 'Ethno wear' :
+              activeDepartment === 'yamunaji' ? 'Yamunaji' :
+              activeDepartment === 'stitching' ? 'Elite Stitching' :
+              'Elite Digital Print'
+            } />
           ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />
           ) : activeTab === 'unicommerce' ? (
@@ -3877,6 +3970,21 @@ export default function App() {
             <LedgerReconciliationPanel />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
+          ) : activeTab === 'not-found' ? (
+            <div style={styles.noAccessContainer}>
+              <HelpCircle size={48} color="var(--primary)" />
+              <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>404 - Page Not Found</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>
+                The requested URL route <code>{typeof window !== 'undefined' ? window.location.hash : ''}</code> does not exist in this ERP.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('dashboard'); if (typeof window !== 'undefined') window.location.hash = '#dashboard'; }}
+                style={{ marginTop: '1.25rem', padding: '8px 20px', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
+              >
+                Go to Dashboard
+              </button>
+            </div>
           ) : activeTab === 'no-access' ? (
             <div style={styles.noAccessContainer}>
               <ShieldAlert size={48} color="var(--primary)" />

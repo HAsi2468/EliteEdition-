@@ -131,6 +131,14 @@ app.use(
 	})
 );
 
+// Strip any client-supplied spoofable privilege headers early (BUG-059 protection)
+app.use((req, res, next) => {
+  delete req.headers['x-user-role'];
+  delete req.headers['x-is-admin'];
+  delete req.headers['x-operator-override'];
+  next();
+});
+
 // Production-grade hardened CORS middleware engine
 app.use(createCorsMiddleware());
 

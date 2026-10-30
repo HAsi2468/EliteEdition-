@@ -228,8 +228,65 @@ const createChallan = async (req, res) => {
       body.status = 'PENDING';
     }
 
+    // Overrun guard: check if challan meters exceed job target by >20%
+    const targetJobNo = body.jobNo || (body.items && body.items[0] && body.items[0].jobNo);
+    const targetJobId = body.jobCardId || (body.items && body.items[0] && body.items[0].jobCardId);
+    if ((targetJobId || targetJobNo) && !body.allowOverrun && !body.overrideTarget) {
+      let jc = null;
+      if (targetJobId && mongoose.Types.ObjectId.isValid(targetJobId)) {
+        jc = await db.JobCard.findById(targetJobId).lean();
+      }
+      if (!jc && targetJobNo) {
+        jc = await db.JobCard.findOne({ jobNo: String(targetJobNo).trim() }).lean();
+      }
+      if (jc) {
+        const jcTarget = parseFloat(String(jc.totalMtr || jc.consumption || 0).replace(/[^\d.]/g, '')) || 0;
+        const challanMtr = parseFloat(body.totalMtr || body.totalQty || (computed && computed.totalQty) || 0);
+        if (jcTarget > 0 && challanMtr > (jcTarget * 1.25)) {
+          return res.status(400).json({
+            success: false,
+            error: `Delivery Challan Overrun: Challan quantity (${challanMtr}m) exceeds Job Card #${jc.jobNo} target (${jcTarget}m) by ${(((challanMtr - jcTarget) / jcTarget) * 100).toFixed(1)}%. Explicit supervisor approval required.`
+          });
+        }
+      }
+    }
+
+    // Anti-duplicate burst submission guard (within 3 seconds)
+    const recentDuplicate = await DeliveryChallan.findOne({
+      partyName: body.partyName,
+      companyEntity,
+      totalQty: computed.totalQty,
+      createdAt: { $gte: new Date(Date.now() - 3000) }
+    });
+    if (recentDuplicate) {
+      return res.status(200).json({ success: true, data: recentDuplicate, deduplicated: true });
+    }
+
     const doc = new DeliveryChallan(body);
     await doc.save();
+
+    // Update linked JobCard stage: must NOT jump to "Done" or "Dispatched" without QA and Invoicing
+    if (targetJobId || targetJobNo) {
+      try {
+        let jcDoc = targetJobId && mongoose.Types.ObjectId.isValid(targetJobId)
+          ? await db.JobCard.findById(targetJobId)
+          : await db.JobCard.findOne({ jobNo: String(targetJobNo).trim() });
+        if (jcDoc) {
+          jcDoc.deliveryStatus = 'Delivery Done';
+          const isQaPassed = jcDoc.qaStatus === 'Passed' || jcDoc.qcStatus === 'Passed';
+          if (!isQaPassed) {
+            jcDoc.status = 'Pending QA';
+            jcDoc.productionStage = 'QA Inspection';
+          } else if (jcDoc.billingStatus !== 'Invoiced') {
+            jcDoc.status = 'Ready For Billing';
+            jcDoc.productionStage = 'Billing & Invoice';
+          }
+          await jcDoc.save();
+        }
+      } catch (jcErr) {
+        logger.warn('Failed to update JobCard stage after delivery challan: %s', jcErr.message);
+      }
+    }
 
     // Auto-sync to Sister Company's Raw Material Inward if buyer is a sister company
     try {

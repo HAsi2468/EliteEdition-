@@ -57,6 +57,7 @@ export default function DigitalPrintCostingScreen({ companyEntity = 'Elite Digit
   const [showOverheadsModal, setShowOverheadsModal] = useState(false);
   const [savingOverheads, setSavingOverheads] = useState(false);
   const [overheadForm, setOverheadForm] = useState({
+    fabricCost: 0,
     paperCost: 0,
     inkCost: 0,
     salaryCost: 0,
@@ -935,6 +936,20 @@ export default function DigitalPrintCostingScreen({ companyEntity = 'Elite Digit
 
             <form onSubmit={handleSaveOverheads}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#7c3aed', marginBottom: '4px' }}>
+                    🧵 Fabric Purchase Budget (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={overheadForm.fabricCost}
+                    onChange={(e) => setOverheadForm({ ...overheadForm, fabricCost: parseFloat(e.target.value) || 0 })}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontWeight: 600 }}
+                  />
+                </div>
+
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#0284c7', marginBottom: '4px' }}>
                     📄 Sublimation Paper Budget (₹)

@@ -755,7 +755,13 @@ const createJobCard = async (req, res) => {
   } catch (err) {
     logger.error('createJobCard error: %o', err);
     if (err.code === 11000) return res.status(400).json({ error: `Job No. "${req.body.jobNo}" already exists.` });
-    res.status(500).json({ error: err.message || 'Internal Server Error' });
+    if (err.name === 'ValidationError' || err.name === 'CastError') {
+      const messages = Object.values(err.errors || {}).map(e => e.message).filter(Boolean);
+      return res.status(400).json({
+        error: messages.length > 0 ? messages.join('. ') : 'Invalid job card data provided.'
+      });
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 

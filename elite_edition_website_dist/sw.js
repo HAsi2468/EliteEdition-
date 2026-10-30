@@ -87,12 +87,23 @@ self.addEventListener('fetch', (event) => {
 
   if (isApi) {
     event.respondWith(
-      fetch(request).catch(() => {
-        return new Response(JSON.stringify({ 
-          error: 'Network offline', 
-          message: 'You are currently offline. Check your internet connection.' 
+      fetch(request).catch((err) => {
+        // Only synthesize 503 if the browser navigator explicitly reports being offline (BUG-058)
+        if (self.navigator && self.navigator.onLine === false) {
+          return new Response(JSON.stringify({ 
+            error: 'Network offline', 
+            message: 'You are currently offline. Check your internet connection.' 
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        // Otherwise surface genuine network error
+        return new Response(JSON.stringify({
+          error: 'NETWORK_REQUEST_FAILED',
+          message: err?.message || 'Network request failed. Please check server status.'
         }), {
-          status: 503,
+          status: 502,
           headers: { 'Content-Type': 'application/json' }
         });
       })

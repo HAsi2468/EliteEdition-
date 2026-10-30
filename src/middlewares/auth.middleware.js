@@ -175,6 +175,11 @@ const requireAuth = async (req, res, next) => {
       isAdmin: user.role === 'admin' || user.role === 'super_admin' || user.isAdmin === true || user.isMainAdmin === true
     };
     req.userId = String(user._id);
+
+    // Populate trusted headers strictly from verified token (BUG-059)
+    req.headers['x-user-role'] = req.user.role;
+    req.headers['x-is-admin'] = String(Boolean(req.user.isAdmin));
+
     next();
   } catch (error) {
     const reqId = req.headers['x-request-id'] || req.headers['request-id'] || 'none';

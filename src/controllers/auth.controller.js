@@ -75,6 +75,12 @@ function clearAuthCookies(res) {
 }
 
 const register = catchAsync(async (req, res) => {
+  // Prevent privilege escalation on public registration (BUG-061)
+  const isCallerAdmin = req.user && (req.user.isAdmin || req.user.isMainAdmin || req.user.role === 'admin' || req.user.role === 'super_admin');
+  if (!isCallerAdmin) {
+    req.body.role = 'user';
+    req.body.isMainAdmin = false;
+  }
   const user = await userService.createUser(req);
   const tokens = await tokenService.generateAuthTokens({
     userId: user.id,

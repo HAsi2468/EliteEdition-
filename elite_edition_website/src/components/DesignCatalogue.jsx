@@ -830,14 +830,17 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     category: Array.isArray(categoryFilter) ? categoryFilter : (categoryFilter && categoryFilter !== 'All' ? [categoryFilter] : []),
     color: Array.isArray(colorFilter) ? colorFilter : (colorFilter && colorFilter !== 'All' ? [colorFilter] : []),
     party: Array.isArray(partyFilter) ? partyFilter : (partyFilter && partyFilter !== 'All' ? [partyFilter] : []),
-    status: statusFilter
+    status: Array.isArray(statusFilter) ? statusFilter : (statusFilter && statusFilter !== 'All' ? [statusFilter] : ['Active'])
   }), [categoryFilter, colorFilter, partyFilter, statusFilter]);
 
   const handleFilterChange = (newVals) => {
     setCategoryFilter(newVals.category || []);
     setColorFilter(newVals.color || []);
     setPartyFilter(newVals.party || []);
-    if (newVals.status) setStatusFilter(newVals.status);
+    if (newVals.status !== undefined) {
+      const sVal = Array.isArray(newVals.status) && newVals.status.length > 0 ? newVals.status[0] : (newVals.status || 'Active');
+      setStatusFilter(sVal);
+    }
     setPage(1);
   };
 
@@ -956,6 +959,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to fetch designs');
+      setDesigns([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }

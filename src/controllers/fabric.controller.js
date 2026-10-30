@@ -420,7 +420,16 @@ const getStockOverview = async (req, res) => {
       existing.totalOutward += item.totalOutward || 0;
       existing.currentStock += item.currentStock || 0;
     }
-    const finalStock = Array.from(normalizedStockMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+    const finalStock = Array.from(normalizedStockMap.values())
+      .map(item => ({
+        ...item,
+        currentStock: Math.max(0, parseFloat((item.currentStock || 0).toFixed(2))),
+        totalInward: parseFloat((item.totalInward || 0).toFixed(2)),
+        totalOutward: parseFloat((item.totalOutward || 0).toFixed(2)),
+        freshOutward: parseFloat((item.freshOutward || 0).toFixed(2)),
+        totalShortage: parseFloat((item.totalShortage || 0).toFixed(2)),
+      }))
+      .sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
     res.status(200).json({ success: true, data: finalStock });
   } catch (error) {
     console.error('Error calculating fabric stock:', error);
@@ -718,7 +727,16 @@ const getStockByPanna = async (req, res) => {
       existing.currentStock += item.currentStock || 0;
       existing.lotCount += item.lotCount || 0;
     }
-    const finalPanna = Array.from(normalizedPannaMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+    const finalPanna = Array.from(normalizedPannaMap.values())
+      .map(item => ({
+        ...item,
+        currentStock: Math.max(0, parseFloat((item.currentStock || 0).toFixed(2))),
+        totalInward: parseFloat((item.totalInward || 0).toFixed(2)),
+        totalOutward: parseFloat((item.totalOutward || 0).toFixed(2)),
+        freshOutward: parseFloat((item.freshOutward || 0).toFixed(2)),
+        totalShortage: parseFloat((item.totalShortage || 0).toFixed(2)),
+      }))
+      .sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
     res.status(200).json({ success: true, data: finalPanna });
   } catch (error) {
     console.error('Error fetching panna-wise stock:', error);
@@ -4533,6 +4551,24 @@ const createWhiteFabricLog = async (req, res) => {
     if (totDefect > totalMtr) {
       return res.status(400).json({ success: false, error: `Total defect meters (${totDefect}m) cannot exceed total roll meters (${totalMtr}m).` });
     }
+
+    // Deduplication guard against rapid burst-clicks (BUG-054)
+    if (body.challanNo && body.fabricQuality) {
+      const recentDuplicate = await WhiteFabricLog.findOne({
+        challanNo: String(body.challanNo).trim(),
+        fabricQuality: String(body.fabricQuality).trim(),
+        totalMtr,
+        createdAt: { $gte: new Date(Date.now() - 3000) }
+      }).lean();
+      if (recentDuplicate) {
+        return res.status(200).json({
+          success: true,
+          data: recentDuplicate,
+          message: 'Deduplicated: Identical White Fabric QA entry logged moments ago.'
+        });
+      }
+    }
+
     const log = await WhiteFabricLog.create({
       ...body,
       totalMtr,

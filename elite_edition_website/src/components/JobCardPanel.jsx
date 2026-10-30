@@ -4478,6 +4478,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
     };
     setBillingChallanData(challanData);
     setOverrideSubTab('billing');
+    if (typeof window !== 'undefined') window.location.hash = '#jobcards_billing';
   };
 
   const openNew  = () => {
@@ -4510,7 +4511,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       {department === 'stitching' && (effectiveSubTab === 'dashboard' || effectiveSubTab === 'list' || effectiveSubTab === 'jobcards' || !effectiveSubTab) ? (
         <GarmentJobCardDashboard />
       ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan') ? (
-        <StitchingChallanPanel onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
+        <StitchingChallanPanel onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); if (typeof window !== 'undefined') window.location.hash = '#jobcards_billing'; }} />
       ) : effectiveSubTab === 'catalogue' || effectiveSubTab === 'master' || effectiveSubTab === 'sample' || effectiveSubTab === 'sample_design' ? (
         <DesignCatalogue 
           department={department} 
@@ -4521,7 +4522,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
         <FabricInventoryPanel
           department={department}
           initialTab={effectiveSubTab === 'dispatch' || effectiveSubTab === 'outward' ? 'outward' : (effectiveSubTab === 'challan' || effectiveSubTab === 'challans') ? 'challan' : 'dashboard'}
-          onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }}
+          onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); if (typeof window !== 'undefined') window.location.hash = '#jobcards_billing'; }}
         />
       ) : effectiveSubTab === 'costing' || effectiveSubTab === 'costing_pl' ? (
         <DigitalPrintCostingScreen companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />

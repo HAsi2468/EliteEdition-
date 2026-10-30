@@ -54,52 +54,54 @@ function numToWords(amount) {
 // Helper for flexible company entity queries
 function buildCompanyFilter(companyEntity) {
   if (!companyEntity) return {};
-  let ce = String(companyEntity).trim();
-  if (ce === '[object Object]') return {};
+  const raw = String(companyEntity).trim();
+  if (raw === '[object Object]') return {};
 
-  if (ce === 'Elite Edition') {
+  const norm = raw.toLowerCase().replace(/[\s_-]+/g, '');
+
+  if (norm === 'eliteedition' || norm === 'ee') {
     return {
       $or: [
         { companyEntity: 'Elite Edition' },
         { invoiceNo: { $regex: '^EE', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Fabtex') {
+  } else if (norm === 'elitefabtex' || norm === 'ef') {
     return {
       $or: [
         { companyEntity: 'Elite Fabtex' },
         { invoiceNo: { $regex: '^EF', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Sobise') {
+  } else if (norm === 'sobise' || norm === 'so') {
     return {
       $or: [
         { companyEntity: 'Sobise' },
         { invoiceNo: { $regex: '^SO', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Stitching') {
+  } else if (norm === 'elitestitching' || norm === 'es') {
     return {
       $or: [
         { companyEntity: 'Elite Stitching' },
         { invoiceNo: { $regex: '^ES', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Online') {
+  } else if (norm === 'eliteonline' || norm === 'eon' || norm === 'eo') {
     return {
       $or: [
         { companyEntity: 'Elite Online' },
         { invoiceNo: { $regex: '^EO', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Ethno wear' || ce === 'ethno_wear' || ce === 'EW') {
+  } else if (norm === 'ethnowear' || norm === 'ew') {
     return {
       $or: [
         { companyEntity: 'Ethno wear' },
         { invoiceNo: { $regex: '^EW', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Yamunaji' || ce === 'yamunaji' || ce === 'YJ') {
+  } else if (norm === 'yamunaji' || norm === 'yj') {
     return {
       $or: [
         { companyEntity: 'Yamunaji' },
@@ -107,10 +109,10 @@ function buildCompanyFilter(companyEntity) {
       ]
     };
   } else if (
-    ce === 'Elite Digital Print' ||
-    ce === 'Elite Digital Prints' ||
-    ce === 'edp' ||
-    ce === 'digital_print'
+    norm === 'elitedigitalprint' ||
+    norm === 'elitedigitalprints' ||
+    norm === 'edp' ||
+    norm === 'digitalprint'
   ) {
     // Elite Digital Print / Digital Print
     return {
@@ -123,9 +125,11 @@ function buildCompanyFilter(companyEntity) {
       ]
     };
   } else {
-    // Exact match for any other company entity to prevent leaking other company data
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return {
-      companyEntity: ce
+      $or: [
+        { companyEntity: { $regex: `^${escaped}$`, $options: 'i' } }
+      ]
     };
   }
 }
@@ -381,19 +385,27 @@ const getInvoices = async (req, res) => {
   try {
     const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd, companyEntity } = req.query;
 
-    const filter = buildCompanyFilter(companyEntity);
+    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'] || req.headers['company'];
+    const filter = buildCompanyFilter(activeCompany);
 
     if (paymentStatus && paymentStatus !== 'ALL') {
       filter.paymentStatus = paymentStatus;
     }
 
-    if (search) {
-      filter.$or = [
-        { invoiceNo: { $regex: search, $options: 'i' } },
-        { 'customer.name': { $regex: search, $options: 'i' } },
-        { 'customer.businessName': { $regex: search, $options: 'i' } },
-        { 'customer.phone': { $regex: search, $options: 'i' } }
+    if (search && String(search).trim()) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchOr = [
+        { invoiceNo: { $regex: safeSearch, $options: 'i' } },
+        { 'customer.name': { $regex: safeSearch, $options: 'i' } },
+        { 'customer.businessName': { $regex: safeSearch, $options: 'i' } },
+        { 'customer.phone': { $regex: safeSearch, $options: 'i' } }
       ];
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchOr;
+      }
     }
 
     if (dateStart || dateEnd) {
@@ -734,33 +746,102 @@ const createInvoice = async (req, res) => {
     const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
     const startSeq = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
 
-    if (!invoiceData.invoiceSeq || !invoiceData.invoiceNo) {
+    const explicitInvoiceNo = invoiceData.invoiceNo ? String(invoiceData.invoiceNo).trim() : '';
+
+    if (explicitInvoiceNo) {
+      // BUG-056: When the user explicitly supplies an invoiceNo, reject duplicate collisions with HTTP 409
+      const existingInv = await BillingInvoice.findOne({ invoiceNo: explicitInvoiceNo, companyEntity: entity }).lean();
+      if (existingInv) {
+        return res.status(409).json({
+          success: false,
+          error: `Invoice number "${explicitInvoiceNo}" already exists for ${entity}. Duplicate invoice numbers are not allowed.`
+        });
+      }
+      invoiceData.invoiceNo = explicitInvoiceNo;
+    } else {
+      // Auto-assign sequential invoice number
       const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
       const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, startSeq) : startSeq;
-      if (!invoiceData.invoiceSeq) {
-        invoiceData.invoiceSeq = nextSeq;
-      }
-      if (!invoiceData.invoiceNo || !String(invoiceData.invoiceNo).trim()) {
-        if (prefix.endsWith('/')) {
-          invoiceData.invoiceNo = `${prefix}${invoiceData.invoiceSeq}`;
-        } else {
-          invoiceData.invoiceNo = `${prefix}${String(invoiceData.invoiceSeq).padStart(4, '0')}`;
-        }
+      invoiceData.invoiceSeq = nextSeq;
+      if (prefix.endsWith('/')) {
+        invoiceData.invoiceNo = `${prefix}${nextSeq}`;
+      } else {
+        invoiceData.invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
       }
     }
 
-    // Strict Collision Shield: If invoiceNo already exists in database for this company, auto-increment to prevent duplicate key 500 error
-    let existingInv = await BillingInvoice.findOne({ invoiceNo: invoiceData.invoiceNo, companyEntity: entity }).lean();
-    if (existingInv) {
-      const highestInv = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 }).lean();
-      const freshSeq = (highestInv && highestInv.invoiceSeq ? highestInv.invoiceSeq : (invoiceData.invoiceSeq || startSeq)) + 1;
-      invoiceData.invoiceSeq = freshSeq;
-      if (prefix.endsWith('/')) {
-        invoiceData.invoiceNo = `${prefix}${freshSeq}`;
+    // Strict Numerical Upper Bound & Tax Consistency Recomputation (BUG-057 & BUG-060)
+    const items = Array.isArray(invoiceData.items) ? invoiceData.items : [];
+    if (items.length === 0) {
+      return res.status(400).json({ success: false, error: 'At least one invoice line item is required.' });
+    }
+
+    let computedTaxable = 0;
+    let computedCgst = 0;
+    let computedSgst = 0;
+    let computedIgst = 0;
+
+    for (const it of items) {
+      const qty = parseFloat(it.qty) || 0;
+      const rate = parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0;
+      const disc = parseFloat(it.discountPct) || 0;
+
+      // Commercial Bounds Guard: max qty 1,000,000; max unit price 10,000,000 (BUG-060)
+      if (qty <= 0 || qty > 1000000) {
+        return res.status(400).json({ success: false, error: `Invalid item quantity (${qty}). Must be between 0.001 and 1,000,000.` });
+      }
+      if (rate < 0 || rate > 10000000) {
+        return res.status(400).json({ success: false, error: `Invalid item unit price (${rate}). Must be between 0 and 10,000,000.` });
+      }
+
+      const lineGross = Math.round((qty * rate) * 100) / 100;
+      const lineDisc = Math.round(((lineGross * disc) / 100) * 100) / 100;
+      const lineTaxable = Math.round((lineGross - lineDisc) * 100) / 100;
+      const gstRate = parseFloat(it.taxRate != null ? it.taxRate : it.gstRate) || 0;
+      const lineTax = Math.round(((lineTaxable * gstRate) / 100) * 100) / 100;
+
+      it.qty = qty;
+      it.unitPrice = rate;
+      it.discountPct = disc;
+      it.discountAmount = lineDisc;
+      it.taxableAmount = lineTaxable;
+      it.taxRate = gstRate;
+      it.gstRate = gstRate;
+      it.taxAmount = lineTax; // BUG-057 fix: ensure line item taxAmount is never 0 when taxable
+      it.totalAmount = Math.round((lineTaxable + lineTax) * 100) / 100;
+
+      computedTaxable += lineTaxable;
+      const isIgst = invoiceData.taxType === 'IGST' || invoiceData.isInterState;
+      if (isIgst) {
+        computedIgst += lineTax;
       } else {
-        invoiceData.invoiceNo = `${prefix}${String(freshSeq).padStart(4, '0')}`;
+        const half = Math.round(((lineTaxable * (gstRate / 2)) / 100) * 100) / 100;
+        computedCgst += half;
+        computedSgst += half;
       }
     }
+
+    computedTaxable = Math.round(computedTaxable * 100) / 100;
+    computedCgst = Math.round(computedCgst * 100) / 100;
+    computedSgst = Math.round(computedSgst * 100) / 100;
+    computedIgst = Math.round(computedIgst * 100) / 100;
+    const computedTotalTax = (invoiceData.taxType === 'IGST' || invoiceData.isInterState)
+      ? computedIgst
+      : Math.round((computedCgst + computedSgst) * 100) / 100;
+
+    invoiceData.taxableAmount = computedTaxable;
+    invoiceData.taxableValue = computedTaxable;
+    invoiceData.subtotal = computedTaxable;
+    invoiceData.cgstAmount = computedCgst;
+    invoiceData.sgstAmount = computedSgst;
+    invoiceData.igstAmount = computedIgst;
+    invoiceData.totalTax = computedTotalTax; // BUG-057: guarantee totalTax === cgst + sgst
+
+    const rawTotal = computedTaxable + computedTotalTax;
+    const grandRounded = Math.round(rawTotal);
+    const roundOff = Math.round((grandRounded - rawTotal) * 100) / 100;
+    invoiceData.roundOff = roundOff;
+    invoiceData.grandTotal = grandRounded;
 
     // Ensure customer object is present and customerId is valid ObjectId or omitted (avoids CastError for walk-in clients)
     if (invoiceData.customer) {

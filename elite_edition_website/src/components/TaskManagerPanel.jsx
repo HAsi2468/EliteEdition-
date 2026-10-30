@@ -940,7 +940,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
           setSelectedTask(updated);
         }
         if (res.discarded) {
-          triggerEliteAlert('Timer Info', 'Timer was active under 15 seconds — work session discarded without 0h entry.', 'info');
+          triggerEliteAlert('Timer Info', 'Timer was active under 2 seconds — work session discarded without 0h entry.', 'info');
         } else {
           triggerEliteAlert('Work Logged', `Timer stopped! Logged ${res.loggedHours || 0} hours.`, 'success');
         }
@@ -1132,10 +1132,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
 
-    // Filter by Member / Assignee
-    if (assigneeFilter === 'me') {
+    // Filter by Member / Assignee (unless inspecting delegated tasks created by me)
+    if (taskScope !== 'delegated' && assigneeFilter === 'me') {
       if (!isTaskAssignedToMe(t)) return false;
-    } else if (assigneeFilter !== 'all') {
+    } else if (assigneeFilter !== 'all' && assigneeFilter !== 'me') {
       const targetId = String(assigneeFilter);
       const isAssigned = (t.assignees || []).some((a) => {
         if (getNormalizedId(a) === targetId) return true;
@@ -1985,9 +1985,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
               <div className="task-main-title">Workforce Task Manager</div>
               <div className="task-meta-subtitle">
                 <span>{filteredTasks.length} tasks</span>
-                {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length > 0 && (
+                {tasks.filter(t => (t.activeTimer && t.activeTimer.startTime) || (Array.isArray(t.liveTimers) && t.liveTimers.some(lt => lt.isRunning))).length > 0 && (
                   <span className="task-active-timer-badge">
-                    ⏱️ {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length} Active Timers
+                    ⏱️ {tasks.filter(t => (t.activeTimer && t.activeTimer.startTime) || (Array.isArray(t.liveTimers) && t.liveTimers.some(lt => lt.isRunning))).length} Active Timers
                   </span>
                 )}
               </div>
@@ -2448,9 +2448,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
               </div>
               <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span>{filteredTasks.length} tasks</span>
-                {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length > 0 && (
+                {tasks.filter(t => (t.activeTimer && t.activeTimer.startTime) || (Array.isArray(t.liveTimers) && t.liveTimers.some(lt => lt.isRunning))).length > 0 && (
                   <span style={{ color: '#16a34a', background: '#dcfce7', padding: '1px 5px', borderRadius: '3px', fontWeight: 800 }}>
-                    ⏱️ {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length}
+                    ⏱️ {tasks.filter(t => (t.activeTimer && t.activeTimer.startTime) || (Array.isArray(t.liveTimers) && t.liveTimers.some(lt => lt.isRunning))).length}
                   </span>
                 )}
               </div>
@@ -3980,8 +3980,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 let totalLoggedHours = 0;
                 tasks.forEach((t) => {
                   (t.timeLogs || []).forEach((log) => {
-                    if (String(log.userId) === uId || (log.userName && user.name && log.userName.trim().toLowerCase() === user.name.trim().toLowerCase())) {
-                      totalLoggedHours += (log.hours || 0);
+                    const logUId = String(log.user?._id || log.user || log.userId || '');
+                    if (logUId === uId || (log.userName && user.name && log.userName.trim().toLowerCase() === user.name.trim().toLowerCase())) {
+                      const logHours = typeof log.hours === 'number' ? log.hours : ((log.durationMinutes || log.minutes || 0) / 60);
+                      totalLoggedHours += (logHours || 0);
                     }
                   });
                 });
@@ -6110,7 +6112,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                     {(selectedTask.comments || []).map((c, idx) => {
                       const commentId = c._id || idx;
                       const isEditing = editingCommentId === commentId;
-                      const canModify = isMasterAdmin || String(c.user || c.userId) === String(myId) || (c.senderName && (c.senderName || '').toLowerCase() === (myName || '').toLowerCase());
+                      const commentSenderId = String(c.sender?._id || c.sender || c.user || c.userId || '');
+                      const canModify = isMasterAdmin || commentSenderId === String(myId) || (c.senderName && (c.senderName || '').toLowerCase() === (myName || '').toLowerCase());
 
                       return (
                         <div key={commentId} style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid var(--border-light)' }}>
@@ -6213,10 +6216,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
                 <div>
                   <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Due Date</label>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'Done' ? '#dc2626' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: isTaskOverdue(selectedTask) ? '#dc2626' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Calendar size={13} />
                     <span>{selectedTask.dueDate ? formatTaskDueDateDisplay(selectedTask.dueDate) : 'No deadline set'}</span>
-                    {selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'Done' && (
+                    {isTaskOverdue(selectedTask) && (
                       <span style={{ fontSize: '0.6rem', color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
                         OVERDUE
                       </span>

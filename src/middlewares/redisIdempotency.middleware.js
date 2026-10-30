@@ -34,6 +34,12 @@ function redisIdempotencyMiddleware(options = {}) {
       return next();
     }
 
+    // Prevent double-evaluation / re-entrant deadlocks if route is wrapped multiple times
+    if (req._idempotencyHandled) {
+      return next();
+    }
+    req._idempotencyHandled = true;
+
     const rawKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
 
     if (!rawKey) {

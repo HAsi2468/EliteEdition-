@@ -26,6 +26,9 @@ export const AVAILABLE_SCREENS = [
   { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Online' },
   { id: 'eo_scan_pack', label: 'Elite Online: Scan & Pack', category: 'Elite Online' },
   { id: 'eo_complaints', label: 'Elite Online: Complaints Module', category: 'Elite Online' },
+  { id: 'eo_raw_materials', label: 'Elite Online: Raw Materials', category: 'Elite Online' },
+  { id: 'eo_invoices', label: 'Elite Online: Invoices & GST Billing', category: 'Elite Online' },
+  { id: 'eo_expenses', label: 'Elite Online: Expense Ledger', category: 'Elite Online' },
 
   // Elite Edition (Company)
   { id: 'ee_dashboard', label: 'Elite Edition: Dashboard Overview', category: 'Elite Edition' },

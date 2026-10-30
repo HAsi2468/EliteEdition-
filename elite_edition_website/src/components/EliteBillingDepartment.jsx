@@ -140,7 +140,8 @@ function numToWords(amount) {
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
   function convert(n) {
-    if (n < 20) return words[n];
+    if (n < 0) return 'Minus ' + convert(Math.abs(n));
+    if (n < 20) return words[n] || '';
     if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
     if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convert(n % 100) : '');
     if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convert(n % 1000) : '');
@@ -148,9 +149,11 @@ function numToWords(amount) {
     return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convert(n % 10000000) : '');
   }
 
-  const num = Math.floor(amount || 0);
-  if (num === 0) return 'Rupees Zero Only';
-  return 'Rupees ' + convert(num) + ' Only';
+  const numVal = Number(amount);
+  if (isNaN(numVal) || Math.floor(Math.abs(numVal)) === 0) return 'Rupees Zero Only';
+  const prefix = numVal < 0 ? 'Minus ' : '';
+  const whole = Math.floor(Math.abs(numVal));
+  return `Rupees ${prefix}${convert(whole).trim()} Only`;
 }
 
 // Helper to format job card display string cleanly
@@ -3364,28 +3367,32 @@ export default function EliteBillingDepartment({
   const calculatedInvoice = useMemo(() => {
     let subtotal = 0;
     const updatedItems = invoiceForm.items.map(it => {
-      const qty = parseFloat(it.qty) || 0;
-      const basePrice = parseFloat(it.unitPrice) || 0;
+      const qty = Math.max(0, parseFloat(it.qty) || 0);
+      const basePrice = Math.max(0, parseFloat(it.unitPrice) || 0);
       const effectivePrice = basePrice + (it.butterPaper ? 3 : 0);
-      const discPct = parseFloat(it.discountPct) || 0;
+      const discPct = Math.min(100, Math.max(0, parseFloat(it.discountPct) || 0));
       const baseTotal = qty * effectivePrice;
       const discAmt = (baseTotal * discPct) / 100;
-      const itemTotal = baseTotal - discAmt;
+      const itemTotal = Math.max(0, baseTotal - discAmt);
       subtotal += itemTotal;
       return {
         ...it,
+        qty,
+        unitPrice: basePrice,
+        discountPct: discPct,
         effectivePrice,
         discountAmt: discAmt,
         totalAmount: itemTotal
       };
     });
 
-    const discVal = parseFloat(invoiceForm.discountValue) || 0;
+    const discVal = Math.max(0, parseFloat(invoiceForm.discountValue) || 0);
     let discountTotal = 0;
     if (invoiceForm.discountType === 'percentage') {
-      discountTotal = (subtotal * discVal) / 100;
+      const clampedPct = Math.min(100, discVal);
+      discountTotal = (subtotal * clampedPct) / 100;
     } else {
-      discountTotal = discVal;
+      discountTotal = Math.min(subtotal, discVal);
     }
 
     const netSubtotal = Math.max(0, subtotal - discountTotal);
@@ -3754,8 +3761,13 @@ export default function EliteBillingDepartment({
     try {
       // Strip UI-only fields and build clean payload
       const { manualRoundOff, manualTdsAmount, _tdsPreset, ...formRest } = invoiceForm;
+      const cleanCustomer = { ...(formRest.customer || {}) };
+      if (!cleanCustomer.customerId || cleanCustomer.customerId === 'walk-in' || !/^[0-9a-fA-F]{24}$/.test(String(cleanCustomer.customerId))) {
+        delete cleanCustomer.customerId;
+      }
       const payload = {
         ...formRest,
+        customer: cleanCustomer,
         companyEntity: invoiceForm.issuingCompany || companyEntity || 'Elite Edition',
         items: calculatedInvoice.items,
         subtotal: calculatedInvoice.subtotal,
@@ -3840,8 +3852,18 @@ export default function EliteBillingDepartment({
 
   // Create / Update Customer Handler
   const handleSaveCustomer = async () => {
-    if (!custForm.name) {
+    if (!custForm.name || !custForm.name.trim()) {
       alert('Customer Name is required');
+      return;
+    }
+    const cleanPhone = (custForm.phone || '').trim().replace(/[\s\-+]/g, '');
+    if (cleanPhone && !/^[0-9]{10,12}$/.test(cleanPhone)) {
+      alert('Please enter a valid 10-12 digit phone number');
+      return;
+    }
+    const cleanGstin = (custForm.gstin || '').trim();
+    if (cleanGstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(cleanGstin)) {
+      alert('Please enter a valid 15-character GSTIN (e.g. 24AAAAA0000A1Z5)');
       return;
     }
     try {

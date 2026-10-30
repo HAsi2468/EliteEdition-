@@ -297,7 +297,8 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const handleRowFieldChange = (index, field, value) => {
     const updated = [...formRows];
     if (field === 'qty') {
-      updated[index][field] = parseInt(value, 10) || 0;
+      const parsed = parseInt(value, 10);
+      updated[index][field] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
     } else if (field === 'purchasePrice' || field === 'salePrice') {
       updated[index][field] = parseFloat(value) || 0.0;
     } else if (field === 'party') {
@@ -455,6 +456,13 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const handleFinalSubmit = (e) => {
     e.preventDefault();
     setError('');
+
+    const negativeQtyRows = formRows.filter(r => r.skuCode && r.skuCode.trim() && (isNaN(r.qty) || Number(r.qty) <= 0));
+    if (negativeQtyRows.length > 0) {
+      setError('Inward quantity must be a positive number greater than 0.');
+      playErrorBeep();
+      return;
+    }
 
     // Filter valid rows (non-empty SKU and qty > 0)
     const validRows = formRows

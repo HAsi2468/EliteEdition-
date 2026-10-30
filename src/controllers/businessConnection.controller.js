@@ -394,18 +394,35 @@ exports.createConnection = async (req, res) => {
   }
 };
 
-// 4. Update Business Connection by ID
+// 4. Update Business Connection by ID (with Optimistic Concurrency Control - BUG-055)
 exports.updateConnection = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
+    const clientVersion = updateData.__v !== undefined ? Number(updateData.__v) : (updateData.version !== undefined ? Number(updateData.version) : null);
 
-    const updated = await BusinessConnection.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
-    if (!updated) {
+    const existing = await BusinessConnection.findById(id);
+    if (!existing) {
       return res.status(404).json({ error: 'Business connection not found.' });
     }
 
-    res.status(200).json({ message: 'Connection updated successfully.', connection: updated });
+    if (clientVersion !== null && !isNaN(clientVersion) && existing.__v !== undefined && existing.__v !== clientVersion) {
+      return res.status(409).json({
+        error: 'CONCURRENT_MODIFICATION',
+        message: 'This record was modified by another user or tab. Please refresh to load the latest changes before saving.'
+      });
+    }
+
+    delete updateData._id;
+    delete updateData.id;
+    delete updateData.__v;
+    delete updateData.version;
+
+    Object.assign(existing, updateData);
+    if (existing.__v !== undefined) existing.__v += 1;
+    await existing.save();
+
+    res.status(200).json({ message: 'Connection updated successfully.', connection: existing });
   } catch (error) {
     console.error('Error updating connection:', error);
     res.status(500).json({ error: 'Failed to update connection.' });

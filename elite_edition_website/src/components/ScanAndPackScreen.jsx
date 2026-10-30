@@ -967,6 +967,13 @@ export default function ScanAndPackScreen({ currentUser }) {
     const trimmed = (codeToProcess || '').trim();
     if (!trimmed || isScanProcessingRef.current) return;
 
+    if (trimmed.length > 80 || /<[a-z][\s\S]*>/i.test(trimmed)) {
+      playAudioCue('error');
+      setErrorMsg('Invalid barcode format or excessive length.');
+      setScanInput('');
+      return;
+    }
+
     if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
     isScanProcessingRef.current = true;
 
@@ -980,8 +987,8 @@ export default function ScanAndPackScreen({ currentUser }) {
     setLoading(true);
     try {
       const lookupRes = await api.lookupAwb(trimmed);
-      if (!lookupRes || !lookupRes.success) {
-        throw new Error(lookupRes?.error || 'Failed to lookup AWB code');
+      if (!lookupRes || !lookupRes.success || lookupRes.found === false || !lookupRes.data) {
+        throw new Error(lookupRes?.error || `Barcode "${trimmed}" not found in ERP order records.`);
       }
 
       const orderData = lookupRes.data || {};
@@ -3240,47 +3247,59 @@ export default function ScanAndPackScreen({ currentUser }) {
             {/* Export CSV button */}
             <button
               type="button"
-              onClick={() => {
-                if (!displayedHistory.length) return alert('No history records to export.');
-                const headers = [
-                  'Time', 'Date', 'AWB Code', 'Package Code', 'Order ID', 'Channel',
-                  'SKU', 'Product Name', 'Brand', 'Size', 'Color',
-                  'Customer Name', 'City', 'Payment Mode', 'Payment Status', 'Amount (INR)',
-                  'Weight (g)', 'Courier', 'Screen / Mode', 'Operation Status', 'Operator'
-                ];
-                const rows = displayedHistory.map(h => [
-                  `"${h.time || ''}"`,
-                  `"${h.date || ''}"`,
-                  `"${h.awb || ''}"`,
-                  `"${h.shippingPackageCode || ''}"`,
-                  `"${h.orderCode || ''}"`,
-                  `"${h.channel || ''}"`,
-                  `"${h.sku || ''}"`,
-                  `"${(h.itemName || '').replace(/"/g, '""')}"`,
-                  `"${h.brand || ''}"`,
-                  `"${h.size || ''}"`,
-                  `"${h.color || ''}"`,
-                  `"${(h.customerName || '').replace(/"/g, '""')}"`,
-                  `"${h.city || ''}"`,
-                  `"${h.paymentMode || 'PREPAID'}"`,
-                  `"${h.paymentStatus || 'PAID'}"`,
-                  h.paymentMode === 'COD' ? (h.codAmount || h.price || 0) : (h.price || 0),
-                  h.weightGrams || 0,
-                  `"${h.courier || ''}"`,
-                  `"${h.mode || ''}"`,
-                  `"${h.status || ''}"`,
-                  `"${h.operator || ''}"`
-                ]);
-                const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement('a');
-                link.setAttribute('href', encodedUri);
-                link.setAttribute('download', `Elite_Edition_Complete_3Screens_Scan_History_${new Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+              onClick={async () => {
+                try {
+                  await api.exportScanPackHistory({
+                    mode: scanMode,
+                    search: historySearchQuery,
+                    startDate: historyStartDate,
+                    endDate: historyEndDate,
+                    courier: historyCourier,
+                    channel: historyChannel,
+                    status: historyOperationStatus
+                  });
+                } catch (err) {
+                  if (!displayedHistory.length) return alert('No history records to export.');
+                  const headers = [
+                    'Time', 'Date', 'AWB Code', 'Package Code', 'Order ID', 'Channel',
+                    'SKU', 'Product Name', 'Brand', 'Size', 'Color',
+                    'Customer Name', 'City', 'Payment Mode', 'Payment Status', 'Amount (INR)',
+                    'Weight (g)', 'Courier', 'Screen / Mode', 'Operation Status', 'Operator'
+                  ];
+                  const rows = displayedHistory.map(h => [
+                    `"${h.time || ''}"`,
+                    `"${h.date || ''}"`,
+                    `"${h.awb || ''}"`,
+                    `"${h.shippingPackageCode || ''}"`,
+                    `"${h.orderCode || ''}"`,
+                    `"${h.channel || ''}"`,
+                    `"${h.sku || ''}"`,
+                    `"${(h.itemName || '').replace(/"/g, '""')}"`,
+                    `"${h.brand || ''}"`,
+                    `"${h.size || ''}"`,
+                    `"${h.color || ''}"`,
+                    `"${(h.customerName || '').replace(/"/g, '""')}"`,
+                    `"${h.city || ''}"`,
+                    `"${h.paymentMode || 'PREPAID'}"`,
+                    `"${h.paymentStatus || 'PAID'}"`,
+                    h.paymentMode === 'COD' ? (h.codAmount || h.price || 0) : (h.price || 0),
+                    h.weightGrams || 0,
+                    `"${h.courier || ''}"`,
+                    `"${h.mode || ''}"`,
+                    `"${h.status || ''}"`,
+                    `"${h.operator || ''}"`
+                  ]);
+                  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement('a');
+                  link.setAttribute('href', encodedUri);
+                  link.setAttribute('download', `Elite_Edition_Complete_Scan_History_${new Date().toISOString().split('T')[0]}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
               }}
-              title="Download scan history as CSV with complete data"
+              title="Download full scan history as CSV"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

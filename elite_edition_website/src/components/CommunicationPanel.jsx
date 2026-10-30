@@ -1705,7 +1705,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         title: chatTaskForm.title.trim(),
         description: chatTaskForm.description.trim(),
         priority: chatTaskForm.priority,
-        status: 'todo',
+        status: 'To Do',
         projectRef: chatTaskForm.projectRef.trim(),
         clientName: chatTaskForm.clientName.trim(),
         dueDate: chatTaskForm.dueDate || undefined,
@@ -3590,6 +3590,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setMessages((prev) =>
       prev.map((m) => {
         if (m._id !== messageId) return m;
+        if (Array.isArray(m.reactions) || !m.reactions) {
+          const list = Array.isArray(m.reactions) ? [...m.reactions] : [];
+          const existingIdx = list.findIndex(
+            (r) => r.emoji === emoji && String(r.user?._id || r.user || r.userId) === String(userId)
+          );
+          if (existingIdx > -1) {
+            list.splice(existingIdx, 1);
+          } else {
+            list.push({ emoji, user: userId });
+          }
+          return { ...m, reactions: list };
+        }
         const currentReactions = { ...(m.reactions || {}) };
         const userList = currentReactions[emoji] || [];
         const uName = currentUser?.name || 'Staff';

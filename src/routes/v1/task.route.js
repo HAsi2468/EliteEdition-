@@ -1,33 +1,31 @@
 const express = require('express');
 const taskController = require('../../controllers/task.controller');
-const redisIdempotencyMiddleware = require('../../middlewares/redisIdempotency.middleware');
 const { requireAuth } = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
-const taskMutationIdempotency = redisIdempotencyMiddleware({ action: 'TASK_MUTATION', required: false });
 
 router.use(requireAuth);
 
 router.get('/', taskController.getTasks);
-router.post('/', taskMutationIdempotency, taskController.createTask);
+router.post('/', taskController.createTask);
 router.get('/:id', taskController.getTaskById);
-router.put('/:id', taskMutationIdempotency, taskController.updateTask);
-router.delete('/:id', taskMutationIdempotency, taskController.deleteTask);
+router.put('/:id', taskController.updateTask);
+router.delete('/:id', taskController.deleteTask);
 
 router.post('/:id/timer/start', taskController.startTimer);
 router.post('/:id/timer/stop', taskController.stopTimer);
-router.post('/:id/timelogs', taskMutationIdempotency, taskController.addManualTimeLog);
+router.post('/:id/timelogs', taskController.addManualTimeLog);
 
-router.post('/:id/checklist', taskMutationIdempotency, taskController.addChecklistItem);
-router.put('/:id/checklist/:itemId', taskMutationIdempotency, taskController.toggleChecklistItem);
-router.delete('/:id/checklist/:itemId', taskMutationIdempotency, taskController.deleteChecklistItem);
+router.post('/:id/checklist', taskController.addChecklistItem);
+router.put('/:id/checklist/:itemId', taskController.toggleChecklistItem);
+router.delete('/:id/checklist/:itemId', taskController.deleteChecklistItem);
 
-router.post('/:id/comments', taskMutationIdempotency, taskController.addComment);
-router.put('/:id/comments/:commentId', taskMutationIdempotency, taskController.editComment);
-router.delete('/:id/comments/:commentId', taskMutationIdempotency, taskController.deleteComment);
+router.post('/:id/comments', taskController.addComment);
+router.put('/:id/comments/:commentId', taskController.editComment);
+router.delete('/:id/comments/:commentId', taskController.deleteComment);
 
 // Attachments (stored in Cloudflare R2)
-router.post('/:id/attachments', taskMutationIdempotency, taskController.addAttachment);
+router.post('/:id/attachments', taskController.addAttachment);
 router.delete('/:id/attachments/:attachmentId', taskMutationIdempotency, taskController.deleteAttachment);
 
 module.exports = router;
