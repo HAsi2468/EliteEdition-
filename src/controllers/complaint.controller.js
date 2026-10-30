@@ -217,8 +217,14 @@ const getOne = async (req, res) => {
 const create = async (req, res) => {
   try {
     const payload = req.body;
-    if (!payload.partyName) {
+    if (!payload.partyName || !String(payload.partyName).trim()) {
       return res.status(400).json({ error: 'Party Name is required' });
+    }
+    if (payload.expectedAmount != null && Number(payload.expectedAmount) < 0) {
+      return res.status(400).json({ error: 'Expected claim amount cannot be negative.' });
+    }
+    if (payload.defectiveMeters != null && Number(payload.defectiveMeters) < 0) {
+      return res.status(400).json({ error: 'Defective meters cannot be negative.' });
     }
 
     if (Array.isArray(payload.responsiblePersons)) {

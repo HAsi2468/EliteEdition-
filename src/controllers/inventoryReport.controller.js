@@ -37,15 +37,16 @@ const fetchImageBuffer = async (imageUrl) => {
 
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
-      timeout: 10000,
+      timeout: 2500,
       headers: { Accept: 'image/jpeg,image/png,image/*' },
+      validateStatus: (status) => status === 200
     });
+    if (!response.data || response.data.length === 0) return null;
     return await sharp(Buffer.from(response.data))
-      .resize({ width: 400, height: 400, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize({ width: 300, height: 300, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
       .toBuffer();
   } catch (err) {
-    logger.error('Image fetch error: %s — %s', imageUrl, err.message);
     return null;
   }
 };
@@ -633,13 +634,16 @@ const enrichImages = async (items) => {
 // Shared: pre-fetch all images (10 at a time)
 // ─────────────────────────────────────────────────────────────
 const buildImageCache = async (items) => {
-  const uniqueUrls = [...new Set(items.map(i => i.imageUrl).filter(Boolean))];
-  logger.info('Pre-fetching %d images…', uniqueUrls.length);
+  const uniqueUrls = [...new Set(items.map(i => i.imageUrl).filter(Boolean))].slice(0, 80);
   const cache = {};
   const CHUNK = 10;
   for (let i = 0; i < uniqueUrls.length; i += CHUNK) {
     await Promise.all(uniqueUrls.slice(i, i + CHUNK).map(async url => {
-      cache[url] = await fetchImageBuffer(url);
+      try {
+        cache[url] = await fetchImageBuffer(url);
+      } catch (_) {
+        cache[url] = null;
+      }
     }));
   }
   return cache;
@@ -923,11 +927,17 @@ const downloadStockOutwardPdf = async (req, res, targetStreamOverride = null) =>
 
     const stockOutLogs = await db.StockOut.find(query).lean();
 
-    // Join with Inventory for details
-    const raw = [];
-    for (const log of stockOutLogs) {
-      const inv = await db.Inventory.findOne({ skuCode: log.skuCode }).lean();
-      raw.push({
+    // High-performance batch join with Inventory to eliminate N+1 latency & timeout crashes
+    const skuList = [...new Set(stockOutLogs.map(l => l.skuCode).filter(Boolean))];
+    const invDocs = skuList.length > 0 ? await db.Inventory.find({ skuCode: { $in: skuList } }).lean() : [];
+    const invMap = {};
+    invDocs.forEach(inv => {
+      if (!invMap[inv.skuCode]) invMap[inv.skuCode] = inv;
+    });
+
+    const raw = stockOutLogs.map(log => {
+      const inv = invMap[log.skuCode];
+      return {
         ...log,
         itemName:     inv?.itemName     || log.skuCode || 'Unknown',
         size:         inv?.size         || log.size    || 'N/A',
@@ -935,8 +945,8 @@ const downloadStockOutwardPdf = async (req, res, targetStreamOverride = null) =>
         salePrice:    inv?.salePrice    || 0,
         purchasePrice:inv?.purchasePrice|| 0,
         qty:          log.qtyOut        || 0,
-      });
-    }
+      };
+    });
 
     const { totalQty, totalSell, items } = groupInventoryItems(raw, 'qty');
     const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);

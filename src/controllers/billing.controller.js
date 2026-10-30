@@ -687,38 +687,39 @@ const createInvoice = async (req, res) => {
       return res.status(409).json({ success: false, error: guardErr.message });
     }
 
+    // Prefix & Sequence Determination
+    let defaultPrefix = 'EDP/26-27/';
+    let defaultStartSeq = 223;
+    if (entity === 'Elite Edition') {
+      defaultPrefix = 'EE-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Elite Fabtex') {
+      defaultPrefix = 'EF-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Sobise') {
+      defaultPrefix = 'SO-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Elite Stitching') {
+      defaultPrefix = 'ES-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Elite Online') {
+      defaultPrefix = 'EO-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Ethno wear' || entity === 'ethno_wear') {
+      defaultPrefix = 'EW-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Yamunaji' || entity === 'yamunaji') {
+      defaultPrefix = 'YJ-2627-';
+      defaultStartSeq = 1;
+    }
+
+    const PrintConfig = require('../db/models/printConfig.model');
+    const config = await PrintConfig.findOne(filter).lean() || {};
+    const isLegacyEdpConfigOnEo = entity === 'Elite Online' && /^EDP/i.test(config.invoicePrefix || '');
+    const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
+    const startSeq = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
+
     if (!invoiceData.invoiceSeq || !invoiceData.invoiceNo) {
-      let defaultPrefix = 'EDP/26-27/';
-      let defaultStartSeq = 223;
-      if (entity === 'Elite Edition') {
-        defaultPrefix = 'EE-2627-';
-        defaultStartSeq = 1;
-      } else if (entity === 'Elite Fabtex') {
-        defaultPrefix = 'EF-2627-';
-        defaultStartSeq = 1;
-      } else if (entity === 'Sobise') {
-        defaultPrefix = 'SO-2627-';
-        defaultStartSeq = 1;
-      } else if (entity === 'Elite Stitching') {
-        defaultPrefix = 'ES-2627-';
-        defaultStartSeq = 1;
-      } else if (entity === 'Elite Online') {
-        defaultPrefix = 'EO-2627-';
-        defaultStartSeq = 1;
-      } else if (entity === 'Ethno wear' || entity === 'ethno_wear') {
-        defaultPrefix = 'EW-2627-';
-        defaultStartSeq = 1;
-      } else if (entity === 'Yamunaji' || entity === 'yamunaji') {
-        defaultPrefix = 'YJ-2627-';
-        defaultStartSeq = 1;
-      }
-
-      const PrintConfig = require('../db/models/printConfig.model');
-      const config = await PrintConfig.findOne(filter).lean() || {};
-      const isLegacyEdpConfigOnEo = entity === 'Elite Online' && /^EDP/i.test(config.invoicePrefix || '');
-      const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
-      const startSeq = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
-
       const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
       const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, startSeq) : startSeq;
       if (!invoiceData.invoiceSeq) {
@@ -733,8 +734,32 @@ const createInvoice = async (req, res) => {
       }
     }
 
-    // Ensure customer object is present
-    if (!invoiceData.customer || !invoiceData.customer.name) {
+    // Strict Collision Shield: If invoiceNo already exists in database for this company, auto-increment to prevent duplicate key 500 error
+    let existingInv = await BillingInvoice.findOne({ invoiceNo: invoiceData.invoiceNo, companyEntity: entity }).lean();
+    if (existingInv) {
+      const highestInv = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 }).lean();
+      const freshSeq = (highestInv && highestInv.invoiceSeq ? highestInv.invoiceSeq : (invoiceData.invoiceSeq || startSeq)) + 1;
+      invoiceData.invoiceSeq = freshSeq;
+      if (prefix.endsWith('/')) {
+        invoiceData.invoiceNo = `${prefix}${freshSeq}`;
+      } else {
+        invoiceData.invoiceNo = `${prefix}${String(freshSeq).padStart(4, '0')}`;
+      }
+    }
+
+    // Ensure customer object is present and customerId is valid ObjectId or omitted (avoids CastError for walk-in clients)
+    if (invoiceData.customer) {
+      if (!invoiceData.customer.name || !String(invoiceData.customer.name).trim()) {
+        invoiceData.customer.name = invoiceData.partyName || invoiceData.customerName || 'Walk-in Client';
+      }
+      if (
+        !invoiceData.customer.customerId ||
+        !mongoose.Types.ObjectId.isValid(invoiceData.customer.customerId) ||
+        String(invoiceData.customer.customerId).toLowerCase().includes('walk')
+      ) {
+        delete invoiceData.customer.customerId;
+      }
+    } else {
       invoiceData.customer = {
         name: invoiceData.partyName || invoiceData.customerName || 'Walk-in Client',
         businessName: invoiceData.partyName || '',
@@ -1087,6 +1112,17 @@ const updateInvoice = async (req, res) => {
     const editorName = req.headers['x-user-name'] || req.user?.name || invoiceData.updatedBy || 'Staff User';
     invoiceData.updatedBy = editorName;
     invoiceData.updatedByName = editorName;
+
+    // Ensure customerId is valid or omitted for walk-in clients
+    if (invoiceData.customer) {
+      if (
+        !invoiceData.customer.customerId ||
+        !mongoose.Types.ObjectId.isValid(invoiceData.customer.customerId) ||
+        String(invoiceData.customer.customerId).toLowerCase().includes('walk')
+      ) {
+        delete invoiceData.customer.customerId;
+      }
+    }
 
     if (Array.isArray(invoiceData.items)) {
       const validChallanIds = invoiceData.items.map(i => i.challanId).filter(Boolean);
@@ -1831,13 +1867,14 @@ const downloadInvoicePdf = async (req, res) => {
     const companyEntity = invoice.companyEntity || 'Elite Digital Print';
     const config = await PrintConfig.findOne({ companyEntity }).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
 
-    const rawCompName = config.companyName || companyEntity.toUpperCase();
+    const isDirectConfig = config.companyEntity === companyEntity;
+    const rawCompName = (isDirectConfig && config.companyName) ? config.companyName : (companyEntity || 'Elite Digital Print').toUpperCase();
     const companyDisplayName = rawCompName.replace(/\s*\([^)]*\)/g, '').trim();
-    const companyGstin   = config.companyGstin || '';
-    const companyAddress = config.companyAddress || '';
-    const companyPhone   = config.companyPhone || '';
-    const companyState   = config.companyState || 'Gujarat';
-    const companyStateCode = config.companyStateCode || '24';
+    const companyGstin   = (isDirectConfig ? config.companyGstin : (companyEntity === 'Elite Digital Print' ? config.companyGstin : '')) || '';
+    const companyAddress = (isDirectConfig ? config.companyAddress : (companyEntity === 'Elite Digital Print' ? config.companyAddress : '')) || '';
+    const companyPhone   = (isDirectConfig ? config.companyPhone : (companyEntity === 'Elite Digital Print' ? config.companyPhone : '')) || '';
+    const companyState   = (isDirectConfig ? config.companyState : 'Gujarat') || 'Gujarat';
+    const companyStateCode = (isDirectConfig ? config.companyStateCode : '24') || '24';
     const companyTerms   = invoice.terms || config.companyTerms ||
       'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
     const bankName   = config.companyBankName || '';
@@ -2293,6 +2330,21 @@ const downloadInvoicePdf = async (req, res) => {
 
       const drawSummary = (startY) => {
         let Y = startY;
+
+        // Render Invoice Discount Row if applicable
+        const discountAmt = Number(invoice.discountTotal || 0) || (invoice.discountType === 'percentage' && Number(invoice.discountValue || 0) > 0 ? (totalTaxable * Number(invoice.discountValue) / 100) : Number(invoice.discountValue || 0));
+        if (discountAmt > 0) {
+          const discH = 16;
+          const discLabel = invoice.discountType === 'percentage'
+            ? `Discount (${invoice.discountValue}%)`
+            : 'Special Discount';
+          doc.rect(PAD, Y, CW, discH).fill(PRPL).stroke(S200);
+          doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+            .text(`Less: ${discLabel}`, colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
+          doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
+            .text(`- ${discountAmt.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+          Y += discH;
+        }
 
         if (isIgst) {
           hsnRows.forEach(row => {
@@ -3270,6 +3322,23 @@ const getCustomers = async (req, res) => {
 
 const createCustomer = async (req, res) => {
   try {
+    const { name, phone, gstin } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ success: false, error: 'Customer Name is required.' });
+    }
+    if (phone && String(phone).trim()) {
+      const cleanPhone = String(phone).trim().replace(/[\s\-+]/g, '');
+      if (!/^\d{10,12}$/.test(cleanPhone)) {
+        return res.status(400).json({ success: false, error: 'Invalid phone number format. Must contain 10 to 12 digits.' });
+      }
+    }
+    if (gstin && String(gstin).trim()) {
+      const cleanGstin = String(gstin).trim().toUpperCase();
+      if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(cleanGstin)) {
+        return res.status(400).json({ success: false, error: 'Invalid GSTIN format. Must be 15 alphanumeric characters (e.g. 24AAAAA0000A1Z5).' });
+      }
+      req.body.gstin = cleanGstin;
+    }
     const customer = await BillingCustomer.create(req.body);
     res.status(201).json({ success: true, data: customer });
   } catch (error) {
@@ -3279,6 +3348,23 @@ const createCustomer = async (req, res) => {
 
 const updateCustomer = async (req, res) => {
   try {
+    const { name, phone, gstin } = req.body;
+    if (name !== undefined && !String(name).trim()) {
+      return res.status(400).json({ success: false, error: 'Customer Name cannot be empty.' });
+    }
+    if (phone && String(phone).trim()) {
+      const cleanPhone = String(phone).trim().replace(/[\s\-+]/g, '');
+      if (!/^\d{10,12}$/.test(cleanPhone)) {
+        return res.status(400).json({ success: false, error: 'Invalid phone number format. Must contain 10 to 12 digits.' });
+      }
+    }
+    if (gstin && String(gstin).trim()) {
+      const cleanGstin = String(gstin).trim().toUpperCase();
+      if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(cleanGstin)) {
+        return res.status(400).json({ success: false, error: 'Invalid GSTIN format. Must be 15 alphanumeric characters (e.g. 24AAAAA0000A1Z5).' });
+      }
+      req.body.gstin = cleanGstin;
+    }
     const customer = await BillingCustomer.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json({ success: true, data: customer });
   } catch (error) {

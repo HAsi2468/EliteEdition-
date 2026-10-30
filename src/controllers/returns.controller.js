@@ -59,12 +59,16 @@ const lookupUniwareOrder = async (req, res) => {
       }
     }
 
+    const isMatched = !!(foundOrder || displayOrderId || sku);
+
     res.status(200).json({
       success: true,
+      matched: isMatched,
       data: {
         referenceId: cleanCode,
-        displayOrderId: displayOrderId || cleanCode,
-        sku: sku || ''
+        displayOrderId: displayOrderId || (isMatched ? cleanCode : ''),
+        sku: sku || '',
+        matched: isMatched
       }
     });
   } catch (error) {

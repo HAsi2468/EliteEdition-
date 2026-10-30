@@ -40,7 +40,7 @@ const billingInvoiceSchema = new mongoose.Schema(
 
     // Customer / Client Details
     customer: {
-      customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'BillingCustomer' },
+      customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'BillingCustomer', default: null, required: false },
       name: { type: String, required: true },
       businessName: { type: String, default: '' },
       phone: { type: String, default: '' },

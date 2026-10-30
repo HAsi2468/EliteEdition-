@@ -37,16 +37,22 @@ const createInward = async (req, res) => {
           panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
           category, shade, hsnCode, location, reorderLevel, unitPrice, totalAmount
         } = item;
-        const effectiveQty = qty != null ? qty : quantity;
-        if (!materialName || effectiveQty == null || effectiveQty < 0) {
-          throw new Error('Material Name and a valid Quantity are required.');
+        const effectiveQty = qty != null ? Number(qty) : Number(quantity);
+        if (!materialName || String(materialName).trim().length === 0) {
+          throw new Error('Material Name is required.');
+        }
+        if (String(materialName).trim().length > 120) {
+          throw new Error('Material Name cannot exceed 120 characters.');
+        }
+        if (isNaN(effectiveQty) || effectiveQty <= 0 || effectiveQty > 1000000) {
+          throw new Error('Quantity must be greater than 0 and not exceed 1,000,000.');
         }
         return {
           type: 'INWARD',
           companyEntity: companyEntity || req.query.companyEntity || compEntity,
           challanNo,
           vendorName,
-          materialName,
+          materialName: String(materialName).trim(),
           qty: effectiveQty,
           unit: unit || 'Meters',
           date: date ? new Date(date) : new Date(),
@@ -74,10 +80,16 @@ const createInward = async (req, res) => {
       panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
       category, shade, hsnCode, location, reorderLevel, unitPrice, totalAmount
     } = req.body;
-    const effectiveQty = qty != null ? qty : quantity;
+    const effectiveQty = qty != null ? Number(qty) : Number(quantity);
 
-    if (!materialName || effectiveQty == null || effectiveQty < 0) {
-      return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity are required.' });
+    if (!materialName || String(materialName).trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Material Name is required.' });
+    }
+    if (String(materialName).trim().length > 120) {
+      return res.status(400).json({ success: false, error: 'Material Name cannot exceed 120 characters.' });
+    }
+    if (isNaN(effectiveQty) || effectiveQty <= 0 || effectiveQty > 1000000) {
+      return res.status(400).json({ success: false, error: 'Quantity must be greater than 0 and not exceed 1,000,000.' });
     }
 
     const transaction = new RawMaterialTransaction({
@@ -85,7 +97,7 @@ const createInward = async (req, res) => {
       companyEntity: companyEntity || compEntity,
       challanNo,
       vendorName,
-      materialName,
+      materialName: String(materialName).trim(),
       qty: effectiveQty,
       unit: unit || 'Meters',
       date: date ? new Date(date) : new Date(),
@@ -123,16 +135,23 @@ const createOutward = async (req, res) => {
           panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
           category, shade, location
         } = item;
-        if (!materialName || qty == null || qty <= 0) {
-          throw new Error('Material Name and a valid Quantity (>0) are required.');
+        const numQty = Number(qty);
+        if (!materialName || String(materialName).trim().length === 0) {
+          throw new Error('Material Name is required.');
+        }
+        if (String(materialName).trim().length > 120) {
+          throw new Error('Material Name cannot exceed 120 characters.');
+        }
+        if (isNaN(numQty) || numQty <= 0 || numQty > 1000000) {
+          throw new Error('Quantity must be greater than 0 and not exceed 1,000,000.');
         }
         return {
           type: 'OUTWARD',
           companyEntity: companyEntity || req.query.companyEntity || compEntity,
           jobNo,
           partyName,
-          materialName,
-          qty,
+          materialName: String(materialName).trim(),
+          qty: numQty,
           unit: unit || 'Meters',
           date: date ? new Date(date) : new Date(),
           notes,
@@ -156,8 +175,15 @@ const createOutward = async (req, res) => {
       category, shade, location
     } = req.body;
 
-    if (!materialName || qty == null || qty <= 0) {
-      return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity (>0) are required.' });
+    const numQty = Number(qty);
+    if (!materialName || String(materialName).trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Material Name is required.' });
+    }
+    if (String(materialName).trim().length > 120) {
+      return res.status(400).json({ success: false, error: 'Material Name cannot exceed 120 characters.' });
+    }
+    if (isNaN(numQty) || numQty <= 0 || numQty > 1000000) {
+      return res.status(400).json({ success: false, error: 'Quantity must be greater than 0 and not exceed 1,000,000.' });
     }
 
     const transaction = new RawMaterialTransaction({
@@ -165,8 +191,8 @@ const createOutward = async (req, res) => {
       companyEntity: companyEntity || compEntity,
       jobNo,
       partyName,
-      materialName,
-      qty,
+      materialName: String(materialName).trim(),
+      qty: numQty,
       unit: unit || 'Meters',
       date: date ? new Date(date) : new Date(),
       notes,

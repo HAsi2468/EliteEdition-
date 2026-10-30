@@ -68,16 +68,17 @@ const getAll = async (req, res) => {
       filter.$and.push({ $or: deptOr });
     }
 
-    if (search) {
+    if (search && String(search).trim()) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchOr = [
-        { designName:     { $regex: search, $options: 'i' } },
-        { designerName:   { $regex: search, $options: 'i' } },
-        { fabricName:     { $regex: search, $options: 'i' } },
-        { colourMatching: { $regex: search, $options: 'i' } },
-        { category:       { $regex: search, $options: 'i' } },
-        { colors:         { $regex: search, $options: 'i' } },
-        { parties:        { $regex: search, $options: 'i' } },
-        { partySkuId:     { $regex: search, $options: 'i' } },
+        { designName:     { $regex: safeSearch, $options: 'i' } },
+        { designerName:   { $regex: safeSearch, $options: 'i' } },
+        { fabricName:     { $regex: safeSearch, $options: 'i' } },
+        { colourMatching: { $regex: safeSearch, $options: 'i' } },
+        { category:       { $regex: safeSearch, $options: 'i' } },
+        { colors:         { $regex: safeSearch, $options: 'i' } },
+        { parties:        { $regex: safeSearch, $options: 'i' } },
+        { partySkuId:     { $regex: safeSearch, $options: 'i' } },
       ];
       if (!filter.$and) filter.$and = [];
       filter.$and.push({ $or: searchOr });

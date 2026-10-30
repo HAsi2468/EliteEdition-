@@ -49,8 +49,12 @@ const createInventory = async (req, res) => {
       const processedItems = [];
       for (const item of req.body) {
         const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes, facility } = item;
+        const numQty = qty != null ? Number(qty) : (currentlyAvailableStock != null ? Number(currentlyAvailableStock) : 0);
         if (!party || !itemName || !size) {
           throw new Error('Party, Item Name, and Size are required for all bulk items');
+        }
+        if (numQty <= 0 || isNaN(numQty)) {
+          throw new Error(`Quantity must be greater than 0 for item ${itemName}`);
         }
 
         const targetFacility = (facility || 'Pankhudi').trim();
@@ -60,7 +64,7 @@ const createInventory = async (req, res) => {
         // Check if an existing inventory record exists for masterSku and facility to consolidate stock
         let existingRecord = await db.Inventory.findOne({ skuCode: masterSku, facility: targetFacility });
         if (existingRecord) {
-          existingRecord.qty = (existingRecord.qty || 0) + (qty || 0);
+          existingRecord.qty = (existingRecord.qty || 0) + numQty;
           existingRecord.currentlyAvailableStock = existingRecord.qty;
           if (imageUrl) existingRecord.imageUrl = imageUrl;
           await existingRecord.save();
@@ -70,10 +74,10 @@ const createInventory = async (req, res) => {
             party,
             itemName: finalItemName,
             size,
-            currentlyAvailableStock: qty || currentlyAvailableStock || 0,
+            currentlyAvailableStock: numQty,
             salePrice: salePrice || 0.0,
             purchasePrice: purchasePrice || 0.0,
-            qty: qty || 0,
+            qty: numQty,
             imageUrl: imageUrl || '',
             skuCode: masterSku,
             challanNo: challanNo || '',
@@ -99,12 +103,17 @@ const createInventory = async (req, res) => {
       return res.status(400).json({ error: 'Party, Item Name, and Size are required' });
     }
 
+    const numQty = qty != null ? Number(qty) : (currentlyAvailableStock != null ? Number(currentlyAvailableStock) : 0);
+    if (numQty <= 0 || isNaN(numQty)) {
+      return res.status(400).json({ error: 'Quantity must be greater than 0.' });
+    }
+
     const masterSku = await resolveMasterSkuForBackend(skuCode, size);
     const finalItemName = (itemName === skuCode || !itemName) ? masterSku : itemName;
 
     let existingRecord = await db.Inventory.findOne({ skuCode: masterSku, facility: targetFacility });
     if (existingRecord) {
-      existingRecord.qty = (existingRecord.qty || 0) + (qty || 0);
+      existingRecord.qty = (existingRecord.qty || 0) + numQty;
       existingRecord.currentlyAvailableStock = existingRecord.qty;
       if (imageUrl) existingRecord.imageUrl = imageUrl;
       await existingRecord.save();
@@ -117,10 +126,10 @@ const createInventory = async (req, res) => {
       party,
       itemName: finalItemName,
       size,
-      currentlyAvailableStock: currentlyAvailableStock || 0,
+      currentlyAvailableStock: numQty,
       salePrice: salePrice || 0.0,
       purchasePrice: purchasePrice || 0.0,
-      qty: qty || 0,
+      qty: numQty,
       imageUrl: imageUrl || '',
       skuCode: masterSku,
       challanNo: challanNo || '',

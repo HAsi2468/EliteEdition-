@@ -51,10 +51,10 @@ const authIpLimiter = rateLimit({
 	},
 });
 
-// 2. Account / Target Identifier Limiter: 10 failed attempts per 15 minutes per target email/mobile
+// 2. Account / Target Identifier Limiter: 5 failed attempts per 15 minutes per target email/mobile
 const authAccountLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 10, // Strict brute-force shield: 10 failed attempts per target account
+	max: 5, // Strict brute-force shield: 5 failed attempts per target account (locks out on 6th attempt)
 	skipSuccessfulRequests: true,
 	standardHeaders: true,
 	legacyHeaders: false,
