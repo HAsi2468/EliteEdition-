@@ -79,6 +79,57 @@ if (isPrimaryInstance) {
   }, 60000);
 }
 
+const exitHandler = (code = 1) => {
+  const forceExitTimer = setTimeout(() => {
+    process.exit(code);
+  }, 3000);
+  if (typeof forceExitTimer.unref === 'function' && code !== 0) {
+    forceExitTimer.unref();
+  }
+  if (server) {
+    try {
+      if (io && typeof io.disconnectSockets === 'function') {
+        io.disconnectSockets(true);
+      }
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
+    } catch (_) {}
+
+    server.close(() => {
+      logger.info('Server closed gracefully');
+      process.exit(code);
+    });
+  } else {
+    process.exit(code);
+  }
+};
+
+process.on('message', (packet) => {
+  try {
+    if (packet === 'shutdown' || packet?.type === 'shutdown') {
+      logger.info('PM2 graceful shutdown IPC received. Draining connections...');
+      exitHandler(0);
+      return;
+    }
+    if (packet && (packet.type === 'broadcast-version-update' || packet.action === 'broadcast-version-update')) {
+      const payload = packet.data || {
+        version: 1791022781512,
+        releaseVersion: 'v2.8.0',
+        releaseName: 'v2.8.0 — Job Card Print Sheet & Production Suite',
+        timestamp: Date.now()
+      };
+      const activeIo = app.get('io') || app.get('socketio') || global.io;
+      if (activeIo) {
+        activeIo.emit('app-version-updated', payload);
+        logger.info('[IPC] Broadcasted app-version-updated to socket clients: %s', payload.releaseVersion || payload.version);
+      }
+    }
+  } catch (ipcErr) {
+    logger.warn('[IPC] Error handling message: %s', ipcErr.message);
+  }
+});
+
 const port = process.env.PORT || 3001;
 const host = process.env.HOST || '127.0.0.1';
 server.listen(port, host, async () => {
@@ -101,52 +152,7 @@ server.listen(port, host, async () => {
   } catch (err) {
     logger.warn('Failed to seed facilities on startup: ' + err.message);
   }
-
-  process.on('message', (packet) => {
-    try {
-      if (packet === 'shutdown' || packet?.type === 'shutdown') {
-        logger.info('PM2 graceful shutdown IPC received. Draining connections...');
-        exitHandler(0);
-        return;
-      }
-      if (packet && (packet.type === 'broadcast-version-update' || packet.action === 'broadcast-version-update')) {
-        const payload = packet.data || {
-          version: 1791022781512,
-          releaseVersion: 'v2.8.0',
-          releaseName: 'v2.8.0 — Job Card Print Sheet & Production Suite',
-          timestamp: Date.now()
-        };
-        const activeIo = app.get('io') || app.get('socketio') || global.io;
-        if (activeIo) {
-          activeIo.emit('app-version-updated', payload);
-          logger.info('[IPC] Broadcasted app-version-updated to socket clients: %s', payload.releaseVersion || payload.version);
-        }
-      }
-    } catch (ipcErr) {
-      logger.warn('[IPC] Error handling message: %s', ipcErr.message);
-    }
-  });
 });
-
-const exitHandler = (code = 1) => {
-  if (server) {
-    try {
-      if (io && typeof io.disconnectSockets === 'function') {
-        io.disconnectSockets(true);
-      }
-    } catch (_) {}
-
-    server.close(() => {
-      logger.info('Server closed gracefully');
-      process.exit(code);
-    });
-    setTimeout(() => {
-      process.exit(code);
-    }, 4000).unref();
-  } else {
-    process.exit(code);
-  }
-};
 
 const unexpectedErrorHandler = (error) => {
   logger.error('CRITICAL UNHANDLED ERROR:', error);

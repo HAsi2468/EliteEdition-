@@ -473,8 +473,9 @@ const getNextInvoiceNo = async (req, res) => {
 
     const filter = buildCompanyFilter(companyEntity);
     const config = await PrintConfig.findOne(filter).lean() || {};
-    const START_SEQ = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : defaultStartSeq;
-    const prefix = config.invoicePrefix || defaultPrefix;
+    const isLegacyEdpConfigOnEo = companyEntity === 'Elite Online' && /^EDP/i.test(config.invoicePrefix || '');
+    const START_SEQ = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
+    const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
 
     const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
     const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, START_SEQ) : START_SEQ;
@@ -714,8 +715,9 @@ const createInvoice = async (req, res) => {
 
       const PrintConfig = require('../db/models/printConfig.model');
       const config = await PrintConfig.findOne(filter).lean() || {};
-      const prefix = config.invoicePrefix || defaultPrefix;
-      const startSeq = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : defaultStartSeq;
+      const isLegacyEdpConfigOnEo = entity === 'Elite Online' && /^EDP/i.test(config.invoicePrefix || '');
+      const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
+      const startSeq = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
 
       const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
       const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, startSeq) : startSeq;
