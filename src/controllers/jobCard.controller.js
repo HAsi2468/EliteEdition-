@@ -274,33 +274,38 @@ const getAllJobCards = async (req, res) => {
 
     if (search) {
       const trimmed = search.trim();
-      const digitsOnly = trimmed.replace(/\D/g, '');
-      const searchRegex = { $regex: trimmed, $options: 'i' };
-      
-      const searchOr = [
-        { jobNo:       searchRegex },
-        { party:       searchRegex },
-        { designNo:    searchRegex },
-        { designName:  searchRegex },
-        { machineName: searchRegex },
-        { billNo:      searchRegex },
-        { partyChallan: searchRegex },
-        { ourChallanNo: searchRegex },
-        { lotNo:       searchRegex },
-        { fabric:      searchRegex },
-      ];
+      const tokens = trimmed.split(/\s+/).filter(Boolean);
 
-      if (digitsOnly) {
-        const digitRegex = { $regex: digitsOnly, $options: 'i' };
-        searchOr.push(
-          { jobNo: digitRegex },
-          { billNo: digitRegex },
-          { partyChallan: digitRegex },
-          { ourChallanNo: digitRegex }
-        );
-      }
+      tokens.forEach(tok => {
+        const escaped = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const tokenRegex = { $regex: escaped, $options: 'i' };
+        const digitsOnly = tok.replace(/\D/g, '');
 
-      baseAndClauses.push({ $or: searchOr });
+        const tokenOr = [
+          { jobNo:       tokenRegex },
+          { party:       tokenRegex },
+          { designNo:    tokenRegex },
+          { designName:  tokenRegex },
+          { machineName: tokenRegex },
+          { billNo:      tokenRegex },
+          { partyChallan: tokenRegex },
+          { ourChallanNo: tokenRegex },
+          { lotNo:       tokenRegex },
+          { fabric:      tokenRegex },
+        ];
+
+        if (digitsOnly && digitsOnly.length >= 2) {
+          const digitRegex = { $regex: digitsOnly, $options: 'i' };
+          tokenOr.push(
+            { jobNo: digitRegex },
+            { billNo: digitRegex },
+            { partyChallan: digitRegex },
+            { ourChallanNo: digitRegex }
+          );
+        }
+
+        baseAndClauses.push({ $or: tokenOr });
+      });
     }
 
     if (baseAndClauses.length > 0) {
@@ -1019,9 +1024,14 @@ const updateJobCard = async (req, res) => {
     body.updatedBy = editorName;
     body.updatedByName = editorName;
 
-    if (printStatus==='Printing Done' && fusingStatus==='Fusing Done' && deliveryStatus==='Delivery Done') body.status='Done';
-    else if (printStatus==='Printing Done' || printStatus==='Printing In Progress' || fusingStatus==='Fusing Done' || fusingStatus==='Fusing In Progress' || fusingStatus==='Partial Complete' || deliveryStatus==='Delivery Done' || deliveryStatus==='Delivery In Progress') body.status='In Progress';
-    else body.status='Pending';
+    const isQaPassed = existingCard.qaStatus === 'Passed' || body.qaStatus === 'Passed' || existingCard.qcStatus === 'Passed' || body.qcStatus === 'Passed';
+    if (printStatus==='Printing Done' && fusingStatus==='Fusing Done' && deliveryStatus==='Delivery Done') {
+      body.status = isQaPassed ? 'Done' : 'Pending QA';
+    } else if (printStatus==='Printing Done' || printStatus==='Printing In Progress' || fusingStatus==='Fusing Done' || fusingStatus==='Fusing In Progress' || fusingStatus==='Partial Complete' || deliveryStatus==='Delivery Done' || deliveryStatus==='Delivery In Progress') {
+      body.status = (body.status === 'Done' && !isQaPassed) ? 'Pending QA' : 'In Progress';
+    } else {
+      body.status = 'Pending';
+    }
 
     // Track detailed field diffs for Mistakes & Revision History Audit Log
     const changesArr = [];

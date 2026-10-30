@@ -4,6 +4,7 @@ const monthlyCostingSchema = new mongoose.Schema(
   {
     companyEntity: { type: String, default: 'Elite Digital Print', index: true },
     month: { type: String, required: true, index: true }, // Format: YYYY-MM e.g. "2026-09"
+    fabricCost: { type: Number, default: 0 },
     paperCost: { type: Number, default: 0 },
     inkCost: { type: Number, default: 0 },
     salaryCost: { type: Number, default: 0 },

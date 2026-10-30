@@ -25,6 +25,7 @@ const getCompanyAliases = (comp) => {
 const categorizeExpense = (exp) => {
   const text = `${exp.category || ''} ${exp.title || ''} ${exp.description || ''}`.toLowerCase();
 
+  if (/fabric|cloth|kapda|grey|greige|viscose|rayon|cotton|crepe|crape|french|satin|georgette/i.test(text)) return 'fabric';
   if (/paper|sublimation\s*paper|transfer\s*film|butter/i.test(text)) return 'paper';
   if (/ink|flushing|cartridge|cmyk|dye/i.test(text)) return 'ink';
   if (/salary|wage|worker|staff|operator|designer|helper|labor|labour|attendance/i.test(text)) return 'salary';
@@ -134,6 +135,7 @@ const getMonthlyCostingReport = async (req, res) => {
     const recordedExpenses = await db.Expense.find(expenseQuery).sort({ date: -1 }).lean();
 
     const expenseCategorySums = {
+      fabric: 0,
       paper: 0,
       ink: 0,
       salary: 0,
@@ -166,6 +168,22 @@ const getMonthlyCostingReport = async (req, res) => {
       };
     });
 
+    // 2.5 Fetch Recorded Fabric Purchases from BillingPurchase for this month
+    try {
+      if (db.BillingPurchase) {
+        const purchases = await db.BillingPurchase.find({
+          companyEntity: { $in: aliases },
+          date: { $gte: startDt, $lte: endDt }
+        }).lean();
+        (purchases || []).forEach(p => {
+          const amt = Number(p.totalAmount || p.grandTotal || p.subtotal || 0);
+          expenseCategorySums.fabric = (expenseCategorySums.fabric || 0) + amt;
+        });
+      }
+    } catch (pErr) {
+      logger.warn('Failed to aggregate BillingPurchase for costing: %s', pErr.message);
+    }
+
     // 3. Fetch Stored Monthly Fixed Overheads for this month
     const storedOverheads = await db.MonthlyCosting.findOne({
       companyEntity: { $in: aliases },
@@ -173,6 +191,7 @@ const getMonthlyCostingReport = async (req, res) => {
     }).lean();
 
     const overheads = {
+      fabricCost: Number(storedOverheads?.fabricCost || 0),
       paperCost: Number(storedOverheads?.paperCost || 0),
       inkCost: Number(storedOverheads?.inkCost || 0),
       salaryCost: Number(storedOverheads?.salaryCost || 0),
@@ -189,6 +208,13 @@ const getMonthlyCostingReport = async (req, res) => {
 
     // 4. Combine Recorded Expenses + Fixed Overheads
     const costBreakdown = {
+      fabric: {
+        label: 'Fabric Purchase Cost',
+        icon: '🧵',
+        recorded: Math.round(expenseCategorySums.fabric * 100) / 100,
+        fixed: overheads.fabricCost,
+        total: Math.round((expenseCategorySums.fabric + overheads.fabricCost) * 100) / 100
+      },
       paper: {
         label: 'Paper Cost',
         icon: '📄',
@@ -339,6 +365,7 @@ const saveMonthlyOverheads = async (req, res) => {
     const {
       companyEntity = 'Elite Digital Print',
       month,
+      fabricCost = 0,
       paperCost = 0,
       inkCost = 0,
       salaryCost = 0,
@@ -361,6 +388,7 @@ const saveMonthlyOverheads = async (req, res) => {
       { companyEntity, month },
       {
         $set: {
+          fabricCost: Number(fabricCost || 0),
           paperCost: Number(paperCost || 0),
           inkCost: Number(inkCost || 0),
           salaryCost: Number(salaryCost || 0),

@@ -1,9 +1,12 @@
 const express = require('express');
 const taskController = require('../../controllers/task.controller');
 const redisIdempotencyMiddleware = require('../../middlewares/redisIdempotency.middleware');
+const { requireAuth } = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 const taskMutationIdempotency = redisIdempotencyMiddleware({ action: 'TASK_MUTATION', required: false });
+
+router.use(requireAuth);
 
 router.get('/', taskController.getTasks);
 router.post('/', taskMutationIdempotency, taskController.createTask);

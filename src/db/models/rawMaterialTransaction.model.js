@@ -22,11 +22,13 @@ const rawMaterialTransactionSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 120,
     },
     qty: {
       type: Number,
       required: true,
-      min: 0,
+      min: [0.001, 'Quantity must be greater than zero'],
+      max: [1000000, 'Quantity cannot exceed 1,000,000'],
     },
     unit: {
       type: String,

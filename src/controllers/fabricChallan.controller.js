@@ -58,12 +58,22 @@ async function syncJobCardDeliveryTotals(jobNo) {
         }
 
         // Update overall Job Card status
+        const isQaPassed = (
+          jCard.qaStatus === 'Passed' ||
+          jCard.qaStatus === 'QA_PASSED' ||
+          jCard.qcStatus === 'Passed'
+        );
+
         if (
           jCard.printStatus === 'Printing Done' &&
           jCard.fusingStatus === 'Fusing Done' &&
           jCard.deliveryStatus === 'Delivery Done'
         ) {
-          jCard.status = 'Done';
+          if (isQaPassed) {
+            jCard.status = 'Done';
+          } else {
+            jCard.status = 'Pending QA'; // Never skip QA stage
+          }
         } else if (
           jCard.printStatus === 'Printing Done' ||
           jCard.printStatus === 'Printing In Progress' ||
@@ -776,6 +786,25 @@ const createChallan = async (req, res) => {
               deliveredMtr,
               jobNo: jCard.jobNo
             });
+          }
+
+          // 4. Job Card Target Overrun Check: Total delivered cannot exceed 15% overrun limit
+          const targetMtr = parseFloat(String(jCard.totalMtr || jCard.consumption || 0).replace(/[^\d.]/g, '')) || 0;
+          if (targetMtr > 0) {
+            const projectedTotal = deliveredMtr + totalMtr;
+            const maxAllowable = targetMtr * 1.15;
+            if (projectedTotal > maxAllowable && !req.body.allowOverrun && !hasAdminOverride) {
+              return res.status(400).json({
+                success: false,
+                error: `Job Card Overrun Alert: Job Card #${jCard.jobNo} target is ${targetMtr}m (max allowed with 15% buffer: ${maxAllowable.toFixed(1)}m). Projected delivery reaches ${projectedTotal.toFixed(1)}m (${deliveredMtr.toFixed(1)}m previous + ${totalMtr.toFixed(1)}m this challan). Overrun exceeds limit. Manager approval (allowOverrun) required.`,
+                stageError: 'JOB_CARD_OVERRUN',
+                targetMtr,
+                projectedTotal,
+                maxAllowable,
+                canAdminOverride: isUserAdmin,
+                jobNo: jCard.jobNo
+              });
+            }
           }
         }
       }

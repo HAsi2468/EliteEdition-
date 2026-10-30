@@ -227,6 +227,13 @@ const create = async (req, res) => {
       return res.status(400).json({ error: 'Defective meters cannot be negative.' });
     }
 
+    if (payload.phone || payload.contactNumber) {
+      const p = String(payload.phone || payload.contactNumber).replace(/[\s\-\(\)\+]/g, '');
+      if (p && !/^\d{10,12}$/.test(p)) {
+        return res.status(400).json({ error: 'Contact phone must be a valid 10 to 12 digit number.' });
+      }
+    }
+
     if (Array.isArray(payload.responsiblePersons)) {
       payload.responsiblePerson = payload.responsiblePersons.join(', ');
     } else if (typeof payload.responsiblePerson === 'string' && payload.responsiblePerson.trim()) {
@@ -302,6 +309,19 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = req.body;
+
+    if (payload.expectedAmount != null && Number(payload.expectedAmount) < 0) {
+      return res.status(400).json({ error: 'Expected claim amount cannot be negative.' });
+    }
+    if (payload.defectiveMeters != null && Number(payload.defectiveMeters) < 0) {
+      return res.status(400).json({ error: 'Defective meters cannot be negative.' });
+    }
+    if (payload.phone || payload.contactNumber) {
+      const p = String(payload.phone || payload.contactNumber).replace(/[\s\-\(\)\+]/g, '');
+      if (p && !/^\d{10,12}$/.test(p)) {
+        return res.status(400).json({ error: 'Contact phone must be a valid 10 to 12 digit number.' });
+      }
+    }
 
     const editorName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.updatedBy || 'Staff User';
     payload.updatedBy = editorName;

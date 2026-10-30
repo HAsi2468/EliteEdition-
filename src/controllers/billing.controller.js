@@ -31,9 +31,24 @@ function numToWords(amount) {
     return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convert(n % 10000000) : '');
   }
 
-  const num = Math.floor(amount || 0);
-  if (num === 0) return 'Rupees Zero Only';
-  return 'Rupees ' + convert(num) + ' Only';
+  const val = parseFloat(amount || 0);
+  if (isNaN(val) || val <= 0) return 'Rupees Zero Only';
+
+  const rupees = Math.floor(val);
+  const paise = Math.round((val - rupees) * 100);
+
+  let result = 'Rupees';
+  if (rupees > 0) {
+    result += ' ' + convert(rupees);
+  } else {
+    result += ' Zero';
+  }
+
+  if (paise > 0) {
+    result += ' and ' + convert(paise) + ' Paise';
+  }
+
+  return result + ' Only';
 }
 
 // Helper for flexible company entity queries
@@ -1977,11 +1992,11 @@ const downloadInvoicePdf = async (req, res) => {
       }
     });
     const hsnRows      = Object.values(hsnMap);
-    const totalTaxable = hsnRows.reduce((s, r) => s + r.taxable, 0);
-    const totalCgst    = hsnRows.reduce((s, r) => s + r.cgst,    0);
-    const totalSgst    = hsnRows.reduce((s, r) => s + r.sgst,    0);
-    const totalIgst    = hsnRows.reduce((s, r) => s + r.igst,    0);
-    const totalTax     = isIgst ? totalIgst : (totalCgst + totalSgst);
+    const totalTaxable = (invoice.subtotal != null && Number(invoice.subtotal) > 0) ? Number(invoice.subtotal) : hsnRows.reduce((s, r) => s + r.taxable, 0);
+    const totalCgst    = (invoice.cgstTotal != null && Number(invoice.cgstTotal) > 0) ? Number(invoice.cgstTotal) : hsnRows.reduce((s, r) => s + r.cgst,    0);
+    const totalSgst    = (invoice.sgstTotal != null && Number(invoice.sgstTotal) > 0) ? Number(invoice.sgstTotal) : hsnRows.reduce((s, r) => s + r.sgst,    0);
+    const totalIgst    = (invoice.igstTotal != null && Number(invoice.igstTotal) > 0) ? Number(invoice.igstTotal) : hsnRows.reduce((s, r) => s + r.igst,    0);
+    const totalTax     = (invoice.totalTax != null && Number(invoice.totalTax) > 0) ? Number(invoice.totalTax) : (isIgst ? totalIgst : (totalCgst + totalSgst));
 
     let delByVal = invoice.deliveryBy || '';
     if (!delByVal && Array.isArray(invoice.linkedChallanIds) && invoice.linkedChallanIds.length > 0) {
@@ -2410,7 +2425,7 @@ const downloadInvoicePdf = async (req, res) => {
           doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
             .text(`Less: TDS${tdsSec}${tdsRate}`, colX[6] - 40, Y + 4, { width: COL[6] + COL[7] + 36, align: 'right' });
           doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
-            .text(`- ${Math.round(Number(invoice.tdsAmount || 0))}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            .text(`- ${Number(invoice.tdsAmount || 0).toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
           Y += tdsH;
 
           const netH = 20;
@@ -3207,7 +3222,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             const tdsRate = invoice.tdsRate ? ` @ ${invoice.tdsRate}%` : '';
             doc.rect(PAD, Y, CW, 16).fill(PRPL).stroke(S200);
             doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
-              .text(`Less: TDS${tdsSec}${tdsRate}: - Rs. ${Math.round(Number(invoice.tdsAmount || 0))}`, PAD + 5, Y + 3);
+              .text(`Less: TDS${tdsSec}${tdsRate}: - Rs. ${Number(invoice.tdsAmount || 0).toFixed(2)}`, PAD + 5, Y + 3);
             const netPayable = Math.max(0, Number(grandTotalVal) - Number(invoice.tdsAmount || 0));
             doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
               .text(`Net Receivable: Rs. ${netPayable.toFixed(2)}`, PAD + CW - 160, Y + 3, { width: 155, align: 'right' });

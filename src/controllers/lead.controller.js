@@ -28,6 +28,23 @@ const createLead = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Customer Name and Phone Number are required.' });
     }
 
+    const cleanPhone = String(phone).replace(/[\s\-\(\)\+]/g, '');
+    if (!/^\d{10,12}$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, error: 'Phone number must be a valid 10 to 12 digit number.' });
+    }
+
+    if (estimatedValue != null && !isNaN(Number(estimatedValue)) && Number(estimatedValue) < 0) {
+      return res.status(400).json({ success: false, error: 'Estimated deal value cannot be negative.' });
+    }
+
+    if (gstin && String(gstin).trim()) {
+      const cleanGstin = String(gstin).trim().toUpperCase();
+      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!gstinRegex.test(cleanGstin)) {
+        return res.status(400).json({ success: false, error: 'Invalid GSTIN format (Expected 15-character format e.g. 24AAAAA0000A1Z5).' });
+      }
+    }
+
     const newLead = new Lead({
       name: String(name).trim(),
       phone: String(phone).trim(),
@@ -127,6 +144,24 @@ const getLeadById = async (req, res) => {
 // Update lead
 const updateLead = async (req, res) => {
   try {
+    const { phone, estimatedValue, gstin } = req.body;
+    if (phone) {
+      const cleanPhone = String(phone).replace(/[\s\-\(\)\+]/g, '');
+      if (!/^\d{10,12}$/.test(cleanPhone)) {
+        return res.status(400).json({ success: false, error: 'Phone number must be a valid 10 to 12 digit number.' });
+      }
+    }
+    if (estimatedValue != null && !isNaN(Number(estimatedValue)) && Number(estimatedValue) < 0) {
+      return res.status(400).json({ success: false, error: 'Estimated deal value cannot be negative.' });
+    }
+    if (gstin && String(gstin).trim()) {
+      const cleanGstin = String(gstin).trim().toUpperCase();
+      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!gstinRegex.test(cleanGstin)) {
+        return res.status(400).json({ success: false, error: 'Invalid GSTIN format (Expected 15-character format e.g. 24AAAAA0000A1Z5).' });
+      }
+    }
+
     const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead not found.' });

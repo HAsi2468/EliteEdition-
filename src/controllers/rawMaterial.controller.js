@@ -186,6 +186,30 @@ const createOutward = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Quantity must be greater than 0 and not exceed 1,000,000.' });
     }
 
+    // ── Stock Sufficiency Validation: Prevent negative stock ──
+    const stockFilter = buildRawCompFilter(companyEntity || compEntity);
+    stockFilter.materialName = String(materialName).trim();
+    if (color) stockFilter.color = color;
+    if (panna) stockFilter.panna = panna;
+
+    const stockAgg = await RawMaterialTransaction.aggregate([
+      { $match: stockFilter },
+      {
+        $group: {
+          _id: null,
+          totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+        }
+      }
+    ]);
+    const available = stockAgg.length > 0 ? (stockAgg[0].totalIn - stockAgg[0].totalOut) : 0;
+    if (numQty > available) {
+      return res.status(400).json({
+        success: false,
+        error: `Insufficient stock for ${materialName}${color ? ' (' + color + ')' : ''}. Available: ${available} ${unit || 'Units'}, Requested: ${numQty} ${unit || 'Units'}. Negative stock is not permitted.`
+      });
+    }
+
     const transaction = new RawMaterialTransaction({
       type: 'OUTWARD',
       companyEntity: companyEntity || compEntity,
@@ -441,6 +465,28 @@ const deleteTransaction = async (req, res) => {
     res.status(200).json({ success: true, message: 'Transaction deleted successfully.' });
   } catch (error) {
     console.error('Error deleting raw material transaction:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Delete all transactions and catalog stock for a specific raw material by name
+const deleteMaterialByName = async (req, res) => {
+  try {
+    const { materialName, companyEntity } = req.query;
+    if (!materialName || !String(materialName).trim()) {
+      return res.status(400).json({ success: false, error: 'Material Name is required to delete.' });
+    }
+    const filter = buildRawCompFilter(companyEntity);
+    filter.materialName = { $regex: new RegExp(`^${materialName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+
+    const deleteRes = await RawMaterialTransaction.deleteMany(filter);
+    res.json({
+      success: true,
+      message: `Successfully deleted material "${materialName}" (${deleteRes.deletedCount} transaction records removed).`,
+      deletedCount: deleteRes.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting raw material:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -1045,6 +1091,7 @@ module.exports = {
   getTransactions,
   getStockOverview,
   deleteTransaction,
+  deleteMaterialByName,
   updateTransaction,
   downloadLedgerPdf,
   importStock,

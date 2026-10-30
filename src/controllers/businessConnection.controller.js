@@ -333,6 +333,12 @@ exports.createConnection = async (req, res) => {
 
     const recordType = payload.record_type.toUpperCase();
     const phone = payload.common_directory.primary_phone || payload.common_directory.whatsapp_phone;
+    if (phone) {
+      const cleanPhone = String(phone).replace(/[\s\-\(\)\+]/g, '');
+      if (!/^\d{10,12}$/.test(cleanPhone)) {
+        return res.status(400).json({ error: 'Phone number must be a valid 10 to 12 digit number.' });
+      }
+    }
     const name = payload.common_directory.name.trim();
 
     // Check for existing record to upsert by phone or (name + record_type)

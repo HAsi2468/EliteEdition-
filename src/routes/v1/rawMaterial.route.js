@@ -27,6 +27,9 @@ router.get('/report/pdf', rawMaterialController.downloadLedgerPdf);
 router.get('/sister-transfers', rawMaterialController.getSisterTransfers);
 router.put('/sister-transfers/:id/verify', rawMaterialController.verifySisterTransfer);
 
+// Delete an entire raw material and its transactions by name
+router.delete('/material', rawMaterialController.deleteMaterialByName);
+
 // Update a transaction by ID
 router.put('/:id', rawMaterialController.updateTransaction);
 

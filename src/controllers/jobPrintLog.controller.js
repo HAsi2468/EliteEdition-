@@ -140,6 +140,23 @@ const createPrintLog = async (req, res) => {
       });
     }
 
+    // Target Overrun Guard: Prevent logging massive overruns (e.g. 1000m on 100m target)
+    const targetStr = targetJob.totalMtr || targetJob.consumption || '0';
+    const targetMatch = String(targetStr).match(/[\d.]+/);
+    const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+    if (targetMtr > 0 && !req.body.overrideTarget) {
+      const existingLogs = await JobPrintLog.find({ jobCardId: targetJob._id }).select('meters').lean();
+      const alreadyPrinted = existingLogs.reduce((sum, l) => sum + (Number(l.meters) || 0), 0);
+      const projectedTotal = alreadyPrinted + numMeters;
+      const maxAllowable = targetMtr * 1.5; // Up to 50% extra allowance for sampling/wastage
+      if (projectedTotal > maxAllowable) {
+        return res.status(400).json({
+          success: false,
+          error: `Print Overrun Blocked: Job Card #${targetJob.jobNo} target is ${targetMtr}m (max allowable: ${maxAllowable.toFixed(1)}m). Projected print reaches ${projectedTotal.toFixed(1)}m (${alreadyPrinted.toFixed(1)}m already logged + ${numMeters}m requested). Override required.`
+        });
+      }
+    }
+
     const printLog = new JobPrintLog({
       jobCardId: targetJob._id,
       jobNo: targetJob.jobNo,

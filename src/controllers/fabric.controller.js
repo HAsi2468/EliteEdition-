@@ -72,8 +72,9 @@ const createInward = async (req, res) => {
   try {
     const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, shortagePct, shortageMtr, shortageMode, department } = req.body;
     
-    if (!fabricQuality || qty == null || qty < 0) {
-      return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity are required.' });
+    const numQty = parseFloat(qty);
+    if (!fabricQuality || isNaN(numQty) || numQty <= 0) {
+      return res.status(400).json({ success: false, error: 'Fabric Quality and a positive Quantity (>0) are required.' });
     }
 
     const normFabric = normalizeFabric(fabricQuality);
@@ -206,6 +207,27 @@ const createOutward = async (req, res) => {
       finalQty = Number((finalQty * 1.02).toFixed(2));
       if (!finalNotes.includes('+2% French Crepe Applied')) {
         finalNotes = finalNotes ? `${finalNotes} (+2% French Crepe Applied)` : '(+2% French Crepe Applied)';
+      }
+    }
+
+    // ── Stock Sufficiency Validation: Prevent negative stock ──
+    if (lotNo) {
+      const lotStockAgg = await FabricTransaction.aggregate([
+        { $match: { lotNo: Number(lotNo) } },
+        {
+          $group: {
+            _id: '$lotNo',
+            totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+            totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+          }
+        }
+      ]);
+      const availableInLot = lotStockAgg.length > 0 ? (lotStockAgg[0].totalIn - lotStockAgg[0].totalOut) : 0;
+      if (finalQty > (availableInLot + 0.05)) {
+        return res.status(400).json({
+          success: false,
+          error: `Insufficient stock in Lot #${lotNo}. Available: ${availableInLot.toFixed(2)}m, Requested: ${finalQty.toFixed(2)}m. Stock cannot go negative.`
+        });
       }
     }
 
@@ -4496,7 +4518,27 @@ const getWhiteFabricLogs = async (req, res) => {
 const createWhiteFabricLog = async (req, res) => {
   try {
     const body = req.body;
-    const log = await WhiteFabricLog.create(body);
+    const totalMtr = parseFloat(body.totalMtr);
+    if (isNaN(totalMtr) || totalMtr <= 0) {
+      return res.status(400).json({ success: false, error: 'Total roll meters must be greater than 0.' });
+    }
+    const wF = parseFloat(body.weavingFaultMtr) || 0;
+    const sF = parseFloat(body.stainFaultMtr) || 0;
+    const shF = parseFloat(body.shadingFaultMtr) || 0;
+    const wdF = parseFloat(body.widthShortageMtr) || 0;
+    if (wF < 0 || sF < 0 || shF < 0 || wdF < 0) {
+      return res.status(400).json({ success: false, error: 'Defect meters cannot be negative.' });
+    }
+    const totDefect = wF + sF + shF + wdF;
+    if (totDefect > totalMtr) {
+      return res.status(400).json({ success: false, error: `Total defect meters (${totDefect}m) cannot exceed total roll meters (${totalMtr}m).` });
+    }
+    const log = await WhiteFabricLog.create({
+      ...body,
+      totalMtr,
+      totalDefectMtr: parseFloat(totDefect.toFixed(2)),
+      usableFreshMtr: parseFloat(Math.max(0, totalMtr - totDefect).toFixed(2))
+    });
     res.json({ success: true, data: log });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

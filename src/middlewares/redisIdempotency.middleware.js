@@ -9,7 +9,7 @@
 const { getRedisClient } = require('../db/redisClient');
 const logger = require('../config/logger');
 
-const LOCK_TTL_SECONDS = 60; // 60s lock during execution
+const LOCK_TTL_SECONDS = 15; // 15s lock during execution (reduced from 60s to prevent prolonged lockouts)
 const CACHE_TTL_SECONDS = 86400; // 24 hours cache for completed responses
 
 /**
@@ -74,13 +74,23 @@ function redisIdempotencyMiddleware(options = {}) {
         const cachedRaw = await redis.get(redisKey);
 
         if (cachedRaw === 'IN_PROGRESS') {
-          // Request is still executing in another worker/thread
-          return res.status(409).json({
-            success: false,
-            code: 'REQUEST_IN_PROGRESS',
-            status: 409,
-            message: 'A request with this Idempotency-Key is currently processing. Please wait.'
-          });
+          // Check if lock is stale (held longer than 5 seconds)
+          const remainingTtl = await redis.ttl(redisKey);
+          if (remainingTtl <= (LOCK_TTL_SECONDS - 5)) {
+            // Stale in-progress lock (worker crash or dropped network) - release and proceed
+            logger.warn('Breaking stale idempotency lock for key %s (TTL: %ds)', redisKey, remainingTtl);
+            await redis.del(redisKey);
+            // Re-acquire lock
+            await redis.set(redisKey, 'IN_PROGRESS', { NX: true, EX: LOCK_TTL_SECONDS });
+          } else {
+            // Actively processing in parallel thread
+            return res.status(409).json({
+              success: false,
+              code: 'REQUEST_IN_PROGRESS',
+              status: 409,
+              message: 'A request with this Idempotency-Key is currently processing. Please wait.'
+            });
+          }
         }
 
         if (cachedRaw) {
@@ -121,11 +131,11 @@ function redisIdempotencyMiddleware(options = {}) {
 
       res.on('finish', async () => {
         try {
-          if (res.statusCode >= 500) {
-            // Server error: release the lock so the client can retry
+          if (res.statusCode >= 400) {
+            // Client error (4xx) or Server error (5xx): release lock immediately so the client can retry
             await redis.del(redisKey);
           } else {
-            // Successful / Client response: Cache with 24-hour TTL
+            // Successful response (2xx / 3xx): Cache with 24-hour TTL
             let serializedBody = capturedBody;
             if (typeof capturedBody === 'object' && capturedBody !== null && !Buffer.isBuffer(capturedBody)) {
               serializedBody = capturedBody;
