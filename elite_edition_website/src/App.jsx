@@ -4473,19 +4473,6 @@ export default function App() {
         activeDepartment={activeDepartment}
       />
 
-      {/* Enterprise Floating Action Dock: UI Scale, Communication, Tasks & AI Reconcile */}
-      <EnterpriseHUDThemeController 
-        activeTab={activeTab}
-        onNavigateTab={(tab) => {
-          setActiveTab(tab);
-          setMobileMenuOpen(false);
-        }}
-        hasCommunicationAccess={hasCommunicationAccess}
-        hasTaskAccess={hasTaskAccess}
-        chatUnreadCount={chatUnreadCount}
-        isAuthenticated={isAuthenticated}
-      />
-
       {/* Undo Toast Container */}
       <UndoToastContainer />
 
