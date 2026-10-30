@@ -168,7 +168,15 @@ const isPublicRoute = (path) => {
     p.startsWith('/v1/upload/download') ||
     p.startsWith('/api/v1/upload/download') ||
     p.startsWith('/v1/upload/preview') ||
-    p.startsWith('/api/v1/upload/preview')
+    p.startsWith('/api/v1/upload/preview') ||
+    p.startsWith('/v1/storefront') ||
+    p.startsWith('/api/v1/storefront') ||
+    p.startsWith('/storefront') ||
+    p.startsWith('/v1/failureinventory') ||
+    p.startsWith('/api/v1/failureinventory') ||
+    p.startsWith('/failureinventory') ||
+    p.startsWith('/v1/myntra/webhook') ||
+    p.startsWith('/api/v1/myntra/webhook')
   );
 };
 
@@ -630,6 +638,17 @@ app.use('/api/infrastructure', require('./routes/infrastructureRoutes'));
 app.use('/verify/challan', require('./routes/v1/challanVerification.route'));
 app.use('/verify/jobcard', require('./routes/v1/jobCardVerification.route'));
 app.use('/verify/invoice', require('./routes/v1/invoiceVerification.route'));
+
+// Myntra Partner Outbound & Mockify Simulator routes (without /v1 and with /v1 prefix)
+const myntraStorefrontRoutes = require('./routes/v1/myntraStorefront.route');
+const myntraStorefrontController = require('./controllers/myntraStorefront.controller');
+app.use('/storefront/v4', myntraStorefrontRoutes);
+app.use('/api/v1/storefront/v4', myntraStorefrontRoutes);
+app.use('/v1/storefront/v4', myntraStorefrontRoutes);
+
+app.post('/failureinventory/update', myntraStorefrontController.failureInventoryUpdate);
+app.post('/api/v1/failureinventory/update', myntraStorefrontController.failureInventoryUpdate);
+app.post('/v1/failureinventory/update', myntraStorefrontController.failureInventoryUpdate);
 
 // Lightweight universal health ping handler for load balancers, CI/CD smoke tests & monitoring
 app.get(['/api/health', '/health', '/v1/health', '/api/v1/ping', '/v1/ping', '/ping'], (req, res) => {
