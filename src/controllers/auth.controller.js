@@ -131,7 +131,12 @@ const refreshTokens = catchAsync(async (req, res) => {
 });
 
 const logout = catchAsync(async (req, res) => {
-  const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
+  const refreshToken =
+    req.body?.refreshToken ||
+    req.cookies?.refreshToken ||
+    req.cookies?.elite_refresh_token ||
+    req.headers['x-refresh-token'];
+
   if (refreshToken) {
     try {
       const payload = await verifyToken(refreshToken);
@@ -142,6 +147,31 @@ const logout = catchAsync(async (req, res) => {
       // Best-effort cleanup
     }
   }
+
+  // Blacklist active access token in Redis so it cannot be used again
+  let accessToken = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    accessToken = authHeader.split(' ')[1];
+  } else if (req.cookies && (req.cookies.accessToken || req.cookies.token || req.cookies.elite_auth_token)) {
+    accessToken = req.cookies.accessToken || req.cookies.token || req.cookies.elite_auth_token;
+  }
+
+  if (accessToken) {
+    try {
+      const redis = typeof tokenService.getRedisClient === 'function' ? tokenService.getRedisClient() : null;
+      if (redis && typeof redis.set === 'function') {
+        await redis.set(`revoked_token:${accessToken}`, '1', { EX: 7200 });
+      }
+    } catch (_) {}
+  }
+
+  if (req.user && req.user.id) {
+    try {
+      await tokenService.revokeAllUserSessions(req.user.id);
+    } catch (_) {}
+  }
+
   clearAuthCookies(res);
   res.status(httpStatus.OK).send({ success: true, message: 'Logged out successfully' });
 });

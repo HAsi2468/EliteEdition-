@@ -63,6 +63,26 @@ const requireAuth = async (req, res, next) => {
       });
     }
 
+    // Check if token was blacklisted on logout (SEC-001 & SEC-011)
+    try {
+      const { getRedisClient } = require('../services/token.service');
+      const redis = typeof getRedisClient === 'function' ? getRedisClient() : null;
+      if (redis && typeof redis.get === 'function') {
+        const isRevoked = await redis.get(`revoked_token:${token}`);
+        if (isRevoked) {
+          try {
+            const { clearAuthCookies } = require('../controllers/auth.controller');
+            if (typeof clearAuthCookies === 'function') clearAuthCookies(res);
+          } catch (_) {}
+          return res.status(401).json({
+            success: false,
+            code: 'SESSION_REVOKED',
+            message: 'Session has been logged out. Please sign in again.'
+          });
+        }
+      }
+    } catch (_) {}
+
     const userId = decoded.id || decoded.userId || decoded._id || decoded.sub;
     if (!userId) {
       return res.status(401).json({

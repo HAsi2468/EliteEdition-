@@ -200,6 +200,26 @@ function buildPurchaseCompanyFilter(companyEntity) {
   return { companyEntity: ce };
 }
 
+// Strict multi-tenant isolation guard (SEC-008 & SEC-002)
+function checkCompanyTenantAccess(req, requestedCompany) {
+  const user = req.user;
+  if (!user) return true;
+  const role = String(user.role || '').toLowerCase();
+  const isAdmin = user.isMainAdmin || user.isAdmin || role === 'admin' || role === 'super_admin' || role === 'superadmin' || user.email === 'harshitsidapara2468@gmail.com';
+  if (isAdmin) return true;
+
+  if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0) {
+    if (!requestedCompany) return true; // Controller will scope to allowedCompanies[0]
+    const normReq = String(requestedCompany).toLowerCase().replace(/[\s_-]+/g, '');
+    const isAllowed = user.allowedCompanies.some(ac => {
+      const normAc = String(ac).toLowerCase().replace(/[\s_-]+/g, '');
+      return normAc === normReq || normAc.includes(normReq) || normReq.includes(normAc);
+    });
+    return isAllowed;
+  }
+  return true;
+}
+
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
 const getBillingDashboardStats = async (req, res) => {
   try {
@@ -207,7 +227,16 @@ const getBillingDashboardStats = async (req, res) => {
     if (companyEntity === '[object Object]') {
       companyEntity = '';
     }
-    const filter = buildCompanyFilter(companyEntity);
+    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to access billing stats for '${activeCompany}'.`
+      });
+    }
+    const effectiveCompany = activeCompany || (req.user?.allowedCompanies?.[0]);
+    const filter = buildCompanyFilter(effectiveCompany);
     const now = new Date();
 
     const [totalInvoices, statsAgg, recentInvoices] = await Promise.all([
@@ -385,7 +414,19 @@ const getInvoices = async (req, res) => {
   try {
     const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd, companyEntity } = req.query;
 
-    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'] || req.headers['company'];
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'] || req.headers['company'];
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to view records for '${activeCompany}'.`
+      });
+    }
+
+    if (!activeCompany && req.user && !req.user.isAdmin && !req.user.isMainAdmin && Array.isArray(req.user.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
+
     const filter = buildCompanyFilter(activeCompany);
 
     if (paymentStatus && paymentStatus !== 'ALL') {
@@ -705,6 +746,32 @@ const createInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
     const entity = invoiceData.companyEntity || 'Elite Digital Print';
+
+    // Strict multi-tenant authorization
+    if (!checkCompanyTenantAccess(req, entity)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to create invoices for '${entity}'.`
+      });
+    }
+
+    // Due Date Validation (BUG-069)
+    if (invoiceData.dueDate && invoiceData.invoiceDate) {
+      const iDate = new Date(invoiceData.invoiceDate);
+      const dDate = new Date(invoiceData.dueDate);
+      if (!isNaN(iDate.getTime()) && !isNaN(dDate.getTime())) {
+        iDate.setHours(0, 0, 0, 0);
+        dDate.setHours(0, 0, 0, 0);
+        if (dDate < iDate) {
+          return res.status(400).json({
+            success: false,
+            error: `Due Date (${invoiceData.dueDate}) cannot precede Invoice Date (${invoiceData.invoiceDate}).`
+          });
+        }
+      }
+    }
+
     const filter = buildCompanyFilter(entity);
 
     // Strict Guard: Prevent duplicate billing of delivery challans
@@ -1205,6 +1272,32 @@ const invalidateInvoicePdfCache = (invoiceId) => {
 const updateInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
+
+    // Strict multi-tenant authorization
+    if (invoiceData.companyEntity && !checkCompanyTenantAccess(req, invoiceData.companyEntity)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to edit invoices for '${invoiceData.companyEntity}'.`
+      });
+    }
+
+    // Due Date Validation (BUG-069)
+    if (invoiceData.dueDate && invoiceData.invoiceDate) {
+      const iDate = new Date(invoiceData.invoiceDate);
+      const dDate = new Date(invoiceData.dueDate);
+      if (!isNaN(iDate.getTime()) && !isNaN(dDate.getTime())) {
+        iDate.setHours(0, 0, 0, 0);
+        dDate.setHours(0, 0, 0, 0);
+        if (dDate < iDate) {
+          return res.status(400).json({
+            success: false,
+            error: `Due Date (${invoiceData.dueDate}) cannot precede Invoice Date (${invoiceData.invoiceDate}).`
+          });
+        }
+      }
+    }
+
     const editorName = req.headers['x-user-name'] || req.user?.name || invoiceData.updatedBy || 'Staff User';
     invoiceData.updatedBy = editorName;
     invoiceData.updatedByName = editorName;
@@ -1584,6 +1677,18 @@ const recordPayment = async (req, res) => {
     }
 
     const effectiveTds = invoice.enableTds ? parseFloat((parseFloat(invoice.tdsAmount) || 0).toFixed(2)) : 0;
+    const currentBalanceDue = invoice.balanceDue != null
+      ? invoice.balanceDue
+      : Math.max(0, parseFloat((invoice.grandTotal - effectiveTds - (invoice.paidAmount || 0)).toFixed(2)));
+
+    // Prevent overpayment beyond balance due (BUG-063)
+    if (paymentAmt > currentBalanceDue + 0.01) {
+      return res.status(400).json({
+        success: false,
+        error: `Payment amount (₹${paymentAmt.toFixed(2)}) exceeds outstanding balance due (₹${currentBalanceDue.toFixed(2)}). Overpayment is not permitted.`
+      });
+    }
+
     invoice.paidAmount = parseFloat(((invoice.paidAmount || 0) + paymentAmt).toFixed(2));
     invoice.balanceDue = Math.max(0, parseFloat((invoice.grandTotal - effectiveTds - invoice.paidAmount).toFixed(2)));
 
@@ -3411,8 +3516,16 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 // ── 10. CUSTOMER CRUD ────────────────────────────────────────────────────────
 const getCustomers = async (req, res) => {
   try {
-    const { companyEntity } = req.query;
-    const filter = buildCompanyFilter(companyEntity);
+    let { companyEntity } = req.query;
+    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to access customers for '${activeCompany}'.`
+      });
+    }
+    const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
     const customers = await BillingCustomer.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: customers });
   } catch (error) {
@@ -3530,8 +3643,16 @@ const deleteVendor = async (req, res) => {
 // ── 11. ITEM CRUD ────────────────────────────────────────────────────────────
 const getItems = async (req, res) => {
   try {
-    const { companyEntity } = req.query;
-    const filter = buildCompanyFilter(companyEntity);
+    let { companyEntity } = req.query;
+    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to access item catalog for '${activeCompany}'.`
+      });
+    }
+    const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
     const items = await BillingItem.find(filter).sort({ itemName: 1 }).lean();
     res.json({ success: true, data: items });
   } catch (error) {
@@ -3861,6 +3982,29 @@ const createPurchase = async (req, res) => {
       }
     }
 
+    // Due Date Validation & Advance Payment Cap (BUG-064 & BUG-069)
+    if (purchaseData.dueDate && purchaseData.date) {
+      const pDateVal = new Date(purchaseData.date);
+      const dDateVal = new Date(purchaseData.dueDate);
+      if (!isNaN(pDateVal.getTime()) && !isNaN(dDateVal.getTime())) {
+        pDateVal.setHours(0, 0, 0, 0);
+        dDateVal.setHours(0, 0, 0, 0);
+        if (dDateVal < pDateVal) {
+          return res.status(400).json({
+            success: false,
+            error: `Due Date cannot precede Purchase Date.`
+          });
+        }
+      }
+    }
+    const paidAmt = parseFloat(purchaseData.paidAmount || purchaseData.advanceAmount || 0);
+    if (paidAmt > gTotal + 0.01 && gTotal > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Paid / advance amount (₹${paidAmt.toFixed(2)}) cannot exceed purchase total (₹${gTotal.toFixed(2)}). Excess advance is not permitted.`
+      });
+    }
+
     const purchase = await BillingPurchase.create(purchaseData);
 
     // Auto-upsert into BillingVendor if vendor info is present so user never loses entered vendor
@@ -4004,6 +4148,29 @@ const updatePurchase = async (req, res) => {
           error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} with identical Vendor "${existing.vendorName}" and Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} already exists for this date.`
         });
       }
+    }
+
+    // Due Date Validation & Advance Payment Cap (BUG-064 & BUG-069)
+    if (purchaseData.dueDate && purchaseData.date) {
+      const pDateVal = new Date(purchaseData.date);
+      const dDateVal = new Date(purchaseData.dueDate);
+      if (!isNaN(pDateVal.getTime()) && !isNaN(dDateVal.getTime())) {
+        pDateVal.setHours(0, 0, 0, 0);
+        dDateVal.setHours(0, 0, 0, 0);
+        if (dDateVal < pDateVal) {
+          return res.status(400).json({
+            success: false,
+            error: `Due Date cannot precede Purchase Date.`
+          });
+        }
+      }
+    }
+    const paidAmt = parseFloat(purchaseData.paidAmount || purchaseData.advanceAmount || 0);
+    if (paidAmt > gTotal + 0.01 && gTotal > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Paid / advance amount (₹${paidAmt.toFixed(2)}) cannot exceed purchase total (₹${gTotal.toFixed(2)}). Excess advance is not permitted.`
+      });
     }
 
     const purchase = await BillingPurchase.findByIdAndUpdate(req.params.id, purchaseData, { new: true });

@@ -10,7 +10,22 @@ const router = express.Router();
 router
 	.route('/')
 	.post(grantAccess('createAny', resources.USERINFO), validate(userValidation.createUser), userController.createUser)
-	.get(validate(userValidation.getUsers), userController.getUsers);
+	.get(
+		(req, res, next) => {
+			const role = String(req.user?.role || '').toLowerCase();
+			const isAdmin = role === 'admin' || role === 'superadmin' || role === 'super_admin' || req.user?.isMainAdmin === true || req.user?.isAdmin === true;
+			if (!isAdmin) {
+				return res.status(403).json({
+					success: false,
+					code: 'FORBIDDEN',
+					message: 'Access denied: Listing user accounts requires administrator privileges.'
+				});
+			}
+			next();
+		},
+		validate(userValidation.getUsers),
+		userController.getUsers
+	);
 
 router.get('/me', async (req, res) => {
 	try {

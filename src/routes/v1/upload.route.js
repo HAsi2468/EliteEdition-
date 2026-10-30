@@ -364,6 +364,37 @@ router.post('/', requireAuth, (req, res, next) => {
     });
   }
 
+  // Folder specific validation (Signed documents must be JPG/PNG/WEBP/PDF, max 10MB)
+  const uploadFolder = String(req.body.folder || '').toLowerCase();
+  if (uploadFolder.includes('signed') || uploadFolder.includes('invoice') || uploadFolder.includes('challan')) {
+    const allowedDocExts = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+    if (!allowedDocExts.includes(fileExt)) {
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({
+        error: `Signed documents must be in JPG, PNG, WEBP, or PDF format. Extension '${fileExt}' is not permitted.`
+      });
+    }
+    if (req.file.size > 10 * 1024 * 1024) {
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({ error: 'Signed document size exceeds maximum allowed 10MB limit.' });
+    }
+  }
+
+  // SVG Script Injection Guard (BUG-065 & SEC-007)
+  if (fileExt === '.svg' && fileBuffer) {
+    const svgStr = fileBuffer.toString('utf-8');
+    if (/<script[\s>]/i.test(svgStr) || /javascript:/i.test(svgStr) || /onload\s*=/i.test(svgStr) || /onerror\s*=/i.test(svgStr) || /href\s*=\s*['"]javascript:/i.test(svgStr)) {
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({ error: 'Malicious SVG payload detected. Script tags, inline event handlers, and javascript: links are strictly forbidden.' });
+    }
+  }
+
   // Magic bytes signature verification
   let fileBuffer = req.file.buffer;
   if (!fileBuffer && req.file.path && fs.existsSync(req.file.path)) {
