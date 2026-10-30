@@ -73,6 +73,27 @@ const chatRoomSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    isInternalOnly: {
+      type: Boolean,
+      default: false,
+    },
+    lastMessage: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -108,7 +129,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'poll', 'sticker', 'gif', 'image', 'attachment'],
+      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'poll', 'sticker', 'gif', 'image', 'attachment', 'call-log'],
       default: 'text',
     },
     taskId: {

@@ -24,7 +24,12 @@ const invalidateGroupsCache = () => { groupsCache.clear(); };
 const groupMessagesCache = new Map();
 const invalidateGroupMessagesCache = (groupId) => {
   if (groupId) {
-    groupMessagesCache.delete(String(groupId));
+    const prefix = `${String(groupId)}_`;
+    for (const key of groupMessagesCache.keys()) {
+      if (key === String(groupId) || key.startsWith(prefix)) {
+        groupMessagesCache.delete(key);
+      }
+    }
   } else {
     groupMessagesCache.clear();
   }
@@ -393,11 +398,11 @@ const getGroupMessages = async (req, res) => {
 const votePollMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { optionId } = req.body;
+    const { optionId, optionIndex } = req.body;
     const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.userId || req.query.userId);
 
-    if (!rawUserId || !optionId) {
-      return res.status(400).json({ success: false, message: 'User ID and option ID are required' });
+    if (!rawUserId || (optionId === undefined && optionIndex === undefined)) {
+      return res.status(400).json({ success: false, message: 'User ID and option ID (or optionIndex) are required' });
     }
 
     const message = await ChatMessage.findById(messageId);
@@ -412,10 +417,11 @@ const votePollMessage = async (req, res) => {
     const userIdStr = String(rawUserId);
     const isMultiSelect = !!message.pollMeta.isMultiSelect;
 
-    message.pollMeta.options.forEach((opt) => {
+    message.pollMeta.options.forEach((opt, idx) => {
       opt.votes = opt.votes || [];
       const userIndex = opt.votes.findIndex((v) => String(v._id || v) === userIdStr);
-      if (opt.id === optionId) {
+      const isTargetOption = (optionId !== undefined && opt.id === optionId) || (optionIndex !== undefined && Number(optionIndex) === idx) || (optionId !== undefined && String(idx) === String(optionId));
+      if (isTargetOption) {
         if (userIndex > -1) {
           opt.votes.splice(userIndex, 1);
         } else {
@@ -428,7 +434,9 @@ const votePollMessage = async (req, res) => {
       }
     });
 
+    message.markModified('pollMeta');
     await message.save();
+    invalidateGroupMessagesCache(message.roomId);
 
     const updatedMessage = await ChatMessage.findById(messageId)
       .populate('senderId', 'name username email role')
@@ -537,8 +545,10 @@ const forwardMessage = async (req, res) => {
         }
         broadcast.emit('receive-message', populatedMsg);
       }
+      invalidateGroupMessagesCache(tRoomId);
     }));
 
+    invalidateGroupsCache();
     const responseData = targetRoomList.length === 1 ? forwardedMessages[0] : forwardedMessages;
     return res.json({ success: true, data: responseData });
   } catch (error) {
@@ -1467,6 +1477,7 @@ const createGroup = async (req, res) => {
     });
 
     const populatedRoom = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department allowedCompanies');
+    invalidateGroupsCache();
 
     res.json({ success: true, data: populatedRoom });
   } catch (error) {
@@ -1505,6 +1516,7 @@ const updateGroupMembers = async (req, res) => {
 
     room.members = memberIds.map((id) => new mongoose.Types.ObjectId(id));
     await room.save();
+    invalidateGroupsCache();
 
     const populatedRoom = await ChatRoom.findById(groupId).populate('members', 'name email role permissions department');
     res.json({ success: true, data: populatedRoom.members });
@@ -1559,6 +1571,8 @@ const deleteGroup = async (req, res) => {
 
     // Clean up message history
     await ChatMessage.deleteMany({ roomId: groupId });
+    invalidateGroupsCache();
+    invalidateGroupMessagesCache(groupId);
 
     res.json({ success: true, message: 'Group and message history deleted successfully' });
   } catch (error) {
@@ -1596,9 +1610,8 @@ const clearGroupMessages = async (req, res) => {
     room.lastMessage = null;
     await room.save();
 
-    if (groupMessagesCache) {
-      groupMessagesCache.delete(String(groupId));
-    }
+    invalidateGroupsCache();
+    invalidateGroupMessagesCache(groupId);
 
     const io = req.app.get('io') || global.io;
     if (io) {
@@ -1655,6 +1668,7 @@ const updateGroup = async (req, res) => {
     }
 
     await room.save();
+    invalidateGroupsCache();
 
     const populatedRoom = await ChatRoom.findById(room._id)
       .populate('members', 'name email role permissions department allowedCompanies avatarUrl');
@@ -1701,6 +1715,8 @@ const clearAllData = async (req, res) => {
     await ChatMessage.deleteMany({});
     await ChatRoom.deleteMany({ isSystemGroup: false });
     await syncCommunicationGroups();
+    invalidateGroupsCache();
+    groupMessagesCache.clear();
 
     const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
@@ -1823,6 +1839,7 @@ const deleteMessage = async (req, res) => {
     }
 
     invalidateGroupMessagesCache(message.roomId);
+    invalidateGroupsCache();
 
     res.json({
       success: true,
@@ -1856,6 +1873,11 @@ const editMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message content cannot be empty' });
     }
 
+    const sanitizedContent = sanitizeChatMessage(content, 10000);
+    if (!sanitizedContent) {
+      return res.status(400).json({ success: false, message: 'Message content cannot be empty after sanitization' });
+    }
+
     const message = await ChatMessage.findById(messageId);
     if (!message) {
       return res.status(404).json({ success: false, message: 'Message not found' });
@@ -1877,7 +1899,7 @@ const editMessage = async (req, res) => {
       });
     }
 
-    message.content = content.trim();
+    message.content = sanitizedContent;
     message.isEdited = true;
     message.editedAt = new Date();
     await message.save();
@@ -1895,6 +1917,7 @@ const editMessage = async (req, res) => {
     }
 
     invalidateGroupMessagesCache(targetRoomId);
+    invalidateGroupsCache();
 
     res.json({
       success: true,

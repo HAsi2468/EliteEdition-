@@ -391,8 +391,8 @@ const setupSockets = (io) => {
       }
     });
 
-    // 5. Join room with security enforcement (prevent joining arbitrary company rooms)
-    socket.on('join-room', (roomId) => {
+    // 5. Join room with security enforcement (prevent joining arbitrary company or private rooms)
+    socket.on('join-room', async (roomId) => {
       if (typeof roomId !== 'string') return;
       if (roomId.startsWith('company:')) {
         const targetCid = roomId.replace('company:', '');
@@ -403,6 +403,24 @@ const setupSockets = (io) => {
           console.warn(`[Socket Security] Unauthorized room join rejected: ${roomId} for ${socket.id}`);
           return;
         }
+      } else if (/^[0-9a-fA-F]{24}$/.test(roomId) && socket.user) {
+        try {
+          const room = await ChatRoom.findById(roomId).select('type isPrivate isSystemGroup members createdBy').lean();
+          if (room) {
+            const uIdStr = String(socket.userId || socket.user?._id || '');
+            const isAdmin = socket.user.role === 'admin' || socket.user.role === 'super_admin' || socket.user.isMainAdmin || socket.user.isAdmin;
+            const isMember = Array.isArray(room.members) && room.members.some((m) => String(m?._id || m) === uIdStr);
+            const isCreator = room.createdBy && String(room.createdBy?._id || room.createdBy) === uIdStr;
+            if (room.type === 'direct' && !isMember) {
+              console.warn(`[Socket Security] Unauthorized direct room join rejected: ${roomId} for user ${uIdStr}`);
+              return;
+            }
+            if (!isAdmin && (room.isPrivate || !room.isSystemGroup) && !isMember && !isCreator) {
+              console.warn(`[Socket Security] Unauthorized private/custom group join rejected: ${roomId} for user ${uIdStr}`);
+              return;
+            }
+          }
+        } catch (e) {}
       }
       socket.join(roomId);
       socket.activeRoomId = String(roomId);
@@ -817,31 +835,32 @@ const setupSockets = (io) => {
     // Handle creating a task directly from the chat stream
     socket.on('create-task-from-chat', async (data) => {
       try {
-        const { roomId, senderId, content, title, priority, assignees, dueDate, replyTo, tags, subTasks, actorId } = data;
+        const { roomId, senderId, content, title, priority, assignees, dueDate, replyTo, tags, subTasks, checklist } = data;
 
         // 1. Save the Task to MongoDB
         const newTask = await Task.create({
           title,
           description: content,
-          priority: priority || 'medium',
+          priority: (priority || 'medium').toLowerCase(),
           status: 'To Do',
           originRoomId: roomId || undefined,
           assignees: assignees || [],
+          createdBy: senderId || socket.userId || undefined,
           dueDate: dueDate || undefined,
-          tags: tags || [],
-          subTasks: subTasks || [],
-          activityLogs: actorId ? [{
-            user: actorId,
-            action: 'Task created',
-            details: 'Initialized task fields'
-          }] : []
+          tags: Array.isArray(tags) ? tags.map((t) => (typeof t === 'string' ? t : t.text)).filter(Boolean) : [],
+          checklist: Array.isArray(checklist || subTasks)
+            ? (checklist || subTasks).map((s) => ({
+                text: s.text || s.title || 'Subtask',
+                completed: Boolean(s.completed)
+              }))
+            : []
         });
 
         if (roomId) {
           // 2. Save a special "task-card" message in the chat timeline
           const newMessage = await ChatMessage.create({
             roomId,
-            senderId,
+            senderId: senderId || socket.userId,
             content: 'Task Created', // Fallback text
             replyTo: replyTo || null,
             type: 'task-card',
@@ -861,8 +880,7 @@ const setupSockets = (io) => {
                 { path: 'assignees', select: 'name email' },
                 { path: 'comments.sender', select: 'name username email' },
                 { path: 'timeLogs.user', select: 'name username email' },
-                { path: 'activityLogs.user', select: 'name username email' },
-                { path: 'subTasks.assignee', select: 'name email' }
+                { path: 'checklist.assignedTo', select: 'name email' }
               ]
             })
             .populate({
@@ -871,15 +889,16 @@ const setupSockets = (io) => {
             });
 
           io.to(roomId).emit('receive-message', populatedMessage);
+          invalidateGroupMessagesCache(roomId);
         }
         
         // Emit a separate event for the Kanban board to update live within company room
         const fullyPopulatedTask = await Task.findById(newTask._id)
-          .populate('assignees', 'name email')
+          .populate('assignees', 'name email role department avatar')
+          .populate('createdBy', 'name email role')
           .populate('comments.sender', 'name username email')
           .populate('timeLogs.user', 'name username email')
-          .populate('activityLogs.user', 'name username email')
-          .populate('subTasks.assignee', 'name email');
+          .populate('checklist.assignedTo', 'name email');
         const taskCompany = fullyPopulatedTask?.companyId ? normalizeCompanyId(fullyPopulatedTask.companyId) : (socket.activeCompanyId || 'digital_print');
         io.to(`company:${taskCompany}`).emit('task-updated', fullyPopulatedTask);
       } catch (error) {
@@ -890,17 +909,22 @@ const setupSockets = (io) => {
     // Handle updating a task status interactively from inside the chat card
     socket.on('update-task-status', async (data) => {
       try {
-        const { taskId, newStatus, actorId } = data;
-        
-        const updateObj = { status: newStatus };
-        if (actorId) {
-          updateObj.$push = {
-            activityLogs: {
-              user: actorId,
-              action: 'Status updated',
-              details: `Status changed to ${newStatus}`
-            }
-          };
+        const { taskId, newStatus } = data;
+        const STATUS_MAP = {
+          backlog: 'Backlog',
+          todo: 'To Do',
+          'to do': 'To Do',
+          'in progress': 'In Progress',
+          in_progress: 'In Progress',
+          'in review': 'In Review',
+          in_review: 'In Review',
+          done: 'Done',
+          completed: 'Done'
+        };
+        const normalizedStatus = STATUS_MAP[String(newStatus || '').trim().toLowerCase()] || newStatus;
+        const updateObj = { status: normalizedStatus };
+        if (normalizedStatus === 'Done') {
+          updateObj.completedAt = new Date();
         }
         
         const updatedTask = await Task.findByIdAndUpdate(
@@ -908,11 +932,11 @@ const setupSockets = (io) => {
           updateObj,
           { new: true }
         )
-        .populate('assignees', 'name email')
+        .populate('assignees', 'name email role department avatar')
+        .populate('createdBy', 'name email role')
         .populate('comments.sender', 'name username email')
         .populate('timeLogs.user', 'name username email')
-        .populate('activityLogs.user', 'name username email')
-        .populate('subTasks.assignee', 'name email');
+        .populate('checklist.assignedTo', 'name email');
 
         // Broadcast to relevant company room so their UI flips the status color
         const taskCompany = updatedTask?.companyId ? normalizeCompanyId(updatedTask.companyId) : (socket.activeCompanyId || 'digital_print');
@@ -925,26 +949,29 @@ const setupSockets = (io) => {
     // Handle updating full task details (including checklist and comments)
     socket.on('update-task-details', async (data) => {
       try {
-        const { taskId, title, description, priority, assignees, dueDate, checklist, comments, tags, subTasks, timeLogs, activityLogs } = data;
+        const { taskId, title, description, priority, assignees, dueDate, checklist, comments, tags, timeLogs } = data;
 
-        const updateFields = { title, description, priority, assignees, dueDate };
+        const updateFields = {};
+        if (title !== undefined) updateFields.title = title;
+        if (description !== undefined) updateFields.description = description;
+        if (priority !== undefined) updateFields.priority = String(priority).toLowerCase();
+        if (assignees !== undefined) updateFields.assignees = assignees;
+        if (dueDate !== undefined) updateFields.dueDate = dueDate;
         if (checklist !== undefined) updateFields.checklist = checklist;
         if (comments !== undefined) updateFields.comments = comments;
         if (tags !== undefined) updateFields.tags = tags;
-        if (subTasks !== undefined) updateFields.subTasks = subTasks;
         if (timeLogs !== undefined) updateFields.timeLogs = timeLogs;
-        if (activityLogs !== undefined) updateFields.activityLogs = activityLogs;
 
         const updatedTask = await Task.findByIdAndUpdate(
           taskId,
           updateFields,
           { new: true }
         )
-        .populate('assignees', 'name email')
+        .populate('assignees', 'name email role department avatar')
+        .populate('createdBy', 'name email role')
         .populate('comments.sender', 'name username email')
         .populate('timeLogs.user', 'name username email')
-        .populate('activityLogs.user', 'name username email')
-        .populate('subTasks.assignee', 'name email');
+        .populate('checklist.assignedTo', 'name email');
 
         // Broadcast updated task details to company room
         const taskCompany = updatedTask?.companyId ? normalizeCompanyId(updatedTask.companyId) : (socket.activeCompanyId || 'digital_print');
@@ -954,10 +981,21 @@ const setupSockets = (io) => {
       }
     });
 
-    // Handle deleting a task
+    // Handle deleting a task (with creator / admin check)
     socket.on('delete-task', async (data) => {
       try {
-        const { taskId } = data;
+        const { taskId } = data || {};
+        if (!taskId) return;
+        const task = await Task.findById(taskId);
+        if (!task) return;
+
+        const isAdmin = socket.user && (socket.user.role === 'admin' || socket.user.role === 'super_admin' || socket.user.isMainAdmin || socket.user.isAdmin);
+        const isCreator = socket.userId && task.createdBy && String(task.createdBy) === String(socket.userId);
+        if (!isAdmin && !isCreator) {
+          console.warn(`[Socket Security] Unauthorized delete-task blocked for user ${socket.userId} on task ${taskId}`);
+          return;
+        }
+
         await Task.findByIdAndDelete(taskId);
 
         // Broadcast deletion event to company room
@@ -968,27 +1006,65 @@ const setupSockets = (io) => {
       }
     });
 
-    // Handle message editing
+    // Handle message editing (with sender/admin check, 24h check, XSS sanitization & cache invalidation)
     socket.on('edit-message', async (data) => {
       try {
-        const { messageId, newContent, roomId } = data;
-        await ChatMessage.findByIdAndUpdate(messageId, {
-          content: newContent,
-          isEdited: true
-        });
-        io.to(roomId).emit('message-edited', { messageId, newContent });
+        const { messageId, newContent, roomId } = data || {};
+        if (!messageId || !newContent || !String(newContent).trim()) return;
+
+        const msg = await ChatMessage.findById(messageId);
+        if (!msg || msg.isDeleted) return;
+
+        const userId = socket.userId || socket.user?._id;
+        const isAdmin = socket.user && (socket.user.role === 'admin' || socket.user.role === 'super_admin' || socket.user.isMainAdmin || socket.user.isAdmin);
+        const isSender = userId && String(msg.senderId) === String(userId);
+        const ageHours = (Date.now() - new Date(msg.createdAt).getTime()) / (1000 * 60 * 60);
+
+        if (!isAdmin && (!isSender || ageHours > 24)) {
+          console.warn(`[Socket Security] Unauthorized edit-message blocked for user ${userId} on message ${messageId}`);
+          return;
+        }
+
+        const sanitized = String(newContent)
+          .trim()
+          .slice(0, 10000)
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+          .replace(/javascript\s*:/gi, '');
+
+        if (!sanitized) return;
+
+        msg.content = sanitized;
+        msg.isEdited = true;
+        msg.editedAt = new Date();
+        await msg.save();
+
+        const targetRoomId = String(roomId || msg.roomId);
+        invalidateGroupMessagesCache(targetRoomId);
+        invalidateGroupsCache();
+
+        io.to(targetRoomId).emit('message-edited', { messageId, newContent: sanitized, roomId: targetRoomId });
       } catch (error) {
         console.error('Error editing message:', error);
       }
     });
 
-    // Handle message soft deletion
+    // Handle message soft deletion (with sender/admin check, 24h check & cache invalidation)
     socket.on('delete-message', async (data) => {
       try {
-        const { messageId, roomId } = data;
-        const userId = socket.userId;
+        const { messageId, roomId } = data || {};
+        const userId = socket.userId || socket.user?._id;
         const msg = await ChatMessage.findById(messageId);
         if (!msg) return;
+
+        const isAdmin = socket.user && (socket.user.role === 'admin' || socket.user.role === 'super_admin' || socket.user.isMainAdmin || socket.user.isAdmin);
+        const isSender = userId && String(msg.senderId) === String(userId);
+        const ageHours = (Date.now() - new Date(msg.createdAt).getTime()) / (1000 * 60 * 60);
+
+        if (!isAdmin && (!isSender || ageHours > 24)) {
+          console.warn(`[Socket Security] Unauthorized delete-message blocked for user ${userId} on message ${messageId}`);
+          return;
+        }
 
         // Purge R2 asset if attached
         if (msg.attachment && msg.attachment.fileUrl) {
@@ -1007,9 +1083,11 @@ const setupSockets = (io) => {
         msg.deletedBy = userId;
         msg.deletedAt = new Date();
         msg.attachment = null;
+        msg.reactions = [];
         await msg.save();
 
-        const room = await ChatRoom.findById(roomId || msg.roomId);
+        const targetRoomId = String(roomId || msg.roomId);
+        const room = await ChatRoom.findById(targetRoomId);
         if (room && room.lastMessage && String(room.lastMessage._id || room.lastMessage) === String(messageId)) {
           const prevMsg = await ChatMessage.findOne({ roomId: room._id, isDeleted: { $ne: true } })
             .sort({ roomSeq: -1, createdAt: -1 })
@@ -1018,7 +1096,10 @@ const setupSockets = (io) => {
           await room.save();
         }
 
-        io.to(String(roomId || msg.roomId)).emit('message-deleted', { messageId, roomId: roomId || msg.roomId });
+        invalidateGroupMessagesCache(targetRoomId);
+        invalidateGroupsCache();
+
+        io.to(targetRoomId).emit('message-deleted', { messageId, roomId: targetRoomId });
       } catch (error) {
         console.error('Error deleting message:', error);
       }
@@ -1027,27 +1108,40 @@ const setupSockets = (io) => {
     // Handle toggling pin status
     socket.on('toggle-pin-message', async (data) => {
       try {
-        const { messageId, roomId } = data;
+        const { messageId, roomId } = data || {};
         const msg = await ChatMessage.findById(messageId);
         if (!msg) return;
         msg.isPinned = !msg.isPinned;
         await msg.save();
-        io.to(roomId).emit('message-pin-updated', { messageId, isPinned: msg.isPinned });
+        const targetRoomId = String(roomId || msg.roomId);
+        invalidateGroupMessagesCache(targetRoomId);
+        io.to(targetRoomId).emit('message-pin-updated', { messageId, isPinned: msg.isPinned, roomId: targetRoomId });
       } catch (error) {
         console.error('Error pinning message:', error);
       }
     });
 
-    // Handle updating room settings (name, members list, archiving)
+    // Handle updating room settings (name, members list, archiving — restricted to admin or group creator)
     socket.on('update-room-settings', async (data) => {
       try {
-        const { roomId, name, isArchived, members } = data;
+        const { roomId, name, isArchived, members } = data || {};
         const room = await ChatRoom.findById(roomId);
         if (!room) return;
-        if (name !== undefined) room.name = name;
-        if (isArchived !== undefined) room.isArchived = isArchived;
-        if (members !== undefined) room.members = members;
+
+        const userId = socket.userId || socket.user?._id;
+        const isAdmin = socket.user && (socket.user.role === 'admin' || socket.user.role === 'super_admin' || socket.user.isMainAdmin || socket.user.isAdmin);
+        const isCreator = userId && room.createdBy && String(room.createdBy) === String(userId);
+
+        if (!isAdmin && !isCreator) {
+          console.warn(`[Socket Security] Unauthorized update-room-settings blocked for user ${userId} on room ${roomId}`);
+          return;
+        }
+
+        if (name !== undefined && typeof name === 'string' && name.trim()) room.name = name.trim().slice(0, 100);
+        if (isArchived !== undefined && !room.isSystemGroup) room.isArchived = Boolean(isArchived);
+        if (members !== undefined && Array.isArray(members)) room.members = members;
         await room.save();
+        invalidateGroupsCache();
         
         const populatedRoom = await ChatRoom.findById(roomId).populate('members', 'name email');
         

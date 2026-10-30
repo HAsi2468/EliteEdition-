@@ -215,7 +215,7 @@ const requireAdmin = (req, res, next) => {
  */
 const requireGroupAccess = async (req, res, next) => {
   try {
-    const groupId = req.params.groupId || req.body.groupId || req.query.groupId;
+    const groupId = req.params.groupId || req.params.roomId || req.body.groupId || req.body.roomId || req.query.groupId || req.query.roomId;
     if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
       return res.status(400).json({ success: false, message: 'Invalid or missing Group ID' });
     }
@@ -252,13 +252,14 @@ const requireGroupAccess = async (req, res, next) => {
       return next();
     }
 
-    // Private or restricted rooms: Must be an explicit member
-    if (room.isPrivate) {
+    // Private or custom non-system rooms: Must be an explicit member
+    if (room.isPrivate || !room.isSystemGroup) {
       const isMember = room.members && room.members.some(m => String(m._id || m) === currentUserIdStr);
-      if (!isMember) {
+      const isCreator = room.createdBy && String(room.createdBy._id || room.createdBy) === currentUserIdStr;
+      if (!isMember && !isCreator) {
         return res.status(403).json({
           success: false,
-          message: 'Access denied: This is a private group and you are not a member.'
+          message: 'Access denied: You are not a member of this group.'
         });
       }
       return next();

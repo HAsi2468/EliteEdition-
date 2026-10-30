@@ -5,6 +5,39 @@ const webPushService = require('../services/webPush.service');
 
 let _lastOverdueCheckAt = 0;
 
+const escapeRegex = (str) => String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const STATUS_MAP = {
+  backlog: 'Backlog',
+  todo: 'To Do',
+  'to do': 'To Do',
+  'in progress': 'In Progress',
+  in_progress: 'In Progress',
+  'in review': 'In Review',
+  in_review: 'In Review',
+  done: 'Done',
+  completed: 'Done'
+};
+
+const normalizeTaskStatus = (s) => {
+  if (!s) return 'To Do';
+  const key = String(s).trim().toLowerCase();
+  return STATUS_MAP[key] || s;
+};
+
+const normalizeTaskPriority = (p) => {
+  if (!p) return 'medium';
+  const key = String(p).trim().toLowerCase();
+  return ['low', 'medium', 'high', 'urgent'].includes(key) ? key : 'medium';
+};
+
+const populateTaskById = (id) =>
+  Task.findById(id)
+    .populate('assignees', 'name email role department avatar')
+    .populate('createdBy', 'name email role avatar')
+    .populate('dependencies', 'title status priority assignees')
+    .populate('attachments.uploadedBy', 'name email');
+
 /**
  * Get all tasks with pagination, search, & multi-attribute filtering
  */
@@ -29,29 +62,30 @@ const getTasks = async (req, res) => {
     const andConditions = [];
 
     if (status && status !== 'all') {
-      query.status = status;
+      query.status = normalizeTaskStatus(status);
     }
     if (priority && priority !== 'all') {
-      query.priority = priority;
+      query.priority = normalizeTaskPriority(priority);
     }
     if (department && department !== 'all') {
       query.department = department;
     }
     if (projectRef) {
-      query.projectRef = { $regex: projectRef, $options: 'i' };
+      query.projectRef = { $regex: escapeRegex(projectRef), $options: 'i' };
     }
     if (lotNo) {
-      query.lotNo = { $regex: lotNo, $options: 'i' };
+      query.lotNo = { $regex: escapeRegex(lotNo), $options: 'i' };
     }
     if (assignee && assignee !== 'all') {
       if (mongoose.Types.ObjectId.isValid(assignee)) {
         query.assignees = new mongoose.Types.ObjectId(assignee);
       } else {
+        const safeAssignee = escapeRegex(assignee);
         const matchedUsers = await User.find({
           $or: [
-            { name: { $regex: assignee, $options: 'i' } },
-            { username: { $regex: assignee, $options: 'i' } },
-            { email: { $regex: assignee, $options: 'i' } }
+            { name: { $regex: safeAssignee, $options: 'i' } },
+            { username: { $regex: safeAssignee, $options: 'i' } },
+            { email: { $regex: safeAssignee, $options: 'i' } }
           ]
         }).select('_id').lean();
         query.assignees = { $in: matchedUsers.map(u => u._id) };
@@ -61,11 +95,12 @@ const getTasks = async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(createdBy)) {
         query.createdBy = new mongoose.Types.ObjectId(createdBy);
       } else {
+        const safeCreatedBy = escapeRegex(createdBy);
         const matchedUsers = await User.find({
           $or: [
-            { name: { $regex: createdBy, $options: 'i' } },
-            { username: { $regex: createdBy, $options: 'i' } },
-            { email: { $regex: createdBy, $options: 'i' } }
+            { name: { $regex: safeCreatedBy, $options: 'i' } },
+            { username: { $regex: safeCreatedBy, $options: 'i' } },
+            { email: { $regex: safeCreatedBy, $options: 'i' } }
           ]
         }).select('_id').lean();
         query.createdBy = { $in: matchedUsers.map(u => u._id) };
@@ -80,8 +115,8 @@ const getTasks = async (req, res) => {
     });
 
     if (search && search.trim()) {
-      const term = search.trim();
-      const cleanTerm = term.replace(/^@/, '').trim();
+      const term = escapeRegex(search.trim());
+      const cleanTerm = escapeRegex(search.trim().replace(/^@/, '').trim());
       andConditions.push({
         $or: [
           { title: { $regex: term, $options: 'i' } },
@@ -239,6 +274,7 @@ const createTask = async (req, res) => {
       tags = [],
       attachments = [],
       images = [],
+      recurrence = null,
       createdBy: customCreatedBy,
       createdByName = 'Admin'
     } = req.body;
@@ -349,11 +385,24 @@ const createTask = async (req, res) => {
       });
     }
 
+    const normalizedStatus = normalizeTaskStatus(status);
+    const normalizedPriority = normalizeTaskPriority(priority);
+    const formattedRecurrence = recurrence && typeof recurrence === 'object'
+      ? {
+          isRecurring: Boolean(recurrence.isRecurring),
+          frequency: ['daily', 'weekly', 'monthly', 'custom'].includes(String(recurrence.frequency || '').toLowerCase())
+            ? String(recurrence.frequency).toLowerCase()
+            : 'daily',
+          intervalDays: Math.max(1, Number(recurrence.intervalDays || recurrence.interval || 1) || 1),
+          nextRunDate: recurrence.nextRunDate ? new Date(recurrence.nextRunDate) : undefined
+        }
+      : { isRecurring: false, frequency: 'daily', intervalDays: 1 };
+
     const task = await Task.create({
       title: title.trim(),
       description: (description || '').trim(),
-      priority,
-      status,
+      priority: normalizedPriority,
+      status: normalizedStatus,
       department,
       projectRef: (projectRef || '').trim(),
       clientName: (clientName || '').trim(),
@@ -362,18 +411,24 @@ const createTask = async (req, res) => {
       estimatedHours: Number(estimatedHours) || 0,
       assignees: finalAssignees,
       dependencies: validDependencies,
-      checklist: Array.isArray(checklist) ? checklist.filter(c => c && c.text) : [],
+      checklist: Array.isArray(checklist)
+        ? checklist
+            .filter(c => c && (c.text || c.title))
+            .map(c => ({
+              text: String(c.text || c.title).trim(),
+              completed: Boolean(c.completed),
+              assignedTo: c.assignedTo || null
+            }))
+        : [],
       tags: Array.isArray(tags) ? tags : [],
       attachments: formattedAttachments,
       images: Array.isArray(images) ? images : formattedAttachments.filter(a => /\.(jpg|jpeg|png|webp|gif)$/i.test(a.fileName)).map(a => a.fileUrl),
+      recurrence: formattedRecurrence,
       createdBy: creatorId || undefined,
       auditLogs: initialAudit
     });
 
-    const populated = await Task.findById(task._id)
-      .populate('assignees', 'name email role department avatar')
-      .populate('createdBy', 'name email role avatar')
-      .populate('attachments.uploadedBy', 'name email');
+    const populated = await populateTaskById(task._id);
 
     // Respond IMMEDIATELY with HTTP 201 Created to completely prevent frontend 500 timeouts
     res.status(201).json({ success: true, data: populated });
@@ -442,6 +497,24 @@ const updateTask = async (req, res) => {
     const task = await Task.findById(id).populate('dependencies');
     if (!task) {
       return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    const previousStatus = task.status;
+    if (updates.status !== undefined) {
+      updates.status = normalizeTaskStatus(updates.status);
+    }
+    if (updates.priority !== undefined) {
+      updates.priority = normalizeTaskPriority(updates.priority);
+    }
+    if (updates.recurrence && typeof updates.recurrence === 'object') {
+      updates.recurrence = {
+        isRecurring: Boolean(updates.recurrence.isRecurring),
+        frequency: ['daily', 'weekly', 'monthly', 'custom'].includes(String(updates.recurrence.frequency || '').toLowerCase())
+          ? String(updates.recurrence.frequency).toLowerCase()
+          : 'daily',
+        intervalDays: Math.max(1, Number(updates.recurrence.intervalDays || updates.recurrence.interval || 1) || 1),
+        nextRunDate: updates.recurrence.nextRunDate ? new Date(updates.recurrence.nextRunDate) : undefined
+      };
     }
 
     // Dependency Enforcement: Cannot set status to 'Done' if any open blocking dependencies exist
@@ -537,11 +610,64 @@ const updateTask = async (req, res) => {
 
     await task.save();
 
-    const updatedTask = await Task.findById(id)
-      .populate('assignees', 'name email role department avatar')
-      .populate('createdBy', 'name email role avatar')
-      .populate('dependencies', 'title status priority')
-      .populate('attachments.uploadedBy', 'name email');
+    // If a recurring task just transitioned to 'Done', automatically spawn the next occurrence
+    const io = req.app.get('socketio');
+    if (previousStatus !== 'Done' && task.status === 'Done' && task.recurrence && task.recurrence.isRecurring) {
+      try {
+        const freq = task.recurrence.frequency || 'daily';
+        const stepDays = freq === 'daily' ? 1 : freq === 'weekly' ? 7 : freq === 'monthly' ? 30 : Math.max(1, Number(task.recurrence.intervalDays) || 1);
+        const baseDate = task.dueDate ? new Date(task.dueDate) : new Date();
+        const nextDueDate = new Date(baseDate.getTime() + stepDays * 24 * 60 * 60 * 1000);
+
+        const spawnedTask = await Task.create({
+          title: task.title,
+          description: task.description || '',
+          priority: task.priority,
+          status: 'To Do',
+          department: task.department,
+          projectRef: task.projectRef || '',
+          clientName: task.clientName || '',
+          lotNo: task.lotNo || '',
+          dueDate: nextDueDate,
+          estimatedHours: task.estimatedHours || 0,
+          assignees: task.assignees || [],
+          checklist: (task.checklist || []).map(c => ({
+            text: c.text,
+            completed: false,
+            assignedTo: c.assignedTo || null
+          })),
+          tags: task.tags || [],
+          recurrence: {
+            isRecurring: true,
+            frequency: freq,
+            intervalDays: stepDays,
+            nextRunDate: nextDueDate
+          },
+          createdBy: task.createdBy,
+          auditLogs: [{
+            user: userId || task.createdBy,
+            userName: 'Recurring Task Scheduler',
+            fieldChanged: 'Recurring Task Spawned',
+            oldValue: String(task._id),
+            newValue: `Spawned next ${freq} occurrence due ${nextDueDate.toISOString().split('T')[0]}`,
+            timestamp: new Date()
+          }]
+        });
+
+        // Turn off recurrence on the completed instance so re-editing it doesn't spawn duplicates
+        task.recurrence.isRecurring = false;
+        await task.save();
+
+        if (io) {
+          const populatedSpawned = await populateTaskById(spawnedTask._id);
+          io.emit('task-created', populatedSpawned);
+        }
+      } catch (recErr) {
+        console.warn('[TaskController] Failed to spawn next recurring task occurrence:', recErr.message);
+      }
+    }
+
+    const updatedTask = await populateTaskById(id);
 
     // Detect newly added assignees for push and socket notifications
     const newAssigneeIds = (updatedTask.assignees || []).map(a => String(typeof a === 'object' ? (a._id || a.id) : a));
@@ -561,7 +687,6 @@ const updateTask = async (req, res) => {
     }
 
     // Real-time socket broadcast
-    const io = req.app.get('socketio');
     if (io) {
       newlyAddedAssignees.forEach(uId => {
         io.to(`user_${uId}`).emit('task-assigned', {
@@ -602,28 +727,45 @@ const deleteTask = async (req, res) => {
     }
 
     const { id } = req.params;
-    let task = null;
+    let existingTask = null;
 
     if (id && mongoose.Types.ObjectId.isValid(String(id))) {
-      task = await Task.findByIdAndDelete(id);
+      existingTask = await Task.findById(id);
     } else if (id) {
-      task = await Task.findOneAndDelete({
+      existingTask = await Task.findOne({
         $or: [{ projectRef: String(id) }, { title: String(id) }]
       });
     }
 
-    if (!task) {
+    if (!existingTask) {
       // Idempotent: Deleting an already-deleted or non-existent task is considered success
       return res.status(200).json({ success: true, message: 'Task already deleted or not found', taskId: id });
     }
 
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin);
+    const isCreator = existingTask.createdBy && String(existingTask.createdBy) === String(req.user._id);
+
+    if (!isMasterAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the task creator or an administrator can delete this task'
+      });
+    }
+
+    await Task.findByIdAndDelete(existingTask._id);
+
     // Broadcast real-time deletion
     const io = req.app.get('socketio');
     if (io) {
-      io.emit('task-deleted', { taskId: id, title: task.title });
+      io.emit('task-deleted', { taskId: String(existingTask._id), title: existingTask.title });
     }
 
-    res.json({ success: true, message: 'Task deleted successfully', taskId: id });
+    res.json({ success: true, message: 'Task deleted successfully', taskId: String(existingTask._id) });
   } catch (error) {
     console.error('Error deleting task:', error);
     res.status(500).json({ success: false, message: 'Failed to delete task', error: error.message });
@@ -652,7 +794,8 @@ const startTimer = async (req, res) => {
     // Check if timer is already running for this user on this task
     const existingIndex = task.liveTimers.findIndex(t => String(t.user) === String(userId) && t.isRunning);
     if (existingIndex >= 0) {
-      return res.json({ success: true, data: task, message: 'Timer is already running' });
+      const populatedExisting = await populateTaskById(id);
+      return res.json({ success: true, data: populatedExisting, message: 'Timer is already running' });
     }
 
     task.liveTimers.push({
@@ -666,7 +809,8 @@ const startTimer = async (req, res) => {
     }
 
     await task.save();
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error starting task timer:', error);
     res.status(500).json({ success: false, message: 'Failed to start timer', error: error.message });
@@ -679,7 +823,7 @@ const startTimer = async (req, res) => {
 const stopTimer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { description = '', isBillable = true, userName = 'Staff' } = req.body;
+    const { description = '', note = '', isBillable = true, userName = 'Staff' } = req.body;
     const userId = req.user ? req.user._id : (req.body.userId || req.query.userId);
 
     if (!userId) {
@@ -713,26 +857,28 @@ const stopTimer = async (req, res) => {
     // Only discard if timer was clicked and immediately stopped under 2 seconds
     if (durationMs < 2000) {
       await task.save();
-      return res.json({ success: true, data: task, loggedHours: 0, discarded: true, message: 'Timer discarded (accidental click under 2s)' });
+      const populatedDiscarded = await populateTaskById(id);
+      return res.json({ success: true, data: populatedDiscarded, loggedHours: 0, discarded: true, message: 'Timer discarded (accidental click under 2s)' });
     }
 
     // Save time log
     if (!task.timeLogs) task.timeLogs = [];
     task.timeLogs.push({
       user: userId,
-      userName,
+      userName: req.user?.name || userName,
       hours,
       durationMinutes,
       startTime,
       endTime,
-      description,
+      description: description || note,
       isBillable,
       status: 'approved',
       createdAt: new Date()
     });
 
     await task.save();
-    res.json({ success: true, data: task, loggedHours: hours });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated, loggedHours: hours });
   } catch (error) {
     console.error('Error stopping task timer:', error);
     res.status(500).json({ success: false, message: 'Failed to stop timer', error: error.message });
@@ -745,11 +891,14 @@ const stopTimer = async (req, res) => {
 const addManualTimeLog = async (req, res) => {
   try {
     const { id } = req.params;
-    const { hours, description = '', isBillable = true, userName = 'Staff' } = req.body;
+    const { hours, durationMinutes, minutes, description = '', note = '', isBillable = true, userName = 'Staff' } = req.body;
     const userId = req.user ? req.user._id : (req.body.userId || req.query.userId);
 
-    if (!hours || isNaN(hours) || Number(hours) <= 0) {
-      return res.status(400).json({ success: false, message: 'Valid hours amount is required' });
+    const resolvedMinutes = durationMinutes !== undefined ? Number(durationMinutes) : (minutes !== undefined ? Number(minutes) : null);
+    const resolvedHours = hours !== undefined && hours !== '' ? Number(hours) : (resolvedMinutes !== null && !isNaN(resolvedMinutes) ? Number((resolvedMinutes / 60).toFixed(2)) : NaN);
+
+    if (isNaN(resolvedHours) || resolvedHours <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid hours or durationMinutes amount is required' });
     }
 
     const task = await Task.findById(id);
@@ -758,20 +907,21 @@ const addManualTimeLog = async (req, res) => {
     }
 
     if (!task.timeLogs) task.timeLogs = [];
-    const numHours = Number(hours);
+    const numHours = Number(resolvedHours);
     task.timeLogs.push({
       user: userId,
-      userName,
+      userName: req.user?.name || userName,
       hours: numHours,
-      durationMinutes: Math.round(numHours * 60),
-      description,
+      durationMinutes: resolvedMinutes !== null && !isNaN(resolvedMinutes) ? Math.round(resolvedMinutes) : Math.round(numHours * 60),
+      description: description || note,
       isBillable,
       status: 'approved',
       createdAt: new Date()
     });
 
     await task.save();
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error adding manual time log:', error);
     res.status(500).json({ success: false, message: 'Failed to add time log', error: error.message });
@@ -784,9 +934,10 @@ const addManualTimeLog = async (req, res) => {
 const addChecklistItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { text, assignedTo } = req.body;
+    const { text, title, assignedTo } = req.body;
+    const itemText = text || title;
 
-    if (!text || !text.trim()) {
+    if (!itemText || !String(itemText).trim()) {
       return res.status(400).json({ success: false, message: 'Checklist text is required' });
     }
 
@@ -797,13 +948,14 @@ const addChecklistItem = async (req, res) => {
 
     if (!task.checklist) task.checklist = [];
     task.checklist.push({
-      text: text.trim(),
+      text: String(itemText).trim(),
       completed: false,
       assignedTo: assignedTo || null
     });
 
     await task.save();
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error adding checklist item:', error);
     res.status(500).json({ success: false, message: 'Failed to add checklist item', error: error.message });
@@ -831,7 +983,8 @@ const toggleChecklistItem = async (req, res) => {
     item.completed = typeof completed === 'boolean' ? completed : !item.completed;
     await task.save();
 
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error toggling checklist item:', error);
     res.status(500).json({ success: false, message: 'Failed to toggle checklist item', error: error.message });
@@ -846,6 +999,7 @@ const addComment = async (req, res) => {
     const { id } = req.params;
     const { text, senderName = 'Staff' } = req.body;
     const userId = req.user ? req.user._id : (req.body.userId || req.query.userId);
+    const resolvedSenderName = req.user ? (req.user.name || req.user.username || senderName) : senderName;
 
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: 'Comment text is required' });
@@ -859,13 +1013,14 @@ const addComment = async (req, res) => {
     if (!task.comments) task.comments = [];
     task.comments.push({
       sender: userId,
-      senderName,
+      senderName: resolvedSenderName,
       text: text.trim(),
       createdAt: new Date()
     });
 
     await task.save();
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error adding task comment:', error);
     res.status(500).json({ success: false, message: 'Failed to add comment', error: error.message });
@@ -920,11 +1075,7 @@ const addAttachment = async (req, res) => {
 
     await task.save();
 
-    const populated = await Task.findById(id)
-      .populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role')
-      .populate('dependencies', 'title status priority assignees')
-      .populate('attachments.uploadedBy', 'name email');
+    const populated = await populateTaskById(id);
 
     res.json({ success: true, data: populated });
   } catch (error) {
@@ -967,11 +1118,7 @@ const deleteAttachment = async (req, res) => {
 
     await task.save();
 
-    const populated = await Task.findById(id)
-      .populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role')
-      .populate('dependencies', 'title status priority assignees')
-      .populate('attachments.uploadedBy', 'name email');
+    const populated = await populateTaskById(id);
 
     res.json({ success: true, data: populated });
   } catch (error) {
@@ -993,7 +1140,8 @@ const deleteChecklistItem = async (req, res) => {
 
     task.checklist = (task.checklist || []).filter(c => String(c._id) !== String(itemId));
     await task.save();
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error deleting checklist item:', error);
     res.status(500).json({ success: false, message: 'Failed to delete checklist item', error: error.message });
@@ -1022,11 +1170,27 @@ const editComment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Comment not found' });
     }
 
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin);
+    const isCommentAuthor = req.user && comment.sender && String(comment.sender) === String(req.user._id);
+
+    if (!isMasterAdmin && !isCommentAuthor) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only edit your own comments'
+      });
+    }
+
     comment.text = text.trim();
     comment.editedAt = new Date();
     await task.save();
 
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error editing comment:', error);
     res.status(500).json({ success: false, message: 'Failed to edit comment', error: error.message });
@@ -1044,10 +1208,31 @@ const deleteComment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
 
+    const comment = (task.comments || []).id(commentId);
+    if (!comment) {
+      return res.status(404).json({ success: false, message: 'Comment not found' });
+    }
+
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin);
+    const isCommentAuthor = req.user && comment.sender && String(comment.sender) === String(req.user._id);
+
+    if (!isMasterAdmin && !isCommentAuthor) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete your own comments'
+      });
+    }
+
     task.comments = (task.comments || []).filter(c => String(c._id) !== String(commentId));
     await task.save();
 
-    res.json({ success: true, data: task });
+    const populated = await populateTaskById(id);
+    res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error deleting comment:', error);
     res.status(500).json({ success: false, message: 'Failed to delete comment', error: error.message });

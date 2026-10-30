@@ -11,6 +11,7 @@ const fs = require('fs');
 const { isR2Configured, uploadToR2, getPresignedR2UploadUrl } = require('../../utils/r2Storage');
 const { decodeUnicodeFileName, sanitizeUnicodeKeyName } = require('../../utils/unicodeFileHelper');
 const communicationController = require('../../controllers/communication.controller');
+const { requireAdmin, requireGroupAccess } = require('../../middlewares/auth.middleware');
 
 // Ensure uploads dir exists
 const uploadsDir = path.join(__dirname, '../../../uploads');
@@ -235,7 +236,7 @@ router.post('/upload', (req, res, next) => {
 });
 
 // List R2 Chat & Workspace Attachments
-router.get('/r2-attachments', async (req, res) => {
+router.get('/r2-attachments', requireAdmin, async (req, res) => {
   try {
     const { listR2Objects } = require('../../utils/r2Storage');
     const items = await listR2Objects({ folder: 'Chat' });
@@ -265,7 +266,7 @@ router.get('/r2-attachments', async (req, res) => {
 });
 
 // Clear R2 Chat Attachments by Room/Folder
-router.delete('/r2-attachments', async (req, res) => {
+router.delete('/r2-attachments', requireAdmin, async (req, res) => {
   try {
     const { roomName = 'General' } = req.query;
     const { deleteR2Folder } = require('../../utils/r2Storage');
@@ -289,13 +290,13 @@ router.delete('/r2-attachments', async (req, res) => {
 });
 
 // Purge Orphan Chat Files (files in R2 Chat/ with no live message)
-router.delete('/r2-orphans', communicationController.purgeOrphanChatFiles);
+router.delete('/r2-orphans', requireAdmin, communicationController.purgeOrphanChatFiles);
 
 
 router.get('/rooms', communicationController.getGroups);
 
 // Broadcast Today's Operational Data across Auto Screen Groups
-router.post('/broadcast-today-data', async (req, res) => {
+router.post('/broadcast-today-data', requireAdmin, async (req, res) => {
   try {
     await ensureAutoScreenGroupsExist();
     
@@ -436,7 +437,7 @@ router.post('/rooms', async (req, res) => {
 });
 
 // Get chat history for a room (with cursor-based pagination)
-router.get('/rooms/:roomId/messages', async (req, res) => {
+router.get('/rooms/:roomId/messages', requireGroupAccess, async (req, res) => {
   try {
     const { limit = 50, before } = req.query;
     const query = { roomId: req.params.roomId };
@@ -479,16 +480,28 @@ router.get('/rooms/:roomId/messages', async (req, res) => {
 });
 
 // Send a message to a room via HTTP (e.g. for sharing reports)
-router.post('/rooms/:roomId/messages', async (req, res, next) => {
+router.post('/rooms/:roomId/messages', requireGroupAccess, async (req, res, next) => {
   req.params.groupId = req.params.roomId;
   return communicationController.postGroupMessage(req, res, next);
 });
 
-// Get all Tasks
+// Get all Tasks (RBAC protected)
 router.get('/tasks', async (req, res) => {
   try {
-    const tasks = await Task.find()
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin);
+    const currentUserId = req.user?._id || req.user?.id;
+    const filter = (!isMasterAdmin && currentUserId)
+      ? { $or: [{ assignees: currentUserId }, { createdBy: currentUserId }] }
+      : {};
+
+    const tasks = await Task.find(filter)
       .populate('assignees', 'name email')
+      .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: tasks });
   } catch (error) {
@@ -499,14 +512,26 @@ router.get('/tasks', async (req, res) => {
 
 const ExcelJS = require('exceljs');
 
-// Export Tasks to Excel
+// Export Tasks to Excel (RBAC protected & fixed populate paths)
 router.get('/tasks/export', async (req, res) => {
   try {
-    const tasks = await Task.find()
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin);
+    const currentUserId = req.user?._id || req.user?.id;
+    const filter = (!isMasterAdmin && currentUserId)
+      ? { $or: [{ assignees: currentUserId }, { createdBy: currentUserId }] }
+      : {};
+
+    const tasks = await Task.find(filter)
       .populate('assignees', 'name email')
+      .populate('createdBy', 'name email')
       .populate('comments.sender', 'name username email')
       .populate('timeLogs.user', 'name username email')
-      .populate('subTasks.assignee', 'name email');
+      .populate('checklist.assignedTo', 'name email');
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Tasks Overview');
@@ -526,14 +551,18 @@ router.get('/tasks/export', async (req, res) => {
     ];
 
     tasks.forEach(task => {
-      const assigneeNames = (task.assignees || []).map(a => a.name || a.email).join(', ');
-      const tagText = (task.tags || []).map(t => t.text).join(', ');
+      const assigneeNames = (task.assignees || []).map(a => a?.name || a?.email || String(a)).join(', ');
+      const tagText = (task.tags || []).map(t => typeof t === 'string' ? t : t.text).filter(Boolean).join(', ');
       
-      const totalSub = task.subTasks?.length || 0;
-      const completedSub = task.subTasks?.filter(s => s.completed).length || 0;
+      const checklistItems = task.checklist || [];
+      const totalSub = checklistItems.length;
+      const completedSub = checklistItems.filter(s => s.completed).length;
       const subtaskStr = totalSub > 0 ? `${completedSub}/${totalSub} completed` : 'N/A';
       
-      const totalHours = (task.timeLogs || []).reduce((acc, curr) => acc + curr.hours, 0);
+      const totalHours = (task.timeLogs || []).reduce((acc, curr) => {
+        const hrs = typeof curr.hours === 'number' ? curr.hours : ((curr.minutes || 0) / 60);
+        return acc + hrs;
+      }, 0);
 
       worksheet.addRow({
         id: task._id.toString(),
