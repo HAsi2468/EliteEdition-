@@ -65,7 +65,7 @@ const requireAuth = async (req, res, next) => {
 
     // Check if token was blacklisted on logout (SEC-001 & SEC-011)
     try {
-      const { getRedisClient } = require('../services/token.service');
+      const { getRedisClient } = require('../db/redisClient');
       const redis = typeof getRedisClient === 'function' ? getRedisClient() : null;
       if (redis && typeof redis.get === 'function') {
         const isRevoked = await redis.get(`revoked_token:${token}`);

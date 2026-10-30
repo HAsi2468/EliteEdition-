@@ -159,7 +159,8 @@ const logout = catchAsync(async (req, res) => {
 
   if (accessToken) {
     try {
-      const redis = typeof tokenService.getRedisClient === 'function' ? tokenService.getRedisClient() : null;
+      const { getRedisClient } = require('../db/redisClient');
+      const redis = typeof getRedisClient === 'function' ? getRedisClient() : null;
       if (redis && typeof redis.set === 'function') {
         await redis.set(`revoked_token:${accessToken}`, '1', { EX: 7200 });
       }
