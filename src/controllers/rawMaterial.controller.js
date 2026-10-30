@@ -124,11 +124,153 @@ const createInward = async (req, res) => {
   }
 };
 
+// ── Helper to validate stock sufficiency for outward raw materials ──
+const checkRawMaterialStockSufficiency = async (companyEntity, items) => {
+  const normComp = (companyEntity || 'Elite Digital Print').trim();
+  const baseFilter = buildRawCompFilter(normComp);
+  baseFilter.$and = baseFilter.$and || [];
+  baseFilter.$and.push({
+    $or: [
+      { isSisterTransfer: { $ne: true } },
+      { verificationStatus: 'VERIFIED' }
+    ]
+  });
+  baseFilter.verificationStatus = { $ne: 'REJECTED' };
+
+  // Fetch all transactions for this company to get true cumulative available stock
+  const allTxs = await RawMaterialTransaction.find(baseFilter).lean();
+
+  // Aggregate current available stock by normalized key
+  const availableMap = {};
+  for (const t of allTxs) {
+    const matName = (t.materialName || '').trim();
+    const isInk = matName.toLowerCase().includes('ink');
+    const isPaper = ['a++', 'a+', 'a'].includes(matName.toLowerCase()) ||
+                    matName.toLowerCase().includes('paper') ||
+                    matName.toLowerCase().includes('sublimation') ||
+                    matName.toLowerCase().includes('butter');
+
+    let normPanna = '';
+    if (isPaper || t.panna) {
+      normPanna = normalizePannaStr(t.panna) || '58" Panna';
+    }
+
+    let groupMat = matName.toLowerCase();
+    let groupColor = (t.color || '').trim().toLowerCase();
+
+    if (isInk) {
+      const isGrando = matName.toLowerCase().includes('grando');
+      const isPrintdot = matName.toLowerCase().includes('printdot');
+      const brand = isGrando ? 'grando' : (isPrintdot ? 'printdot' : matName.toLowerCase());
+      const cCombined = `${groupColor} ${matName}`.toLowerCase();
+      let colorKey = 'cyan';
+      if (cCombined.includes('magenta') || groupColor === 'm') colorKey = 'magenta';
+      else if (cCombined.includes('yellow') || groupColor === 'y') colorKey = 'yellow';
+      else if (cCombined.includes('black') || groupColor === 'k') colorKey = 'black';
+      else if (cCombined.includes('clean') || groupColor === 'c.s.' || groupColor === 'cs') colorKey = 'clean';
+      groupMat = `${brand}_${colorKey}`;
+      groupColor = colorKey;
+    } else if (isPaper) {
+      const isButter = matName.toLowerCase().includes('butter');
+      if (isButter) groupMat = 'butter_paper';
+      else {
+        const combined = `${matName} ${t.paperQuality || ''}`.toLowerCase();
+        let paperGrade = 'a++';
+        if (combined.includes('a++')) paperGrade = 'a++';
+        else if (combined.includes('a+')) paperGrade = 'a+';
+        else if (/\ba\b/.test(combined) || combined.includes('(a)')) paperGrade = 'a';
+        groupMat = `sublimation_${paperGrade}`;
+      }
+    }
+
+    const key = isInk ? groupMat : (isPaper ? `${groupMat}___${normPanna}` : `${groupMat}___${(t.unit || 'meters').toLowerCase()}___${normPanna}`);
+    if (!availableMap[key]) availableMap[key] = { in: 0, out: 0, balance: 0, name: matName, unit: t.unit || 'Units' };
+    const qty = Number(t.qty) || 0;
+    if (t.type === 'INWARD') {
+      availableMap[key].in += qty;
+    } else {
+      availableMap[key].out += qty;
+    }
+  }
+
+  // Calculate true physical on-hand balances (never negative)
+  for (const k of Object.keys(availableMap)) {
+    availableMap[k].balance = Math.max(0, availableMap[k].in - availableMap[k].out);
+  }
+
+  // Validate each requested item and deduct sequentially
+  for (const item of items) {
+    const matName = (item.materialName || '').trim();
+    const isInk = matName.toLowerCase().includes('ink');
+    const isPaper = ['a++', 'a+', 'a'].includes(matName.toLowerCase()) ||
+                    matName.toLowerCase().includes('paper') ||
+                    matName.toLowerCase().includes('sublimation') ||
+                    matName.toLowerCase().includes('butter');
+
+    let normPanna = '';
+    if (isPaper || item.panna) {
+      normPanna = normalizePannaStr(item.panna) || '58" Panna';
+    }
+
+    let groupMat = matName.toLowerCase();
+    let groupColor = (item.color || '').trim().toLowerCase();
+
+    if (isInk) {
+      const isGrando = matName.toLowerCase().includes('grando');
+      const isPrintdot = matName.toLowerCase().includes('printdot');
+      const brand = isGrando ? 'grando' : (isPrintdot ? 'printdot' : matName.toLowerCase());
+      const cCombined = `${groupColor} ${matName}`.toLowerCase();
+      let colorKey = 'cyan';
+      if (cCombined.includes('magenta') || groupColor === 'm') colorKey = 'magenta';
+      else if (cCombined.includes('yellow') || groupColor === 'y') colorKey = 'yellow';
+      else if (cCombined.includes('black') || groupColor === 'k') colorKey = 'black';
+      else if (cCombined.includes('clean') || groupColor === 'c.s.' || groupColor === 'cs') colorKey = 'clean';
+      groupMat = `${brand}_${colorKey}`;
+      groupColor = colorKey;
+    } else if (isPaper) {
+      const isButter = matName.toLowerCase().includes('butter');
+      if (isButter) groupMat = 'butter_paper';
+      else {
+        const combined = `${matName} ${item.paperQuality || ''}`.toLowerCase();
+        let paperGrade = 'a++';
+        if (combined.includes('a++')) paperGrade = 'a++';
+        else if (combined.includes('a+')) paperGrade = 'a+';
+        else if (/\ba\b/.test(combined) || combined.includes('(a)')) paperGrade = 'a';
+        groupMat = `sublimation_${paperGrade}`;
+      }
+    }
+
+    const key = isInk ? groupMat : (isPaper ? `${groupMat}___${normPanna}` : `${groupMat}___${(item.unit || 'meters').toLowerCase()}___${normPanna}`);
+    const available = availableMap[key] ? availableMap[key].balance : 0;
+    const requested = Number(item.qty) || 0;
+
+    if (requested > available) {
+      return {
+        valid: false,
+        error: `Insufficient stock for "${item.materialName}${item.color ? ' (' + item.color + ')' : ''}". Available: ${available} ${item.unit || 'Units'}, Requested: ${requested} ${item.unit || 'Units'}. Negative stock is not permitted.`
+      };
+    }
+
+    // Deduct in-memory so multiple items in the same request cannot exceed available balance
+    if (availableMap[key]) {
+      availableMap[key].balance -= requested;
+    }
+  }
+
+  return { valid: true };
+};
+
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
     const compEntity = (req.body && !Array.isArray(req.body) ? req.body.companyEntity : null) || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
+      if (req.body.length === 0) {
+        return res.status(400).json({ success: false, error: 'At least one outward item is required.' });
+      }
+
+      // 1. Sanitize & validate each item in array
+      const itemsToValidate = [];
       const docs = req.body.map(item => {
         const {
           jobNo, partyName, materialName, qty, unit, date, notes,
@@ -145,7 +287,8 @@ const createOutward = async (req, res) => {
         if (isNaN(numQty) || numQty <= 0 || numQty > 1000000) {
           throw new Error('Quantity must be greater than 0 and not exceed 1,000,000.');
         }
-        return {
+
+        const doc = {
           type: 'OUTWARD',
           companyEntity: companyEntity || req.query.companyEntity || compEntity,
           jobNo,
@@ -164,7 +307,16 @@ const createOutward = async (req, res) => {
           shade,
           location
         };
+        itemsToValidate.push(doc);
+        return doc;
       });
+
+      // 2. Strict Stock Sufficiency Validation for Array Payload
+      const stockCheck = await checkRawMaterialStockSufficiency(compEntity, itemsToValidate);
+      if (!stockCheck.valid) {
+        return res.status(400).json({ success: false, error: stockCheck.error });
+      }
+
       const transactions = await RawMaterialTransaction.insertMany(docs);
       return res.status(201).json({ success: true, data: transactions });
     }
@@ -186,33 +338,24 @@ const createOutward = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Quantity must be greater than 0 and not exceed 1,000,000.' });
     }
 
-    // ── Stock Sufficiency Validation: Prevent negative stock ──
-    const stockFilter = buildRawCompFilter(companyEntity || compEntity);
-    stockFilter.materialName = String(materialName).trim();
-    if (color) stockFilter.color = color;
-    if (panna) stockFilter.panna = panna;
+    // ── Stock Sufficiency Validation for Single Item ──
+    const targetComp = companyEntity || compEntity;
+    const stockCheck = await checkRawMaterialStockSufficiency(targetComp, [{
+      materialName: String(materialName).trim(),
+      color,
+      panna,
+      qty: numQty,
+      unit: unit || 'Meters',
+      paperQuality
+    }]);
 
-    const stockAgg = await RawMaterialTransaction.aggregate([
-      { $match: stockFilter },
-      {
-        $group: {
-          _id: null,
-          totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
-          totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
-        }
-      }
-    ]);
-    const available = stockAgg.length > 0 ? (stockAgg[0].totalIn - stockAgg[0].totalOut) : 0;
-    if (numQty > available) {
-      return res.status(400).json({
-        success: false,
-        error: `Insufficient stock for ${materialName}${color ? ' (' + color + ')' : ''}. Available: ${available} ${unit || 'Units'}, Requested: ${numQty} ${unit || 'Units'}. Negative stock is not permitted.`
-      });
+    if (!stockCheck.valid) {
+      return res.status(400).json({ success: false, error: stockCheck.error });
     }
 
     const transaction = new RawMaterialTransaction({
       type: 'OUTWARD',
-      companyEntity: companyEntity || compEntity,
+      companyEntity: targetComp,
       jobNo,
       partyName,
       materialName: String(materialName).trim(),
@@ -444,9 +587,98 @@ const getStockOverview = async (req, res) => {
       }
     }
 
+    // If date filtering is active, compute actual cumulative on-hand stock up to dateEnd
+    if (dateStart || dateEnd) {
+      try {
+        const cumulativeStage = buildRawCompFilter(companyEntity);
+        cumulativeStage.$and = cumulativeStage.$and || [];
+        cumulativeStage.$and.push({
+          $or: [
+            { isSisterTransfer: { $ne: true } },
+            { verificationStatus: 'VERIFIED' }
+          ]
+        });
+        cumulativeStage.verificationStatus = { $ne: 'REJECTED' };
+        if (dateEnd) {
+          const deStr = String(dateEnd).trim();
+          const de = /^\d{4}-\d{2}-\d{2}$/.test(deStr) ? new Date(`${deStr}T23:59:59.999`) : new Date(dateEnd);
+          if (!isNaN(de.getTime())) {
+            de.setHours(23, 59, 59, 999);
+            cumulativeStage.date = { $lte: de };
+          }
+        }
+        const cumTxs = await RawMaterialTransaction.find(cumulativeStage).lean();
+        const cumMap = {};
+        for (const ct of cumTxs) {
+          const cMatName = (ct.materialName || '').trim();
+          const cIsInk = cMatName.toLowerCase().includes('ink');
+          const cIsPaper = ['a++', 'a+', 'a'].includes(cMatName.toLowerCase()) ||
+                          cMatName.toLowerCase().includes('paper') ||
+                          cMatName.toLowerCase().includes('sublimation') ||
+                          cMatName.toLowerCase().includes('butter');
+          let cNormPanna = '';
+          if (cIsPaper || ct.panna) {
+            cNormPanna = normalizePannaStr(ct.panna) || '58" Panna';
+          }
+          let cGroupMat = cMatName;
+          let cGroupColor = (ct.color || '').trim();
+          if (cIsInk) {
+            const isGrando = cMatName.toLowerCase().includes('grando');
+            const isPrintdot = cMatName.toLowerCase().includes('printdot');
+            const brand = isGrando ? 'Grando Ink' : (isPrintdot ? 'Printdot Ink' : cMatName);
+            const cCombined = `${cGroupColor} ${cMatName}`.toLowerCase();
+            let colorKey = 'Cyan';
+            let colorCode = 'C';
+            if (cCombined.includes('magenta') || cGroupColor === 'M') { colorKey = 'Magenta'; colorCode = 'M'; }
+            else if (cCombined.includes('yellow') || cGroupColor === 'Y') { colorKey = 'Yellow'; colorCode = 'Y'; }
+            else if (cCombined.includes('black') || cGroupColor === 'K') { colorKey = 'Black'; colorCode = 'K'; }
+            else if (cCombined.includes('clean') || cGroupColor === 'C.S.' || cGroupColor === 'CS') { colorKey = 'Cleaning Solution'; colorCode = 'C.S.'; }
+            cGroupMat = `${brand} - ${colorKey} (${colorCode})`;
+            cGroupColor = colorKey;
+          } else if (cIsPaper) {
+            const isButter = cMatName.toLowerCase().includes('butter');
+            if (isButter) cGroupMat = 'Butter Paper';
+            else {
+              const combined = `${cMatName} ${ct.paperQuality || ''}`.toLowerCase();
+              let paperGrade = 'A++';
+              if (combined.includes('a++')) paperGrade = 'A++';
+              else if (combined.includes('a+')) paperGrade = 'A+';
+              else if (/\ba\b/.test(combined) || combined.includes('(a)')) paperGrade = 'A';
+              cGroupMat = `Sublimation Paper (${paperGrade})`;
+            }
+          }
+          const cKey = cIsInk
+            ? `${cGroupMat}___${cGroupColor}`
+            : (cIsPaper ? `${cGroupMat}___${cNormPanna}` : `${cGroupMat}___${ct.unit || 'Meters'}___${cNormPanna}`);
+          if (!cumMap[cKey]) cumMap[cKey] = { in: 0, out: 0, inMtr: 0, outMtr: 0 };
+          const cQty = Number(ct.qty) || 0;
+          const cMtr = cQty * (Number(ct.metersPerRoll) || 0);
+          if (ct.type === 'INWARD') {
+            cumMap[cKey].in += cQty;
+            cumMap[cKey].inMtr += cMtr;
+          } else {
+            cumMap[cKey].out += cQty;
+            cumMap[cKey].outMtr += cMtr;
+          }
+        }
+        for (const [k, v] of Object.entries(map)) {
+          if (cumMap[k]) {
+            v.currentStock = Math.max(0, cumMap[k].in - cumMap[k].out);
+            v.currentStockMtr = Math.max(0, cumMap[k].inMtr - cumMap[k].outMtr);
+          }
+        }
+      } catch (cumErr) {
+        console.warn('Failed to calculate cumulative stock overview:', cumErr.message);
+      }
+    }
+
     const stock = Object.values(map).map(item => {
-      item.currentStock = Math.max(0, item.totalInward - item.totalOutward);
-      item.currentStockMtr = Math.max(0, item.totalInwardMtr - item.totalOutwardMtr);
+      if (item.currentStock === undefined) {
+        item.currentStock = Math.max(0, item.totalInward - item.totalOutward);
+      }
+      if (item.currentStockMtr === undefined) {
+        item.currentStockMtr = Math.max(0, item.totalInwardMtr - item.totalOutwardMtr);
+      }
       return item;
     }).sort((a, b) => {
       if (a.materialName !== b.materialName) return a.materialName.localeCompare(b.materialName);
