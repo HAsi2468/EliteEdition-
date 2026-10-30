@@ -633,8 +633,13 @@ const normalizeAndMergeBrands = (rawBrands) => {
 // ─────────────────────────────────────────────────────────────
 // BRAND REPORT PDF
 // ─────────────────────────────────────────────────────────────
+const isWritableStream = (obj) => {
+  return obj && typeof obj === 'object' && typeof obj.write === 'function' && typeof obj.on === 'function';
+};
+
 const downloadBrandReportPdf = async (req, res, targetStreamOverride = null) => {
   try {
+    const streamTarget = isWritableStream(targetStreamOverride) ? targetStreamOverride : null;
     const { dateStart, dateEnd } = req.query;
     if (!dateStart || !dateEnd) {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
@@ -653,8 +658,8 @@ const downloadBrandReportPdf = async (req, res, targetStreamOverride = null) => 
       whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
     }
 
-    const count = targetStreamOverride ? 0 : await db.SalesList.countDocuments(whereClause);
-    if (!targetStreamOverride && count > 5000) {
+    const count = streamTarget ? 0 : await db.SalesList.countDocuments(whereClause);
+    if (!streamTarget && count > 5000) {
       logger.info(`Brand report dataset is large (${count} rows > 5,000 threshold). Offloading to async job queue.`);
       const enqueued = await asyncJobQueue.enqueue('BRAND_REPORT_PDF', { dateStart, dateEnd, searchCode, count }, async (job, updateProgress) => {
         const reportsDir = ensureReportsDir();
@@ -755,12 +760,12 @@ const downloadBrandReportPdf = async (req, res, targetStreamOverride = null) => 
 
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
-    if (!targetStreamOverride) {
+    if (!streamTarget) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="Brand_Report_${dateStart}.pdf"`);
       doc.pipe(res);
     } else {
-      doc.pipe(targetStreamOverride);
+      doc.pipe(streamTarget);
     }
 
     let pageNum = 1;
@@ -915,11 +920,11 @@ const downloadBrandReportPdf = async (req, res, targetStreamOverride = null) => 
     }
 
     doc.end();
-    if (targetStreamOverride) {
+    if (streamTarget) {
       await new Promise((resolve, reject) => {
-        targetStreamOverride.on('finish', resolve);
-        targetStreamOverride.on('close', resolve);
-        targetStreamOverride.on('error', reject);
+        streamTarget.on('finish', resolve);
+        streamTarget.on('close', resolve);
+        streamTarget.on('error', reject);
       });
     }
     logger.info('Brand PDF complete.');

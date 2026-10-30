@@ -69,6 +69,18 @@ class InMemoryRedisFallback {
     return val !== null ? 1 : 0;
   }
 
+  async ttl(key) {
+    const item = this.store.get(key);
+    if (!item) return -2;
+    if (!item.expiresAt) return -1;
+    const remainingMs = item.expiresAt - Date.now();
+    if (remainingMs <= 0) {
+      this.del(key);
+      return -2;
+    }
+    return Math.ceil(remainingMs / 1000);
+  }
+
   async expire(key, seconds) {
     const item = this.store.get(key);
     if (!item) return 0;

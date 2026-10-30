@@ -871,7 +871,7 @@ const createInvoice = async (req, res) => {
     // Auto-calculate balance due (deducting TDS if enabled)
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const tdsAmount = invoiceData.enableTds ? Math.round(parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    const tdsAmount = invoiceData.enableTds ? parseFloat((parseFloat(invoiceData.tdsAmount) || 0).toFixed(2)) : 0;
     invoiceData.tdsAmount = tdsAmount;
     const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
@@ -1230,7 +1230,7 @@ const updateInvoice = async (req, res) => {
 
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const tdsAmount = invoiceData.enableTds ? Math.round(parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    const tdsAmount = invoiceData.enableTds ? parseFloat((parseFloat(invoiceData.tdsAmount) || 0).toFixed(2)) : 0;
     invoiceData.tdsAmount = tdsAmount;
     const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
@@ -1583,7 +1583,7 @@ const recordPayment = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
-    const effectiveTds = invoice.enableTds ? Math.round(parseFloat(invoice.tdsAmount) || 0) : 0;
+    const effectiveTds = invoice.enableTds ? parseFloat((parseFloat(invoice.tdsAmount) || 0).toFixed(2)) : 0;
     invoice.paidAmount = parseFloat(((invoice.paidAmount || 0) + paymentAmt).toFixed(2));
     invoice.balanceDue = Math.max(0, parseFloat((invoice.grandTotal - effectiveTds - invoice.paidAmount).toFixed(2)));
 
@@ -2066,18 +2066,18 @@ const downloadInvoicePdf = async (req, res) => {
       const taxable = Number(it.totalAmount || 0);
       hsnMap[key].taxable += taxable;
       if (isIgst) {
-        hsnMap[key].igst += taxable * (rate / 100);
+        hsnMap[key].igst += Math.round((taxable * (rate / 100)) * 100) / 100;
       } else {
-        hsnMap[key].cgst += taxable * (rate / 2 / 100);
-        hsnMap[key].sgst += taxable * (rate / 2 / 100);
+        hsnMap[key].cgst += Math.round((taxable * (rate / 2 / 100)) * 100) / 100;
+        hsnMap[key].sgst += Math.round((taxable * (rate / 2 / 100)) * 100) / 100;
       }
     });
     const hsnRows      = Object.values(hsnMap);
     const totalTaxable = (invoice.subtotal != null && Number(invoice.subtotal) > 0) ? Number(invoice.subtotal) : hsnRows.reduce((s, r) => s + r.taxable, 0);
-    const totalCgst    = (invoice.cgstTotal != null && Number(invoice.cgstTotal) > 0) ? Number(invoice.cgstTotal) : hsnRows.reduce((s, r) => s + r.cgst,    0);
-    const totalSgst    = (invoice.sgstTotal != null && Number(invoice.sgstTotal) > 0) ? Number(invoice.sgstTotal) : hsnRows.reduce((s, r) => s + r.sgst,    0);
-    const totalIgst    = (invoice.igstTotal != null && Number(invoice.igstTotal) > 0) ? Number(invoice.igstTotal) : hsnRows.reduce((s, r) => s + r.igst,    0);
-    const totalTax     = (invoice.totalTax != null && Number(invoice.totalTax) > 0) ? Number(invoice.totalTax) : (isIgst ? totalIgst : (totalCgst + totalSgst));
+    const totalCgst    = (invoice.cgstAmount != null && Number(invoice.cgstAmount) > 0) ? Number(invoice.cgstAmount) : ((invoice.cgstTotal != null && Number(invoice.cgstTotal) > 0) ? Number(invoice.cgstTotal) : hsnRows.reduce((s, r) => s + r.cgst, 0));
+    const totalSgst    = (invoice.sgstAmount != null && Number(invoice.sgstAmount) > 0) ? Number(invoice.sgstAmount) : ((invoice.sgstTotal != null && Number(invoice.sgstTotal) > 0) ? Number(invoice.sgstTotal) : hsnRows.reduce((s, r) => s + r.sgst, 0));
+    const totalIgst    = (invoice.igstAmount != null && Number(invoice.igstAmount) > 0) ? Number(invoice.igstAmount) : ((invoice.igstTotal != null && Number(invoice.igstTotal) > 0) ? Number(invoice.igstTotal) : hsnRows.reduce((s, r) => s + r.igst, 0));
+    const totalTax     = (invoice.totalTax != null && Number(invoice.totalTax) > 0) ? Number(invoice.totalTax) : (isIgst ? totalIgst : parseFloat((totalCgst + totalSgst).toFixed(2)));
 
     let delByVal = invoice.deliveryBy || '';
     if (!delByVal && Array.isArray(invoice.linkedChallanIds) && invoice.linkedChallanIds.length > 0) {
@@ -2518,12 +2518,13 @@ const downloadInvoicePdf = async (req, res) => {
           Y += netH;
         }
 
-        const wordsH = 28;
+        const wordsText = numToWords(invoice.grandTotal);
+        const wordsH = Math.max(28, doc.heightOfString(wordsText, { width: CW - 80 }) + 14);
         doc.rect(PAD, Y, CW, wordsH).fill(S50).stroke(S200);
         doc.fillColor(S700).fontSize(7.5).font('Helvetica-Bold')
           .text('Amount Chargeable (in words):', PAD + 5, Y + 4);
         doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
-          .text(numToWords(invoice.grandTotal), PAD + 5, Y + 14, { width: CW - 80 });
+          .text(wordsText, PAD + 5, Y + 14, { width: CW - 80 });
         doc.fillColor(S500).fontSize(7).font('Helvetica')
           .text('E. & O.E.', PAD + CW - 55, Y + 14, { width: 50, align: 'right' });
         Y += wordsH;
@@ -3277,15 +3278,16 @@ const downloadBulkInvoicesPdf = async (req, res) => {
           }
           Y += totH;
 
-          const gtotBoxH = 22;
+          const grandTotalVal = invoice.grandTotal || (totalTaxable + totalTax);
+          const gtotWordsText = numToWords(grandTotalVal);
+          const gtotBoxH = Math.max(22, doc.heightOfString(gtotWordsText, { width: CW - 260 }) + 8);
           doc.rect(PAD, Y, CW, gtotBoxH).fill(PRP);
 
           doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
             .text('Grand Total (in words):', PAD + 4, Y + 4, { width: 140 });
 
-          const grandTotalVal = invoice.grandTotal || (totalTaxable + totalTax);
           doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
-            .text(numToWords(grandTotalVal), PAD + 148, Y + 4, { width: CW - 260 });
+            .text(gtotWordsText, PAD + 148, Y + 4, { width: CW - 260 });
 
           doc.fillColor(WHT).fontSize(11).font('Helvetica-Bold')
             .text(`Rs. ${Number(grandTotalVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -3310,11 +3312,13 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             Y += 16;
           }
 
-          doc.rect(PAD, Y, CW, 16).fill(WHT).stroke(S200);
+          const taxWordsText = numToWords(totalTax);
+          const taxWordsH = Math.max(16, doc.heightOfString(taxWordsText, { width: CW - 109 }) + 5);
+          doc.rect(PAD, Y, CW, taxWordsH).fill(WHT).stroke(S200);
           doc.fillColor(S500).fontSize(7.5).font('Helvetica')
             .text('Tax Amount (in words):', PAD + 2, Y + 2)
-            .text(numToWords(totalTax), PAD + 105, Y + 2, { width: CW - 109 });
-          Y += 16;
+            .text(taxWordsText, PAD + 105, Y + 2, { width: CW - 109 });
+          Y += taxWordsH;
 
           return Y;
         };

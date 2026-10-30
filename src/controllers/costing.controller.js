@@ -168,20 +168,85 @@ const getMonthlyCostingReport = async (req, res) => {
       };
     });
 
-    // 2.5 Fetch Recorded Fabric Purchases from BillingPurchase for this month
+    // 2.5 Fetch Recorded Fabric & Raw Material Purchases from BillingPurchase & RawMaterialTransaction for this month
     try {
       if (db.BillingPurchase) {
-        const purchases = await db.BillingPurchase.find({
-          companyEntity: { $in: aliases },
-          date: { $gte: startDt, $lte: endDt }
-        }).lean();
+        const purchaseQuery = {
+          $and: [
+            {
+              $or: [
+                { companyEntity: { $in: aliases } },
+                { companyEntity: { $exists: false } },
+                { companyEntity: null },
+                { companyEntity: '' }
+              ]
+            },
+            {
+              $or: [
+                { date: { $gte: startDt, $lte: endDt } },
+                { date: { $gte: startDateStr, $lte: endDateStr } },
+                { createdAt: { $gte: startDt, $lte: endDt } }
+              ]
+            }
+          ]
+        };
+        const purchases = await db.BillingPurchase.find(purchaseQuery).lean();
         (purchases || []).forEach(p => {
-          const amt = Number(p.totalAmount || p.grandTotal || p.subtotal || 0);
-          expenseCategorySums.fabric = (expenseCategorySums.fabric || 0) + amt;
+          if (Array.isArray(p.items) && p.items.length > 0) {
+            p.items.forEach(it => {
+              const itAmt = Number(it.totalAmount || it.amount || (it.qty * it.rate) || 0);
+              const text = `${it.itemName || ''} ${it.description || ''} ${p.purchaseType || ''}`.toLowerCase();
+              if (/paper|sublimation/i.test(text)) {
+                expenseCategorySums.paper = (expenseCategorySums.paper || 0) + itAmt;
+              } else if (/ink|cmyk/i.test(text)) {
+                expenseCategorySums.ink = (expenseCategorySums.ink || 0) + itAmt;
+              } else {
+                expenseCategorySums.fabric = (expenseCategorySums.fabric || 0) + itAmt;
+              }
+            });
+          } else {
+            const amt = Number(p.totalAmount || p.grandTotal || p.subtotal || 0);
+            expenseCategorySums.fabric = (expenseCategorySums.fabric || 0) + amt;
+          }
+        });
+      }
+
+      if (db.RawMaterialTransaction) {
+        const rawTxs = await db.RawMaterialTransaction.find({
+          type: 'INWARD',
+          $and: [
+            {
+              $or: [
+                { companyEntity: { $in: aliases } },
+                { companyEntity: { $exists: false } },
+                { companyEntity: null },
+                { companyEntity: '' }
+              ]
+            },
+            {
+              $or: [
+                { date: { $gte: startDt, $lte: endDt } },
+                { createdAt: { $gte: startDt, $lte: endDt } }
+              ]
+            }
+          ]
+        }).lean();
+        (rawTxs || []).forEach(rt => {
+          const amt = Number(rt.amount || (rt.qty * rt.rate) || 0);
+          if (amt > 0) {
+            const text = `${rt.category || ''} ${rt.materialName || ''}`.toLowerCase();
+            if (/paper|sublimation/i.test(text)) {
+              expenseCategorySums.paper = (expenseCategorySums.paper || 0) + amt;
+            } else if (/ink|cmyk/i.test(text)) {
+              expenseCategorySums.ink = (expenseCategorySums.ink || 0) + amt;
+            } else {
+              expenseCategorySums.fabric = (expenseCategorySums.fabric || 0) + amt;
+            }
+          }
         });
       }
     } catch (pErr) {
-      logger.warn('Failed to aggregate BillingPurchase for costing: %s', pErr.message);
+      logger.warn('Failed to aggregate BillingPurchase/RawMaterial for costing: %s', pErr.message);
     }
 
     // 3. Fetch Stored Monthly Fixed Overheads for this month

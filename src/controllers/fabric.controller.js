@@ -76,6 +76,9 @@ const createInward = async (req, res) => {
     if (!fabricQuality || isNaN(numQty) || numQty <= 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a positive Quantity (>0) are required.' });
     }
+    if (numQty > 1000000) {
+      return res.status(400).json({ success: false, error: 'Inward quantity cannot exceed 1,000,000 meters.' });
+    }
 
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
@@ -185,6 +188,13 @@ const createInward = async (req, res) => {
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error creating inward fabric transaction:', error);
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      const messages = Object.values(error.errors || {}).map(e => e.message).filter(Boolean);
+      return res.status(400).json({
+        success: false,
+        error: messages.length > 0 ? messages.join('. ') : error.message
+      });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -196,6 +206,9 @@ const createOutward = async (req, res) => {
     
     if (!fabricQuality || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity (>0) are required.' });
+    }
+    if (parseFloat(qty) > 1000000) {
+      return res.status(400).json({ success: false, error: 'Outward quantity cannot exceed 1,000,000 meters.' });
     }
 
     const normFabric = normalizeFabric(fabricQuality);
@@ -322,6 +335,13 @@ const createOutward = async (req, res) => {
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error creating outward fabric transaction:', error);
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      const messages = Object.values(error.errors || {}).map(e => e.message).filter(Boolean);
+      return res.status(400).json({
+        success: false,
+        error: messages.length > 0 ? messages.join('. ') : error.message
+      });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 };

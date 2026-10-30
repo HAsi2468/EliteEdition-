@@ -69,19 +69,22 @@ const getAll = async (req, res) => {
     }
 
     if (search && String(search).trim()) {
-      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const searchOr = [
-        { designName:     { $regex: safeSearch, $options: 'i' } },
-        { designerName:   { $regex: safeSearch, $options: 'i' } },
-        { fabricName:     { $regex: safeSearch, $options: 'i' } },
-        { colourMatching: { $regex: safeSearch, $options: 'i' } },
-        { category:       { $regex: safeSearch, $options: 'i' } },
-        { colors:         { $regex: safeSearch, $options: 'i' } },
-        { parties:        { $regex: safeSearch, $options: 'i' } },
-        { partySkuId:     { $regex: safeSearch, $options: 'i' } },
-      ];
-      if (!filter.$and) filter.$and = [];
-      filter.$and.push({ $or: searchOr });
+      const tokens = String(search).trim().split(/\s+/).filter(Boolean);
+      tokens.forEach(tok => {
+        const safeTok = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchOr = [
+          { designName:     { $regex: safeTok, $options: 'i' } },
+          { designerName:   { $regex: safeTok, $options: 'i' } },
+          { fabricName:     { $regex: safeTok, $options: 'i' } },
+          { colourMatching: { $regex: safeTok, $options: 'i' } },
+          { category:       { $regex: safeTok, $options: 'i' } },
+          { colors:         { $regex: safeTok, $options: 'i' } },
+          { parties:        { $regex: safeTok, $options: 'i' } },
+          { partySkuId:     { $regex: safeTok, $options: 'i' } },
+        ];
+        if (!filter.$and) filter.$and = [];
+        filter.$and.push({ $or: searchOr });
+      });
     }
     const skip = (Number(page) - 1) * Number(limit);
     let sort = { designName: -1 };

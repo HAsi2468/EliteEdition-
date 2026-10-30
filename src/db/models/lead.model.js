@@ -38,7 +38,8 @@ const leadSchema = new mongoose.Schema({
   },
   estimatedValue: {
     type: Number,
-    default: 0
+    default: 0,
+    min: [0, 'Estimated deal value cannot be negative']
   },
   requirement: {
     type: String,
