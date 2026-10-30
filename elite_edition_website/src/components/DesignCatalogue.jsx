@@ -177,6 +177,11 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
     onChange(updated);
   };
 
+  const allUniqueOptions = Array.from(new Set([...options, ...selected])).filter(Boolean);
+  const filteredOptions = allUniqueOptions.filter(opt =>
+    opt.toLowerCase().includes(searchTerm.toLowerCase().trim())
+  );
+
   const removeParty = (party, e) => {
     e.stopPropagation();
     onChange(selected.filter(p => p !== party));
@@ -204,11 +209,6 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
       setCustomPartyInput('');
     }
   };
-
-  const allUniqueOptions = Array.from(new Set([...options, ...selected])).filter(Boolean);
-  const filteredOptions = allUniqueOptions.filter(opt =>
-    opt.toLowerCase().includes(searchTerm.toLowerCase().trim())
-  );
 
   return (
     <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 calc(50% - 0.5rem)', minWidth: '220px', position: 'relative' }}>

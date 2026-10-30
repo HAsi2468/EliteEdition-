@@ -174,12 +174,17 @@ export const ROUTE_ALIASES = {
   'jobcards': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcard': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
+  'jobcards_crm': { tab: 'jobcards_crm', dept: 'digital_print' },
+  'crm': { tab: 'jobcards_crm', dept: 'digital_print' },
   'design': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'designs': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'dispatch': { tab: 'jobcards_dispatch', dept: 'digital_print' },
   'jobcards_dispatch': { tab: 'jobcards_dispatch', dept: 'digital_print' },
   'inventory': { tab: 'inventory', dept: 'elite_online' },
+  'sales': { tab: 'sales', dept: 'elite_online' },
+  'catalog': { tab: 'catalog', dept: 'elite_online' },
+  'returns': { tab: 'returns', dept: 'elite_online' },
   'stock-ledger': { tab: 'inventory', dept: 'elite_online' },
   'stock_ledger': { tab: 'inventory', dept: 'elite_online' },
   'ee_complaints': { tab: 'ee_complaints', dept: 'elite_edition' },
@@ -1241,6 +1246,12 @@ export default function App() {
     if (activeTab === 'task_management' && hasTaskAccess) return;
 
     // Check company-level workspace tab access
+    if (activeDepartment === 'digital_print' && hasDigitalPrintAccess) {
+      if (EDP_PERMISSIONS.includes(activeTab) || activeTab.startsWith('jobcards')) return;
+    }
+    if (activeDepartment === 'stitching' && hasStitchingAccess) {
+      if (STITCHING_PERMISSIONS.includes(activeTab) || activeTab.startsWith('es_') || activeTab.startsWith('stitching_')) return;
+    }
     if (activeDepartment === 'elite_online' && hasEliteOnlineAccess) {
       if (ELITE_ONLINE_PERMISSIONS.includes(activeTab) || activeTab.startsWith('eo_')) return;
     }

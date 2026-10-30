@@ -182,16 +182,6 @@ export default function InventoryGrid({
     setOverviewPage(1);
   }, [searchTerm, sizeFilter, facilityFilter, stockStatusFilter, overviewDateStart, overviewDateEnd]);
 
-  useEffect(() => {
-    setInwardChallanPage(1);
-    setInwardItemPage(1);
-  }, [inwardSearchTerm, facilityFilter, inwardDateStart, inwardDateEnd]);
-
-  useEffect(() => {
-    setOutwardChallanPage(1);
-    setOutwardItemPage(1);
-  }, [outwardSearchTerm, facilityFilter, outwardDateStart, outwardDateEnd]);
-
   // Load facilities from backend and listen for dynamic updates
   const loadFacilities = useCallback(async () => {
     try {
@@ -257,6 +247,16 @@ export default function InventoryGrid({
   const [outwardLoading, setOutwardLoading] = useState(false);
   const [outwardError, setOutwardError] = useState('');
   const [downloadingOutwardPdf, setDownloadingOutwardPdf] = useState(false);
+
+  useEffect(() => {
+    setInwardChallanPage(1);
+    setInwardItemPage(1);
+  }, [inwardSearchTerm, facilityFilter, inwardDateStart, inwardDateEnd]);
+
+  useEffect(() => {
+    setOutwardChallanPage(1);
+    setOutwardItemPage(1);
+  }, [outwardSearchTerm, facilityFilter, outwardDateStart, outwardDateEnd]);
 
   // Challan-Wise Outward View States
   const [outwardViewMode, setOutwardViewMode] = useState('challan'); // 'challan' (default) | 'items'

@@ -80,6 +80,40 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const scanDebounceRef = useRef(null);
   const lastScanTimestampRef = useRef({ code: '', time: 0 });
 
+  // Scroll preservation reference
+  const scrollPosRef = useRef(0);
+  const scanInputRef = useRef(null);
+
+  // Helper to create empty row
+  const createEmptyRow = (partyVal = '', facVal = '') => ({
+    skuCode: '',
+    itemName: '',
+    size: '',
+    qtyOut: 1,
+    availableStock: 0,
+    party: partyVal,
+    facility: facVal || (selectedFacility !== 'All' ? selectedFacility : ''),
+    imageUrl: '',
+  });
+
+  const [formRows, setFormRows] = useState(() => {
+    if (prefilledItem) {
+      const sizeStr = Array.isArray(prefilledItem.size) ? prefilledItem.size[0] : (prefilledItem.size || '');
+      return [{
+        skuCode: prefilledItem.skuCode || '',
+        itemName: prefilledItem.itemName || prefilledItem.description || '',
+        size: sizeStr,
+        qtyOut: 1,
+        availableStock: prefilledItem.currentlyAvailableStock || 0,
+        party: prefilledItem.party || '',
+        facility: prefilledItem.facility || '',
+        imageUrl: prefilledItem.imageUrl || '',
+        originalItem: prefilledItem
+      }];
+    }
+    return [createEmptyRow()];
+  });
+
   // Auto-listen to physical hardware USB/Bluetooth barcode scanners globally
   useHardwareBarcodeSniffer((scanData) => {
     if (scanData && scanData.code) {
@@ -115,40 +149,6 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Scroll preservation reference
-  const scrollPosRef = useRef(0);
-  const scanInputRef = useRef(null);
-
-  // Helper to create empty row
-  const createEmptyRow = (partyVal = '', facVal = '') => ({
-    skuCode: '',
-    itemName: '',
-    size: '',
-    qtyOut: 1,
-    availableStock: 0,
-    party: partyVal,
-    facility: facVal || (selectedFacility !== 'All' ? selectedFacility : ''),
-    imageUrl: '',
-  });
-
-  const [formRows, setFormRows] = useState(() => {
-    if (prefilledItem) {
-      const sizeStr = Array.isArray(prefilledItem.size) ? prefilledItem.size[0] : (prefilledItem.size || '');
-      return [{
-        skuCode: prefilledItem.skuCode || '',
-        itemName: prefilledItem.itemName || prefilledItem.description || '',
-        size: sizeStr,
-        qtyOut: 1,
-        availableStock: prefilledItem.currentlyAvailableStock || 0,
-        party: prefilledItem.party || '',
-        facility: prefilledItem.facility || '',
-        imageUrl: prefilledItem.imageUrl || '',
-        originalItem: prefilledItem
-      }];
-    }
-    return [createEmptyRow()];
-  });
 
   // Real registered parties for autocompletion
   const [allParties, setAllParties] = useState([]);

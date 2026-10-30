@@ -19,6 +19,25 @@ export class ErrorBoundary extends Component {
     console.error('[ErrorBoundary caught error]:', error, errorInfo);
   }
 
+  componentDidMount() {
+    this._resetOnNav = () => {
+      if (this.state.hasError) {
+        this.setState({ hasError: false, error: null });
+      }
+    };
+    window.addEventListener('hashchange', this._resetOnNav);
+    window.addEventListener('popstate', this._resetOnNav);
+    window.addEventListener('elite-route-change', this._resetOnNav);
+  }
+
+  componentWillUnmount() {
+    if (this._resetOnNav) {
+      window.removeEventListener('hashchange', this._resetOnNav);
+      window.removeEventListener('popstate', this._resetOnNav);
+      window.removeEventListener('elite-route-change', this._resetOnNav);
+    }
+  }
+
   handleReload = () => {
     this.setState({ hasError: false, error: null });
     window.location.reload();

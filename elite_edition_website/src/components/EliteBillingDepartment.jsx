@@ -352,25 +352,6 @@ export default function EliteBillingDepartment({
     return false;
   });
 
-  const computeNextPurchaseNo = (list = purchases, forEntity = (purchaseForm?.companyEntity || companyEntity)) => {
-    const norm = String(forEntity || '').trim().toLowerCase();
-    const isEthno = norm.includes('ethno') || norm === 'ew';
-    const prefix = isEthno ? 'EWP-' : 'DP-';
-    const regex = isEthno ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
-    let maxNum = 0;
-    (list || []).forEach(p => {
-      if (p && p.purchaseNo) {
-        const match = String(p.purchaseNo).trim().match(regex);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxNum) maxNum = num;
-        }
-      }
-    });
-    const nextSeq = maxNum + 1;
-    return `${prefix}${String(nextSeq).padStart(2, '0')}`;
-  };
-
   const createEmptyPurchaseItem = () => ({
     id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     itemName: '',
@@ -423,6 +404,25 @@ export default function EliteBillingDepartment({
     paidAmount: 0,
     notes: 'Vendor purchase bill recorded in ERP.'
   });
+
+  const computeNextPurchaseNo = (list = purchases, forEntity = (purchaseForm?.companyEntity || companyEntity)) => {
+    const norm = String(forEntity || '').trim().toLowerCase();
+    const isEthno = norm.includes('ethno') || norm === 'ew';
+    const prefix = isEthno ? 'EWP-' : 'DP-';
+    const regex = isEthno ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
+    let maxNum = 0;
+    (list || []).forEach(p => {
+      if (p && p.purchaseNo) {
+        const match = String(p.purchaseNo).trim().match(regex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+    const nextSeq = maxNum + 1;
+    return `${prefix}${String(nextSeq).padStart(2, '0')}`;
+  };
 
   // ── REAL-TIME PURCHASE CALCULATIONS (mirroring calculatedInvoice) ─────────────
   const calculatedPurchase = useMemo(() => {

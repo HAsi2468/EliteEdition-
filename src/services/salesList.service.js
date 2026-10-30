@@ -116,10 +116,13 @@ const getSalseListFromDB = async (
 
     return {
       data: salesListWithCounts,
+      totalPages,
+      totalRecords,
       meta: {
         currentPage: pageNum,
         pageSize: limitNum,
         totalPages,
+        totalRecords,
       },
     };
   } catch (error) {

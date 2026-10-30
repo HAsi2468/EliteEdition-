@@ -1532,6 +1532,9 @@ const deleteGroup = async (req, res) => {
       req.user.isAdmin === true ||
       req.user.isMainAdmin === true
     );
+    const isCreator = Boolean(
+      req.user && room.createdBy && String(room.createdBy) === String(req.user._id || req.user.id)
+    );
     const isMember = req.user && (
       (room.type === 'direct' && room.members?.some(m => String(m) === String(req.user._id)))
     );

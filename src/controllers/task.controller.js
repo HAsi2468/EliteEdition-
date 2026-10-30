@@ -3,6 +3,8 @@ const { Task } = require('../db/models/task.model');
 const { user: User } = require('../db/models');
 const webPushService = require('../services/webPush.service');
 
+let _lastOverdueCheckAt = 0;
+
 /**
  * Get all tasks with pagination, search, & multi-attribute filtering
  */
@@ -42,10 +44,32 @@ const getTasks = async (req, res) => {
       query.lotNo = { $regex: lotNo, $options: 'i' };
     }
     if (assignee && assignee !== 'all') {
-      query.assignees = mongoose.Types.ObjectId.isValid(assignee) ? new mongoose.Types.ObjectId(assignee) : assignee;
+      if (mongoose.Types.ObjectId.isValid(assignee)) {
+        query.assignees = new mongoose.Types.ObjectId(assignee);
+      } else {
+        const matchedUsers = await User.find({
+          $or: [
+            { name: { $regex: assignee, $options: 'i' } },
+            { username: { $regex: assignee, $options: 'i' } },
+            { email: { $regex: assignee, $options: 'i' } }
+          ]
+        }).select('_id').lean();
+        query.assignees = { $in: matchedUsers.map(u => u._id) };
+      }
     }
     if (createdBy && createdBy !== 'all') {
-      query.createdBy = mongoose.Types.ObjectId.isValid(createdBy) ? new mongoose.Types.ObjectId(createdBy) : createdBy;
+      if (mongoose.Types.ObjectId.isValid(createdBy)) {
+        query.createdBy = new mongoose.Types.ObjectId(createdBy);
+      } else {
+        const matchedUsers = await User.find({
+          $or: [
+            { name: { $regex: createdBy, $options: 'i' } },
+            { username: { $regex: createdBy, $options: 'i' } },
+            { email: { $regex: createdBy, $options: 'i' } }
+          ]
+        }).select('_id').lean();
+        query.createdBy = { $in: matchedUsers.map(u => u._id) };
+      }
     }
 
     // Exclude test tasks from all live lists
@@ -104,23 +128,39 @@ const getTasks = async (req, res) => {
       query.$and = andConditions;
     }
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(2000, parseInt(limit, 10) || 200));
     const skip = (pageNum - 1) * limitNum;
-    const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+    const allowedSortFields = new Set(['createdAt', 'updatedAt', 'dueDate', 'priority', 'status', 'title']);
+    const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : 'createdAt';
+    const sort = { [safeSortBy]: sortOrder === 'asc' ? 1 : -1 };
 
     const total = await Task.countDocuments(query);
-    const tasks = await Task.find(query)
-      .populate('assignees', 'name email role department avatar')
-      .populate('createdBy', 'name email role avatar')
-      .populate('dependencies', 'title status priority')
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum);
+    let tasks;
+    try {
+      tasks = await Task.find(query)
+        .populate('assignees', 'name email role department avatar')
+        .populate('createdBy', 'name email role avatar')
+        .populate('dependencies', 'title status priority')
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum);
+    } catch (popErr) {
+      console.warn('[TaskController] Populate fallback triggered:', popErr.message);
+      tasks = await Task.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum)
+        .lean();
+    }
 
-    // Trigger async overdue tasks check
-    const io = req.app?.get ? (req.app.get('socketio') || req.app.get('io')) : (global.io || null);
-    checkOverdueTasks(io).catch(e => console.error('Overdue check error:', e));
+    // Trigger throttled async overdue tasks check (max once every 60s)
+    const now = Date.now();
+    if (now - _lastOverdueCheckAt > 60000) {
+      _lastOverdueCheckAt = now;
+      const io = req.app?.get ? (req.app.get('socketio') || req.app.get('io')) : (global.io || null);
+      checkOverdueTasks(io).catch(e => console.error('Overdue check error:', e));
+    }
 
     res.json({
       success: true,

@@ -538,7 +538,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
       await Promise.allSettled([
         (async () => {
           try {
-            const tasksRes = await api.getTasks({ limit: 200 });
+            let tasksRes;
+            try {
+              tasksRes = await api.getTasks({ limit: 200 });
+            } catch (_) {
+              await new Promise((r) => setTimeout(r, 400));
+              tasksRes = await api.getTasks({ limit: 200 });
+            }
             if (tasksRes?.success && tasksRes?.data) {
               const rawTasks = tasksRes.data;
               setTasks(isMasterAdmin ? rawTasks : rawTasks.filter(isTaskVisible));

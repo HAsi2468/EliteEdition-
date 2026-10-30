@@ -4217,6 +4217,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
     }
   };
 
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const loadingMoreRef = useRef(false);
+
   const fetchCards = useCallback(async (isSilent = false, targetPage = 1, targetPageSize = pageSizeRef.current) => {
     if (activeSubTab !== 'list') return;
     // Cancel any in-flight request to prevent race conditions
@@ -4272,10 +4276,6 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       if (!controller.signal.aborted) setLoading(false);
     }
   }, [debouncedSearch, statusFilter, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
-
-  const pageRef = useRef(page);
-  pageRef.current = page;
-  const loadingMoreRef = useRef(false);
 
   // Infinite scroll loader: fetches next page and appends with deduplication
   const loadMore = useCallback(async () => {

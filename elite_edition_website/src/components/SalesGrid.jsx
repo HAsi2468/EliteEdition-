@@ -157,7 +157,7 @@ export default function SalesGrid() {
         setOrders(res.data);
         if (res.meta) {
           setTotalPages(res.meta.totalPages || 1);
-          setTotal(res.meta.totalRecords || 0);
+          setTotal(res.meta.totalRecords ?? res.totalRecords ?? res.data.length ?? 0);
         }
         setPage(targetPage);
         pageRef.current = targetPage;
