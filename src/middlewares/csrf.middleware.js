@@ -50,6 +50,7 @@ const createCsrfMiddleware = (options = {}) => {
     if (
       path.endsWith('/csrf-token') ||
       path.includes('/auth/csrf-token') ||
+      path.includes('/auth/logout') ||
       path.includes('/notifications/focus') ||
       path.includes('/telemetry') ||
       path.includes('/challanVerification') ||
