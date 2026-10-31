@@ -13,6 +13,12 @@ import {
   focusSearchInput,
   cyclePanes,
   handleGlobalEnterAsTab,
+  scrollTableHorizontally,
+  navigateTableRows,
+  triggerPrimaryNewAction,
+  triggerScreenRefresh,
+  triggerExportExcel,
+  focusDateRangeFilter,
 } from './navigationHelpers';
 
 interface HotkeyContextValue {
@@ -220,7 +226,37 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // 5. Universal Sub-Tab Switching (Alt + ArrowRight/Left or Ctrl + ]/[)
+      // 5. Wide Table Keyboard Horizontal Scrolling (Shift + ArrowLeft/Right, Shift + Home/End, Alt + PageUp/Down)
+      const isShiftArrow = e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
+      const isShiftHomeEnd = e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === 'Home' || e.key === 'End');
+      const isAltPage = (e.altKey || e.shiftKey) && (e.key === 'PageUp' || e.key === 'PageDown');
+
+      const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+      const isDirectlyOnTable = activeEl && (
+        activeEl.tagName?.toLowerCase() === 'table' ||
+        activeEl.hasAttribute('data-keyboard-scroll') ||
+        activeEl.classList?.contains('overflow-x-auto') ||
+        activeEl.getAttribute('role') === 'region' ||
+        activeEl.getAttribute('role') === 'grid'
+      );
+      const isBareArrowOnTable = isDirectlyOnTable && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
+
+      if ((isShiftArrow && !inInput) || (isShiftHomeEnd && !inInput) || isAltPage || isBareArrowOnTable) {
+        let direction: 'left' | 'right' | 'home' | 'end' = 'right';
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') direction = 'left';
+        else if (e.key === 'ArrowRight' || e.key === 'PageDown') direction = 'right';
+        else if (e.key === 'Home') direction = 'home';
+        else if (e.key === 'End') direction = 'end';
+
+        const scrolled = scrollTableHorizontally(direction);
+        if (scrolled) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 6. Universal Sub-Tab Switching (Alt + ArrowRight/Left or Ctrl + ]/[)
       if ((e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) ||
           (isCtrlOrMeta && (e.key === ']' || e.key === '['))) {
         const direction = (e.key === 'ArrowRight' || e.key === ']') ? 'next' : 'prev';
@@ -298,6 +334,96 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const handledTab = handleGlobalEnterAsTab(e);
         if (handledTab) {
           return;
+        }
+      }
+
+      // 13. Primary Action Shortcuts: New (Alt+N), Refresh (F5 / Alt+R), Export (Alt+E), Date (Alt+D)
+      if (e.altKey && !isCtrlOrMeta) {
+        if (key === 'n' || e.code === 'KeyN') {
+          const handled = triggerPrimaryNewAction();
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+        if (key === 'r' || e.code === 'KeyR') {
+          const handled = triggerScreenRefresh();
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+        if (key === 'e' || e.code === 'KeyE') {
+          const handled = triggerExportExcel();
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+        if (key === 'd' || e.code === 'KeyD') {
+          const handled = focusDateRangeFilter();
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+      }
+
+      // Intercept F5 for seamless in-app table data refresh without full browser reload
+      if (upperKey === 'F5') {
+        const refreshed = triggerScreenRefresh();
+        if (refreshed) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      // 14. Quick Table Bracket Scrolling ([ / ] when not inside a text input)
+      if (!inInput && !e.altKey && !isCtrlOrMeta) {
+        if (e.key === '[' || e.key === ']') {
+          const scrolled = scrollTableHorizontally(e.key === ']' ? 'right' : 'left');
+          if (scrolled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+      }
+
+      // 15. Table Row Roving Navigation (ArrowUp / ArrowDown / Enter / Space on table rows)
+      if (!inInput && !e.altKey && !isCtrlOrMeta) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          // If active element is a table row or body
+          const isRow = activeEl && (activeEl.tagName?.toLowerCase() === 'tr' || activeEl.hasAttribute('data-erp-active-row'));
+          if (isRow || isDirectlyOnTable) {
+            const moved = navigateTableRows(e.key === 'ArrowDown' ? 'down' : 'up');
+            if (moved) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          }
+        } else if (activeEl && (activeEl.tagName?.toLowerCase() === 'tr' || activeEl.hasAttribute('data-erp-active-row'))) {
+          if (e.key === 'Enter') {
+            const entered = navigateTableRows('enter');
+            if (entered) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          } else if (e.key === ' ') {
+            const toggled = navigateTableRows('space');
+            if (toggled) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          }
         }
       }
     };

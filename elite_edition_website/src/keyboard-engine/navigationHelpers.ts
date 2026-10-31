@@ -373,3 +373,290 @@ export function activateSidebarModule(index: number): boolean {
 
   return false;
 }
+
+/**
+ * Universal Wide Table Keyboard Horizontal Scroll Engine
+ * Allows users to scroll horizontally through large tables without touching the mouse.
+ */
+export function getActiveHorizontalScrollContainer(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+
+  const active = document.activeElement as HTMLElement | null;
+
+  // 1. If currently focused element is inside or is itself a scrollable container
+  if (active && active !== document.body && active !== document.documentElement) {
+    let curr: HTMLElement | null = active;
+    while (curr && curr !== document.body) {
+      if (curr.scrollWidth > curr.clientWidth + 5) {
+        const style = window.getComputedStyle(curr);
+        if (
+          style.overflowX === 'auto' ||
+          style.overflowX === 'scroll' ||
+          curr.classList.contains('overflow-x-auto') ||
+          curr.hasAttribute('data-keyboard-scroll')
+        ) {
+          return curr;
+        }
+      }
+      curr = curr.parentElement;
+    }
+  }
+
+  // 2. Look for any visible table container with horizontal overflow on the active screen
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[data-keyboard-scroll="true"], .table-responsive, .responsive-table-wrapper, .overflow-x-auto, [role="region"], table'
+    )
+  );
+
+  for (const el of candidates) {
+    const target = el.tagName.toLowerCase() === 'table' ? el.parentElement : el;
+    if (target && target.scrollWidth > target.clientWidth + 10) {
+      const rect = target.getBoundingClientRect();
+      if (rect.height > 0 && rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight) {
+        return target;
+      }
+    }
+  }
+
+  // 3. Fallback: inspect elements inside main-content-area
+  const main = document.getElementById('main-content-area') || document.body;
+  const allContainers = Array.from(main.querySelectorAll<HTMLElement>('div, section, main'));
+  for (const div of allContainers) {
+    if (div.scrollWidth > div.clientWidth + 15) {
+      const style = window.getComputedStyle(div);
+      if (style.overflowX === 'auto' || style.overflowX === 'scroll') {
+        const rect = div.getBoundingClientRect();
+        if (rect.height > 40 && rect.top < window.innerHeight && rect.bottom > 80) {
+          return div;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Universally scroll the active wide table horizontally via keyboard
+ * @param direction 'left' | 'right' | 'home' | 'end'
+ * @param amount optional custom pixel amount
+ */
+export function scrollTableHorizontally(
+  direction: 'left' | 'right' | 'home' | 'end',
+  amount?: number
+): boolean {
+  const container = getActiveHorizontalScrollContainer();
+  if (!container) return false;
+
+  const clientW = container.clientWidth || 400;
+  const step = amount ?? Math.max(160, Math.floor(clientW * 0.25));
+
+  if (direction === 'home') {
+    container.scrollTo({ left: 0, behavior: 'smooth' });
+    return true;
+  }
+  if (direction === 'end') {
+    container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+    return true;
+  }
+
+  const delta = direction === 'right' ? step : -step;
+  container.scrollBy({ left: delta, behavior: 'smooth' });
+  return true;
+}
+
+/**
+ * Table Row Keyboard Navigation (Roving Focus across table rows)
+ * Allows users to traverse rows with ArrowUp / ArrowDown, open row with Enter,
+ * and toggle row selection with Space.
+ */
+export function navigateTableRows(action: 'up' | 'down' | 'enter' | 'space'): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const container = getActiveHorizontalScrollContainer() || document.getElementById('main-content-area') || document.body;
+  const rows = Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody tr')).filter(
+    (tr) => (tr.offsetWidth || tr.offsetHeight || tr.getClientRects().length) > 0
+  );
+
+  if (!rows.length) return false;
+
+  const activeEl = document.activeElement as HTMLElement | null;
+  let activeIndex = rows.findIndex(
+    (r) => r === activeEl || r.contains(activeEl) || r.getAttribute('data-erp-active-row') === 'true'
+  );
+
+  if (action === 'down') {
+    const nextIdx = activeIndex === -1 ? 0 : Math.min(rows.length - 1, activeIndex + 1);
+    const targetRow = rows[nextIdx];
+    rows.forEach((r) => r.removeAttribute('data-erp-active-row'));
+    targetRow.setAttribute('data-erp-active-row', 'true');
+    targetRow.tabIndex = 0;
+    targetRow.focus();
+    targetRow.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    return true;
+  }
+
+  if (action === 'up') {
+    const prevIdx = activeIndex === -1 ? 0 : Math.max(0, activeIndex - 1);
+    const targetRow = rows[prevIdx];
+    rows.forEach((r) => r.removeAttribute('data-erp-active-row'));
+    targetRow.setAttribute('data-erp-active-row', 'true');
+    targetRow.tabIndex = 0;
+    targetRow.focus();
+    targetRow.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    return true;
+  }
+
+  if (action === 'enter' && activeIndex !== -1) {
+    const targetRow = rows[activeIndex];
+    const clickTarget =
+      targetRow.querySelector<HTMLElement>('button:not([disabled]), a[href], [data-action="view"]') ||
+      targetRow;
+    clickTarget.click();
+    return true;
+  }
+
+  if (action === 'space' && activeIndex !== -1) {
+    const targetRow = rows[activeIndex];
+    const checkbox = targetRow.querySelector<HTMLInputElement>('input[type="checkbox"]:not([disabled])');
+    if (checkbox) {
+      checkbox.click();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Trigger Primary "New / Create" Button on active screen (Alt + N)
+ */
+export function triggerPrimaryNewAction(): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const content = document.getElementById('main-content-area') || document.body;
+  const buttons = Array.from(content.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
+
+  for (const btn of buttons) {
+    const text = (btn.textContent || '').trim();
+    const aria = btn.getAttribute('aria-label') || '';
+    const title = btn.getAttribute('title') || '';
+    const combined = `${text} ${aria} ${title}`.toLowerCase();
+
+    if (
+      btn.getAttribute('data-action') === 'create' ||
+      btn.getAttribute('data-action') === 'new' ||
+      /^\+\s*(new|add)/i.test(text) ||
+      combined.includes('new job card') ||
+      combined.includes('new invoice') ||
+      combined.includes('new purchase') ||
+      combined.includes('new inward') ||
+      combined.includes('new item') ||
+      combined.includes('add party') ||
+      combined.includes('add product') ||
+      combined.includes('new expense') ||
+      combined.includes('new complain')
+    ) {
+      if (btn.offsetWidth > 0 && btn.offsetHeight > 0) {
+        btn.focus();
+        btn.click();
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Trigger Screen Refresh Button (F5 or Alt + R)
+ */
+export function triggerScreenRefresh(): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const content = document.getElementById('main-content-area') || document.body;
+  const buttons = Array.from(content.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
+
+  for (const btn of buttons) {
+    const text = (btn.textContent || '').trim();
+    const title = btn.getAttribute('title') || '';
+    const aria = btn.getAttribute('aria-label') || '';
+    const combined = `${text} ${title} ${aria}`.toLowerCase();
+
+    if (
+      btn.getAttribute('data-action') === 'refresh' ||
+      combined === 'refresh' ||
+      combined.includes('refresh data') ||
+      combined.includes('sync list') ||
+      btn.querySelector('svg.lucide-refresh-cw') !== null
+    ) {
+      if (btn.offsetWidth > 0 && btn.offsetHeight > 0) {
+        btn.focus();
+        btn.click();
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Trigger Screen Excel Export Button (Alt + E)
+ */
+export function triggerExportExcel(): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const content = document.getElementById('main-content-area') || document.body;
+  const buttons = Array.from(content.querySelectorAll<HTMLButtonElement>('button:not([disabled]), a.export-btn'));
+
+  for (const btn of buttons) {
+    const text = (btn.textContent || '').trim().toLowerCase();
+    const title = (btn.getAttribute('title') || '').toLowerCase();
+    const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+    const combined = `${text} ${title} ${aria}`;
+
+    if (
+      btn.getAttribute('data-action') === 'export' ||
+      combined.includes('export') ||
+      combined.includes('excel') ||
+      combined.includes('download xlsx') ||
+      combined.includes('download csv')
+    ) {
+      if (btn.offsetWidth > 0 && btn.offsetHeight > 0) {
+        btn.focus();
+        btn.click();
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Focus Date Range Picker filter (Alt + D)
+ */
+export function focusDateRangeFilter(): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const content = document.getElementById('main-content-area') || document.body;
+  const dateBtn = content.querySelector<HTMLButtonElement>(
+    'button.date-preset-btn, button[data-filter="date"], button:has(svg.lucide-calendar)'
+  );
+
+  if (dateBtn && dateBtn.offsetWidth > 0) {
+    dateBtn.focus();
+    dateBtn.click();
+    return true;
+  }
+
+  const dateInput = content.querySelector<HTMLInputElement>('input[type="date"], input.date-range-input');
+  if (dateInput && dateInput.offsetWidth > 0) {
+    dateInput.focus();
+    return true;
+  }
+
+  return false;
+}

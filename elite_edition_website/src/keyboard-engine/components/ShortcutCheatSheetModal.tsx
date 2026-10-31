@@ -39,6 +39,19 @@ const SHORTCUT_DATABASE: ShortcutCategory[] = [
     ],
   },
   {
+    title: 'Quick Actions & Screen Operations',
+    items: [
+      { key: 'Alt + N', description: 'Quick New / Create (+ New Job Card, Invoice, Inward, Item)' },
+      { key: 'Alt + R / F5', description: 'Refresh active list data without full browser reload' },
+      { key: 'Alt + E', description: 'Export active screen data to Excel / XLSX' },
+      { key: 'Alt + D', description: 'Quick focus / open Date Range Filter' },
+      { key: 'Arrow Up / Down', description: 'Navigate through table rows smoothly' },
+      { key: 'Enter on Row', description: 'Open / drill-down into focused row details' },
+      { key: 'Space on Row', description: 'Toggle row multi-selection checkbox' },
+      { key: '[ and ]', description: 'Quick bracket scroll wide table horizontally' },
+    ],
+  },
+  {
     title: 'Voucher Entry & Actions',
     items: [
       { key: 'Ctrl + S / Ctrl + A', description: 'Save and Accept Active Form' },
@@ -69,6 +82,15 @@ const SHORTCUT_DATABASE: ShortcutCategory[] = [
       { key: '500 + 250', description: 'Evaluates to 750 upon pressing Enter' },
       { key: '1500 * 1.18', description: 'Evaluates 18% GST (1770) automatically' },
       { key: '1000 - 10%', description: 'Evaluates 10% discount (900) automatically' },
+    ],
+  },
+  {
+    title: 'Wide Table Horizontal Scrolling',
+    items: [
+      { key: 'Shift + Arrow Left / Right', description: 'Scroll wide table horizontally left or right' },
+      { key: 'Shift + Home / End', description: 'Jump to first column / last action column in table' },
+      { key: 'Alt + PageUp / PageDown', description: 'Page scroll wide table horizontally' },
+      { key: 'Tab into Table Container', description: 'Focus table container to scroll with Arrow Left / Right' },
     ],
   },
   {

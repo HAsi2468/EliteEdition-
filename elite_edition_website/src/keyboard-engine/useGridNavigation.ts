@@ -62,6 +62,7 @@ export function useGridNavigation<T = any>(
     );
     if (targetCell) {
       targetCell.focus();
+      targetCell.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     }
   }, [activeCell, isEditing]);
 

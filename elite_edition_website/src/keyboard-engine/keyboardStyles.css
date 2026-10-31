@@ -297,4 +297,61 @@ body[data-erp-alt-mode="true"] .erp-mnemonic-badge {
   }
 }
 
+/* 8. Horizontally Scrollable Table Containers */
+.overflow-x-auto,
+.table-responsive,
+.responsive-table-wrapper,
+[data-keyboard-scroll="true"],
+[role="region"][aria-label*="table" i] {
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+}
+
+.overflow-x-auto:focus-visible,
+.table-responsive:focus-visible,
+.responsive-table-wrapper:focus-visible,
+[data-keyboard-scroll="true"]:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: -2px !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important;
+}
+
+/* 9. Active Table Row Keyboard Focus Highlight */
+tr[data-erp-active-row="true"] {
+  background-color: #eff6ff !important;
+  outline: 2px solid #2563eb !important;
+  outline-offset: -2px !important;
+}
+
+tr[data-erp-active-row="true"] td {
+  background-color: #eff6ff !important;
+}
+
+/* 10. Smooth custom scrollbars for horizontally wide tables */
+.overflow-x-auto::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar,
+.responsive-table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track,
+.responsive-table-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb,
+.responsive-table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover,
+.responsive-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 
