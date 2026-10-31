@@ -136,6 +136,19 @@ const deleteFacility = async (req, res) => {
 
 const seedFacilitiesOnStartup = async () => {
   try {
+    // Purge QA-TEST test facilities (SEC-010 & QA Cleanup)
+    await db.Facility.deleteMany({
+      $or: [
+        { name: /QA-TEST/i },
+        { code: 'QAT' },
+        { code: /QA-TEST/i }
+      ]
+    }).catch(() => {});
+
+    // Clean up QA-TEST test users (SEC-008 - SEC-011 QA cleanup)
+    const User = require('../db/models/user.model');
+    await User.deleteMany({ email: /qa-test-viewer/i }).catch(() => {});
+
     const count = await db.Facility.countDocuments();
     if (count === 0) {
       logger.info('[FACILITY] No facilities found, auto-seeding defaults on startup...');

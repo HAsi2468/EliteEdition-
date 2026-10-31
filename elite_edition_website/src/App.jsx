@@ -3,43 +3,80 @@ import ReactDOM from 'react-dom';
 import { api, getBaseUrl, setBaseUrl } from './services/api';
 import Login from './components/Login';
 
-// Dynamic code-splitting for all route and workspace modules
-const ClientLogin = lazy(() => import('./components/ClientLogin'));
-const ClientPortal = lazy(() => import('./components/ClientPortal'));
-const DashboardStats = lazy(() => import('./components/DashboardStats'));
-const InventoryGrid = lazy(() => import('./components/InventoryGrid'));
-const ProductCatalogGrid = lazy(() => import('./components/ProductCatalogGrid'));
-const InventoryForm = lazy(() => import('./components/InventoryForm'));
-const BulkInwardModal = lazy(() => import('./components/BulkInwardModal'));
-const SalesGrid = lazy(() => import('./components/SalesGrid'));
-const StockOutForm = lazy(() => import('./components/StockOutForm'));
-const CatalogManagerModal = lazy(() => import('./components/CatalogManagerModal'));
-const JobCardPanel = lazy(() => import('./components/JobCardPanel'));
-const StitchingSettings = lazy(() => import('./components/StitchingSettings'));
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
-const Workspace = lazy(() => import('./components/Workspace'));
-const CommunicationPanel = lazy(() => import('./components/CommunicationPanel'));
-const TaskManagerPanel = lazy(() => import('./components/TaskManagerPanel'));
-const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPanel'));
-const DocumentDesignStudio = lazy(() => import('./components/DesignStudio/DocumentDesignStudio'));
-const EliteBillingDepartment = lazy(() => import('./components/EliteBillingDepartment'));
-const RawMaterialsPanel = lazy(() => import('./components/RawMaterialsPanel'));
-const YamunajiRfdPanel = lazy(() => import('./components/YamunajiRfdPanel'));
-const CompanyDevelopmentWorkspace = lazy(() => import('./components/CompanyDevelopmentWorkspace'));
-const DigitalPrintComplainModule = lazy(() => import('./components/DigitalPrintComplainModule'));
-const DigitalPrintExpenseModule = lazy(() => import('./components/DigitalPrintExpenseModule'));
-const CompanyDedicatedDashboard = lazy(() => import('./components/CompanyDedicatedDashboard'));
-const GarmentJobCardDashboard = lazy(() => import('./components/GarmentJobCardDashboard'));
-const CrmPanel = lazy(() => import('./components/CrmPanel'));
-const BusinessConnectionPanel = lazy(() => import('./components/BusinessConnectionPanel'));
-const ReportsCenter = lazy(() => import('./components/ReportsCenter'));
-const UnicommerceHub = lazy(() => import('./components/UnicommerceHub'));
-const MyntraHub = lazy(() => import('./components/MyntraHub'));
-const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
-const ScanAndPackScreen = lazy(() => import('./components/ScanAndPackScreen'));
-const DesignerModule = lazy(() => import('./components/DesignerModule'));
-const DesignerScreen = lazy(() => import('./components/DesignerScreen'));
-const LedgerReconciliationPanel = lazy(() => import('./components/LedgerReconciliationPanel'));
+// Dynamic code-splitting with auto-retry and chunk recovery
+const lazyWithRetry = (componentImport) =>
+  lazy(() =>
+    new Promise((resolve, reject) => {
+      let attempts = 0;
+      const execute = () => {
+        attempts++;
+        componentImport()
+          .then(resolve)
+          .catch((error) => {
+            const msg = String(error?.message || '');
+            const isChunkOrFetchError =
+              msg.includes('dynamically imported module') ||
+              msg.includes('Loading chunk') ||
+              msg.includes('Failed to fetch') ||
+              msg.includes('Importing a module script failed');
+
+            if (attempts < 3) {
+              setTimeout(execute, 500 * attempts);
+            } else if (isChunkOrFetchError && typeof window !== 'undefined') {
+              const storageKey = 'elite_last_chunk_reload';
+              const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+              const now = Date.now();
+              if (now - lastReload > 12000) {
+                sessionStorage.setItem(storageKey, String(now));
+                window.location.reload();
+              } else {
+                reject(error);
+              }
+            } else {
+              reject(error);
+            }
+          });
+      };
+      execute();
+    })
+  );
+
+const ClientLogin = lazyWithRetry(() => import('./components/ClientLogin'));
+const ClientPortal = lazyWithRetry(() => import('./components/ClientPortal'));
+const DashboardStats = lazyWithRetry(() => import('./components/DashboardStats'));
+const InventoryGrid = lazyWithRetry(() => import('./components/InventoryGrid'));
+const ProductCatalogGrid = lazyWithRetry(() => import('./components/ProductCatalogGrid'));
+const InventoryForm = lazyWithRetry(() => import('./components/InventoryForm'));
+const BulkInwardModal = lazyWithRetry(() => import('./components/BulkInwardModal'));
+const SalesGrid = lazyWithRetry(() => import('./components/SalesGrid'));
+const StockOutForm = lazyWithRetry(() => import('./components/StockOutForm'));
+const CatalogManagerModal = lazyWithRetry(() => import('./components/CatalogManagerModal'));
+const JobCardPanel = lazyWithRetry(() => import('./components/JobCardPanel'));
+const StitchingSettings = lazyWithRetry(() => import('./components/StitchingSettings'));
+const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
+const Workspace = lazyWithRetry(() => import('./components/Workspace'));
+const CommunicationPanel = lazyWithRetry(() => import('./components/CommunicationPanel'));
+const TaskManagerPanel = lazyWithRetry(() => import('./components/TaskManagerPanel'));
+const CompanySettingsPanel = lazyWithRetry(() => import('./components/CompanySettingsPanel'));
+const DocumentDesignStudio = lazyWithRetry(() => import('./components/DesignStudio/DocumentDesignStudio'));
+const EliteBillingDepartment = lazyWithRetry(() => import('./components/EliteBillingDepartment'));
+const RawMaterialsPanel = lazyWithRetry(() => import('./components/RawMaterialsPanel'));
+const YamunajiRfdPanel = lazyWithRetry(() => import('./components/YamunajiRfdPanel'));
+const CompanyDevelopmentWorkspace = lazyWithRetry(() => import('./components/CompanyDevelopmentWorkspace'));
+const DigitalPrintComplainModule = lazyWithRetry(() => import('./components/DigitalPrintComplainModule'));
+const DigitalPrintExpenseModule = lazyWithRetry(() => import('./components/DigitalPrintExpenseModule'));
+const CompanyDedicatedDashboard = lazyWithRetry(() => import('./components/CompanyDedicatedDashboard'));
+const GarmentJobCardDashboard = lazyWithRetry(() => import('./components/GarmentJobCardDashboard'));
+const CrmPanel = lazyWithRetry(() => import('./components/CrmPanel'));
+const BusinessConnectionPanel = lazyWithRetry(() => import('./components/BusinessConnectionPanel'));
+const ReportsCenter = lazyWithRetry(() => import('./components/ReportsCenter'));
+const UnicommerceHub = lazyWithRetry(() => import('./components/UnicommerceHub'));
+const MyntraHub = lazyWithRetry(() => import('./components/MyntraHub'));
+const ReturnsManager = lazyWithRetry(() => import('./components/ReturnsManager'));
+const ScanAndPackScreen = lazyWithRetry(() => import('./components/ScanAndPackScreen'));
+const DesignerModule = lazyWithRetry(() => import('./components/DesignerModule'));
+const DesignerScreen = lazyWithRetry(() => import('./components/DesignerScreen'));
+const LedgerReconciliationPanel = lazyWithRetry(() => import('./components/LedgerReconciliationPanel'));
 
 import EliteModalDialog from './components/EliteModalDialog';
 import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService';
@@ -1985,8 +2022,9 @@ export default function App() {
       setLoading(true);
       try {
         await api.deleteProductCatalog(id);
-        setCatalogItems(prev => prev.filter(item => item._id !== id));
+        setCatalogItems(prev => prev.filter(item => item._id !== id && item.id !== id));
         triggerGlobalDataRefresh();
+        await fetchData();
       } catch (err) {
         triggerEliteAlert('Delete Error', err.message || 'Failed to delete product from catalog.', 'error');
       } finally {

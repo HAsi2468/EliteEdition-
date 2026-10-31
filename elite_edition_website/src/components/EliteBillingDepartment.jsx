@@ -1223,6 +1223,33 @@ export default function EliteBillingDepartment({
       });
     }
 
+    // BUG-064: Prevent advance/paid amount exceeding grand total
+    const paidAmt = Number(purchaseForm.paidAmount || purchaseForm.advanceAmount || 0);
+    if (paidAmt > calculatedPurchase.grandTotal + 0.01) {
+      errs.push({
+        fieldId: 'purchase-advance-paid',
+        label: 'Advance Paid',
+        message: `Advance amount (₹${paidAmt.toFixed(2)}) cannot exceed grand total (₹${calculatedPurchase.grandTotal.toFixed(2)}).`
+      });
+    }
+
+    // BUG-069: Due Date cannot precede Purchase Date
+    if (purchaseForm.dueDate && purchaseForm.date) {
+      const pDate = new Date(purchaseForm.date);
+      const dDate = new Date(purchaseForm.dueDate);
+      if (!isNaN(pDate.getTime()) && !isNaN(dDate.getTime())) {
+        pDate.setHours(0, 0, 0, 0);
+        dDate.setHours(0, 0, 0, 0);
+        if (dDate < pDate) {
+          errs.push({
+            fieldId: 'purchase-due-date',
+            label: 'Due Date',
+            message: 'Due Date cannot precede Purchase Date'
+          });
+        }
+      }
+    }
+
     if (errs.length > 0) {
       setValidationErrors(errs);
       return;
@@ -3203,7 +3230,20 @@ export default function EliteBillingDepartment({
         else if (pdfDuplicateModal) setPdfDuplicateModal(null);
         else if (viewInvoiceModal) setViewInvoiceModal(null);
         else if (viewPurchaseModal) setViewPurchaseModal(null);
-        else if (showPurchaseModal) setShowPurchaseModal(false);
+        else if (showPurchaseModal) {
+          const isDirty = Boolean(
+            purchaseForm.vendorName ||
+            purchaseForm.billNo ||
+            (purchaseForm.items && purchaseForm.items.some(i => i.itemName || i.qty || i.unitPrice))
+          );
+          if (isDirty) {
+            if (window.confirm('You have unsaved changes in this purchase bill. Are you sure you want to discard them?')) {
+              setShowPurchaseModal(false);
+            }
+          } else {
+            setShowPurchaseModal(false);
+          }
+        }
         else if (paymentModalInvoice) setPaymentModalInvoice(null);
         else if (showLedgerModal) setShowLedgerModal(false);
         else if (showCustomerModal) setShowCustomerModal(false);
@@ -3337,7 +3377,8 @@ export default function EliteBillingDepartment({
     try {
       await Promise.all([
         fetchInvoicesAndStats(true),
-        fetchMasterData()
+        fetchMasterData(),
+        fetchPurchases()
       ]);
     } catch (err) {
       setError(err.message || 'Failed to load billing data');
@@ -3947,6 +3988,23 @@ export default function EliteBillingDepartment({
       });
     }
 
+    // BUG-069: Due Date cannot precede Invoice Date
+    if (invoiceForm.dueDate && invoiceForm.invoiceDate) {
+      const iDate = new Date(invoiceForm.invoiceDate);
+      const dDate = new Date(invoiceForm.dueDate);
+      if (!isNaN(iDate.getTime()) && !isNaN(dDate.getTime())) {
+        iDate.setHours(0, 0, 0, 0);
+        dDate.setHours(0, 0, 0, 0);
+        if (dDate < iDate) {
+          errs.push({
+            fieldId: 'invoice-due-date',
+            label: 'Due Date',
+            message: 'Due Date cannot precede Invoice Date'
+          });
+        }
+      }
+    }
+
     if (errs.length > 0) {
       setValidationErrors(errs);
       return;
@@ -4021,8 +4079,19 @@ export default function EliteBillingDepartment({
 
   // Record Payment
   const handleSavePayment = async () => {
-    if (!payAmount || parseFloat(payAmount) <= 0) {
-      alert('Please enter a valid payment amount');
+    const numAmt = parseFloat(payAmount);
+    if (!payAmount || isNaN(numAmt) || numAmt <= 0) {
+      alert('Please enter a valid payment amount greater than zero.');
+      return;
+    }
+    // BUG-063: Prevent overpayment beyond outstanding balance due
+    const maxDue = paymentModalInvoice
+      ? (paymentModalInvoice.balanceDue != null
+          ? paymentModalInvoice.balanceDue
+          : Math.max(0, parseFloat(((paymentModalInvoice.grandTotal || 0) - (paymentModalInvoice.paidAmount || 0)).toFixed(2))))
+      : 0;
+    if (numAmt > maxDue + 0.01) {
+      alert(`Payment amount (₹${numAmt.toFixed(2)}) cannot exceed outstanding balance due (₹${maxDue.toFixed(2)}). Overpayment is not permitted.`);
       return;
     }
     setSubmittingPay(true);

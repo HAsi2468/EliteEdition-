@@ -215,10 +215,37 @@ function buildPurchaseCompanyFilter(companyEntity) {
   return { companyEntity: ce };
 }
 
+// Strict billing module permission guard (SEC-008)
+function checkBillingPermission(req) {
+  const user = req.user;
+  if (!user) return false;
+  const role = String(user.role || '').toLowerCase();
+  if (user.isMainAdmin || role === 'super_admin' || role === 'superadmin' || role === 'admin') {
+    return true;
+  }
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  const billingScreens = [
+    'jobcards_billing',
+    'jobcards_billing_elite',
+    'jobcards_billing_fabtex',
+    'jobcards_billing_sobise',
+    'invoices',
+    'eo_invoices',
+    'ee_invoices',
+    'ef_invoices',
+    'so_invoices',
+    'ew_invoices',
+    'yj_invoices',
+    'finance',
+    'reports'
+  ];
+  return billingScreens.some(s => perms.includes(s)) || user.canViewFinancials === true || user.canCreateInvoices === true;
+}
+
 // Strict multi-tenant isolation guard (SEC-008 & SEC-002)
 function checkCompanyTenantAccess(req, requestedCompany) {
   const user = req.user;
-  if (!user) return true;
+  if (!user) return false;
   const role = String(user.role || '').toLowerCase();
   const isSuperOwner = user.isMainAdmin || role === 'super_admin' || role === 'superadmin' || user.email === 'harshitsidapara2468@gmail.com';
 
@@ -227,15 +254,20 @@ function checkCompanyTenantAccess(req, requestedCompany) {
     return true;
   }
 
-  // Tenant enforcement: derive allowed tenant from user's allowedCompanies (SEC-002)
+  // Tenant enforcement: derive allowed tenant from user's allowedCompanies (SEC-002 & SEC-008)
   if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0) {
-    if (!requestedCompany) return true; // Controller will scope to allowedCompanies[0]
+    if (!requestedCompany) return false;
     const normReq = String(requestedCompany).toLowerCase().replace(/[\s_-]+/g, '');
     const isAllowed = user.allowedCompanies.some(ac => {
       const normAc = String(ac).toLowerCase().replace(/[\s_-]+/g, '');
-      return normAc === normReq || normAc.includes(normReq) || normReq.includes(normAc);
+      return normAc === normReq;
     });
     return isAllowed;
+  }
+
+  // Standard user without allowedCompanies is not permitted to access tenant data
+  if (!isSuperOwner && role !== 'admin') {
+    return false;
   }
   return true;
 }
@@ -243,16 +275,27 @@ function checkCompanyTenantAccess(req, requestedCompany) {
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
 const getBillingDashboardStats = async (req, res) => {
   try {
+    if (!checkBillingPermission(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission to access Billing & Invoicing records.'
+      });
+    }
+
     let { companyEntity } = req.query;
     if (companyEntity === '[object Object]') {
       companyEntity = '';
     }
-    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
     if (!checkCompanyTenantAccess(req, activeCompany)) {
       return res.status(403).json({
         success: false,
         code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to access billing stats for '${activeCompany}'.`
+        error: `Access denied: You do not have permission to access billing stats for '${activeCompany || 'unspecified company'}'.`
       });
     }
     const effectiveCompany = activeCompany || (req.user?.allowedCompanies?.[0]);
@@ -432,6 +475,14 @@ const enrichInvoiceItemsWithImages = async (invoices) => {
 // ── 2. GET INVOICES LIST ───────────────────────────────────────────────────────
 const getInvoices = async (req, res) => {
   try {
+    if (!checkBillingPermission(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission to access Billing & Invoicing records.'
+      });
+    }
+
     const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd, companyEntity } = req.query;
 
     if (search !== undefined && search !== null && typeof search !== 'string') {
@@ -458,6 +509,14 @@ const getInvoices = async (req, res) => {
       }
     } else {
       activeCompany = activeCompany || req.headers['x-company-id'] || req.headers['x-company'] || req.headers['company'];
+    }
+
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to view records for '${activeCompany || 'unspecified company'}'.`
+      });
     }
 
     const filter = buildCompanyFilter(activeCompany);
@@ -3613,6 +3672,14 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 // ── 10. CUSTOMER CRUD ────────────────────────────────────────────────────────
 const getCustomers = async (req, res) => {
   try {
+    if (!checkBillingPermission(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission to access Customer records.'
+      });
+    }
+
     let { companyEntity } = req.query;
     let activeCompany = companyEntity;
     const isRestricted = Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0 &&
@@ -3630,6 +3697,14 @@ const getCustomers = async (req, res) => {
       }
     } else {
       activeCompany = activeCompany || req.headers['x-company-id'] || req.headers['x-company'];
+    }
+
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to access customers for '${activeCompany || 'unspecified company'}'.`
+      });
     }
 
     const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
@@ -3704,8 +3779,26 @@ const deleteCustomer = async (req, res) => {
 // ── 10B. VENDOR CRUD (Billing Vendors Collection) ──────────────────────────
 const getVendors = async (req, res) => {
   try {
-    const { companyEntity } = req.query;
-    const filter = buildPurchaseCompanyFilter(companyEntity);
+    if (!checkBillingPermission(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission to access Vendor records.'
+      });
+    }
+    let { companyEntity } = req.query;
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to access vendors for '${activeCompany || 'unspecified company'}'.`
+      });
+    }
+    const filter = buildPurchaseCompanyFilter(activeCompany);
 
     const vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: vendors || [] });
@@ -3792,13 +3885,23 @@ const deleteVendor = async (req, res) => {
 // ── 11. ITEM CRUD ────────────────────────────────────────────────────────────
 const getItems = async (req, res) => {
   try {
+    if (!checkBillingPermission(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission to access Item catalog records.'
+      });
+    }
     let { companyEntity } = req.query;
-    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
     if (!checkCompanyTenantAccess(req, activeCompany)) {
       return res.status(403).json({
         success: false,
         code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to access item catalog for '${activeCompany}'.`
+        error: `Access denied: You do not have permission to access item catalog for '${activeCompany || 'unspecified company'}'.`
       });
     }
     const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
@@ -4005,10 +4108,28 @@ const updateCompanySettings = async (req, res) => {
 // ── 13. PURCHASES CRUD ────────────────────────────────────────────────────────
 const getPurchases = async (req, res) => {
   try {
-    const { companyEntity, search } = req.query;
+    if (!checkBillingPermission(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission to access Purchase records.'
+      });
+    }
+    let { companyEntity, search } = req.query;
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
+    if (!checkCompanyTenantAccess(req, activeCompany)) {
+      return res.status(403).json({
+        success: false,
+        code: 'COMPANY_FORBIDDEN',
+        error: `Access denied: You do not have permission to access purchases for '${activeCompany || 'unspecified company'}'.`
+      });
+    }
     let query = {};
-    if (companyEntity && companyEntity !== 'ALL') {
-      query = buildPurchaseCompanyFilter(companyEntity);
+    if (activeCompany && activeCompany !== 'ALL') {
+      query = buildPurchaseCompanyFilter(activeCompany);
     }
     if (search && search.trim()) {
       const s = search.trim();

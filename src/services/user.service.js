@@ -110,7 +110,13 @@ async function getUsers(req) {
 		isTest: { $ne: true }
 	};
 
-	const usersList = await db.user.find(userFilter, { password: 0 })
+	const usersList = await db.user.find(userFilter, {
+		password: 0,
+		pushSubscriptions: 0,
+		webPushSubscription: 0,
+		subscription: 0,
+		pushSubscription: 0
+	})
 		.sort({ name: 1, created_date_time: -1, modified_date_time: -1 })
 		.skip(offset)
 		.limit(limit)

@@ -144,7 +144,7 @@ export default function GstCreditAnalysisPanel({
         partyName: party,
         gstin,
         state,
-        isB2B: !!gstin && gstin.length >= 15,
+        isB2B: !!gstin && /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(gstin.trim()),
         isInterState,
         taxable,
         cgst,
@@ -172,7 +172,7 @@ export default function GstCreditAnalysisPanel({
       const isInterState = pur.taxType === 'IGST' || (pur.igstAmount && Number(pur.igstAmount) > 0);
 
       const taxable = Number(pur.taxableAmount != null ? pur.taxableAmount : (pur.subtotal != null ? pur.subtotal : (pur.grandTotal || pur.totalAmount || 0) - (pur.totalTax || pur.gstAmount || 0))) || 0;
-      const totalTax = Number(pur.totalTax != null ? pur.totalTax : (pur.gstAmount != null ? pur.gstAmount : 0)) || 0;
+      let totalTax = Number(pur.totalTax != null ? pur.totalTax : (pur.gstAmount != null ? pur.gstAmount : 0)) || 0;
 
       let cgst = Number(pur.cgstAmount || 0);
       let sgst = Number(pur.sgstAmount || 0);
@@ -182,10 +182,14 @@ export default function GstCreditAnalysisPanel({
         igst = igst || totalTax;
         cgst = 0;
         sgst = 0;
+        totalTax = igst;
       } else {
         if (!cgst && !sgst && totalTax > 0) {
-          cgst = totalTax / 2;
-          sgst = totalTax / 2;
+          cgst = Number((totalTax / 2).toFixed(2));
+          sgst = Number((totalTax - cgst).toFixed(2));
+        } else if (cgst > 0 && sgst > 0) {
+          // BUG-071: Synchronize totalTax with cgst + sgst to eliminate 12.06 vs 12.07 discrepancy
+          totalTax = Number((cgst + sgst).toFixed(2));
         }
       }
 
@@ -211,7 +215,7 @@ export default function GstCreditAnalysisPanel({
         partyName: party,
         gstin,
         state,
-        isB2B: !!gstin && gstin.length >= 15,
+        isB2B: !!gstin && /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(gstin.trim()),
         isInterState,
         taxable,
         cgst,
@@ -331,20 +335,26 @@ export default function GstCreditAnalysisPanel({
     );
 
     // 2. Inward Input Tax Credit (Purchases / ITC)
+    // BUG-071: Input tax credit is ONLY eligible from registered B2B vendors with valid GSTIN!
     const inward = filteredPurchases.reduce(
       (acc, pur) => {
         acc.taxable += pur.taxable;
-        acc.cgst += pur.cgst;
-        acc.sgst += pur.sgst;
-        acc.igst += pur.igst;
-        acc.totalTax += pur.totalTax;
         acc.grandTotal += pur.grandTotal;
         acc.tdsWithheld += pur.tdsAmount;
-        if (pur.isB2B) acc.b2bCount += 1;
-        else acc.b2cCount += 1;
+        if (pur.isB2B) {
+          acc.cgst += pur.cgst;
+          acc.sgst += pur.sgst;
+          acc.igst += pur.igst;
+          acc.totalTax += pur.totalTax;
+          acc.eligibleItc += pur.totalTax;
+          acc.b2bCount += 1;
+        } else {
+          acc.ineligibleItc += pur.totalTax;
+          acc.b2cCount += 1;
+        }
         return acc;
       },
-      { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0, grandTotal: 0, tdsWithheld: 0, b2bCount: 0, b2cCount: 0 }
+      { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0, grandTotal: 0, tdsWithheld: 0, eligibleItc: 0, ineligibleItc: 0, b2bCount: 0, b2cCount: 0 }
     );
 
     // 3. Component Level Balances (Net = Output - Input)
@@ -627,7 +637,7 @@ export default function GstCreditAnalysisPanel({
           'Input CGST (₹)': pur.cgst,
           'Input SGST (₹)': pur.sgst,
           'Input IGST (₹)': pur.igst,
-          'Total Eligible ITC (₹)': pur.totalTax,
+          'Total Eligible ITC (₹)': pur.isB2B ? pur.totalTax : 0,
           'TDS Withheld (₹)': pur.tdsAmount,
           'TDS Section': pur.tdsSection || '-',
           'TDS Rate (%)': pur.tdsRate ? `${pur.tdsRate}%` : '-',

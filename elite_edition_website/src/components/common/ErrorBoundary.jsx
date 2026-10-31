@@ -62,6 +62,11 @@ export class ErrorBoundary extends Component {
         }
       }).catch(() => {});
     }
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      try {
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+      } catch (e) {}
+    }
     window.location.reload();
   };
 

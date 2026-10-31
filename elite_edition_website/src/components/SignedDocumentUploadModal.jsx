@@ -33,20 +33,38 @@ export default function SignedDocumentUploadModal({
   const fileInputRef = useRef(null);
   const dragCounterRef = useRef(0);
 
-  // Common file processor for input, drag & drop, and clipboard paste
+  // Common file processor for input, drag & drop, and clipboard paste (BUG-065 & BUG-067)
   const processFiles = useCallback((incomingFiles) => {
     if (!incomingFiles || incomingFiles.length === 0) return;
     setError('');
 
-    const validFiles = Array.from(incomingFiles).filter((f) => {
+    const filesArray = Array.from(incomingFiles);
+
+    // Validate each file
+    for (const f of filesArray) {
+      if (/\.svg$/i.test(f.name || '') || f.type === 'image/svg+xml') {
+        setError('SVG format is strictly not allowed for signed document verification. Please upload JPG, PNG, or WEBP.');
+        return;
+      }
+      if (f.size === 0) {
+        setError(`File "${f.name || 'image'}" is empty (0 bytes). Upload rejected.`);
+        return;
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        setError(`File "${f.name || 'image'}" exceeds maximum 10MB limit (${(f.size / (1024 * 1024)).toFixed(1)}MB).`);
+        return;
+      }
+    }
+
+    const validFiles = filesArray.filter((f) => {
       return (
-        (f.type && f.type.startsWith('image/')) ||
-        /\.(jpe?g|png|webp|heic|bmp|gif|svg)$/i.test(f.name || '')
+        (f.type && f.type.startsWith('image/') && f.type !== 'image/svg+xml') ||
+        /\.(jpe?g|png|webp|heic|bmp)$/i.test(f.name || '')
       );
     });
 
     if (validFiles.length === 0) {
-      setError('Please select or paste valid image files (JPG, PNG, WEBP).');
+      setError('Please select or paste valid signed document image files (JPG, PNG, WEBP).');
       return;
     }
 
@@ -609,7 +627,7 @@ export default function SignedDocumentUploadModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/heic"
             multiple
             capture="environment"
             onChange={handleFileSelect}

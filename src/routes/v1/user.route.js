@@ -4,21 +4,32 @@ const userValidation = require('../../validations/user.validation');
 const userController = require('../../controllers/user.controller');
 const { grantAccess } = require('../../middlewares/validateAccessControl');
 const { resources } = require('../../config/roles');
+const { requireAuth } = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 
 router
 	.route('/')
-	.post(grantAccess('createAny', resources.USERINFO), validate(userValidation.createUser), userController.createUser)
+	.post(requireAuth, grantAccess('createAny', resources.USERINFO), validate(userValidation.createUser), userController.createUser)
 	.get(
+		requireAuth,
 		(req, res, next) => {
 			const role = String(req.user?.role || '').toLowerCase();
 			const isAdmin = role === 'admin' || role === 'superadmin' || role === 'super_admin' || req.user?.isMainAdmin === true || req.user?.isAdmin === true;
 			if (!isAdmin) {
-				return res.status(403).json({
-					success: false,
-					code: 'FORBIDDEN',
-					message: 'Access denied: Listing user accounts requires administrator privileges.'
+				// SEC-009: Non-admins receive only their own caller record to prevent directory enumeration and PII disclosure
+				const callerUser = { ...(req.user || {}) };
+				delete callerUser.password;
+				delete callerUser.pushSubscriptions;
+				delete callerUser.subscription;
+				delete callerUser.webPushSubscription;
+				delete callerUser.pushSubscription;
+				delete callerUser.tokenVersion;
+				return res.status(200).json({
+					success: true,
+					data: [callerUser],
+					count: 1,
+					users: { rows: [callerUser], count: 1 }
 				});
 			}
 			next();
@@ -27,13 +38,13 @@ router
 		userController.getUsers
 	);
 
-router.get('/me', async (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
 	try {
 		if (!req.user || !req.user.id) {
 			return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Unauthorized' });
 		}
 		const User = require('../../db/models').user || require('../../db/models/user.model');
-		const user = await User.findById(req.user.id).select('-password').lean();
+		const user = await User.findById(req.user.id).select('-password -pushSubscriptions -webPushSubscription -subscription').lean();
 		if (!user) {
 			return res.status(404).json({ success: false, message: 'User not found' });
 		}
@@ -43,7 +54,7 @@ router.get('/me', async (req, res) => {
 	}
 });
 
-router.patch('/me', async (req, res) => {
+router.patch('/me', requireAuth, async (req, res) => {
 	try {
 		const userId = req.user?.id || req.user?._id;
 		if (!userId) {

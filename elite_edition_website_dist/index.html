@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Strict Content Security Policy with sha256 hash (SEC-005) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-2rNJVazXbqeMKdNnCcimF1zyeQMLJbCiPoyDRdxUpPA=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.r2.dev https://*.cloudflarestorage.com https://*.s3.amazonaws.com https://*.amazonaws.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://drive.google.com; connect-src 'self' https://erp.eliteedition.in wss://erp.eliteedition.in ws://localhost:3001 http://localhost:3001 https://*.r2.dev https://*.cloudflarestorage.com https://*.s3.amazonaws.com; media-src 'self' blob: data: https://*.r2.dev; object-src 'none'; frame-src 'self'; upgrade-insecure-requests;" />
     <script>
       (function() {
         var h = window.location.hostname;
@@ -109,7 +111,7 @@
 
     <!-- JsBarcode library loaded asynchronously (Non-render blocking) -->
     <script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script type="module" crossorigin src="/assets/index-DXSfTuO6.js"></script>
+    <script type="module" crossorigin src="/assets/index-B2mEFblU.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vendor-react-CHHTaQIC.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-socket-SYmKJpIj.js">
     <link rel="stylesheet" crossorigin href="/assets/index-AYLssOtl.css">

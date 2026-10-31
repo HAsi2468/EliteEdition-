@@ -328,15 +328,42 @@ export const api = {
 
   logout() {
     inMemoryAccessToken = null;
-    localStorage.removeItem('elite_auth_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('elite_refresh_token');
-    localStorage.removeItem('elite_user');
-    localStorage.removeItem('elite_is_client');
-    localStorage.removeItem('elite_client_data');
+    inMemoryCsrfToken = null;
+
+    // Purge all user-scoped data, cache keys, and custom storage (SEC-007)
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.startsWith('elite_') ||
+           k.startsWith('QA-TEST') ||
+           k.includes('material') ||
+           k.includes('chat') ||
+           k.includes('token') ||
+           k.includes('user') ||
+           k.includes('auth'))
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (_) {}
+
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
+
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => {});
+      }
+    } catch (_) {}
+
     request('/auth/logout', { method: 'POST' }).catch(() => {});
     try {
-      import('../utils/crossTabSync').then(m => m.broadcastCrossTab('AUTH_LOGOUT'));
+      import('../utils/crossTabSync').then((m) => m.broadcastCrossTab('AUTH_LOGOUT'));
     } catch (_) {}
   },
 

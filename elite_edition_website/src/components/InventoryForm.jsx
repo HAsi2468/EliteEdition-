@@ -384,31 +384,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
       qty: Number(formData.currentlyAvailableStock) || 0,
     };
 
-    // Auto-save product to Catalog database if SKU is not in catalog
-    const cleanSku = formData.skuCode.trim();
-    const existsInCatalog = catalogItems.some(c => 
-      (c.skuCode && c.skuCode.trim().toLowerCase() === cleanSku.toLowerCase()) ||
-      matchSkuOrBrandCode(c, cleanSku)
-    );
-
-    if (!existsInCatalog && cleanSku) {
-      const catPayload = {
-        skuCode: cleanSku,
-        description: formData.itemName || cleanSku,
-        brand: primaryBrand,
-        size: formData.size,
-        basePrice: Number(formData.purchasePrice) || 0.0,
-        price: Number(formData.salePrice) || 0.0,
-        imageUrl: formData.imageUrl || '',
-        categoryName: formData.categoryName || '',
-        hsnCode: formData.hsnCode || '',
-        brandCodes: validBrandCodes,
-      };
-      api.createProductCatalog(catPayload).catch(err => {
-        console.warn('Auto catalog save notice:', err.message);
-      });
-    }
-
+    // BUG-075: onSubmit handles centralized creation in catalog and inventory to prevent duplicate POST requests
     onSubmit(payload);
   };
 

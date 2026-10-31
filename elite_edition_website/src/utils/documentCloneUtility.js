@@ -56,6 +56,9 @@ export function cloneDocumentPayload(sourceDoc, docType = 'invoice') {
 
     // Reset Signatures, Approvals, and Digital Verification (BUG-068)
     signedCopy: null,
+    signedCopyUrl: null,
+    signedDocuments: [],
+    documents: [],
     signedAt: null,
     signedBy: null,
     signatureUrl: null,

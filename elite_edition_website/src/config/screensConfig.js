@@ -142,24 +142,24 @@ export const SCREEN_GROUPS = {
   },
   jobcards_billing_elite: {
     id: 'jobcards_billing_elite',
-    name: '[EDP] Elite Edition Billing',
-    deptShort: 'EDP',
+    name: '[EE] Elite Edition Billing',
+    deptShort: 'EE',
     screenName: 'Elite Edition Billing',
     permissionKeys: ['jobcards_billing_elite', 'jobcards_billing'],
     description: 'Elite Edition GST Billing & Invoicing Channel'
   },
   jobcards_billing_fabtex: {
     id: 'jobcards_billing_fabtex',
-    name: '[EDP] Elite Fabtex Billing',
-    deptShort: 'EDP',
+    name: '[EF] Elite Fabtex Billing',
+    deptShort: 'EF',
     screenName: 'Elite Fabtex Billing',
     permissionKeys: ['jobcards_billing_fabtex'],
     description: 'Elite Fabtex GST Billing & Invoicing Channel'
   },
   jobcards_billing_sobise: {
     id: 'jobcards_billing_sobise',
-    name: '[EDP] Sobise Billing',
-    deptShort: 'EDP',
+    name: '[SO] Sobise Billing',
+    deptShort: 'SO',
     screenName: 'Sobise Billing',
     permissionKeys: ['jobcards_billing_sobise'],
     description: 'Sobise GST Billing & Invoicing Channel'
@@ -182,11 +182,11 @@ export const SCREEN_GROUPS = {
   },
   inventory: {
     id: 'inventory',
-    name: '[EE] E-Commerce Inventory',
-    deptShort: 'EE',
+    name: '[EON] E-Commerce Inventory',
+    deptShort: 'EON',
     screenName: 'E-Commerce Inventory',
     permissionKeys: ['inventory', 'catalog', 'sales'],
-    description: 'Elite Edition Online Inventory & Dispatch Group'
+    description: 'Elite Online Inventory & Dispatch Group'
   }
 };
 
@@ -201,7 +201,15 @@ export const getDynamicScreenGroup = (screenId) => {
   const foundScreen = AVAILABLE_SCREENS.find(s => s.id === screenId);
   const label = foundScreen ? foundScreen.label : screenId;
   const category = foundScreen ? foundScreen.category : 'General';
-  const prefix = category === 'Elite Digital Print' ? '[EDP]' : category === 'Elite Stitching' ? '[ST]' : category === 'Elite Edition' ? '[EE]' : '[SYS]';
+  const prefix = category === 'Elite Digital Print' ? '[EDP]'
+    : category === 'Elite Stitching' ? '[ST]'
+    : category === 'Elite Edition' ? '[EE]'
+    : category === 'Elite Online' ? '[EON]'
+    : category === 'Elite Fabtex' ? '[EF]'
+    : category === 'Sobise' ? '[SO]'
+    : category === 'Ethno wear' ? '[EW]'
+    : category === 'Yamunaji' ? '[YJ]'
+    : '[SYS]';
 
   return {
     id: screenId,

@@ -7,6 +7,24 @@ const { user: User, ChatRoom } = require('../db/models');
 const userAuthCache = new Map();
 const USER_CACHE_TTL_MS = 60000;
 
+// High-speed in-memory blacklist for instantly revoked tokens upon logout (SEC-011)
+const inMemoryRevokedTokens = new Set();
+
+function revokeTokenInMemory(token) {
+  if (token && typeof token === 'string') {
+    const clean = token.trim();
+    inMemoryRevokedTokens.add(clean);
+    // Auto-purge tombstone after 24 hours to prevent unbounded memory growth
+    setTimeout(() => inMemoryRevokedTokens.delete(clean), 24 * 60 * 60 * 1000);
+  }
+}
+
+function invalidateCachedUser(id) {
+  if (id) {
+    userAuthCache.delete(String(id));
+  }
+}
+
 function getCachedUser(id) {
   const entry = userAuthCache.get(String(id));
   if (entry && (Date.now() - entry.timestamp < USER_CACHE_TTL_MS)) {
@@ -43,6 +61,21 @@ const requireAuth = async (req, res, next) => {
         success: false,
         code: 'UNAUTHORIZED',
         message: 'Authentication required. Please provide a valid session cookie or Bearer token.'
+      });
+    }
+
+    const cleanToken = token.trim();
+
+    // Check in-memory revoked tokens (instant rejection without Redis dependency - SEC-011)
+    if (inMemoryRevokedTokens.has(cleanToken)) {
+      try {
+        const { clearAuthCookies } = require('../controllers/auth.controller');
+        if (typeof clearAuthCookies === 'function') clearAuthCookies(res, req);
+      } catch (_) {}
+      return res.status(401).json({
+        success: false,
+        code: 'SESSION_REVOKED',
+        message: 'Session has been logged out. Please sign in again.'
       });
     }
 
@@ -98,6 +131,23 @@ const requireAuth = async (req, res, next) => {
     // 1. Check in-memory fast cache first
     const cached = getCachedUser(userId);
     if (cached) {
+      // Validate sessionRevokedAt against token issuance time even on cached user (SEC-011)
+      if (cached.user && cached.user.sessionRevokedAt && decoded && decoded.iat) {
+        const tokenIssuedMs = decoded.iat * 1000;
+        const revokedMs = new Date(cached.user.sessionRevokedAt).getTime();
+        if (tokenIssuedMs < (revokedMs - 1000)) {
+          userAuthCache.delete(String(userId));
+          try {
+            const { clearAuthCookies } = require('../controllers/auth.controller');
+            if (typeof clearAuthCookies === 'function') clearAuthCookies(res, req);
+          } catch (_) {}
+          return res.status(401).json({
+            success: false,
+            code: 'SESSION_REVOKED',
+            message: 'Session has been logged out. Please sign in again.'
+          });
+        }
+      }
       user = cached.user;
       isClient = cached.isClient;
     } else {
@@ -347,5 +397,7 @@ module.exports = {
   requireAdmin,
   requireRole,
   scoped,
-  requireGroupAccess
+  requireGroupAccess,
+  invalidateCachedUser,
+  revokeTokenInMemory
 };

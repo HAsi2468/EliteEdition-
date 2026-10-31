@@ -198,8 +198,15 @@ const logout = catchAsync(async (req, res) => {
     }
   }
 
-  // Blacklist active access token in Redis / distributed memory store
+  // Blacklist active access token in in-memory store AND Redis (SEC-011)
   if (accessToken) {
+    try {
+      const { revokeTokenInMemory } = require('../middlewares/auth.middleware');
+      if (typeof revokeTokenInMemory === 'function') {
+        revokeTokenInMemory(accessToken);
+      }
+    } catch (_) {}
+
     try {
       const { getRedisClient } = require('../db/redisClient');
       const redis = typeof getRedisClient === 'function' ? getRedisClient() : null;

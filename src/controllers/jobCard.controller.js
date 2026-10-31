@@ -139,9 +139,48 @@ const invalidateJobStatsCache = () => {
   jobCardsListCache.clear();
 };
 
+// Strict multi-tenant & RBAC isolation guard for Job Cards (SEC-008)
+function checkJobCardAccess(req) {
+  const user = req.user;
+  if (!user) return false;
+  const role = String(user.role || '').toLowerCase();
+  if (user.isMainAdmin || role === 'super_admin' || role === 'superadmin' || role === 'admin') {
+    return true;
+  }
+
+  // Tenant check: standard user with allowedCompanies must have EDP / Digital Print
+  if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0) {
+    const isEdpAllowed = user.allowedCompanies.some(c => {
+      const norm = String(c).toLowerCase().replace(/[\s_-]+/g, '');
+      return norm.includes('edp') || norm.includes('digitalprint') || norm.includes('eliteprint') || norm.includes('stitching');
+    });
+    if (!isEdpAllowed) return false;
+  }
+
+  // Permission check: standard user must have at least one jobcard / production permission
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  if (perms.length === 0) return false;
+
+  const validPerms = [
+    'jobcards', 'jobcards_list', 'jobcards_tracking', 'jobcards_printing_log',
+    'jobcards_fusing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_qa',
+    'jobcards_settings', 'jobcards_catalogue', 'jobcards_sample', 'stitching_jobcards',
+    'admin'
+  ];
+  return validPerms.some(p => perms.includes(p));
+}
+
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
+    if (!checkJobCardAccess(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission or tenant access to Job Cards.'
+      });
+    }
+
     const { status, printStatus, fusingStatus, deliveryStatus, party, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department, dateField } = req.query;
 
     if (search !== undefined && search !== null && typeof search !== 'string') {
@@ -582,6 +621,14 @@ const getAllJobCards = async (req, res) => {
 
 const getJobCard = async (req, res) => {
   try {
+    if (!checkJobCardAccess(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PERMISSION_DENIED',
+        error: 'Access denied: You do not have permission or tenant access to Job Cards.'
+      });
+    }
+
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     const mongoose = require('mongoose');
     const param = req.params.id || req.params.jobNo;
