@@ -8,6 +8,7 @@ import {
   ShieldCheck, Check, Clock, AlertTriangle, Building2, Eye, ShieldAlert, CheckCheck, XCircle
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import { ErpTh } from './common/ErpTableParts';
 
 const parseCanSize = (val) => {
   if (val === undefined || val === null || val === '') return 0;
@@ -2675,74 +2676,14 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th 
-                      onClick={() => {
-                        if (inwardSortBy === 'date') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('date');
-                          setInwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Date {inwardSortBy === 'date' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (inwardSortBy === 'challanNo') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('challanNo');
-                          setInwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Challan No {inwardSortBy === 'challanNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (inwardSortBy === 'materialName') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('materialName');
-                          setInwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Material Name {inwardSortBy === 'materialName' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (inwardSortBy === 'vendorName') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('vendorName');
-                          setInwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Vendor Name {inwardSortBy === 'vendorName' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (inwardSortBy === 'qty') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('qty');
-                          setInwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}
-                    >
-                      Qty {inwardSortBy === 'qty' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th>Unit</th>
-                    <th>Notes</th>
-                    <th className="text-center">Action</th>
+                    <ErpTh columnKey="date" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Date</ErpTh>
+                    <ErpTh columnKey="challanNo" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Challan No</ErpTh>
+                    <ErpTh columnKey="materialName" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Material Name</ErpTh>
+                    <ErpTh columnKey="vendorName" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Vendor Name</ErpTh>
+                    <ErpTh columnKey="qty" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }} align="right">Qty</ErpTh>
+                    <ErpTh hideSort>Unit</ErpTh>
+                    <ErpTh hideSort>Notes</ErpTh>
+                    <ErpTh hideSort align="center">Action</ErpTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -3084,74 +3025,14 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th 
-                      onClick={() => {
-                        if (outwardSortBy === 'date') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('date');
-                          setOutwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Date {outwardSortBy === 'date' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (outwardSortBy === 'jobNo') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('jobNo');
-                          setOutwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Job No {outwardSortBy === 'jobNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (outwardSortBy === 'materialName') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('materialName');
-                          setOutwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Material Name {outwardSortBy === 'materialName' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (outwardSortBy === 'partyName') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('partyName');
-                          setOutwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Party Name {outwardSortBy === 'partyName' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th 
-                      onClick={() => {
-                        if (outwardSortBy === 'qty') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('qty');
-                          setOutwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}
-                    >
-                      Qty {outwardSortBy === 'qty' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th>Unit</th>
-                    <th>Notes</th>
-                    <th className="text-center">Action</th>
+                    <ErpTh columnKey="date" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Date</ErpTh>
+                    <ErpTh columnKey="jobNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Job No</ErpTh>
+                    <ErpTh columnKey="materialName" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Material Name</ErpTh>
+                    <ErpTh columnKey="partyName" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Party Name</ErpTh>
+                    <ErpTh columnKey="qty" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }} align="right">Qty</ErpTh>
+                    <ErpTh hideSort>Unit</ErpTh>
+                    <ErpTh hideSort>Notes</ErpTh>
+                    <ErpTh hideSort align="center">Action</ErpTh>
                   </tr>
                 </thead>
                 <tbody>

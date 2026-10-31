@@ -53,6 +53,7 @@ import EntityBrandBadge from './common/EntityBrandBadge';
 import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import { ErpTh } from './common/ErpTableParts';
 
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -228,6 +229,7 @@ export default function ScanAndPackScreen({ currentUser }) {
 
   const [historyFilterMode, setHistoryFilterMode] = useState('ALL'); // 'ALL' | 'PACK' | 'DELIVERY' | 'RETURN'
   const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historySortState, setHistorySortState] = useState({ columnKey: 'timestamp', order: 'desc' });
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // ── 🎯 Multi-Dimension & Date Range Filters for Scan Registers & Operations ──
@@ -368,6 +370,48 @@ export default function ScanAndPackScreen({ currentUser }) {
       return true;
     });
   }, [scanHistory, scanMode, historyStartDate, historyEndDate, historyFilters, historySearchQuery]);
+
+  const sortedHistory = React.useMemo(() => {
+    if (!historySortState.columnKey || !historySortState.order) return displayedHistory;
+    const { columnKey, order } = historySortState;
+    const mult = order === 'asc' ? 1 : -1;
+    return [...displayedHistory].sort((a, b) => {
+      let valA, valB;
+      if (columnKey === 'timestamp') {
+        valA = new Date(a.createdAt || a.updatedAt || a.date || 0).getTime();
+        valB = new Date(b.createdAt || b.updatedAt || b.date || 0).getTime();
+        return (valA - valB) * mult;
+      }
+      if (columnKey === 'awb') {
+        valA = a.awb || a.shippingPackageCode || '';
+        valB = b.awb || b.shippingPackageCode || '';
+      } else if (columnKey === 'order') {
+        valA = a.orderCode || a.channel || '';
+        valB = b.orderCode || b.channel || '';
+      } else if (columnKey === 'product') {
+        valA = a.sku || a.itemName || '';
+        valB = b.sku || b.itemName || '';
+      } else if (columnKey === 'customer') {
+        valA = a.customerName || a.city || '';
+        valB = b.customerName || b.city || '';
+      } else if (columnKey === 'value') {
+        valA = Number(a.totalPrice || a.collectableAmount || 0);
+        valB = Number(b.totalPrice || b.collectableAmount || 0);
+        return (valA - valB) * mult;
+      } else if (columnKey === 'weight') {
+        valA = Number(a.actualWeight || a.weight || 0);
+        valB = Number(b.actualWeight || b.weight || 0);
+        return (valA - valB) * mult;
+      } else if (columnKey === 'courier') {
+        valA = a.courier || '';
+        valB = b.courier || '';
+      } else if (columnKey === 'status') {
+        valA = a.status || '';
+        valB = b.status || '';
+      }
+      return String(valA || '').localeCompare(String(valB || ''), undefined, { numeric: true }) * mult;
+    });
+  }, [displayedHistory, historySortState]);
 
   const manifestFilterCategories = React.useMemo(() => [
     {
@@ -3323,22 +3367,22 @@ export default function ScanAndPackScreen({ currentUser }) {
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.73rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Timestamp</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>AWB & Package Code</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Order & Channel</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Product / SKU Details</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Customer & City</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Payment & Value</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Weight</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Courier</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800 }}>Screen / Mode</th>
-                <th style={{ padding: '10px 12px', fontWeight: 800, textAlign: 'center' }}>Operation Status</th>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <ErpTh columnKey="timestamp" sortState={historySortState} onSortChange={setHistorySortState}>Timestamp</ErpTh>
+                <ErpTh columnKey="awb" sortState={historySortState} onSortChange={setHistorySortState}>AWB & Package Code</ErpTh>
+                <ErpTh columnKey="order" sortState={historySortState} onSortChange={setHistorySortState}>Order & Channel</ErpTh>
+                <ErpTh columnKey="product" sortState={historySortState} onSortChange={setHistorySortState}>Product / SKU Details</ErpTh>
+                <ErpTh columnKey="customer" sortState={historySortState} onSortChange={setHistorySortState}>Customer & City</ErpTh>
+                <ErpTh columnKey="value" sortState={historySortState} onSortChange={setHistorySortState} align="right">Payment & Value</ErpTh>
+                <ErpTh columnKey="weight" sortState={historySortState} onSortChange={setHistorySortState} align="right">Weight</ErpTh>
+                <ErpTh columnKey="courier" sortState={historySortState} onSortChange={setHistorySortState}>Courier</ErpTh>
+                <ErpTh hideSort>Screen / Mode</ErpTh>
+                <ErpTh columnKey="status" sortState={historySortState} onSortChange={setHistorySortState} align="center">Operation Status</ErpTh>
               </tr>
             </thead>
             <tbody>
               {(() => {
-                if (displayedHistory.length === 0) {
+                if (sortedHistory.length === 0) {
                   return (
                     <tr>
                       <td colSpan={10} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
@@ -3350,7 +3394,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                   );
                 }
 
-                return displayedHistory.map((item) => {
+                return sortedHistory.map((item) => {
                   const rowKey = String(item.awb || item.shippingPackageCode || item.orderCode || item.id || item._id || '').toUpperCase();
                   const isExpanded = expandedRowAwb === rowKey;
                   const isCod = item.paymentMode === 'COD' || item.isCod === true;

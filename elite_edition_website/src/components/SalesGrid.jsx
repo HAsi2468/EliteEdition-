@@ -16,6 +16,7 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
+import { ErpTh } from './common/ErpTableParts';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
@@ -306,26 +307,16 @@ export default function SalesGrid() {
           ) : (
             <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <th onClick={() => handleSort('orderDate')} style={styles.thSort}>
-                    Order Date {sortField === 'orderDate' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th onClick={() => handleSort('itemSKUCode')} style={styles.thSort}>
-                    SKU Code {sortField === 'itemSKUCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th>Category</th>
-                  <th>Destination</th>
-                  <th onClick={() => handleSort('totalPrice')} style={styles.thSort} className="text-right">
-                    Price {sortField === 'totalPrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th onClick={() => handleSort('discount')} style={styles.thSort} className="text-right">
-                    Discount {sortField === 'discount' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th onClick={() => handleSort('itemSKUCodeCount')} style={styles.thSort} className="text-center">
-                    Qty {sortField === 'itemSKUCodeCount' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th className="text-center">Status</th>
-                  <th className="text-center">Sync Live</th>
+                <tr>
+                  <ErpTh columnKey="orderDate" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>Order Date</ErpTh>
+                  <ErpTh columnKey="itemSKUCode" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>SKU Code</ErpTh>
+                  <ErpTh columnKey="category" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>Category</ErpTh>
+                  <ErpTh columnKey="shippingAddressCity" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>Destination</ErpTh>
+                  <ErpTh columnKey="totalPrice" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }} align="right">Price (₹)</ErpTh>
+                  <ErpTh columnKey="discount" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }} align="right">Discount (₹)</ErpTh>
+                  <ErpTh columnKey="itemSKUCodeCount" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }} align="center">Qty</ErpTh>
+                  <ErpTh columnKey="saleOrderStatus" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }} align="center">Status</ErpTh>
+                  <ErpTh hideSort align="center">Sync Live</ErpTh>
                 </tr>
               </thead>
               <tbody>

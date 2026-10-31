@@ -15,6 +15,7 @@ import { triggerGlobalDataRefresh } from './NotificationToast';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import { StandardNumericInput } from './common/StandardNumericInput';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
+import { ErpTh } from './common/ErpTableParts';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -51,6 +52,7 @@ function formatDateISO(d) {
 
 export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null, companyEntity = 'Elite Digital Print' }) {
   const [expenses, setExpenses] = useState([]);
+  const [expenseSortState, setExpenseSortState] = useState({ columnKey: 'date', order: 'desc' });
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, totalVouchers: 0 });
   const [loading, setLoading] = useState(false);
 
@@ -1545,6 +1547,29 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     .filter(e => e.type === 'OUT' && (e.paymentMode || '').toLowerCase() !== 'cash')
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
+  const sortedExpenses = useMemo(() => {
+    if (!Array.isArray(expenses)) return [];
+    if (!expenseSortState.columnKey || !expenseSortState.order) return expenses;
+    const { columnKey, order } = expenseSortState;
+    const mult = order === 'asc' ? 1 : -1;
+    return [...expenses].sort((a, b) => {
+      let valA = a[columnKey];
+      let valB = b[columnKey];
+      if (columnKey === 'amount') {
+        return ((Number(valA) || 0) - (Number(valB) || 0)) * mult;
+      }
+      if (columnKey === 'date') {
+        const timeA = new Date(valA || 0).getTime();
+        const timeB = new Date(valB || 0).getTime();
+        return (timeA - timeB) * mult;
+      }
+      if (columnKey === 'voucherNo') {
+        return String(valA || '').localeCompare(String(valB || ''), undefined, { numeric: true }) * mult;
+      }
+      return String(valA || '').localeCompare(String(valB || '')) * mult;
+    });
+  }, [expenses, expenseSortState]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       {canViewDashboard ? (
@@ -2057,21 +2082,21 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>Voucher No</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Date</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Type</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Title / Purpose</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Category</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Amount (₹)</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Payment Mode</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Vendor / Person</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Logged By</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>
+                    <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                      <ErpTh columnKey="voucherNo" sortState={expenseSortState} onSortChange={setExpenseSortState}>Voucher No</ErpTh>
+                      <ErpTh columnKey="date" sortState={expenseSortState} onSortChange={setExpenseSortState}>Date</ErpTh>
+                      <ErpTh columnKey="type" sortState={expenseSortState} onSortChange={setExpenseSortState}>Type</ErpTh>
+                      <ErpTh columnKey="title" sortState={expenseSortState} onSortChange={setExpenseSortState}>Title / Purpose</ErpTh>
+                      <ErpTh columnKey="category" sortState={expenseSortState} onSortChange={setExpenseSortState}>Category</ErpTh>
+                      <ErpTh columnKey="amount" sortState={expenseSortState} onSortChange={setExpenseSortState} align="right">Amount (₹)</ErpTh>
+                      <ErpTh columnKey="paymentMode" sortState={expenseSortState} onSortChange={setExpenseSortState}>Payment Mode</ErpTh>
+                      <ErpTh columnKey="vendor" sortState={expenseSortState} onSortChange={setExpenseSortState}>Vendor / Person</ErpTh>
+                      <ErpTh columnKey="createdBy" sortState={expenseSortState} onSortChange={setExpenseSortState}>Logged By</ErpTh>
+                      <ErpTh hideSort align="center">Actions</ErpTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {expenses.map((item, idx) => {
+                    {sortedExpenses.map((item, idx) => {
                       const isIN = item.type === 'IN';
 
                       return (

@@ -3,6 +3,7 @@ import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Pr
 import BrandManagerModal from './BrandManagerModal';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { SmartThumbnail } from './common/SmartThumbnail';
+import { ErpTh } from './common/ErpTableParts';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync, onOpenManager }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -627,24 +628,14 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           <table className="data-table" style={{ ...styles.table, minWidth: '820px', width: '100%' }}>
             <thead>
               <tr>
-                <th onClick={() => handleSort('description')} style={{ cursor: 'pointer' }}>
-                  PRODUCT DETAILS {sortField === 'description' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('skuCode')} style={{ cursor: 'pointer' }}>
-                  SKU CODE {sortField === 'skuCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('brand')} style={{ cursor: 'pointer' }}>
-                  BRAND {sortField === 'brand' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th>SIZES</th>
-                <th onClick={() => handleSort('basePrice')} style={{ cursor: 'pointer' }}>
-                  BASE PRICE {sortField === 'basePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('price')} style={{ cursor: 'pointer' }}>
-                  PRICE {sortField === 'price' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th className="text-center">LIVE STOCK</th>
-                <th className="text-center">ACTIONS</th>
+                <ErpTh columnKey="description" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>PRODUCT DETAILS</ErpTh>
+                <ErpTh columnKey="skuCode" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>SKU CODE</ErpTh>
+                <ErpTh columnKey="brand" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>BRAND</ErpTh>
+                <ErpTh hideSort>SIZES</ErpTh>
+                <ErpTh columnKey="basePrice" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }} align="right">BASE PRICE</ErpTh>
+                <ErpTh columnKey="price" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }} align="right">PRICE</ErpTh>
+                <ErpTh hideSort align="center">LIVE STOCK</ErpTh>
+                <ErpTh hideSort align="center">ACTIONS</ErpTh>
               </tr>
             </thead>
             <tbody>

@@ -22,6 +22,7 @@ import { SmartActionGroup } from './common/SmartActionGroup';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import { StandardNumericInput } from './common/StandardNumericInput';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
@@ -181,6 +182,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // Challan state
   const [challans, setChallans] = useState([]);
+  const [challanSortState, setChallanSortState] = useState({ columnKey: 'date', order: 'desc' });
   const [challanSearch, setChallanSearch] = useState('');
   const [challanFilters, setChallanFilters] = useState({ status: [], party: [] });
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
@@ -4076,88 +4078,16 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th
-                      onClick={() => {
-                        if (inwardSortBy === 'date') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('date');
-                          setInwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Date {inwardSortBy === 'date' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (inwardSortBy === 'lotNo') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('lotNo');
-                          setInwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Lot No {inwardSortBy === 'lotNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (inwardSortBy === 'challanNo') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('challanNo');
-                          setInwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Challan No {inwardSortBy === 'challanNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (inwardSortBy === 'vendorName') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('vendorName');
-                          setInwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Vendor {inwardSortBy === 'vendorName' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (inwardSortBy === 'fabricQuality') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('fabricQuality');
-                          setInwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Fabric Quality {inwardSortBy === 'fabricQuality' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th>Panna</th>
-                    <th
-                      onClick={() => {
-                        if (inwardSortBy === 'qty') {
-                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setInwardSortBy('qty');
-                          setInwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Qty (mtr) {inwardSortBy === 'qty' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th>Shortage %</th>
-                    <th>Notes</th>
-                    <th>Action</th>
+                    <ErpTh columnKey="date" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Date</ErpTh>
+                    <ErpTh columnKey="lotNo" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Lot No</ErpTh>
+                    <ErpTh columnKey="challanNo" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Challan No</ErpTh>
+                    <ErpTh columnKey="vendorName" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Vendor</ErpTh>
+                    <ErpTh columnKey="fabricQuality" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Fabric Quality</ErpTh>
+                    <ErpTh hideSort>Panna</ErpTh>
+                    <ErpTh columnKey="qty" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }} align="right">Qty (mtr)</ErpTh>
+                    <ErpTh hideSort>Shortage %</ErpTh>
+                    <ErpTh hideSort>Notes</ErpTh>
+                    <ErpTh hideSort align="center">Action</ErpTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -4321,101 +4251,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'date') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('date');
-                          setOutwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Date {outwardSortBy === 'date' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'jobNo') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('jobNo');
-                          setOutwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Job Card No {outwardSortBy === 'jobNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'challanNo') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('challanNo');
-                          setOutwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Challan No {outwardSortBy === 'challanNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'partyName') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('partyName');
-                          setOutwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Party {outwardSortBy === 'partyName' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'fabricQuality') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('fabricQuality');
-                          setOutwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Fabric Quality {outwardSortBy === 'fabricQuality' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'lotNo') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('lotNo');
-                          setOutwardSortOrder('desc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Lot No {outwardSortBy === 'lotNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th>Panna</th>
-                    <th
-                      onClick={() => {
-                        if (outwardSortBy === 'qty') {
-                          setOutwardSortOrder(outwardSortOrder === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOutwardSortBy('qty');
-                          setOutwardSortOrder('asc');
-                        }
-                      }}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Qty (mtr) {outwardSortBy === 'qty' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th>Notes</th>
-                    <th>Logged By</th>
-                    <th>Action</th>
+                    <ErpTh columnKey="date" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Date</ErpTh>
+                    <ErpTh columnKey="jobNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Job Card No</ErpTh>
+                    <ErpTh columnKey="challanNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Challan No</ErpTh>
+                    <ErpTh columnKey="partyName" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Party</ErpTh>
+                    <ErpTh columnKey="fabricQuality" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Fabric Quality</ErpTh>
+                    <ErpTh columnKey="lotNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Lot No</ErpTh>
+                    <ErpTh hideSort>Panna</ErpTh>
+                    <ErpTh columnKey="qty" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }} align="right">Qty (mtr)</ErpTh>
+                    <ErpTh hideSort>Notes</ErpTh>
+                    <ErpTh hideSort>Logged By</ErpTh>
+                    <ErpTh hideSort align="center">Action</ErpTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -5286,6 +5132,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     if (!challanFilters.party.includes(p)) return false;
                   }
                   return true;
+                }).sort((a, b) => {
+                  if (!challanSortState.columnKey || !challanSortState.order) return 0;
+                  const { columnKey, order } = challanSortState;
+                  const mult = order === 'asc' ? 1 : -1;
+                  let valA = a[columnKey];
+                  let valB = b[columnKey];
+                  if (columnKey === 'totalMtr' || columnKey === 'totalRolls') {
+                    return ((Number(valA) || 0) - (Number(valB) || 0)) * mult;
+                  }
+                  if (columnKey === 'date') {
+                    return (new Date(valA || 0).getTime() - new Date(valB || 0).getTime()) * mult;
+                  }
+                  if (columnKey === 'challanNo' || columnKey === 'lotNo' || columnKey === 'jobNo') {
+                    return String(valA || '').localeCompare(String(valB || ''), undefined, { numeric: true }) * mult;
+                  }
+                  return String(valA || '').localeCompare(String(valB || '')) * mult;
                 });
                 const displayedChallans = filteredChallans.slice(0, challanVisibleCount);
 
@@ -5293,35 +5155,32 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <table className="data-table" style={{ width: '100%', minWidth: '950px', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>
-                          <input
-                            type="checkbox"
-                            checked={displayedChallans.length > 0 && displayedChallans.every(c => !!selectedChallanMap[c._id])}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setSelectedChallanMap(prev => {
-                                  const copy = { ...prev };
-                                  displayedChallans.forEach(c => { copy[c._id] = c; });
-                                  return copy;
-                                });
-                              } else {
-                                setSelectedChallanMap({});
-                              }
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </th>
-                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
-                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '85px' }}>Status</th>
-                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
-                        <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
-                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
-                        <th style={{ padding: '0.65rem 0.5rem' }}>Fabric</th>
-                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '110px' }}>Job No</th>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Total Mtr</th>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '200px' }}>Actions</th>
+                        <MasterCheckboxTh
+                          allChecked={displayedChallans.length > 0 && displayedChallans.every(c => !!selectedChallanMap[c._id])}
+                          indeterminate={displayedChallans.some(c => !!selectedChallanMap[c._id]) && !displayedChallans.every(c => !!selectedChallanMap[c._id])}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedChallanMap(prev => {
+                                const copy = { ...prev };
+                                displayedChallans.forEach(c => { copy[c._id] = c; });
+                                return copy;
+                              });
+                            } else {
+                              setSelectedChallanMap({});
+                            }
+                          }}
+                        />
+                        <ErpTh columnKey="challanNo" sortState={challanSortState} onSortChange={setChallanSortState} width="95px">Ch. No</ErpTh>
+                        <ErpTh columnKey="status" sortState={challanSortState} onSortChange={setChallanSortState} width="90px">Status</ErpTh>
+                        <ErpTh columnKey="date" sortState={challanSortState} onSortChange={setChallanSortState} width="95px">Date</ErpTh>
+                        <ErpTh columnKey="billTo" sortState={challanSortState} onSortChange={setChallanSortState}>Bill To / Party</ErpTh>
+                        <ErpTh columnKey="lotNo" sortState={challanSortState} onSortChange={setChallanSortState} width="80px">Lot No</ErpTh>
+                        <ErpTh columnKey="fabricQuality" sortState={challanSortState} onSortChange={setChallanSortState}>Fabric</ErpTh>
+                        <ErpTh columnKey="jobNo" sortState={challanSortState} onSortChange={setChallanSortState} width="110px">Job No</ErpTh>
+                        <ErpTh columnKey="panna" sortState={challanSortState} onSortChange={setChallanSortState} align="center" width="60px">Panna</ErpTh>
+                        <ErpTh columnKey="totalRolls" sortState={challanSortState} onSortChange={setChallanSortState} align="center" width="45px">TP</ErpTh>
+                        <ErpTh columnKey="totalMtr" sortState={challanSortState} onSortChange={setChallanSortState} align="right" width="105px">Total Mtr</ErpTh>
+                        <ErpTh hideSort align="center" width="200px">Actions</ErpTh>
                       </tr>
                     </thead>
                     <tbody>

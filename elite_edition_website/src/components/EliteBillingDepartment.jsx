@@ -328,6 +328,9 @@ export default function EliteBillingDepartment({
     'Expense Purchase',
     'Asset Purchase'
   ]);
+  const [customerSortState, setCustomerSortState] = useState({ columnKey: 'name', order: 'asc' });
+  const [vendorSortState, setVendorSortState] = useState({ columnKey: 'name', order: 'asc' });
+  const [itemSortState, setItemSortState] = useState({ columnKey: 'name', order: 'asc' });
 
   useEffect(() => {
     let isMounted = true;
@@ -2980,42 +2983,126 @@ export default function EliteBillingDepartment({
   };
 
 
-  // Filtered Customers & Items
+  // Filtered Customers & Items with ERP Column Sorting
   const filteredCustomers = useMemo(() => {
-    const list = Array.isArray(customers) ? customers : [];
-    if (!customerSearch) return list;
-    const q = customerSearch.toLowerCase();
-    return list.filter(c =>
-      (c.name || '').toLowerCase().includes(q) ||
-      (c.businessName || '').toLowerCase().includes(q) ||
-      (c.phone || '').toLowerCase().includes(q) ||
-      (c.gstin || '').toLowerCase().includes(q)
-    );
-  }, [customers, customerSearch]);
+    const list = Array.isArray(customers) ? [...customers] : [];
+    let result = list;
+    if (customerSearch) {
+      const q = customerSearch.toLowerCase();
+      result = list.filter(c =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.businessName || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q) ||
+        (c.gstin || '').toLowerCase().includes(q)
+      );
+    }
+    if (customerSortState?.columnKey && customerSortState?.order) {
+      const { columnKey, order } = customerSortState;
+      result.sort((a, b) => {
+        let valA = '';
+        let valB = '';
+        if (columnKey === 'name') {
+          valA = (a.name || '').toLowerCase();
+          valB = (b.name || '').toLowerCase();
+        } else if (columnKey === 'businessName') {
+          valA = (a.businessName || '').toLowerCase();
+          valB = (b.businessName || '').toLowerCase();
+        } else if (columnKey === 'phone') {
+          valA = (a.phone || '').toLowerCase();
+          valB = (b.phone || '').toLowerCase();
+        } else if (columnKey === 'gstin') {
+          valA = (a.gstin || '').toLowerCase();
+          valB = (b.gstin || '').toLowerCase();
+        } else if (columnKey === 'state') {
+          valA = (a.state || a.billingAddress || '').toLowerCase();
+          valB = (b.state || b.billingAddress || '').toLowerCase();
+        }
+        return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+    }
+    return result;
+  }, [customers, customerSearch, customerSortState]);
 
   const filteredVendors = useMemo(() => {
-    const list = Array.isArray(vendorsList) ? vendorsList : [];
-    if (!vendorSearch || !vendorSearch.trim()) return list;
-    const q = vendorSearch.toLowerCase().trim();
-    return list.filter(v =>
-      (v.name || '').toLowerCase().includes(q) ||
-      (v.businessName || '').toLowerCase().includes(q) ||
-      (v.phone || '').toLowerCase().includes(q) ||
-      (v.gstin || '').toLowerCase().includes(q) ||
-      (v.email || '').toLowerCase().includes(q)
-    );
-  }, [vendorsList, vendorSearch]);
+    const list = Array.isArray(vendorsList) ? [...vendorsList] : [];
+    let result = list;
+    if (vendorSearch && vendorSearch.trim()) {
+      const q = vendorSearch.toLowerCase().trim();
+      result = list.filter(v =>
+        (v.name || '').toLowerCase().includes(q) ||
+        (v.businessName || '').toLowerCase().includes(q) ||
+        (v.phone || '').toLowerCase().includes(q) ||
+        (v.gstin || '').toLowerCase().includes(q) ||
+        (v.email || '').toLowerCase().includes(q)
+      );
+    }
+    if (vendorSortState?.columnKey && vendorSortState?.order) {
+      const { columnKey, order } = vendorSortState;
+      result.sort((a, b) => {
+        let valA = '';
+        let valB = '';
+        if (columnKey === 'name') {
+          valA = (a.name || a.businessName || '').toLowerCase();
+          valB = (b.name || b.businessName || '').toLowerCase();
+        } else if (columnKey === 'businessName') {
+          valA = (a.businessName || '').toLowerCase();
+          valB = (b.businessName || '').toLowerCase();
+        } else if (columnKey === 'phone') {
+          valA = (a.phone || '').toLowerCase();
+          valB = (b.phone || '').toLowerCase();
+        } else if (columnKey === 'gstin') {
+          valA = (a.gstin || '').toLowerCase();
+          valB = (b.gstin || '').toLowerCase();
+        } else if (columnKey === 'state') {
+          valA = (a.state || a.billingAddress || '').toLowerCase();
+          valB = (b.state || b.billingAddress || '').toLowerCase();
+        }
+        return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+    }
+    return result;
+  }, [vendorsList, vendorSearch, vendorSortState]);
 
   const filteredItems = useMemo(() => {
-    const list = Array.isArray(itemsList) ? itemsList : [];
-    if (!itemSearch) return list;
-    const q = itemSearch.toLowerCase();
-    return list.filter(i =>
-      (i.itemName || '').toLowerCase().includes(q) ||
-      (i.hsnCode || '').toLowerCase().includes(q) ||
-      (i.category || '').toLowerCase().includes(q)
-    );
-  }, [itemsList, itemSearch]);
+    const list = Array.isArray(itemsList) ? [...itemsList] : [];
+    let result = list;
+    if (itemSearch) {
+      const q = itemSearch.toLowerCase();
+      result = list.filter(i =>
+        (i.itemName || '').toLowerCase().includes(q) ||
+        (i.hsnCode || '').toLowerCase().includes(q) ||
+        (i.category || '').toLowerCase().includes(q)
+      );
+    }
+    if (itemSortState?.columnKey && itemSortState?.order) {
+      const { columnKey, order } = itemSortState;
+      result.sort((a, b) => {
+        if (columnKey === 'name') {
+          const valA = (a.itemName || '').toLowerCase();
+          const valB = (b.itemName || '').toLowerCase();
+          return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (columnKey === 'category') {
+          const valA = (a.category || '').toLowerCase();
+          const valB = (b.category || '').toLowerCase();
+          return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (columnKey === 'hsnCode') {
+          const valA = (a.hsnCode || '').toLowerCase();
+          const valB = (b.hsnCode || '').toLowerCase();
+          return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (columnKey === 'taxRate') {
+          const numA = Number(a.taxRate || 0);
+          const numB = Number(b.taxRate || 0);
+          return order === 'asc' ? numA - numB : numB - numA;
+        } else if (columnKey === 'unitPrice') {
+          const numA = Number(a.unitPrice || 0);
+          const numB = Number(b.unitPrice || 0);
+          return order === 'asc' ? numA - numB : numB - numA;
+        }
+        return 0;
+      });
+    }
+    return result;
+  }, [itemsList, itemSearch, itemSortState]);
 
   // Delete Customer
   const handleDeleteCustomer = async (id, name) => {
@@ -5973,13 +6060,13 @@ export default function EliteBillingDepartment({
           <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Customer / Contact</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Business Name</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Phone & Email</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>GSTIN</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Address & State</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>Actions</th>
+                <tr>
+                  <ErpTh columnKey="name" sortState={customerSortState} onSortChange={setCustomerSortState}>Customer / Contact</ErpTh>
+                  <ErpTh columnKey="businessName" sortState={customerSortState} onSortChange={setCustomerSortState}>Business Name</ErpTh>
+                  <ErpTh columnKey="phone" sortState={customerSortState} onSortChange={setCustomerSortState}>Phone & Email</ErpTh>
+                  <ErpTh columnKey="gstin" sortState={customerSortState} onSortChange={setCustomerSortState}>GSTIN</ErpTh>
+                  <ErpTh columnKey="state" sortState={customerSortState} onSortChange={setCustomerSortState}>Address & State</ErpTh>
+                  <ErpTh hideSort align="center">Actions</ErpTh>
                 </tr>
               </thead>
               <tbody>
@@ -6065,13 +6152,13 @@ export default function EliteBillingDepartment({
           <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Vendor / Contact</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Business / Firm Name</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Phone & Email</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>GSTIN</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Address & State</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>Actions</th>
+                <tr>
+                  <ErpTh columnKey="name" sortState={vendorSortState} onSortChange={setVendorSortState}>Vendor / Contact</ErpTh>
+                  <ErpTh columnKey="businessName" sortState={vendorSortState} onSortChange={setVendorSortState}>Business / Firm Name</ErpTh>
+                  <ErpTh columnKey="phone" sortState={vendorSortState} onSortChange={setVendorSortState}>Phone & Email</ErpTh>
+                  <ErpTh columnKey="gstin" sortState={vendorSortState} onSortChange={setVendorSortState}>GSTIN</ErpTh>
+                  <ErpTh columnKey="state" sortState={vendorSortState} onSortChange={setVendorSortState}>Address & State</ErpTh>
+                  <ErpTh hideSort align="center">Actions</ErpTh>
                 </tr>
               </thead>
               <tbody>
@@ -6144,13 +6231,13 @@ export default function EliteBillingDepartment({
           <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Product / Service</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Category</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>HSN Code</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Unit Price</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Default GST %</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>Actions</th>
+                <tr>
+                  <ErpTh columnKey="name" sortState={itemSortState} onSortChange={setItemSortState}>Product / Service</ErpTh>
+                  <ErpTh columnKey="category" sortState={itemSortState} onSortChange={setItemSortState}>Category</ErpTh>
+                  <ErpTh columnKey="hsnCode" sortState={itemSortState} onSortChange={setItemSortState}>HSN Code</ErpTh>
+                  <ErpTh columnKey="unitPrice" sortState={itemSortState} onSortChange={setItemSortState} align="right">Unit Price</ErpTh>
+                  <ErpTh columnKey="taxRate" sortState={itemSortState} onSortChange={setItemSortState} align="center">Default GST %</ErpTh>
+                  <ErpTh hideSort align="center">Actions</ErpTh>
                 </tr>
               </thead>
               <tbody>
