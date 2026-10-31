@@ -225,8 +225,13 @@ const createOutward = async (req, res) => {
 
     // ── Stock Sufficiency Validation: Prevent negative stock ──
     if (lotNo) {
+      const lotNum = Number(lotNo);
+      const lotMatch = !isNaN(lotNum) && lotNum > 0
+        ? { $or: [{ lotNo: lotNum }, { lotNo: String(lotNo).trim() }] }
+        : { lotNo: String(lotNo).trim() };
+
       const lotStockAgg = await FabricTransaction.aggregate([
-        { $match: { lotNo: Number(lotNo) } },
+        { $match: lotMatch },
         {
           $group: {
             _id: '$lotNo',
@@ -239,9 +244,34 @@ const createOutward = async (req, res) => {
       if (finalQty > (availableInLot + 0.05)) {
         return res.status(400).json({
           success: false,
-          error: `Insufficient stock in Lot #${lotNo}. Available: ${availableInLot.toFixed(2)}m, Requested: ${finalQty.toFixed(2)}m. Stock cannot go negative.`
+          error: `Insufficient stock in Lot #${lotNo}. Available: ${Math.max(0, availableInLot).toFixed(2)}m, Requested: ${finalQty.toFixed(2)}m. Stock cannot go negative.`
         });
       }
+    }
+
+    // Quality-level check across all lots to strictly prohibit negative fabric inventory
+    const qualMatch = {
+      fabricQuality: new RegExp(`^${normFabric.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')
+    };
+    if (department) {
+      qualMatch.department = department;
+    }
+    const qualAgg = await FabricTransaction.aggregate([
+      { $match: qualMatch },
+      {
+        $group: {
+          _id: null,
+          totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+        }
+      }
+    ]);
+    const qualAvailable = qualAgg.length > 0 ? (qualAgg[0].totalIn - qualAgg[0].totalOut) : 0;
+    if (finalQty > (qualAvailable + 0.05)) {
+      return res.status(400).json({
+        success: false,
+        error: `Insufficient stock for "${normFabric}". Total available stock is ${Math.max(0, qualAvailable).toFixed(2)}m, Requested: ${finalQty.toFixed(2)}m. Stock cannot go negative.`
+      });
     }
 
     const transaction = new FabricTransaction({
@@ -1537,8 +1567,8 @@ async function computeLotWiseData(dateStart, dateEnd, vendorRegex = null) {
     const rawOutward = Number(l.totalOutward.toFixed(2));
     let rawStock = Number((rawInward - rawOutward).toFixed(2));
 
-    // Rule: 0 <= stock <= 5 makes stock 0 (negative stock stays negative)
-    if (rawStock >= 0 && rawStock <= 5) {
+    // Rule: Stock cannot be negative; remnants <= 5m are rounded to 0
+    if (rawStock <= 5) {
       rawStock = 0;
     }
 
@@ -1550,7 +1580,7 @@ async function computeLotWiseData(dateStart, dateEnd, vendorRegex = null) {
       vendorChallanNo: l.vendorChallanNo,
       totalInward: rawInward,
       totalOutward: rawOutward,
-      currentStock: rawStock,
+      currentStock: Math.max(0, rawStock),
       firstDate: l.firstDate
     };
   }).filter(l => l.currentStock !== 0 || (l.totalInward > 0 || l.totalOutward > 0))
@@ -4557,6 +4587,10 @@ const getWhiteFabricLogs = async (req, res) => {
 const inFlightWhiteFabricQALocks = new Map();
 
 const createWhiteFabricLog = async (req, res) => {
+  let redisLockKey = null;
+  let redisClient = null;
+  let acquiredRedisLock = false;
+
   try {
     const body = req.body;
     const totalMtr = parseFloat(body.totalMtr);
@@ -4575,8 +4609,12 @@ const createWhiteFabricLog = async (req, res) => {
       return res.status(400).json({ success: false, error: `Total defect meters (${totDefect}m) cannot exceed total roll meters (${totalMtr}m).` });
     }
 
-    // Deduplication guard against rapid burst-clicks (BUG-054)
-    const lockKey = `${String(body.challanNo || '').trim()}___${String(body.fabricQuality || '').trim()}___${String(body.lotNo || '').trim()}___${totalMtr}`;
+    const cleanChallan = String(body.challanNo || '').trim();
+    const cleanLot = String(body.lotNo || '').trim();
+    const cleanFabric = String(body.fabricQuality || '').trim();
+
+    // 1. In-process in-flight deduplication map
+    const lockKey = `${cleanChallan}___${cleanFabric}___${cleanLot}___${totalMtr}`;
     if (inFlightWhiteFabricQALocks.has(lockKey)) {
       const existing = await inFlightWhiteFabricQALocks.get(lockKey);
       return res.status(200).json({
@@ -4586,13 +4624,49 @@ const createWhiteFabricLog = async (req, res) => {
       });
     }
 
-    if (body.challanNo && body.fabricQuality) {
+    // 2. Distributed Redis lock across all PM2 cluster workers
+    try {
+      const { getRedisClient } = require('../db/redisClient');
+      redisClient = typeof getRedisClient === 'function' ? getRedisClient() : null;
+      if (redisClient && redisClient.status === 'ready') {
+        redisLockKey = `lock:white_qa:${cleanChallan || 'nochallan'}:${cleanLot || 'nolot'}:${cleanFabric}:${totalMtr}`;
+        const setNxRes = await redisClient.set(redisLockKey, '1', 'EX', 12, 'NX');
+        if (!setNxRes) {
+          // Lock already held by a concurrent request in another PM2 cluster process
+          await new Promise(r => setTimeout(r, 250));
+          const recentDoc = await WhiteFabricLog.findOne({
+            fabricQuality: cleanFabric,
+            totalMtr,
+            createdAt: { $gte: new Date(Date.now() - 15000) }
+          }).sort({ createdAt: -1 }).lean();
+          if (recentDoc) {
+            return res.status(200).json({
+              success: true,
+              data: recentDoc,
+              message: 'Deduplicated: Identical White Fabric QA entry logged moments ago.'
+            });
+          }
+        } else {
+          acquiredRedisLock = true;
+        }
+      }
+    } catch (rErr) {
+      console.warn('[createWhiteFabricLog] Redis distributed lock notice:', rErr.message);
+    }
+
+    // 3. Database recent duplicate check (15-second debounce window)
+    const duplicateOrConds = [];
+    if (cleanChallan) duplicateOrConds.push({ challanNo: cleanChallan });
+    if (cleanLot) duplicateOrConds.push({ lotNo: cleanLot });
+
+    if (duplicateOrConds.length > 0) {
       const recentDuplicate = await WhiteFabricLog.findOne({
-        challanNo: String(body.challanNo).trim(),
-        fabricQuality: String(body.fabricQuality).trim(),
+        fabricQuality: cleanFabric,
         totalMtr,
-        createdAt: { $gte: new Date(Date.now() - 3000) }
-      }).lean();
+        $or: duplicateOrConds,
+        createdAt: { $gte: new Date(Date.now() - 15000) }
+      }).sort({ createdAt: -1 }).lean();
+
       if (recentDuplicate) {
         return res.status(200).json({
           success: true,
@@ -4618,6 +4692,9 @@ const createWhiteFabricLog = async (req, res) => {
     const log = await creationPromise;
     res.json({ success: true, data: log });
   } catch (err) {
+    if (acquiredRedisLock && redisClient && redisLockKey) {
+      try { await redisClient.del(redisLockKey); } catch (e) {}
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 };

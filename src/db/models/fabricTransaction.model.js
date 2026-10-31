@@ -120,12 +120,18 @@ fabricTransactionSchema.pre('save', async function () {
 });
 
 // ── Non-Negative Ledger Guard Pre-Save Hook ──
-// Prohibits OUTWARD transactions from driving lot inventory below zero
+// Prohibits OUTWARD transactions from driving lot or fabric quality inventory below zero
 fabricTransactionSchema.pre('save', async function () {
-  if (this.type === 'OUTWARD' && this.lotNo && !this.forceAllowNegative) {
-    const lotNum = Number(this.lotNo);
-    if (!isNaN(lotNum) && lotNum > 0) {
-      const matchCriteria = { lotNo: lotNum };
+  if (this.type === 'OUTWARD' && !this.forceAllowNegative) {
+    const requestedQty = parseFloat(this.qty) || 0;
+
+    // 1. Lot-level sufficiency check (if lotNo specified)
+    if (this.lotNo) {
+      const lotNum = Number(this.lotNo);
+      const matchCriteria = !isNaN(lotNum) && lotNum > 0
+        ? { $or: [{ lotNo: lotNum }, { lotNo: String(this.lotNo).trim() }] }
+        : { lotNo: String(this.lotNo).trim() };
+
       if (!this.isNew && this._id) {
         matchCriteria._id = { $ne: this._id };
       }
@@ -143,13 +149,51 @@ fabricTransactionSchema.pre('save', async function () {
 
       const currentStats = agg && agg[0] ? agg[0] : { totalIn: 0, totalOut: 0 };
       const currentAvailable = currentStats.totalIn - currentStats.totalOut;
-      const requestedQty = parseFloat(this.qty) || 0;
 
       // Allow 0.05m tolerance for floating point rounding differences
       if (requestedQty > currentAvailable + 0.05) {
         const deficit = Math.round((requestedQty - currentAvailable) * 100) / 100;
         const err = new Error(
-          `INSUFFICIENT_FABRIC_STOCK: Cannot issue ${requestedQty} mtr from Lot #${lotNum}. Available balance is only ${Math.max(0, Math.round(currentAvailable * 100) / 100)} mtr (Deficit: ${deficit} mtr). Negative inventory ledger balances are strictly prohibited.`
+          `INSUFFICIENT_FABRIC_STOCK: Cannot issue ${requestedQty} mtr from Lot #${this.lotNo}. Available balance is only ${Math.max(0, Math.round(currentAvailable * 100) / 100)} mtr (Deficit: ${deficit} mtr). Negative inventory ledger balances are strictly prohibited.`
+        );
+        err.name = 'LedgerStockError';
+        err.statusCode = 422;
+        err.code = 'INSUFFICIENT_FABRIC_STOCK';
+        throw err;
+      }
+    }
+
+    // 2. Quality-level overall sufficiency check (applies whether lotNo is present or not)
+    if (this.fabricQuality && String(this.fabricQuality).trim()) {
+      const cleanQual = String(this.fabricQuality).trim();
+      const qualMatch = {
+        fabricQuality: new RegExp(`^${cleanQual.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')
+      };
+      if (!this.isNew && this._id) {
+        qualMatch._id = { $ne: this._id };
+      }
+      if (this.department) {
+        qualMatch.department = this.department;
+      }
+
+      const qualAgg = await this.constructor.aggregate([
+        { $match: qualMatch },
+        {
+          $group: {
+            _id: null,
+            totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+            totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          },
+        },
+      ]);
+
+      const qualStats = qualAgg && qualAgg[0] ? qualAgg[0] : { totalIn: 0, totalOut: 0 };
+      const qualAvailable = qualStats.totalIn - qualStats.totalOut;
+
+      if (requestedQty > qualAvailable + 0.05) {
+        const deficit = Math.round((requestedQty - qualAvailable) * 100) / 100;
+        const err = new Error(
+          `INSUFFICIENT_FABRIC_STOCK: Cannot issue ${requestedQty} mtr of ${cleanQual}. Total available stock is ${Math.max(0, Math.round(qualAvailable * 100) / 100)} mtr (Deficit: ${deficit} mtr). Negative inventory ledger balances are strictly prohibited.`
         );
         err.name = 'LedgerStockError';
         err.statusCode = 422;

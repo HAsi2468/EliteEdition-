@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const fabricController = require('../../controllers/fabric.controller');
+const redisIdempotencyMiddleware = require('../../middlewares/redisIdempotency.middleware');
 
 // Create new INWARD transaction
 router.post('/inward', fabricController.createInward);
@@ -59,7 +60,7 @@ router.delete('/lot-transfer/:refId', fabricController.deleteLotTransfer);
 
 // White Fabric QA inspection routes
 router.get('/white-qa-logs', fabricController.getWhiteFabricLogs);
-router.post('/white-qa-logs', fabricController.createWhiteFabricLog);
+router.post('/white-qa-logs', redisIdempotencyMiddleware({ action: 'WHITE_FABRIC_QA' }), fabricController.createWhiteFabricLog);
 router.delete('/white-qa-logs/:id', fabricController.deleteWhiteFabricLog);
 
 // Update a transaction by ID
