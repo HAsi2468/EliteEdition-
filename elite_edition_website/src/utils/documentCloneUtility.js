@@ -46,11 +46,27 @@ export function cloneDocumentPayload(sourceDoc, docType = 'invoice') {
 
     // Reset Financial Ledger & Payment States
     status: 'draft',
+    invoiceStatus: 'DRAFT',
     paymentStatus: 'UNPAID',
     paidAmount: 0,
     balanceDue: sourceDoc.grandTotal || sourceDoc.totalAmount || 0,
     payments: [],
+    paymentHistory: [],
     history: [],
+
+    // Reset Signatures, Approvals, and Digital Verification (BUG-068)
+    signedCopy: null,
+    signedAt: null,
+    signedBy: null,
+    signatureUrl: null,
+    signature: null,
+    approved: false,
+    approvalStatus: 'DRAFT',
+    approvalTrail: [],
+    approvedBy: null,
+    approvedAt: null,
+    challanNos: [],
+    deliveryChallanIds: [],
 
     // Items array cloned
     items: clonedItems,

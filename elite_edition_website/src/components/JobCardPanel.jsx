@@ -4553,7 +4553,33 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       ) : effectiveSubTab === 'reports' || effectiveSubTab === 'reports_center' ? (
         <ReportsCenter department={department === 'stitching' ? 'stitching' : 'elite-print'} />
       ) : effectiveSubTab === 'jobcards' || effectiveSubTab === 'dashboard' ? (
-        department === 'stitching' ? <GarmentJobCardDashboard /> : <DigitalPrintOperationsDashboard onNavigateDepartment={(tab) => setOverrideSubTab(tab)} />
+        department === 'stitching' ? <GarmentJobCardDashboard /> : (
+          <DigitalPrintOperationsDashboard 
+            onNavigateDepartment={(tab) => {
+              if (tab === 'billing') {
+                if (typeof window !== 'undefined') window.location.hash = '#jobcards_billing';
+                setOverrideSubTab('billing');
+              } else if (tab === 'costing') {
+                if (typeof window !== 'undefined') window.location.hash = '#costing';
+                setOverrideSubTab('costing');
+              } else if (tab === 'raw_materials') {
+                if (typeof window !== 'undefined') window.location.hash = '#raw-materials';
+                setOverrideSubTab('raw_materials');
+              } else if (tab === 'fabric') {
+                if (typeof window !== 'undefined') window.location.hash = '#fabric';
+                setOverrideSubTab('fabric');
+              } else if (tab === 'printing_log') {
+                if (typeof window !== 'undefined') window.location.hash = '#printing';
+                setOverrideSubTab('printing_log');
+              } else if (tab === 'fusing' || tab === 'fusing_log') {
+                if (typeof window !== 'undefined') window.location.hash = '#fusing';
+                setOverrideSubTab('fusing_log');
+              } else {
+                setOverrideSubTab(tab);
+              }
+            }} 
+          />
+        )
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           {/* Enterprise Header Banner */}

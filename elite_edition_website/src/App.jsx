@@ -258,7 +258,10 @@ export function getDepartmentForTab(tab) {
 }
 
 export function parseHashRoute(hashStr = '') {
-  const clean = (hashStr || '').replace(/^#\/?/, '').trim();
+  let clean = (hashStr || '').replace(/^#\/?/, '').trim();
+  if (!clean && typeof window !== 'undefined' && window.location.pathname && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+    clean = window.location.pathname.replace(/^\//, '').trim();
+  }
   if (!clean) return { path: '', query: {}, queryString: '' };
   const [pathPart, queryPart] = clean.split('?');
   const path = (pathPart || '').trim().toLowerCase();
@@ -296,8 +299,8 @@ export function resolveActiveRoute(hashStr = '') {
 
   // Check if it is a known system tab directly
   const normalizedUnder = path.replace(/-/g, '_');
-  if (ALL_KNOWN_ERP_TABS.has(path) || ALL_KNOWN_ERP_TABS.has(normalizedUnder) || path.startsWith('jobcards_') || path.startsWith('jobcards-')) {
-    const tabName = ALL_KNOWN_ERP_TABS.has(normalizedUnder) ? normalizedUnder : (ALL_KNOWN_ERP_TABS.has(path) ? path : normalizedUnder);
+  if (ALL_KNOWN_ERP_TABS.has(path) || ALL_KNOWN_ERP_TABS.has(normalizedUnder)) {
+    const tabName = ALL_KNOWN_ERP_TABS.has(normalizedUnder) ? normalizedUnder : path;
     const dept = getDepartmentForTab(tabName);
     return { tab: tabName, dept, query, queryString, path };
   }
@@ -335,8 +338,8 @@ export default function App() {
     let savedTab = '';
     let savedDept = '';
     try {
-      if (typeof window !== 'undefined' && window.location.hash) {
-        const route = resolveActiveRoute(window.location.hash);
+      if (typeof window !== 'undefined' && (window.location.hash || (window.location.pathname && window.location.pathname !== '/' && window.location.pathname !== '/index.html'))) {
+        const route = resolveActiveRoute(window.location.hash || window.location.pathname);
         if (route.tab) {
           savedTab = route.tab;
           if (route.dept) savedDept = route.dept;
@@ -1235,6 +1238,12 @@ export default function App() {
   const handleNavClick = (tab) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
+    if (typeof window !== 'undefined') {
+      const canonical = getCanonicalHashForTab(tab);
+      if (canonical) {
+        window.location.hash = canonical;
+      }
+    }
   };
 
   const handleSwitchDepartment = (dept) => {

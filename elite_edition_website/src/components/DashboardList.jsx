@@ -39,9 +39,11 @@ export function DashboardList({
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'zero' | 'critical' | 'low'
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
 
+  const safeItems = Array.isArray(items) ? items : [];
+
   // Filter items based on search and stock status
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    return safeItems.filter((item) => {
       const stock = item.currentlyAvailableStock ?? item.stock ?? 0;
       const matchesSearch = 
         !searchTerm ||
@@ -56,13 +58,13 @@ export function DashboardList({
       if (filterMode === 'low') return stock > 5 && stock <= (threshold || 10);
       return true;
     });
-  }, [items, searchTerm, filterMode, threshold]);
+  }, [safeItems, searchTerm, filterMode, threshold]);
 
-  const zeroCount = useMemo(() => items.filter(i => (i.currentlyAvailableStock ?? 0) === 0).length, [items]);
-  const criticalCount = useMemo(() => items.filter(i => {
+  const zeroCount = useMemo(() => safeItems.filter(i => (i.currentlyAvailableStock ?? 0) === 0).length, [safeItems]);
+  const criticalCount = useMemo(() => safeItems.filter(i => {
     const s = i.currentlyAvailableStock ?? 0;
     return s > 0 && s <= 5;
-  }).length, [items]);
+  }).length, [safeItems]);
 
   const getStockBadge = (stock) => {
     if (stock === 0) {
@@ -182,7 +184,7 @@ export function DashboardList({
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            All Items ({items.length})
+            All Items ({safeItems.length})
           </button>
           <button
             type="button"
@@ -356,7 +358,7 @@ export function DashboardList({
 
         {/* Footer Summary Strip */}
         <div className="px-4 py-2.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-          <span>Showing {filteredItems.length} of {items.length} total tracked items</span>
+          <span>Showing {filteredItems.length} of {safeItems.length} total tracked items</span>
           <span className="text-slate-400">Ergonomic ERP Layout • WCAG AAA Readable</span>
         </div>
 

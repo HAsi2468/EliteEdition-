@@ -327,7 +327,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     });
 
     map.forEach(item => {
-      item.currentStock = item.totalInward - item.totalOutward;
+      const baseStockItem = Array.isArray(stock) ? stock.find(s => String(s.fabricQuality || '').trim().toUpperCase() === item.fabricQuality) : null;
+      item.currentStock = baseStockItem ? Math.max(0, Number(baseStockItem.currentStock) || 0) : Math.max(0, item.totalInward - item.totalOutward);
     });
 
     const result = Array.from(map.values());
@@ -349,8 +350,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     const dateRangeStr = stockDateStart && stockDateEnd
       ? `${stockDateStart} to ${stockDateEnd}`
       : stockDateStart
-      ? `From ${stockDateStart}`
-      : 'All Time';
+        ? `From ${stockDateStart}`
+        : 'All Time';
 
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1e293b; background: #ffffff;">
@@ -402,10 +403,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           </thead>
           <tbody>
             ${listToExport.map((item, index) => {
-              const cur = Number(item.currentStock || 0);
-              const statusClass = cur <= 0 ? 'badge-empty' : cur <= 50 ? 'badge-low' : 'badge-ok';
-              const statusText = cur <= 0 ? 'Out of Stock' : cur <= 50 ? 'Low Stock' : 'In Stock';
-              return `
+      const cur = Number(item.currentStock || 0);
+      const statusClass = cur <= 0 ? 'badge-empty' : cur <= 50 ? 'badge-low' : 'badge-ok';
+      const statusText = cur <= 0 ? 'Out of Stock' : cur <= 50 ? 'Low Stock' : 'In Stock';
+      return `
                 <tr>
                   <td>${index + 1}</td>
                   <td style="font-weight: 800; color: #0f172a;">${item.fabricQuality}</td>
@@ -415,7 +416,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <td style="text-align: center;"><span class="status-badge ${statusClass}">${statusText}</span></td>
                 </tr>
               `;
-            }).join('')}
+    }).join('')}
           </tbody>
         </table>
 
@@ -707,6 +708,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // Modals
   const [isInwardOpen, setIsInwardOpen] = useState(false);
+  const [inwardError, setInwardError] = useState('');
   const [isOutwardOpen, setIsOutwardOpen] = useState(false);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
 
@@ -1008,20 +1010,33 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const handleInwardSubmit = async (e) => {
     e.preventDefault();
+    setInwardError('');
     if (loading) return; // Prevent double submissions
 
     const numQty = parseFloat(inwardForm.qty);
     if (isNaN(numQty) || numQty <= 0) {
-      alert('Please enter a valid positive quantity (> 0 meters).');
+      const msg = 'Please enter a valid positive quantity (> 0 meters).';
+      setInwardError(msg);
+      triggerEliteAlert('Validation Error', msg, 'warning');
+      return;
+    }
+    if (numQty > 1000000) {
+      const msg = 'Inward quantity cannot exceed 1,000,000 meters.';
+      setInwardError(msg);
+      triggerEliteAlert('Validation Error', msg, 'warning');
       return;
     }
     if (!inwardForm.fabricQuality || !String(inwardForm.fabricQuality).trim()) {
-      alert('Please select or specify Fabric Quality.');
+      const msg = 'Please select or specify Fabric Quality.';
+      setInwardError(msg);
+      triggerEliteAlert('Validation Error', msg, 'warning');
       return;
     }
 
     if (duplicateInwardMatch) {
-      alert(`⚠️ Duplicate Inward Blocked: Lot #${duplicateInwardMatch.lotNo} already exists for Vendor "${duplicateInwardMatch.vendorName}", Challan #${duplicateInwardMatch.challanNo || 'N/A'}, Fabric "${duplicateInwardMatch.fabricQuality}" (${duplicateInwardMatch.panna || 'Standard'}" - ${duplicateInwardMatch.qty}m on ${duplicateInwardMatch.date ? new Date(duplicateInwardMatch.date).toLocaleDateString('en-GB') : 'N/A'}). Duplicate entries are not permitted.`);
+      const msg = `⚠️ Duplicate Inward Blocked: Lot #${duplicateInwardMatch.lotNo} already exists for Vendor "${duplicateInwardMatch.vendorName}", Challan #${duplicateInwardMatch.challanNo || 'N/A'}, Fabric "${duplicateInwardMatch.fabricQuality}" (${duplicateInwardMatch.panna || 'Standard'}" - ${duplicateInwardMatch.qty}m on ${duplicateInwardMatch.date ? new Date(duplicateInwardMatch.date).toLocaleDateString('en-GB') : 'N/A'}). Duplicate entries are not permitted.`;
+      setInwardError(msg);
+      triggerEliteAlert('Duplicate Inward Blocked', msg, 'warning');
       return;
     }
     setLoading(true);
@@ -1037,11 +1052,16 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       }
       setIsInwardOpen(false);
       setEditingTransaction(null);
+      setInwardError('');
       setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: '' });
       triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
-      alert(err.message);
+      const errMsg = err.message || 'Failed to record fabric inward. Please check your inputs.';
+      setInwardError(errMsg);
+      triggerEliteAlert('Inward Error', errMsg, 'danger');
+      triggerPushNotification('Inward Failed', errMsg, 'danger');
+    } finally {
       setLoading(false);
     }
   };
@@ -1052,11 +1072,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
     const numOutQty = parseFloat(outwardForm.qty);
     if (isNaN(numOutQty) || numOutQty <= 0) {
-      alert('Please enter a valid positive quantity (> 0 meters).');
+      triggerEliteAlert('Validation Error', 'Please enter a valid positive quantity (> 0 meters).', 'warning');
       return;
     }
     if (!outwardForm.fabricQuality || !String(outwardForm.fabricQuality).trim()) {
-      alert('Please select or specify Fabric Quality.');
+      triggerEliteAlert('Validation Error', 'Please select or specify Fabric Quality.', 'warning');
       return;
     }
 
@@ -1077,7 +1097,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
-      alert(err.message);
+      triggerEliteAlert('Outward Error', err.message || 'Failed to record fabric outward.', 'danger');
     } finally {
       setLoading(false);
       isSubmittingChallanRef.current = false;
@@ -1248,6 +1268,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const closeInwardModal = () => {
     setIsInwardOpen(false);
     setEditingTransaction(null);
+    setInwardError('');
     setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: '' });
   };
 
@@ -1256,17 +1277,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     setInwardTpModalTransaction(t);
     const existingTps = Array.isArray(t.tpDetails) && t.tpDetails.length > 0
       ? t.tpDetails.map((r, i) => ({
-          id: Date.now() + i + Math.random(),
-          tpNo: r.tpNo || (i + 1),
-          tpMeter: r.tpMeter != null ? String(r.tpMeter) : '',
-          notes: r.notes || ''
-        }))
+        id: Date.now() + i + Math.random(),
+        tpNo: r.tpNo || (i + 1),
+        tpMeter: r.tpMeter != null ? String(r.tpMeter) : '',
+        notes: r.notes || ''
+      }))
       : Array.from({ length: 5 }, (_, i) => ({
-          id: Date.now() + i + Math.random(),
-          tpNo: i + 1,
-          tpMeter: '',
-          notes: ''
-        }));
+        id: Date.now() + i + Math.random(),
+        tpNo: i + 1,
+        tpMeter: '',
+        notes: ''
+      }));
     setInwardTpRows(existingTps);
     setSyncInwardQty(false);
     setInwardBulkPasteOpen(false);
@@ -1662,7 +1683,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       const pStatus = (primaryJob.printStatus || '').toLowerCase();
       const pMtr = parseFloat(primaryJob.printMtr || 0);
       const isPrintDone = pStatus.includes('done') || pMtr > 0;
-      
+
       const fStatus = (primaryJob.fusingStatus || '').toLowerCase();
       const freshMtr = parseFloat(primaryJob.freshMtr || 0);
       const fusedMtr = parseFloat(primaryJob.fusingMtr || primaryJob.freshMtr || 0);
@@ -1909,9 +1930,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             j.totalWastageMtr ||
             j.fabricWastageMtr ||
             ((parseFloat(j.fabricFaultMtr) || 0) +
-             (parseFloat(j.fusingFaultMtr) || 0) +
-             (parseFloat(j.printFaultMtr) || 0) +
-             (parseFloat(j.genuineFaultMtr) || 0)) ||
+              (parseFloat(j.fusingFaultMtr) || 0) +
+              (parseFloat(j.printFaultMtr) || 0) +
+              (parseFloat(j.genuineFaultMtr) || 0)) ||
             0
           );
           const fused = parseFloat(j.fusingMtr || 0);
@@ -2137,12 +2158,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     setEditingChallan(c);
     const tpRows = c.tpDetails && c.tpDetails.length > 0
       ? c.tpDetails.map((r, idx) => ({
-          tpNo: idx + 1,
-          tpMeter: String(r.tpMeter != null ? r.tpMeter : (parseFloat(r.freshMtr) || '')),
-          freshMtr: r.freshMtr != null ? String(r.freshMtr) : '',
-          westMtr: r.westMtr != null ? String(r.westMtr) : '',
-          lotNo: r.lotNo || ''
-        }))
+        tpNo: idx + 1,
+        tpMeter: String(r.tpMeter != null ? r.tpMeter : (parseFloat(r.freshMtr) || '')),
+        freshMtr: r.freshMtr != null ? String(r.freshMtr) : '',
+        westMtr: r.westMtr != null ? String(r.westMtr) : '',
+        lotNo: r.lotNo || ''
+      }))
       : emptyTpRows();
     setChallanForm({
       date: c.date ? new Date(c.date).toISOString().split('T')[0] : '',
@@ -2261,9 +2282,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           const bLower = (c.businessName || '').trim().toLowerCase();
           const nLower = (c.name || '').trim().toLowerCase();
           return (bLower && bLower === pLower) ||
-                 (nLower && nLower === pLower) ||
-                 (bLower && (bLower.startsWith(pLower) || pLower.startsWith(bLower))) ||
-                 (nLower && (nLower.startsWith(pLower) || pLower.startsWith(nLower)));
+            (nLower && nLower === pLower) ||
+            (bLower && (bLower.startsWith(pLower) || pLower.startsWith(bLower))) ||
+            (nLower && (nLower.startsWith(pLower) || pLower.startsWith(nLower)));
         });
         if (matched) {
           contactPersonName = matched.name || party;
@@ -2801,9 +2822,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         j.totalWastageMtr ||
         j.fabricWastageMtr ||
         ((parseFloat(j.fabricFaultMtr) || 0) +
-         (parseFloat(j.fusingFaultMtr) || 0) +
-         (parseFloat(j.printFaultMtr) || 0) +
-         (parseFloat(j.genuineFaultMtr) || 0)) ||
+          (parseFloat(j.fusingFaultMtr) || 0) +
+          (parseFloat(j.printFaultMtr) || 0) +
+          (parseFloat(j.genuineFaultMtr) || 0)) ||
         0
       );
       const fused = parseFloat(j.fusingMtr || 0);
@@ -3646,10 +3667,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                                       const displayVendor = isLotTransferIn
                                         ? (inTx.partyName && inTx.partyName.includes('(')
-                                            ? inTx.partyName
-                                            : (inTx.vendorName && inTx.vendorName.includes('(')
-                                                ? inTx.vendorName
-                                                : (srcLotNum ? `Lot #${srcLotNum}${srcChallanStr}` : 'Lot Transfer')))
+                                          ? inTx.partyName
+                                          : (inTx.vendorName && inTx.vendorName.includes('(')
+                                            ? inTx.vendorName
+                                            : (srcLotNum ? `Lot #${srcLotNum}${srcChallanStr}` : 'Lot Transfer')))
                                         : (inTx.vendorName || inTx.partyName || matchedSrcLot?.vendorName || lot.vendorName || '—');
 
                                       return (
@@ -3755,8 +3776,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                                       const displayParty = isLotTransfer
                                         ? (outTx.partyName && outTx.partyName.includes('(')
-                                            ? outTx.partyName
-                                            : (destLotNum ? `Lot #${destLotNum}${destChallanStr}` : (outTx.partyName || 'Lot Transfer')))
+                                          ? outTx.partyName
+                                          : (destLotNum ? `Lot #${destLotNum}${destChallanStr}` : (outTx.partyName || 'Lot Transfer')))
                                         : (outTx.partyName || fallbackParty || '—');
 
                                       return (
@@ -4154,96 +4175,96 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       : (t.vendorName || t.partyName || '-');
 
                     return (
-                    <tr key={t._id}>
-                      <td>{formatDateDDMMYYYY(t.date)}</td>
-                      <td><span style={{ fontWeight: 600 }}>#{t.lotNo}</span></td>
-                      <td>
-                        <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
-                      </td>
-                      <td>
-                        <div>{displayVendor}</div>
-                        {isTransfer && (
-                          <span style={{ fontSize: '0.68rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.25)', display: 'inline-block', marginTop: '2px' }}>
-                            🔄 Transfer {srcLotNum ? `← #${srcLotNum}` : ''}
-                          </span>
-                        )}
-                      </td>
-                      <td>{t.fabricQuality}</td>
-                      <td>{t.panna || '-'}</td>
-                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>
-                        <div>
-                          +{Number(t.qty || 0).toFixed(2)}
+                      <tr key={t._id}>
+                        <td>{formatDateDDMMYYYY(t.date)}</td>
+                        <td><span style={{ fontWeight: 600 }}>#{t.lotNo}</span></td>
+                        <td>
+                          <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
+                        </td>
+                        <td>
+                          <div>{displayVendor}</div>
                           {isTransfer && (
-                            <span style={{ fontSize: '0.68rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 5px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-block' }}>Transfer</span>
+                            <span style={{ fontSize: '0.68rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.25)', display: 'inline-block', marginTop: '2px' }}>
+                              🔄 Transfer {srcLotNum ? `← #${srcLotNum}` : ''}
+                            </span>
                           )}
-                        </div>
-                        {Array.isArray(t.tpDetails) && t.tpDetails.length > 0 && (
-                          <div
-                            onClick={() => openInwardTpModal(t)}
-                            title="Click to view/edit TP details"
+                        </td>
+                        <td>{t.fabricQuality}</td>
+                        <td>{t.panna || '-'}</td>
+                        <td style={{ color: 'var(--success)', fontWeight: 600 }}>
+                          <div>
+                            +{Number(t.qty || 0).toFixed(2)}
+                            {isTransfer && (
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 5px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-block' }}>Transfer</span>
+                            )}
+                          </div>
+                          {Array.isArray(t.tpDetails) && t.tpDetails.length > 0 && (
+                            <div
+                              onClick={() => openInwardTpModal(t)}
+                              title="Click to view/edit TP details"
+                              style={{
+                                fontSize: '0.69rem',
+                                color: '#0284c7',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                marginTop: '2px',
+                                background: '#f0f9ff',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                border: '1px solid #bae6fd',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Layers size={11} /> {t.tpDetails.length} TPs ({t.tpDetails.reduce((a, b) => a + (Number(b.tpMeter) || 0), 0).toFixed(1)}m)
+                            </div>
+                          )}
+                        </td>
+                        <td>{t.shortagePct != null ? `${t.shortagePct}%` : '-'}</td>
+                        <td>{t.notes}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            className="btn-icon"
+                            title={Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `TP Details (${t.tpDetails.length} Rolls / TPs)` : "Add TP Details (Roll-wise meters)"}
                             style={{
-                              fontSize: '0.69rem',
-                              color: '#0284c7',
-                              fontWeight: 600,
+                              color: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? '#0369a1' : '#0284c7',
+                              background: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.05)',
+                              border: `1px solid ${Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.35)' : 'rgba(2, 132, 199, 0.2)'}`,
+                              borderRadius: '6px',
+                              marginRight: '0.45rem',
+                              padding: '3px 8px',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '3px',
-                              marginTop: '2px',
-                              background: '#f0f9ff',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              border: '1px solid #bae6fd',
-                              cursor: 'pointer'
+                              gap: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.74rem',
+                              fontWeight: 700
                             }}
+                            onClick={() => openInwardTpModal(t)}
                           >
-                            <Layers size={11} /> {t.tpDetails.length} TPs ({t.tpDetails.reduce((a, b) => a + (Number(b.tpMeter) || 0), 0).toFixed(1)}m)
-                          </div>
-                        )}
-                      </td>
-                      <td>{t.shortagePct != null ? `${t.shortagePct}%` : '-'}</td>
-                      <td>{t.notes}</td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          className="btn-icon"
-                          title={Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `TP Details (${t.tpDetails.length} Rolls / TPs)` : "Add TP Details (Roll-wise meters)"}
-                          style={{
-                            color: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? '#0369a1' : '#0284c7',
-                            background: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.05)',
-                            border: `1px solid ${Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.35)' : 'rgba(2, 132, 199, 0.2)'}`,
-                            borderRadius: '6px',
-                            marginRight: '0.45rem',
-                            padding: '3px 8px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.74rem',
-                            fontWeight: 700
-                          }}
-                          onClick={() => openInwardTpModal(t)}
-                        >
-                          <Layers size={13} />
-                          <span>{Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `${t.tpDetails.length} TP` : '+ TP'}</span>
-                        </button>
-                        <button
-                          className="btn-icon"
-                          title="Edit"
-                          style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
-                          onClick={() => startEditInward(t)}
-                        >
-                          <Edit size={15} />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          title="Delete"
-                          style={{ color: 'var(--danger)' }}
-                          onClick={() => setDeleteTarget({ id: t._id, type: 'INWARD', label: `Lot #${t.lotNo} — ${t.fabricQuality} (${t.qty} mtr)` })}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
+                            <Layers size={13} />
+                            <span>{Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `${t.tpDetails.length} TP` : '+ TP'}</span>
+                          </button>
+                          <button
+                            className="btn-icon"
+                            title="Edit"
+                            style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
+                            onClick={() => startEditInward(t)}
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button
+                            className="btn-icon"
+                            title="Delete"
+                            style={{ color: 'var(--danger)' }}
+                            onClick={() => setDeleteTarget({ id: t._id, type: 'INWARD', label: `Lot #${t.lotNo} — ${t.fabricQuality} (${t.qty} mtr)` })}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
                   {inwardTx.length === 0 && (
@@ -4412,104 +4433,104 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       : (t.partyName || '-');
 
                     return (
-                    <tr key={t._id}>
-                      <td>{formatDateDDMMYYYY(t.date)}</td>
-                      <td>
-                        {isTransfer ? (
-                          <span style={{ fontSize: '0.72rem', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(59, 130, 246, 0.25)', display: 'inline-block' }}>
-                            🔄 Transfer {destLotNum ? `→ #${destLotNum}` : ''}
-                          </span>
-                        ) : renderJobNoBadge(t.jobNo)}
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
-                      </td>
-                      <td>{displayParty}</td>
-                      <td>{t.fabricQuality}</td>
-                      <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
-                      <td>{t.panna || '-'}</td>
-                      <td style={{ color: 'var(--danger)', fontWeight: 600 }}>
-                        -{Number(t.qty || 0).toFixed(2)}
-                        {isTransfer && (
-                          <span style={{ fontSize: '0.68rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(167, 139, 250, 0.3)', display: 'inline-block' }}>Transfer</span>
-                        )}
-                        {(t.notes || '').includes('+2% French Crepe Applied') && (
-                          <span style={{ fontSize: '0.68rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(124, 58, 237, 0.3)', display: 'inline-block' }}>+2%</span>
-                        )}
-                        {(t.notes || '').includes('Remnant Stock Auto-Clear') && (
-                          <span style={{ fontSize: '0.68rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'inline-block' }}>Cleared (≤5m)</span>
-                        )}
-                      </td>
-                      <td>
-                        {(() => {
-                          const notes = t.notes || '';
-                          if (notes.startsWith('Auto: EDP-') || notes.startsWith('Auto: Job ')) {
-                            const parts = notes.split('|');
-                            if (parts.length >= 2) {
-                              const header = parts[0].trim();
-                              const badges = parts.slice(1).map(p => p.trim());
-                              return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
-                                  <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.8rem' }}>
-                                    {header}
-                                  </span>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                    {badges.map((badge, bIdx) => (
-                                      <span key={bIdx} style={{
-                                        fontSize: '0.7rem',
-                                        fontWeight: 600,
-                                        color: bIdx === 0 ? '#38bdf8' : '#34d399',
-                                        background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                                        border: bIdx === 0 ? '1px solid rgba(14, 165, 233, 0.15)' : '1px solid rgba(16, 185, 129, 0.15)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        display: 'inline-block',
-                                        marginTop: '2px',
-                                        whiteSpace: 'nowrap'
-                                      }}>
-                                        {badge}
-                                      </span>
-                                    ))}
+                      <tr key={t._id}>
+                        <td>{formatDateDDMMYYYY(t.date)}</td>
+                        <td>
+                          {isTransfer ? (
+                            <span style={{ fontSize: '0.72rem', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(59, 130, 246, 0.25)', display: 'inline-block' }}>
+                              🔄 Transfer {destLotNum ? `→ #${destLotNum}` : ''}
+                            </span>
+                          ) : renderJobNoBadge(t.jobNo)}
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
+                        </td>
+                        <td>{displayParty}</td>
+                        <td>{t.fabricQuality}</td>
+                        <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
+                        <td>{t.panna || '-'}</td>
+                        <td style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                          -{Number(t.qty || 0).toFixed(2)}
+                          {isTransfer && (
+                            <span style={{ fontSize: '0.68rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(167, 139, 250, 0.3)', display: 'inline-block' }}>Transfer</span>
+                          )}
+                          {(t.notes || '').includes('+2% French Crepe Applied') && (
+                            <span style={{ fontSize: '0.68rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(124, 58, 237, 0.3)', display: 'inline-block' }}>+2%</span>
+                          )}
+                          {(t.notes || '').includes('Remnant Stock Auto-Clear') && (
+                            <span style={{ fontSize: '0.68rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'inline-block' }}>Cleared (≤5m)</span>
+                          )}
+                        </td>
+                        <td>
+                          {(() => {
+                            const notes = t.notes || '';
+                            if (notes.startsWith('Auto: EDP-') || notes.startsWith('Auto: Job ')) {
+                              const parts = notes.split('|');
+                              if (parts.length >= 2) {
+                                const header = parts[0].trim();
+                                const badges = parts.slice(1).map(p => p.trim());
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.8rem' }}>
+                                      {header}
+                                    </span>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                      {badges.map((badge, bIdx) => (
+                                        <span key={bIdx} style={{
+                                          fontSize: '0.7rem',
+                                          fontWeight: 600,
+                                          color: bIdx === 0 ? '#38bdf8' : '#34d399',
+                                          background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                                          border: bIdx === 0 ? '1px solid rgba(14, 165, 233, 0.15)' : '1px solid rgba(16, 185, 129, 0.15)',
+                                          padding: '2px 6px',
+                                          borderRadius: '4px',
+                                          display: 'inline-block',
+                                          marginTop: '2px',
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          {badge}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              );
+                                );
+                              }
                             }
-                          }
-                          return t.notes || '—';
-                        })()}
-                      </td>
-                      <td>
-                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
-                          {t.createdByName || t.createdBy || 'HASI'}
-                        </span>
-                      </td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <button
-                          className="btn-icon"
-                          title="View Audit History"
-                          style={{ color: '#fbbf24', marginRight: '0.5rem' }}
-                          onClick={() => setSelectedChallanHistory(t)}
-                        >
-                          <Clock size={15} />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          title="Edit Outward Transaction"
-                          style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
-                          onClick={() => startEditOutward(t)}
-                        >
-                          <Edit size={15} />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          title="Delete"
-                          style={{ color: 'var(--danger)' }}
-                          onClick={() => setDeleteTarget({ id: t._id, type: 'OUTWARD', label: `Job ${t.jobNo} — ${t.fabricQuality} (${t.qty} mtr)` })}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
+                            return t.notes || '—';
+                          })()}
+                        </td>
+                        <td>
+                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                            {t.createdByName || t.createdBy || 'HASI'}
+                          </span>
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <button
+                            className="btn-icon"
+                            title="View Audit History"
+                            style={{ color: '#fbbf24', marginRight: '0.5rem' }}
+                            onClick={() => setSelectedChallanHistory(t)}
+                          >
+                            <Clock size={15} />
+                          </button>
+                          <button
+                            className="btn-icon"
+                            title="Edit Outward Transaction"
+                            style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
+                            onClick={() => startEditOutward(t)}
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button
+                            className="btn-icon"
+                            title="Delete"
+                            style={{ color: 'var(--danger)' }}
+                            onClick={() => setDeleteTarget({ id: t._id, type: 'OUTWARD', label: `Job ${t.jobNo} — ${t.fabricQuality} (${t.qty} mtr)` })}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
                   {outwardTx.length === 0 && (
@@ -6816,6 +6837,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   placeholder="0.00"
                   required
                   min={0.01}
+                  max={1000000}
                   value={inwardForm.qty}
                   onChange={e => setInwardForm({ ...inwardForm, qty: e.target.value })}
                   style={inputStyle}
@@ -6869,6 +6891,24 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <div style={{ fontSize: '0.75rem', color: '#fca5a5' }}>
                     ⚠️ Saving is blocked to prevent double-counting inventory.
                   </div>
+                </div>
+              )}
+
+              {inwardError && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  color: '#ef4444',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <AlertTriangle size={16} />
+                  <span>{inwardError}</span>
                 </div>
               )}
 

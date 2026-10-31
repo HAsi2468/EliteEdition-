@@ -63,6 +63,9 @@ function nativeCompressionPlugin() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), versionPlugin(), nativeCompressionPlugin()],
+  css: {
+    postcss: {}
+  },
   server: {
     headers: {
       'Service-Worker-Allowed': '/',

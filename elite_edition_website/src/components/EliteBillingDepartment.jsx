@@ -140,7 +140,7 @@ function numToWords(amount) {
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
   function convert(n) {
-    if (n < 0) return 'Minus ' + convert(Math.abs(n));
+    if (n <= 0) return '';
     if (n < 20) return words[n] || '';
     if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
     if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convert(n % 100) : '');
@@ -150,10 +150,24 @@ function numToWords(amount) {
   }
 
   const numVal = Number(amount);
-  if (isNaN(numVal) || Math.floor(Math.abs(numVal)) === 0) return 'Rupees Zero Only';
+  if (isNaN(numVal) || Math.abs(numVal) < 0.005) return 'Rupees Zero Only';
   const prefix = numVal < 0 ? 'Minus ' : '';
-  const whole = Math.floor(Math.abs(numVal));
-  return `Rupees ${prefix}${convert(whole).trim()} Only`;
+  const absVal = Math.abs(numVal);
+  const rupees = Math.floor(absVal);
+  const paise = Math.round((absVal - rupees) * 100);
+
+  let result = 'Rupees ' + prefix;
+  if (rupees > 0) {
+    result += convert(rupees).trim();
+  } else {
+    result += 'Zero';
+  }
+
+  if (paise > 0) {
+    result += ' and ' + convert(paise).trim() + ' Paise';
+  }
+
+  return result + ' Only';
 }
 
 // Helper to format job card display string cleanly
@@ -3438,12 +3452,10 @@ export default function EliteBillingDepartment({
     let tdsAmount = 0;
     if (invoiceForm.enableTds) {
       if (invoiceForm.manualTdsAmount !== undefined && invoiceForm.manualTdsAmount !== '') {
-        tdsAmount = Math.round(parseFloat(invoiceForm.manualTdsAmount) || 0);
+        tdsAmount = parseFloat((parseFloat(invoiceForm.manualTdsAmount) || 0).toFixed(2));
       } else {
         const rate = parseFloat(invoiceForm.tdsRate) || 0;
-        // In India, TDS is standardly computed on taxable subtotal (excluding GST)
-        // Rounded off to nearest rupee: >= 0.50 rounds up by 1, < 0.50 removes decimal (Sec 288B)
-        tdsAmount = Math.round((netSubtotal * rate) / 100);
+        tdsAmount = parseFloat(((netSubtotal * rate) / 100).toFixed(2));
       }
     }
 

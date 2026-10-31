@@ -208,14 +208,24 @@ export default function QADepartment({ department = 'digital_print' }) {
   // Submit White Fabric Inspection Log
   const handleWhiteFormSubmit = async (e) => {
     e.preventDefault();
-    if (isWhiteSubmittingRef.current) return;
+    e.stopPropagation();
+    if (isWhiteSubmittingRef.current || isWhiteSubmitting) return;
+
+    // Immediately lock submission synchronously to prevent burst clicks
+    isWhiteSubmittingRef.current = true;
+    setIsWhiteSubmitting(true);
+
     if (!whiteForm.fabricQuality || !whiteForm.totalMtr) {
+      isWhiteSubmittingRef.current = false;
+      setIsWhiteSubmitting(false);
       triggerEliteAlert('Please fill in Fabric Quality and Total Roll Meters.');
       return;
     }
 
     const totMtr = parseFloat(whiteForm.totalMtr) || 0;
     if (totMtr <= 0) {
+      isWhiteSubmittingRef.current = false;
+      setIsWhiteSubmitting(false);
       triggerEliteAlert('Total roll meters must be greater than 0.');
       return;
     }
@@ -224,11 +234,15 @@ export default function QADepartment({ department = 'digital_print' }) {
     const shF = parseFloat(whiteForm.shadingFaultMtr) || 0;
     const wdF = parseFloat(whiteForm.widthShortageMtr) || 0;
     if (wF < 0 || sF < 0 || shF < 0 || wdF < 0) {
+      isWhiteSubmittingRef.current = false;
+      setIsWhiteSubmitting(false);
       triggerEliteAlert('Defect meters cannot be negative.');
       return;
     }
     const totDefect = wF + sF + shF + wdF;
     if (totDefect > totMtr) {
+      isWhiteSubmittingRef.current = false;
+      setIsWhiteSubmitting(false);
       triggerEliteAlert(`Total defect meters (${totDefect}m) cannot exceed total roll meters (${totMtr}m).`);
       return;
     }
@@ -254,12 +268,11 @@ export default function QADepartment({ department = 'digital_print' }) {
       notes: whiteForm.notes || ''
     };
 
-    isWhiteSubmittingRef.current = true;
-    setIsWhiteSubmitting(true);
     try {
-      const res = await api.createWhiteFabricLog(logPayload);
+      const idempotencyKey = `WFQA-${(whiteForm.challanNo || 'NOCH').replace(/\W/g, '')}-${(whiteForm.lotNo || 'NOLOT').replace(/\W/g, '')}-${Date.now()}`;
+      const res = await api.createWhiteFabricLog(logPayload, { idempotencyKey });
       const savedDoc = res?.data || { ...logPayload, _id: `WF-${Date.now()}` };
-      const updatedLogs = [savedDoc, ...whiteFabricLogs];
+      const updatedLogs = [savedDoc, ...whiteFabricLogs.filter(l => (l._id || l.id) !== (savedDoc._id || savedDoc.id))];
       setWhiteFabricLogs(updatedLogs);
       localStorage.setItem(`qa_white_fabric_logs_${department}`, JSON.stringify(updatedLogs));
 
@@ -584,10 +597,13 @@ export default function QADepartment({ department = 'digital_print' }) {
                   borderRadius: '8px',
                   fontWeight: 900,
                   cursor: isWhiteSubmitting ? 'not-allowed' : 'pointer',
+                  pointerEvents: isWhiteSubmitting ? 'none' : 'auto',
+                  opacity: isWhiteSubmitting ? 0.7 : 1,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <Save size={16} /> {isWhiteSubmitting ? 'Saving QA Entry...' : 'Save White Fabric QA Entry'}

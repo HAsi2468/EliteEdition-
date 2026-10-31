@@ -1606,10 +1606,15 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/fabric/white-qa-logs${qs}`);
   },
-  async createWhiteFabricLog(data) {
+  async createWhiteFabricLog(data, options = {}) {
+    const rawKey = options.idempotencyKey || `WFQA-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     return request('/fabric/white-qa-logs', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      headers: {
+        'Idempotency-Key': rawKey,
+        ...(options.headers || {})
+      }
     });
   },
   async deleteWhiteFabricLog(id) {

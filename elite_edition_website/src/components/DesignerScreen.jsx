@@ -878,10 +878,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
           return !isApproved && !isRevision && Boolean(t.stage3Status);
         }
         if (stageTab === 'CM') {
-          return !isApproved && !isRevision && Boolean(t.colourMatchingStatus);
+          return !isApproved && !isRevision && !t.stage3Status && Boolean(t.colourMatchingStatus);
         }
         if (stageTab === 'DROW') {
-          return !isApproved && !isRevision && (!t.colourMatchingStatus || t.drowDesignStatus);
+          return !isApproved && !isRevision && !t.stage3Status && !t.colourMatchingStatus;
         }
         return true;
       });

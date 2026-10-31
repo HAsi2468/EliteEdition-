@@ -236,6 +236,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
   const [drawerUploadingAttachment, setDrawerUploadingAttachment] = useState(false);
   const fileInputRef = useRef(null);
   const drawerFileInputRef = useRef(null);
+  const isCreatingRef = useRef(false);
 
 
   const formatFileSize = (bytes) => {
@@ -782,7 +783,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
   const handleCreateTaskSubmit = async (e) => {
     e.preventDefault();
-    if (creating) return; // Prevent concurrent submissions
+    if (creating || isCreatingRef.current) return; // Prevent concurrent submissions
     if (!newTitle.trim()) {
       triggerEliteAlert('Validation', 'Please enter a task title.', 'warning');
       return;
@@ -797,6 +798,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
       return;
     }
 
+    isCreatingRef.current = true;
     setCreating(true);
     try {
       const payload = {
@@ -836,6 +838,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
       console.error('Failed to create task:', err);
       triggerEliteAlert('Task Creation Failed', err.message || 'Unknown error occurred while creating task.', 'error');
     } finally {
+      isCreatingRef.current = false;
       setCreating(false);
     }
   };

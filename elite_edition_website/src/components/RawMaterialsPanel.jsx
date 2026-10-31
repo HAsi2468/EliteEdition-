@@ -930,6 +930,23 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     const paperQual = isPaper ? (outwardForm.paperQuality || 'A++') : '';
     const mtrRoll = outwardForm.metersPerRoll ? Number(outwardForm.metersPerRoll) : (isPaper ? 1000 : '');
 
+    // Check available stock in current stock list to prevent queuing beyond stock
+    const matchingStock = stock.find(s => {
+      const mMatch = String(s.materialName || '').toLowerCase() === String(matName || '').toLowerCase();
+      const cMatch = !colorVal || String(s.color || '').toLowerCase() === String(colorVal || '').toLowerCase();
+      const pMatch = !cleanPanna || String(s.panna || '').trim() === String(cleanPanna || '').trim();
+      return mMatch && cMatch && pMatch;
+    });
+    const currentAvail = matchingStock ? (matchingStock.currentStock || 0) : 0;
+    const currentQueued = outwardItems
+      .filter(it => it.materialName === matName && (!colorVal || it.color === colorVal))
+      .reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+
+    if (Number(outwardForm.qty) + currentQueued > currentAvail) {
+      alert(`Insufficient stock for "${matName}${colorVal ? ' (' + colorVal + ')' : ''}". Available: ${currentAvail} ${outwardForm.unit || ''}${currentQueued > 0 ? `, already queued: ${currentQueued}` : ''}. Requested quantity exceeds available stock.`);
+      return;
+    }
+
     const itemToAdd = {
       materialName: matName,
       qty: Number(outwardForm.qty),
@@ -1396,23 +1413,34 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
         if (!itemCat.includes('label') && !itemCat.includes('tag')) return false;
       } else if (filterCat === 'packing material') {
         if (!itemCat.includes('pack')) return false;
+      } else if (filterCat === 'paper') {
+        if (!itemCat.includes('paper')) return false;
+      } else if (filterCat === 'inks & consumables' || filterCat === 'ink') {
+        if (!itemCat.includes('ink') && !itemCat.includes('consumable')) return false;
+      } else if (filterCat === 'other') {
+        if (itemCat.includes('paper') || itemCat.includes('ink') || itemCat.includes('fabric')) return false;
       } else if (itemCat !== filterCat) {
         return false;
       }
     }
-    // 3. Search query filter
+    // 3. Search query filter: tokenized multi-word search across all metadata fields
     if (stockSearchQuery && stockSearchQuery.trim()) {
-      const q = stockSearchQuery.toLowerCase().trim();
-      const matchesName = String(item.materialName || '').toLowerCase().includes(q);
-      const matchesCat = String(item.category || '').toLowerCase().includes(q);
-      const matchesShade = String(item.shade || '').toLowerCase().includes(q);
-      const matchesLoc = String(item.location || '').toLowerCase().includes(q);
-      const matchesHsn = String(item.hsnCode || '').toLowerCase().includes(q);
-      const matchesColor = String(item.color || '').toLowerCase().includes(q);
-      const matchesPanna = String(item.panna || '').toLowerCase().includes(q);
-      const matchesQual = String(item.paperQuality || '').toLowerCase().includes(q);
-      const matchesNotes = String(item.notes || '').toLowerCase().includes(q);
-      if (!matchesName && !matchesCat && !matchesShade && !matchesLoc && !matchesHsn && !matchesColor && !matchesPanna && !matchesQual && !matchesNotes) return false;
+      const tokens = stockSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const haystack = [
+        item.materialName,
+        item.category,
+        item.shade,
+        item.location,
+        item.hsnCode,
+        item.color,
+        item.panna,
+        item.paperQuality,
+        item.notes,
+        item.unit
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      const allTokensMatch = tokens.every(token => haystack.includes(token));
+      if (!allTokensMatch) return false;
     }
     return true;
   });
@@ -1850,7 +1878,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   return (
                     <span style={{ fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '2px 8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
-                      {stockQty < 0 ? `Negative (${stockQty})` : 'Empty'}
+                      {stockQty < 0 ? `Deficit (${Math.abs(stockQty)})` : 'Out of Stock'}
                     </span>
                   );
                 }
@@ -1870,8 +1898,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                 );
               };
 
-              const grandoTotalStock = grandoItems.reduce((acc, it) => acc + (it.currentStock || 0), 0);
-              const printdotTotalStock = printdotItems.reduce((acc, it) => acc + (it.currentStock || 0), 0);
+              const grandoTotalStock = Math.max(0, grandoItems.reduce((acc, it) => acc + (it.currentStock || 0), 0));
+              const printdotTotalStock = Math.max(0, printdotItems.reduce((acc, it) => acc + (it.currentStock || 0), 0));
 
               const tableCardStyle = {
                 marginBottom: '2rem',
@@ -2042,8 +2070,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                         <button 
                                           onClick={() => handleQuickOutward(item.materialName, item.panna, '', null, { paperQuality: item.paperQuality, metersPerRoll: item.metersPerRoll })}
                                           className="btn-secondary" 
-                                          title={`Quick Outward for ${displayName} ${item.panna || ''}`}
-                                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                          title={(item.currentStock || 0) <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for ${displayName} ${item.panna || ''}`}
+                                          disabled={(item.currentStock || 0) <= 0}
+                                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: (item.currentStock || 0) <= 0 ? 0.4 : 1, cursor: (item.currentStock || 0) <= 0 ? 'not-allowed' : 'pointer' }}
                                         >
                                           <ArrowUpFromLine size={14} />
                                         </button>
@@ -2149,7 +2178,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                               const matched = matching[0];
                               const inward = matching.reduce((sum, it) => sum + (it.totalInward || 0), 0);
                               const outward = matching.reduce((sum, it) => sum + (it.totalOutward || 0), 0);
-                              const currentStock = matching.reduce((sum, it) => sum + (it.currentStock || 0), 0);
+                              const currentStock = Math.max(0, matching.reduce((sum, it) => sum + (it.currentStock || 0), 0));
                               const isCleaning = spec.key === 'Cleaning';
                               const canSize = matched?.canSize || (isCleaning ? 1 : 5);
                               const containerLabel = isCleaning ? `${canSize} Liter Bottle` : `${canSize} Liter Can`;
@@ -2214,8 +2243,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                       <button 
                                         onClick={() => handleQuickOutward('Grando Ink', '', spec.key, canSize)}
                                         className="btn-secondary" 
-                                        title={`Quick Outward for Grando ${spec.name}`}
-                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                        title={currentStock <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for Grando ${spec.name}`}
+                                        disabled={currentStock <= 0}
+                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: currentStock <= 0 ? 0.4 : 1, cursor: currentStock <= 0 ? 'not-allowed' : 'pointer' }}
                                       >
                                         <ArrowUpFromLine size={14} />
                                       </button>
@@ -2281,7 +2311,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                               const matched = matching[0];
                               const inward = matching.reduce((sum, it) => sum + (it.totalInward || 0), 0);
                               const outward = matching.reduce((sum, it) => sum + (it.totalOutward || 0), 0);
-                              const currentStock = matching.reduce((sum, it) => sum + (it.currentStock || 0), 0);
+                              const currentStock = Math.max(0, matching.reduce((sum, it) => sum + (it.currentStock || 0), 0));
                               const canSize = matched?.canSize || 10;
 
                               if (stockSearchQuery && matching.length === 0) return null;
@@ -2344,8 +2374,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                       <button 
                                         onClick={() => handleQuickOutward('Printdot Ink', '', spec.key, canSize)}
                                         className="btn-secondary" 
-                                        title={`Quick Outward for Printdot ${spec.name}`}
-                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                        title={currentStock <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for Printdot ${spec.name}`}
+                                        disabled={currentStock <= 0}
+                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: currentStock <= 0 ? 0.4 : 1, cursor: currentStock <= 0 ? 'not-allowed' : 'pointer' }}
                                       >
                                         <ArrowUpFromLine size={14} />
                                       </button>
@@ -2497,8 +2528,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                         <button 
                                           onClick={() => handleQuickOutward(item.materialName, '', '', null, { unit: item.unit, category: item.category })}
                                           className="btn-secondary" 
-                                          title={`Quick Outward for ${item.materialName}`}
-                                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                          title={(item.currentStock || 0) <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for ${item.materialName}`}
+                                          disabled={(item.currentStock || 0) <= 0}
+                                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: (item.currentStock || 0) <= 0 ? 0.4 : 1, cursor: (item.currentStock || 0) <= 0 ? 'not-allowed' : 'pointer' }}
                                         >
                                           <ArrowUpFromLine size={14} />
                                         </button>

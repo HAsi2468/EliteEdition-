@@ -2,18 +2,21 @@ import React, { useState, useMemo, memo } from 'react';
 import { Package, TrendingUp, IndianRupee, AlertTriangle, Layers, ShoppingBag, MapPin, Activity, PieChart, BarChart3 } from 'lucide-react';
 import DashboardList from './DashboardList';
 
-function DashboardStats({ items, sales }) {
+function DashboardStats({ items = [], sales = [] }) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const safeSales = Array.isArray(sales) ? sales : [];
+
   const stats = useMemo(() => {
   // --- INVENTORY CALCULATIONS ---
-  const totalUnique = items.length;
-  const totalStock = items.reduce((sum, item) => sum + (item.currentlyAvailableStock || 0), 0);
-  const totalQty = items.reduce((sum, item) => sum + (item.qty || 0), 0);
+  const totalUnique = safeItems.length;
+  const totalStock = safeItems.reduce((sum, item) => sum + (item.currentlyAvailableStock || 0), 0);
+  const totalQty = safeItems.reduce((sum, item) => sum + (item.qty || 0), 0);
   
-  const totalPurchaseValue = items.reduce(
+  const totalPurchaseValue = safeItems.reduce(
     (sum, item) => sum + ((item.purchasePrice || 0) * (item.currentlyAvailableStock || 0)), 
     0
   );
-  const totalSalesValue = items.reduce(
+  const totalSalesValue = safeItems.reduce(
     (sum, item) => sum + ((item.salePrice || 0) * (item.currentlyAvailableStock || 0)), 
     0
   );
@@ -24,17 +27,17 @@ function DashboardStats({ items, sales }) {
     : 0;
 
   // --- SALES CALCULATIONS ---
-  const totalOrders = sales.length;
-  const totalRevenue = sales.reduce((sum, order) => sum + (parseFloat(order.totalPrice) || 0), 0);
+  const totalOrders = safeSales.length;
+  const totalRevenue = safeSales.reduce((sum, order) => sum + (parseFloat(order.totalPrice) || 0), 0);
   const avgOrderValue = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
   
-  const deliveredOrders = sales.filter(o => (o.saleOrderStatus || '').toUpperCase() === 'DELIVERED').length;
-  const cancelledOrders = sales.filter(o => (o.saleOrderStatus || '').toUpperCase() === 'CANCELLED').length;
-  const returnedOrders = sales.filter(o => (o.saleOrderStatus || '').toUpperCase() === 'RETURNED').length;
+  const deliveredOrders = safeSales.filter(o => (o.saleOrderStatus || '').toUpperCase() === 'DELIVERED').length;
+  const cancelledOrders = safeSales.filter(o => (o.saleOrderStatus || '').toUpperCase() === 'CANCELLED').length;
+  const returnedOrders = safeSales.filter(o => (o.saleOrderStatus || '').toUpperCase() === 'RETURNED').length;
 
   // City-wise order volume aggregation (Top 5)
   const cityGroups = {};
-  sales.forEach(order => {
+  safeSales.forEach(order => {
     const city = order.shippingAddressCity || 'Unknown';
     cityGroups[city] = (cityGroups[city] || 0) + (parseInt(order.itemSKUCodeCount) || 1);
   });
@@ -43,13 +46,13 @@ function DashboardStats({ items, sales }) {
     .slice(0, 5);
 
   // Top Stock Items (Top 5)
-  const topStockItems = [...items]
+  const topStockItems = [...safeItems]
     .sort((a, b) => (b.currentlyAvailableStock || 0) - (a.currentlyAvailableStock || 0))
     .slice(0, 5);
 
   // --- SVG GRAPH 1: SALES TREND OVER TIME ---
   const salesByDate = {};
-  sales.forEach(order => {
+  safeSales.forEach(order => {
     if (!order.orderDate) return;
     const dateObj = new Date(order.orderDate);
     const dateStr = dateObj.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
@@ -102,7 +105,7 @@ function DashboardStats({ items, sales }) {
 
   // --- SVG GRAPH 2: INVENTORY CATEGORY DONUT CHART ---
   const categoryGroups = {};
-  items.forEach(item => {
+  safeItems.forEach(item => {
     const cat = item.itemName ? item.itemName.split(' ')[0] : 'Other';
     categoryGroups[cat] = (categoryGroups[cat] || 0) + (item.currentlyAvailableStock || 0);
   });
@@ -140,7 +143,7 @@ function DashboardStats({ items, sales }) {
 
   // --- SVG GRAPH 3: TOP 5 SKUS BY SALES REVENUE ---
   const skuSales = {};
-  sales.forEach(order => {
+  safeSales.forEach(order => {
     const sku = order.itemSKUCode || 'Unknown';
     skuSales[sku] = (skuSales[sku] || 0) + (parseFloat(order.totalPrice) || 0);
   });
@@ -153,7 +156,7 @@ function DashboardStats({ items, sales }) {
   const topSkusMaxRevenue = topSKUs.length > 0 ? Math.max(...topSKUs.map(s => s.revenue)) * 1.15 : 1000;
 
   // --- SVG GRAPH 4: MARGIN ANALYSIS (TOP 5 STOCK ITEMS) ---
-  const topStockItemsData = [...items]
+  const topStockItemsData = [...safeItems]
     .sort((a, b) => (b.currentlyAvailableStock || 0) - (a.currentlyAvailableStock || 0))
     .slice(0, 5)
     .map(item => ({
@@ -191,7 +194,7 @@ function DashboardStats({ items, sales }) {
 
   // threshold is interactive state — kept outside useMemo
   const [threshold, setThreshold] = useState(10);
-  const lowStockItems = items.filter(item => (item.currentlyAvailableStock || 0) <= threshold);
+  const lowStockItems = safeItems.filter(item => (item.currentlyAvailableStock || 0) <= threshold);
 
   return (
     <div style={styles.container}>

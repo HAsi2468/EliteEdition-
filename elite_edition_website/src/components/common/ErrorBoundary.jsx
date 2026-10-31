@@ -40,11 +40,26 @@ export class ErrorBoundary extends Component {
 
   handleReload = () => {
     this.setState({ hasError: false, error: null });
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        for (const reg of regs) {
+          try { reg.update(); } catch (e) {}
+        }
+      }).catch(() => {});
+    }
     window.location.reload();
   };
 
   render() {
     if (this.state.hasError) {
+      const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      const msg = this.state.error?.message || '';
+      const isChunkOrInitError = msg.includes('initialization') ||
+                                 msg.includes('dynamically imported module') ||
+                                 msg.includes('Loading chunk') ||
+                                 msg.includes('Failed to fetch') ||
+                                 isOffline;
+
       return (
         <div
           style={{
@@ -82,10 +97,14 @@ export class ErrorBoundary extends Component {
             </svg>
           </div>
           <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
-            Something went wrong loading this screen
+            {isOffline ? 'You Are Currently Offline' : 'Something went wrong loading this screen'}
           </div>
           <div style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5, maxWidth: '440px' }}>
-            {this.state.error?.message || 'An unexpected error occurred.'}
+            {isOffline
+              ? 'This screen requires an active internet connection to load live analytics. Check your Wi-Fi/mobile data and tap Reload.'
+              : isChunkOrInitError
+              ? 'A recent update was deployed or network connection was interrupted. Please reload the page to load the updated module.'
+              : msg || 'An unexpected error occurred.'}
           </div>
           <button
             type="button"
