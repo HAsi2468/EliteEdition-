@@ -1385,6 +1385,27 @@ const createProduct = async (req, res) => {
       return res.status(400).json({ error: 'skuCode is required' });
     }
 
+    // BUG-075: Validate HSN code (must be 4 to 8 numeric digits if provided)
+    if (hsnCode && String(hsnCode).trim()) {
+      const cleanHsn = String(hsnCode).trim();
+      if (!/^\d{4,8}$/.test(cleanHsn)) {
+        return res.status(400).json({ error: 'Invalid HSN code. Must consist of 4 to 8 numeric digits.' });
+      }
+    }
+
+    // BUG-075: Prevent javascript: and dangerous URI schemes in imageUrl
+    if (imageUrl && typeof imageUrl === 'string') {
+      const trimmedUrl = imageUrl.trim().toLowerCase();
+      if (
+        trimmedUrl.startsWith('javascript:') ||
+        trimmedUrl.startsWith('vbscript:') ||
+        trimmedUrl.startsWith('data:text/html') ||
+        /<script/i.test(trimmedUrl)
+      ) {
+        return res.status(400).json({ error: 'Invalid or unsafe image URL protocol.' });
+      }
+    }
+
     let sizeArray = [];
     if (Array.isArray(size)) {
       sizeArray = size;
@@ -1449,6 +1470,9 @@ const deleteProduct = async (req, res) => {
       if (match && match.skuCode) {
         await db.Product.deleteMany({ skuCode: match.skuCode }).catch(() => {});
         await db.InventoryProduct.deleteMany({ skuCode: match.skuCode }).catch(() => {});
+        emitSocketEvent(req, 'inventory-deleted', { id, sku: match.skuCode });
+        emitSocketEvent(req, 'catalog-updated', { id, sku: match.skuCode });
+        emitSocketEvent(req, 'product-deleted', { id, sku: match.skuCode });
         return res.json({ message: 'Product deleted successfully', id });
       }
       return res.status(404).json({ error: 'Product not found' });
@@ -1462,6 +1486,7 @@ const deleteProduct = async (req, res) => {
 
     emitSocketEvent(req, 'inventory-deleted', { id, sku: skuToDelete });
     emitSocketEvent(req, 'catalog-updated', { id, sku: skuToDelete });
+    emitSocketEvent(req, 'product-deleted', { id, sku: skuToDelete });
 
     res.json({ message: 'Product deleted successfully', id });
   } catch (error) {
@@ -1474,6 +1499,27 @@ const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const { skuCode, description, imageUrl, size, brand, brandCodes, price, basePrice, categoryName, hsnCode } = req.body;
+
+    // BUG-075: Validate HSN code on update
+    if (hsnCode && String(hsnCode).trim()) {
+      const cleanHsn = String(hsnCode).trim();
+      if (!/^\d{4,8}$/.test(cleanHsn)) {
+        return res.status(400).json({ error: 'Invalid HSN code. Must consist of 4 to 8 numeric digits.' });
+      }
+    }
+
+    // BUG-075: Prevent javascript: and dangerous URI schemes in imageUrl
+    if (imageUrl && typeof imageUrl === 'string') {
+      const trimmedUrl = imageUrl.trim().toLowerCase();
+      if (
+        trimmedUrl.startsWith('javascript:') ||
+        trimmedUrl.startsWith('vbscript:') ||
+        trimmedUrl.startsWith('data:text/html') ||
+        /<script/i.test(trimmedUrl)
+      ) {
+        return res.status(400).json({ error: 'Invalid or unsafe image URL protocol.' });
+      }
+    }
 
     let product = await db.Product.findById(id).catch(() => null);
     let invProduct = await db.InventoryProduct.findById(id).catch(() => null);

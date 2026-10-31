@@ -1007,6 +1007,14 @@ const createInvoice = async (req, res) => {
       invoiceData.paymentStatus = 'UNPAID';
     }
 
+    // BUG-068: Invoices > Clone must not copy signed-copy approval state
+    delete invoiceData.signedCopy;
+    delete invoiceData.signedCopyUrl;
+    invoiceData.signedCopy = null;
+    if (!invoiceData.approvalStatus || invoiceData.approvalStatus === 'APPROVED' || invoiceData.approvalStatus === 'SIGNED') {
+      invoiceData.approvalStatus = 'DRAFT';
+    }
+
     await enrichInvoiceItemsWithImages(invoiceData);
 
     const invoice = await BillingInvoice.create(invoiceData);
@@ -2250,7 +2258,8 @@ const downloadInvoicePdf = async (req, res) => {
     const totalCgst    = (invoice.cgstAmount != null && Number(invoice.cgstAmount) > 0) ? Number(invoice.cgstAmount) : ((invoice.cgstTotal != null && Number(invoice.cgstTotal) > 0) ? Number(invoice.cgstTotal) : hsnRows.reduce((s, r) => s + r.cgst, 0));
     const totalSgst    = (invoice.sgstAmount != null && Number(invoice.sgstAmount) > 0) ? Number(invoice.sgstAmount) : ((invoice.sgstTotal != null && Number(invoice.sgstTotal) > 0) ? Number(invoice.sgstTotal) : hsnRows.reduce((s, r) => s + r.sgst, 0));
     const totalIgst    = (invoice.igstAmount != null && Number(invoice.igstAmount) > 0) ? Number(invoice.igstAmount) : ((invoice.igstTotal != null && Number(invoice.igstTotal) > 0) ? Number(invoice.igstTotal) : hsnRows.reduce((s, r) => s + r.igst, 0));
-    const totalTax     = (invoice.totalTax != null && Number(invoice.totalTax) > 0) ? Number(invoice.totalTax) : (isIgst ? totalIgst : parseFloat((totalCgst + totalSgst).toFixed(2)));
+    // BUG-070: Total tax must strictly equal sum of CGST + SGST (or IGST) to prevent ₹0.01 tax mismatch
+    const totalTax     = isIgst ? totalIgst : parseFloat((totalCgst + totalSgst).toFixed(2));
 
     let delByVal = invoice.deliveryBy || '';
     if (!delByVal && Array.isArray(invoice.linkedChallanIds) && invoice.linkedChallanIds.length > 0) {
@@ -2604,13 +2613,28 @@ const downloadInvoicePdf = async (req, res) => {
       const drawSummary = (startY) => {
         let Y = startY;
 
-        // Render Invoice Discount Row if applicable
-        const discountAmt = Number(invoice.discountTotal || 0) || (invoice.discountType === 'percentage' && Number(invoice.discountValue || 0) > 0 ? (totalTaxable * Number(invoice.discountValue) / 100) : Number(invoice.discountValue || 0));
+        // Render Invoice / Item Discount Row if applicable (BUG-070)
+        let itemDiscountTotal = 0;
+        (items || []).forEach(it => {
+          const qty = parseFloat(it.qty) || 0;
+          const rate = parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0;
+          const discPct = parseFloat(it.discountPct) || 0;
+          const discAmt = parseFloat(it.discountAmount) || 0;
+          if (discAmt > 0) itemDiscountTotal += discAmt;
+          else if (discPct > 0) itemDiscountTotal += Math.round(((qty * rate * discPct) / 100) * 100) / 100;
+        });
+
+        const invoiceDiscountAmt = Number(invoice.discountTotal || invoice.discountAmount || 0) ||
+          (invoice.discountType === 'percentage' && Number(invoice.discountValue || 0) > 0
+            ? (totalTaxable * Number(invoice.discountValue) / 100)
+            : Number(invoice.discountValue || 0));
+
+        const discountAmt = invoiceDiscountAmt > 0 ? invoiceDiscountAmt : itemDiscountTotal;
         if (discountAmt > 0) {
           const discH = 16;
-          const discLabel = invoice.discountType === 'percentage'
+          const discLabel = invoiceDiscountAmt > 0 && invoice.discountType === 'percentage'
             ? `Discount (${invoice.discountValue}%)`
-            : 'Special Discount';
+            : (invoiceDiscountAmt > 0 ? 'Special Discount' : 'Item Discount Total');
           doc.rect(PAD, Y, CW, discH).fill(PRPL).stroke(S200);
           doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
             .text(`Less: ${discLabel}`, colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
@@ -2645,12 +2669,13 @@ const downloadInvoicePdf = async (req, res) => {
           });
         }
 
+        // BUG-070: Calculate roundOff strictly so that totalTaxable + totalTax + roundOff === grandTotal
+        const rawSum = totalTaxable + totalTax;
         let computedRoundOff = 0;
-        if (invoice.roundOff !== undefined && invoice.roundOff !== null && Number(invoice.roundOff) !== 0) {
-          computedRoundOff = Number(invoice.roundOff);
-        } else if (invoice.grandTotal) {
-          const rawSum = totalTaxable + totalTax;
+        if (invoice.grandTotal) {
           computedRoundOff = Number((Number(invoice.grandTotal) - rawSum).toFixed(2));
+        } else if (invoice.roundOff !== undefined && invoice.roundOff !== null) {
+          computedRoundOff = Number(invoice.roundOff);
         }
 
         const roH = 16;
@@ -3689,8 +3714,46 @@ const getVendors = async (req, res) => {
   }
 };
 
+const validateVendorPayload = (body) => {
+  const name = (body.name || body.businessName || '').trim();
+  if (!name) {
+    return 'Vendor name or business name is required.';
+  }
+  if (name.length > 200) {
+    return 'Vendor name cannot exceed 200 characters.';
+  }
+  if (body.phone && String(body.phone).trim()) {
+    const cleanPhone = String(body.phone).trim().replace(/[\s-]/g, '');
+    if (!/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      return 'Invalid phone number format. Must contain 7 to 15 digits.';
+    }
+    body.phone = cleanPhone;
+  }
+  if (body.email && String(body.email).trim()) {
+    const cleanEmail = String(body.email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return 'Invalid email address format.';
+    }
+    body.email = cleanEmail;
+  }
+  if (body.gstin && String(body.gstin).trim()) {
+    const cleanGstin = String(body.gstin).trim().toUpperCase();
+    if (cleanGstin !== 'N/A' && cleanGstin !== 'UNREGISTERED') {
+      if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(cleanGstin)) {
+        return 'Invalid GSTIN format. Must be 15 alphanumeric characters (e.g. 24AAAAA0000A1Z5).';
+      }
+    }
+    body.gstin = cleanGstin;
+  }
+  return null;
+};
+
 const createVendor = async (req, res) => {
   try {
+    const vErr = validateVendorPayload(req.body);
+    if (vErr) {
+      return res.status(400).json({ success: false, error: vErr });
+    }
     const vendor = await BillingVendor.create(req.body);
     res.status(201).json({ success: true, data: vendor });
   } catch (error) {
@@ -3700,6 +3763,10 @@ const createVendor = async (req, res) => {
 
 const updateVendor = async (req, res) => {
   try {
+    const vErr = validateVendorPayload(req.body);
+    if (vErr) {
+      return res.status(400).json({ success: false, error: vErr });
+    }
     const vendor = await BillingVendor.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!vendor) {
       return res.status(404).json({ success: false, error: 'Vendor not found' });
@@ -3742,8 +3809,52 @@ const getItems = async (req, res) => {
   }
 };
 
+const validateItemPayload = (body) => {
+  const itemName = (body.itemName || body.name || '').trim();
+  if (!itemName) {
+    return 'Item name is required.';
+  }
+  if (itemName.length > 200) {
+    return 'Item name cannot exceed 200 characters.';
+  }
+  body.itemName = itemName;
+
+  const priceVal = body.unitPrice != null ? body.unitPrice : body.price;
+  if (priceVal !== undefined && priceVal !== null && priceVal !== '') {
+    const numPrice = Number(priceVal);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return 'Item unit price cannot be negative or invalid.';
+    }
+    if (numPrice > 10000000) {
+      return 'Item unit price exceeds commercial limit (₹10,000,000).';
+    }
+    body.unitPrice = numPrice;
+  }
+
+  if (body.hsnCode && String(body.hsnCode).trim()) {
+    const cleanHsn = String(body.hsnCode).trim();
+    if (!/^\d{4,8}$/.test(cleanHsn)) {
+      return 'Invalid HSN/SAC code. Must consist of 4 to 8 numeric digits.';
+    }
+    body.hsnCode = cleanHsn;
+  }
+
+  if (body.taxRate !== undefined && body.taxRate !== null && body.taxRate !== '') {
+    const numTax = Number(body.taxRate);
+    if (isNaN(numTax) || numTax < 0 || numTax > 100) {
+      return 'Tax rate must be between 0% and 100%.';
+    }
+  }
+
+  return null;
+};
+
 const createItem = async (req, res) => {
   try {
+    const iErr = validateItemPayload(req.body);
+    if (iErr) {
+      return res.status(400).json({ success: false, error: iErr });
+    }
     const item = await BillingItem.create(req.body);
     res.status(201).json({ success: true, data: item });
   } catch (error) {
@@ -3753,7 +3864,14 @@ const createItem = async (req, res) => {
 
 const updateItem = async (req, res) => {
   try {
+    const iErr = validateItemPayload(req.body);
+    if (iErr) {
+      return res.status(400).json({ success: false, error: iErr });
+    }
     const item = await BillingItem.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
     res.json({ success: true, data: item });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -4079,8 +4197,14 @@ const createPurchase = async (req, res) => {
         }
       }
     }
-    const paidAmt = parseFloat(purchaseData.paidAmount || purchaseData.advanceAmount || 0);
-    if (paidAmt > gTotal + 0.01 && gTotal > 0) {
+    const paidAmt = parseFloat(purchaseData.paidAmount || purchaseData.advanceAmount || purchaseData.advance || purchaseData.paid || 0);
+    if (paidAmt < 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Paid / advance amount cannot be negative.`
+      });
+    }
+    if (paidAmt > gTotal + 0.01) {
       return res.status(400).json({
         success: false,
         error: `Paid / advance amount (₹${paidAmt.toFixed(2)}) cannot exceed purchase total (₹${gTotal.toFixed(2)}). Excess advance is not permitted.`
@@ -4120,8 +4244,9 @@ const createPurchase = async (req, res) => {
       ).catch(() => {});
     }
 
-    // Auto-upsert into BillingItem catalog so any newly entered line item is saved with its details
-    if (Array.isArray(purchaseData.items) && purchaseData.items.length > 0) {
+    // BUG-074: Only upsert into BillingItem catalog if user explicitly opted in (saveItemsToCatalog)
+    // Prevents silent side effects and cluttering of the items catalog
+    if (purchaseData.saveItemsToCatalog === true && Array.isArray(purchaseData.items) && purchaseData.items.length > 0) {
       const compEntity = purchaseData.companyEntity || 'Elite Digital Prints';
       for (const it of purchaseData.items) {
         if (!it.itemName || !it.itemName.trim()) continue;
@@ -4247,8 +4372,14 @@ const updatePurchase = async (req, res) => {
         }
       }
     }
-    const paidAmt = parseFloat(purchaseData.paidAmount || purchaseData.advanceAmount || 0);
-    if (paidAmt > gTotal + 0.01 && gTotal > 0) {
+    const paidAmt = parseFloat(purchaseData.paidAmount || purchaseData.advanceAmount || purchaseData.advance || purchaseData.paid || 0);
+    if (paidAmt < 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Paid / advance amount cannot be negative.`
+      });
+    }
+    if (paidAmt > gTotal + 0.01) {
       return res.status(400).json({
         success: false,
         error: `Paid / advance amount (₹${paidAmt.toFixed(2)}) cannot exceed purchase total (₹${gTotal.toFixed(2)}). Excess advance is not permitted.`

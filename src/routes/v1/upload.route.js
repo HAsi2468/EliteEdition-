@@ -138,10 +138,10 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-// Dynamic multer middleware depending on R2 availability (up to 50MB)
+// Dynamic multer middleware depending on R2 availability (max 10MB as per BUG-066)
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter
 });
 
@@ -334,7 +334,7 @@ router.post('/', requireAuth, (req, res, next) => {
   upload.any()(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File size exceeds maximum limit of 50MB' });
+        return res.status(400).json({ error: 'File size exceeds maximum limit of 10MB' });
       }
       return res.status(400).json({ error: err.message || 'File upload validation failed' });
     }
@@ -345,6 +345,22 @@ router.post('/', requireAuth, (req, res, next) => {
   req.file = req.file || (req.files && req.files[0]);
   if (!req.file) {
     return res.status(400).json({ error: 'No image or attachment file provided' });
+  }
+
+  // BUG-066: Reject 0-byte (empty) files immediately and ensure local file cleanup
+  if (req.file.size === 0) {
+    if (req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    return res.status(400).json({ error: 'File is empty (0 bytes). Upload rejected.' });
+  }
+
+  // BUG-066: Max 10MB limit enforcement
+  if (req.file.size > 10 * 1024 * 1024) {
+    if (req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    return res.status(400).json({ error: 'File size exceeds maximum allowed 10MB limit.' });
   }
 
   // Multi-language Unicode filename decode (Gujarati, Hindi, Arabic, Chinese, etc.)
@@ -359,12 +375,23 @@ router.post('/', requireAuth, (req, res, next) => {
 
   // Check and disallow TIFF files
   if (fileExt === '.tif' || fileExt === '.tiff' || fileMime === 'image/tiff' || fileMime === 'image/tif') {
+    if (req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
     return res.status(400).json({
       error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
     });
   }
 
-  // Folder specific validation (Signed documents must be JPG/PNG/WEBP/PDF, max 10MB)
+  // Obtain buffer safely upfront for magic byte / script inspection
+  let fileBuffer = req.file.buffer;
+  if (!fileBuffer && req.file.path && fs.existsSync(req.file.path)) {
+    try {
+      fileBuffer = fs.readFileSync(req.file.path);
+    } catch (_) {}
+  }
+
+  // Folder specific validation (Signed documents must be JPG/PNG/WEBP/PDF, max 10MB - BUG-065 & BUG-067)
   const uploadFolder = String(req.body.folder || '').toLowerCase();
   if (uploadFolder.includes('signed') || uploadFolder.includes('invoice') || uploadFolder.includes('challan')) {
     const allowedDocExts = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
@@ -376,18 +403,22 @@ router.post('/', requireAuth, (req, res, next) => {
         error: `Signed documents must be in JPG, PNG, WEBP, or PDF format. Extension '${fileExt}' is not permitted.`
       });
     }
-    if (req.file.size > 10 * 1024 * 1024) {
-      if (req.file.path && fs.existsSync(req.file.path)) {
-        try { fs.unlinkSync(req.file.path); } catch (_) {}
-      }
-      return res.status(400).json({ error: 'Signed document size exceeds maximum allowed 10MB limit.' });
-    }
   }
 
   // SVG Script Injection Guard (BUG-065 & SEC-007)
   if (fileExt === '.svg' && fileBuffer) {
     const svgStr = fileBuffer.toString('utf-8');
-    if (/<script[\s>]/i.test(svgStr) || /javascript:/i.test(svgStr) || /onload\s*=/i.test(svgStr) || /onerror\s*=/i.test(svgStr) || /href\s*=\s*['"]javascript:/i.test(svgStr)) {
+    if (
+      /<script[\s>]/i.test(svgStr) ||
+      /javascript:/i.test(svgStr) ||
+      /onload\s*=/i.test(svgStr) ||
+      /onerror\s*=/i.test(svgStr) ||
+      /onclick\s*=/i.test(svgStr) ||
+      /<iframe[\s>]/i.test(svgStr) ||
+      /<object[\s>]/i.test(svgStr) ||
+      /<embed[\s>]/i.test(svgStr) ||
+      /href\s*=\s*['"]javascript:/i.test(svgStr)
+    ) {
       if (req.file.path && fs.existsSync(req.file.path)) {
         try { fs.unlinkSync(req.file.path); } catch (_) {}
       }
@@ -396,12 +427,6 @@ router.post('/', requireAuth, (req, res, next) => {
   }
 
   // Magic bytes signature verification
-  let fileBuffer = req.file.buffer;
-  if (!fileBuffer && req.file.path && fs.existsSync(req.file.path)) {
-    try {
-      fileBuffer = fs.readFileSync(req.file.path);
-    } catch (_) {}
-  }
   if (fileBuffer && !verifyFileSignature(fileBuffer, fileExt)) {
     if (req.file.path && fs.existsSync(req.file.path)) {
       try { fs.unlinkSync(req.file.path); } catch (_) {}
