@@ -96,21 +96,16 @@ const fetchSalesReportData = async (whereClause) => {
       {
         $group: {
           _id: '$skuName',
-          salesCount: { $sum: 1 },
+          salesCount: { $sum: { $ifNull: ['$saleCount', 1] } },
           itemTypeBrand: { $first: '$itemTypeBrand' },
           sellableAmount: {
             $sum: {
-              $multiply: [
-                { $ifNull: ['$saleCount', 0] },
-                {
-                  $convert: {
-                    input: '$totalPrice',
-                    to: 'double',
-                    onError: 0.0,
-                    onNull: 0.0,
-                  },
-                },
-              ],
+              $convert: {
+                input: '$totalPrice',
+                to: 'double',
+                onError: 0.0,
+                onNull: 0.0,
+              },
             },
           },
         },
@@ -134,21 +129,16 @@ const fetchSalesReportData = async (whereClause) => {
           _id: '$itemSKUCode',
           sellableAmount: {
             $sum: {
-              $multiply: [
-                { $ifNull: ['$saleCount', 0] },
-                {
-                  $convert: {
-                    input: '$totalPrice',
-                    to: 'double',
-                    onError: 0.0,
-                    onNull: 0.0,
-                  },
-                },
-              ],
+              $convert: {
+                input: '$totalPrice',
+                to: 'double',
+                onError: 0.0,
+                onNull: 0.0,
+              },
             },
           },
           maxOrderDate: { $max: '$orderDate' },
-          salesCount: { $sum: 1 },
+          salesCount: { $sum: { $ifNull: ['$saleCount', 1] } },
           skuName: { $first: '$skuName' },
           itemTypeBrand: { $first: '$itemTypeBrand' },
         },

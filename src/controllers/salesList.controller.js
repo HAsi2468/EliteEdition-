@@ -53,7 +53,7 @@ const buildWhereClause = (query) => {
   if (dateStart && endDate) {
     const dateStartObj = new Date(dateStart);
     const dateEndObj = new Date(endDate);
-    const startOfDay = new Date(dateStartObj.setHours(0, 59, 0, 0));
+    const startOfDay = new Date(dateStartObj.setHours(0, 0, 0, 0));
     const endOfDay = new Date(dateEndObj.setHours(23, 59, 59, 999));
     whereClause.orderDate = {
       $gte: startOfDay,

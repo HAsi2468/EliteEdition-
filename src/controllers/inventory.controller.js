@@ -144,7 +144,8 @@ const createInventory = async (req, res) => {
     res.status(201).json(newItem);
   } catch (error) {
     logger.error('[INVENTORY] Error creating inventory item: %o', error);
-    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    const isValidation = error.message.includes('Quantity must be') || error.message.includes('required') || error.name === 'ValidationError';
+    res.status(isValidation ? 400 : 500).json({ success: false, error: error.message, details: error.message });
   }
 };
 
@@ -617,6 +618,15 @@ const bulkInward = async (req, res) => {
         logger.error(`Error processing bulk inward item: %o`, err);
         results.errors.push({ skuCode: item.skuCode, error: err.message });
       }
+    }
+
+    if (results.errors.length > 0 && results.created === 0 && results.updated === 0) {
+      return res.status(400).json({
+        success: false,
+        error: results.errors[0].error,
+        message: results.errors[0].error,
+        results
+      });
     }
 
     emitSocketEvent(req, 'inventory-created', { count: results.created, updated: results.updated });

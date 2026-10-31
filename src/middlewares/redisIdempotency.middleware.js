@@ -80,6 +80,34 @@ function redisIdempotencyMiddleware(options = {}) {
         const cachedRaw = await redis.get(redisKey);
 
         if (cachedRaw === 'IN_PROGRESS') {
+          // Poll briefly (up to 2000ms in 150ms steps) to allow concurrent in-flight request to finish
+          let resolvedCached = null;
+          for (let attempt = 0; attempt < 12; attempt++) {
+            await new Promise(r => setTimeout(r, 150));
+            const probe = await redis.get(redisKey);
+            if (probe && probe !== 'IN_PROGRESS') {
+              resolvedCached = probe;
+              break;
+            }
+          }
+
+          if (resolvedCached) {
+            try {
+              const cached = JSON.parse(resolvedCached);
+              res.setHeader('Idempotent-Replayed', 'true');
+              if (cached.headers) {
+                for (const [hKey, hVal] of Object.entries(cached.headers)) {
+                  if (hKey.toLowerCase() !== 'transfer-encoding' && hKey.toLowerCase() !== 'content-length') {
+                    res.setHeader(hKey, hVal);
+                  }
+                }
+              }
+              return res.status(cached.statusCode || 200).send(cached.body);
+            } catch (pErr) {
+              logger.warn('Failed to parse resolved idempotency payload: %s', pErr.message);
+            }
+          }
+
           // Check if lock is stale (held longer than 5 seconds)
           const remainingTtl = await redis.ttl(redisKey);
           if (remainingTtl <= (LOCK_TTL_SECONDS - 5)) {

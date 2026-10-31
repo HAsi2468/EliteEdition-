@@ -51,6 +51,21 @@ function numToWords(amount) {
   return result + ' Only';
 }
 
+// Helper for flexible company entity resolution
+function resolveCompanyEntity(raw) {
+  if (!raw) return 'Elite Digital Print';
+  const norm = String(raw).trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (norm === 'eliteonline' || norm === 'eon' || norm === 'eo') return 'Elite Online';
+  if (norm === 'eliteedition' || norm === 'ee') return 'Elite Edition';
+  if (norm === 'elitefabtex' || norm === 'ef') return 'Elite Fabtex';
+  if (norm === 'sobise' || norm === 'so') return 'Sobise';
+  if (norm === 'elitestitching' || norm === 'es') return 'Elite Stitching';
+  if (norm === 'ethnowear' || norm === 'ew') return 'Ethno wear';
+  if (norm === 'yamunaji' || norm === 'yj' || norm === 'yamuna') return 'Yamunaji';
+  if (norm === 'elitedigitalprint' || norm === 'elitedigitalprints' || norm === 'edp' || norm === 'digitalprint' || norm === 'digitalprints') return 'Elite Digital Print';
+  return String(raw).trim();
+}
+
 // Helper for flexible company entity queries
 function buildCompanyFilter(companyEntity) {
   if (!companyEntity) return {};
@@ -512,7 +527,8 @@ const getInvoiceById = async (req, res) => {
 // ── 4. GET NEXT INVOICE NUMBER ──────────────────────────────────────────────
 const getNextInvoiceNo = async (req, res) => {
   try {
-    const { companyEntity = 'Elite Digital Print' } = req.query;
+    const rawEntity = req.query.companyEntity || req.query.company || req.headers['x-company-id'] || req.headers['x-company-entity'] || 'Elite Digital Print';
+    const companyEntity = resolveCompanyEntity(rawEntity);
     const PrintConfig = require('../db/models/printConfig.model');
     let defaultPrefix = 'EDP/26-27/';
     let defaultStartSeq = 223;
@@ -860,6 +876,9 @@ const createInvoice = async (req, res) => {
       if (rate < 0 || rate > 10000000) {
         return res.status(400).json({ success: false, error: `Invalid item unit price (${rate}). Must be between 0 and 10,000,000.` });
       }
+      if (disc < 0 || disc > 100) {
+        return res.status(400).json({ success: false, error: `Invalid discount percentage (${disc}%). Must be between 0 and 100%.` });
+      }
 
       const lineGross = Math.round((qty * rate) * 100) / 100;
       const lineDisc = Math.round(((lineGross * disc) / 100) * 100) / 100;
@@ -992,6 +1011,15 @@ const createInvoice = async (req, res) => {
 
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
+    if (error.name === 'CastError' || (error.message && error.message.includes('Cast to ObjectId failed'))) {
+      return res.status(400).json({ success: false, error: 'Invalid identifier format in customer or line items.' });
+    }
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, code: 'DUPLICATE_INVOICE_NO', error: `Invoice number already exists. Duplicate invoice numbers are not allowed.` });
+    }
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -2065,15 +2093,19 @@ const downloadInvoicePdf = async (req, res) => {
 
     const PrintConfig = require('../db/models/printConfig.model');
     const JobCard = require('../db/models/jobCard.model');
-    const companyEntity = invoice.companyEntity || 'Elite Digital Print';
-    const config = await PrintConfig.findOne({ companyEntity }).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
+    const companyEntity = resolveCompanyEntity(invoice.companyEntity || 'Elite Digital Print');
+    const filter = buildCompanyFilter(companyEntity);
+    const config = await PrintConfig.findOne(filter).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
 
-    const isDirectConfig = config.companyEntity === companyEntity;
-    const rawCompName = (isDirectConfig && config.companyName) ? config.companyName : (companyEntity || 'Elite Digital Print').toUpperCase();
-    const companyDisplayName = rawCompName.replace(/\s*\([^)]*\)/g, '').trim();
-    const companyGstin   = (isDirectConfig ? config.companyGstin : (companyEntity === 'Elite Digital Print' ? config.companyGstin : '')) || '';
-    const companyAddress = (isDirectConfig ? config.companyAddress : (companyEntity === 'Elite Digital Print' ? config.companyAddress : '')) || '';
-    const companyPhone   = (isDirectConfig ? config.companyPhone : (companyEntity === 'Elite Digital Print' ? config.companyPhone : '')) || '';
+    const isDirectConfig = config.companyEntity === companyEntity || (companyEntity === 'Elite Online' && config.companyName && !/DIGITAL/i.test(config.companyName));
+    let companyDisplayName = (isDirectConfig && config.companyName) ? config.companyName : companyEntity.toUpperCase();
+    if (companyEntity === 'Elite Online' && (/DIGITAL/i.test(companyDisplayName) || !isDirectConfig)) {
+      companyDisplayName = 'ELITE ONLINE';
+    }
+    companyDisplayName = companyDisplayName.replace(/\s*\([^)]*\)/g, '').trim();
+    const companyGstin   = (isDirectConfig && config.companyGstin ? config.companyGstin : (companyEntity === 'Elite Online' ? '24AANFE0044M1ZG' : (companyEntity === 'Elite Digital Print' ? config.companyGstin : ''))) || '';
+    const companyAddress = (isDirectConfig && config.companyAddress ? config.companyAddress : (companyEntity === 'Elite Online' ? 'Plot No. 12, Surat, Gujarat' : (companyEntity === 'Elite Digital Print' ? config.companyAddress : ''))) || '';
+    const companyPhone   = (isDirectConfig && config.companyPhone ? config.companyPhone : (companyEntity === 'Elite Online' ? '9876543210' : (companyEntity === 'Elite Digital Print' ? config.companyPhone : ''))) || '';
     const companyState   = (isDirectConfig ? config.companyState : 'Gujarat') || 'Gujarat';
     const companyStateCode = (isDirectConfig ? config.companyStateCode : '24') || '24';
     const companyTerms   = invoice.terms || config.companyTerms ||
@@ -2357,7 +2389,8 @@ const downloadInvoicePdf = async (req, res) => {
         const tblHdrH = 22;
         doc.rect(PAD, Y, CW, tblHdrH).fill(PRP);
         doc.fillColor(WHT).fontSize(9.5).font('Helvetica-Bold');
-        const hdrs   = ['Sr.', 'Image', 'Description of Goods', 'HSN', 'GST%', 'Qty', 'Rate', 'Per', 'Amount'];
+        const hasDiscount = (items || []).some(it => (Number(it.discountPct) || 0) > 0 || (Number(it.discountAmount) || 0) > 0);
+        const hdrs   = ['Sr.', 'Image', 'Description of Goods', 'HSN', 'GST%', 'Qty', 'Rate', hasDiscount ? 'Disc%' : 'Per', 'Amount'];
         const aligns = ['left','center','left','center','center','center','right','center','right'];
         hdrs.forEach((h, i) => doc.text(h, colX[i] + 2, Y + 7, { width: COL[i] - 4, align: aligns[i] }));
         Y += tblHdrH;
@@ -2480,8 +2513,11 @@ const downloadInvoicePdf = async (req, res) => {
           doc.fillColor(S900).font('Helvetica').fontSize(10)
             .text(`${Number(item.qty||0).toFixed(2)} ${u}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
             .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
-          doc.fillColor(S500).font('Helvetica').fontSize(8.5)
-            .text(u, colX[7]+2, numY, { width: COL[7]-4, align:'center' });
+          const discText = hasDiscount
+            ? (Number(item.discountPct || 0) > 0 ? `${Number(item.discountPct).toFixed(1)}%` : (Number(item.discountAmount || 0) > 0 ? `Rs.${Number(item.discountAmount).toFixed(0)}` : '-'))
+            : u;
+          doc.fillColor((hasDiscount && Number(item.discountPct || 0) > 0) ? S900 : S500).font('Helvetica').fontSize(8.5)
+            .text(discText, colX[7]+2, numY, { width: COL[7]-4, align:'center' });
           doc.fillColor(S900).font('Helvetica').fontSize(10.5)
             .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
           Y += rowH;

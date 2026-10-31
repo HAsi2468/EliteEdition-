@@ -134,7 +134,7 @@ const logScanEvent = async ({
 // Looks up an order/package by AWB code (e.g. MYSC1359190430) or Order Code
 const lookupAwb = async (req, res) => {
   try {
-    const rawCode = req.query.code || req.body.code;
+    const rawCode = req.query.code || req.query.barcode || req.body?.code || req.body?.barcode;
     if (!rawCode || !String(rawCode).trim()) {
       return res.status(400).json({ success: false, error: 'AWB code or barcode is required' });
     }
@@ -392,9 +392,17 @@ const lookupAwb = async (req, res) => {
       }
     }
 
+    if (!order && !salesItem) {
+      return res.status(404).json({
+        success: false,
+        found: false,
+        error: `Order or barcode "${cleanCode}" not found in Sales records.`
+      });
+    }
+
     res.json({
       success: true,
-      found: !!(order || salesItem),
+      found: true,
       data: {
         awb: cleanCode,
         displayOrderCode,
