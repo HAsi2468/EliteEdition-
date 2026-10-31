@@ -5204,6 +5204,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <thead>
                       <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
                         <MasterCheckboxTh
+                          style={{ position: 'sticky', left: 0, zIndex: 22, background: 'rgba(20,29,44,0.95)' }}
                           allChecked={displayedChallans.length > 0 && displayedChallans.every(c => !!selectedChallanMap[c._id])}
                           indeterminate={displayedChallans.some(c => !!selectedChallanMap[c._id]) && !displayedChallans.every(c => !!selectedChallanMap[c._id])}
                           onChange={e => {
@@ -5218,7 +5219,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             }
                           }}
                         />
-                        <ErpTh columnKey="challanNo" sortState={challanSortState} onSortChange={setChallanSortState} width="95px">Ch. No</ErpTh>
+                        <ErpTh columnKey="challanNo" sortState={challanSortState} onSortChange={setChallanSortState} width="95px" style={{ position: 'sticky', left: 42, zIndex: 22, background: 'rgba(20,29,44,0.95)', boxShadow: '2px 0 6px rgba(0,0,0,0.15)' }}>Ch. No</ErpTh>
                         <ErpTh columnKey="status" sortState={challanSortState} onSortChange={setChallanSortState} width="90px">Status</ErpTh>
                         <ErpTh columnKey="date" sortState={challanSortState} onSortChange={setChallanSortState} width="95px">Date</ErpTh>
                         <ErpTh columnKey="billTo" sortState={challanSortState} onSortChange={setChallanSortState}>Bill To / Party</ErpTh>
@@ -5228,7 +5229,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         <ErpTh columnKey="panna" sortState={challanSortState} onSortChange={setChallanSortState} align="center" width="60px">Panna</ErpTh>
                         <ErpTh columnKey="totalRolls" sortState={challanSortState} onSortChange={setChallanSortState} align="center" width="45px">TP</ErpTh>
                         <ErpTh columnKey="totalMtr" sortState={challanSortState} onSortChange={setChallanSortState} align="right" width="105px">Total Mtr</ErpTh>
-                        <ErpTh hideSort align="center" width="200px">Actions</ErpTh>
+                        <ErpTh hideSort align="center" width="200px" style={{ position: 'sticky', right: 0, zIndex: 22, background: 'linear-gradient(135deg, rgba(30,41,59,0.95), rgba(15,23,42,0.95))', boxShadow: '-2px 0 6px rgba(0,0,0,0.2)' }}>Actions</ErpTh>
                       </tr>
                     </thead>
                     <tbody>
@@ -5238,6 +5239,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       {displayedChallans.map(ch => (
                         <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s', background: getRowHighlightStyle(!!selectedChallanMap[ch._id]) }}>
                           <RowCheckboxTd
+                            style={{ position: 'sticky', left: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)' }}
                             checked={!!selectedChallanMap[ch._id]}
                             onChange={e => {
                               if (e.target.checked) {
@@ -5251,7 +5253,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               }
                             }}
                           />
-                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', position: 'sticky', left: 42, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>
                             <span style={{ padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: 900, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', fontSize: '0.78rem' }}>
                               EDP-{ch.challanNo}
                             </span>
@@ -5335,7 +5337,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
                           <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
                           <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
-                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', position: 'sticky', right: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
                             {(() => {
                               const challanActions = [
                                 {

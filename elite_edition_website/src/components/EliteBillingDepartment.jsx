@@ -4588,13 +4588,14 @@ export default function EliteBillingDepartment({
                   <thead>
                     <tr>
                       <MasterCheckboxTh
+                        style={{ position: 'sticky', left: 0, zIndex: 22, background: '#f8fafc' }}
                         allSelected={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
                         someSelected={displayedInvoices.some(i => selectedInvoiceIds.includes(i._id))}
                         onToggleAll={() => handleToggleSelectAllInvoices(displayedInvoices)}
                         totalCount={displayedInvoices.length}
                         title="Select All Invoices"
                       />
-                      <ErpTh columnKey="invoiceNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Invoice No</ErpTh>
+                      <ErpTh columnKey="invoiceNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState} style={{ position: 'sticky', left: 42, zIndex: 22, background: '#f8fafc', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>Invoice No</ErpTh>
                       <ErpTh columnKey="challanNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Challan No</ErpTh>
                       <ErpTh columnKey="customerName" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Customer Name</ErpTh>
                       <ErpTh columnKey="date" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Date</ErpTh>
@@ -4603,7 +4604,7 @@ export default function EliteBillingDepartment({
                       <ErpTh columnKey="balanceDue" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Balance Due</ErpTh>
                       <ErpTh columnKey="status" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="center">Status</ErpTh>
                       <ErpTh columnKey="createdBy" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Created By</ErpTh>
-                      <ErpTh hideSort align="center">Actions</ErpTh>
+                      <ErpTh hideSort align="center" style={{ position: 'sticky', right: 0, zIndex: 22, background: '#f8fafc', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>Actions</ErpTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -4637,10 +4638,11 @@ export default function EliteBillingDepartment({
                         return (
                           <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(selectedInvoiceIds.includes(inv._id)) }}>
                             <RowCheckboxTd
+                              style={{ position: 'sticky', left: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)' }}
                               checked={selectedInvoiceIds.includes(inv._id)}
                               onChange={() => handleToggleSelectInvoice(inv._id)}
                             />
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle' }}>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle', position: 'sticky', left: 42, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>
                               <button
                                 onClick={() => setViewInvoiceModal(inv)}
                                 style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none', whiteSpace: 'nowrap' }}
@@ -4728,7 +4730,7 @@ export default function EliteBillingDepartment({
                                 {inv.createdByName || inv.createdBy || 'HASI'}
                               </span>
                             </td>
-                            <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                            <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', position: 'sticky', right: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
                               {(() => {
                                 const sc = inv.signedCopy;
                                 const status = sc?.status;

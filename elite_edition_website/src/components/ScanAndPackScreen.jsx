@@ -1994,7 +1994,17 @@ export default function ScanAndPackScreen({ currentUser }) {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+          <div style={{
+            display: 'flex',
+            gap: '6px',
+            background: '#f1f5f9',
+            padding: '4px',
+            borderRadius: '10px',
+            overflowX: 'auto',
+            maxWidth: '100%',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none'
+          }}>
             
             {/* Screen 1: Central Department Dashboard & Auto-Router */}
             <button
@@ -2013,7 +2023,9 @@ export default function ScanAndPackScreen({ currentUser }) {
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: scanMode === 'ALL' ? '0 2px 8px rgba(99,102,241,0.3)' : 'none',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
               }}
             >
               <Zap size={15} />
@@ -2052,7 +2064,9 @@ export default function ScanAndPackScreen({ currentUser }) {
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: scanMode === 'PACK' ? '0 2px 8px rgba(14,165,233,0.3)' : 'none',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
               }}
             >
               <Truck size={15} />
@@ -2093,7 +2107,9 @@ export default function ScanAndPackScreen({ currentUser }) {
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: scanMode === 'RETURN' ? '0 2px 8px rgba(244,63,94,0.3)' : 'none',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
               }}
             >
               <RotateCcw size={15} />
@@ -2300,8 +2316,8 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
 
           {/* Scan input form */}
-          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
+          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 260px', minWidth: '220px' }}>
               <Scan size={22} style={{
                 position: 'absolute',
                 left: '14px',
@@ -2333,7 +2349,8 @@ export default function ScanAndPackScreen({ currentUser }) {
                   color: '#0f172a',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                   outline: 'none',
-                  letterSpacing: '0.02em'
+                  letterSpacing: '0.02em',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
@@ -2347,6 +2364,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 border: 'none',
                 borderRadius: '12px',
                 padding: '0 1.75rem',
+                minHeight: '46px',
                 fontSize: '0.95rem',
                 fontWeight: 800,
                 cursor: loading || !scanInput.trim() ? 'not-allowed' : 'pointer',
@@ -2354,7 +2372,8 @@ export default function ScanAndPackScreen({ currentUser }) {
                 alignItems: 'center',
                 gap: '8px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flex: '0 0 auto'
               }}
             >
               {loading ? <RefreshCw size={18} className="spin-loader" /> : <Barcode size={18} />}

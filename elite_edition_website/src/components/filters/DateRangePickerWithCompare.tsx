@@ -778,7 +778,7 @@ function MonthCalendarView({
       <div className="grid grid-cols-7 gap-y-0.5">
         {/* Leading empty slots */}
         {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
-          <div key={`empty-${idx}`} className="h-8" />
+          <div key={`empty-${idx}`} className="min-h-[40px] h-10" />
         ))}
 
         {days.map((day) => {
@@ -794,7 +794,7 @@ function MonthCalendarView({
             isWithinInterval(day, { start: compareRange.from, end: compareRange.to });
 
           let dayClasses =
-            'relative h-8 flex items-center justify-center text-xs font-medium cursor-pointer transition-colors';
+            'relative min-h-[40px] h-10 flex items-center justify-center text-xs font-medium cursor-pointer transition-colors';
 
           if (isStart && isEnd) {
             dayClasses += ' bg-emerald-600 text-white font-bold rounded-lg shadow-xs z-10';
@@ -814,13 +814,14 @@ function MonthCalendarView({
             <button
               key={day.toISOString()}
               type="button"
+              aria-label={format(day, 'EEEE, MMMM d, yyyy')}
               onClick={() => onDayClick(day)}
               onMouseEnter={() => onDayHover(day)}
               className={dayClasses}
             >
               <span>{day.getDate()}</span>
               {isTodayDate && !isStart && !isEnd && (
-                <span className="absolute bottom-1 w-1 h-1 rounded-full bg-emerald-600" />
+                <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-emerald-600" />
               )}
             </button>
           );

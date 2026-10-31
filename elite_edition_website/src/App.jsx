@@ -2544,9 +2544,9 @@ export default function App() {
                 className="btn-icon"
                 title="Quick Actions"
                 style={{
-                  minWidth: '36px',
-                  minHeight: '36px',
-                  padding: '6px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '8px',
                   borderRadius: '8px',
                   border: '1px solid #bfdbfe',
                   background: '#eff6ff',
@@ -2565,9 +2565,9 @@ export default function App() {
                 className="btn-icon"
                 title="Global Search"
                 style={{
-                  minWidth: '36px',
-                  minHeight: '36px',
-                  padding: '6px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '8px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
                   background: '#ffffff',
@@ -2587,9 +2587,9 @@ export default function App() {
                 className="btn-icon"
                 title="Notifications & Alerts"
                 style={{
-                  minWidth: '36px',
-                  minHeight: '36px',
-                  padding: '6px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '8px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
                   background: '#ffffff',
@@ -2621,9 +2621,9 @@ export default function App() {
                 className="btn-icon"
                 title="More Actions"
                 style={{
-                  minWidth: '36px',
-                  minHeight: '36px',
-                  padding: '6px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '8px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
                   background: mobileHeaderMoreOpen ? '#f1f5f9' : '#ffffff',
@@ -2763,24 +2763,25 @@ export default function App() {
                 className="btn-secondary"
                 title="Global Search (Ctrl/Cmd+K)"
                 style={{
-                  minHeight: '30px',
-                  height: '30px',
-                  padding: '3px 8px',
-                  fontSize: '0.74rem',
+                  minHeight: '38px',
+                  height: '38px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  cursor: 'pointer'
+                  gap: '6px',
+                  cursor: 'pointer',
+                  borderRadius: '8px'
                 }}
               >
-                <Search size={13} style={{ flexShrink: 0 }} />
+                <Search size={15} style={{ flexShrink: 0 }} />
                 <span>Search</span>
                 <kbd style={{
-                  fontSize: '9px',
+                  fontSize: '10px',
                   background: '#f1f5f9',
                   color: '#475569',
-                  padding: '1px 4px',
-                  borderRadius: '3px',
+                  padding: '2px 5px',
+                  borderRadius: '4px',
                   border: '1px solid #cbd5e1'
                 }}>⌘K</kbd>
               </button>
@@ -2790,7 +2791,7 @@ export default function App() {
                   onClick={handleInstallClick}
                   className="btn-primary"
                   title="Install Elite ERP App"
-                  style={{ minHeight: '30px', height: '30px', padding: '3px 10px', fontSize: '0.74rem', fontWeight: 600 }}
+                  style={{ minHeight: '38px', height: '38px', padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px' }}
                 >
                   Install App
                 </button>
@@ -2804,24 +2805,25 @@ export default function App() {
                 className="btn-secondary"
                 title="Notifications & Alerts"
                 style={{
-                  minHeight: '30px',
-                  height: '30px',
-                  padding: '3px 8px',
-                  fontSize: '0.74rem',
+                  minHeight: '38px',
+                  height: '38px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '6px',
+                  borderRadius: '8px'
                 }}
               >
-                <Bell size={13} style={{ flexShrink: 0 }} />
+                <Bell size={15} style={{ flexShrink: 0 }} />
                 <span>Alerts</span>
                 {unreadNotifCount > 0 && (
                   <span style={{
                     background: '#ef4444',
                     color: '#ffffff',
-                    padding: '1px 5px',
+                    padding: '2px 6px',
                     borderRadius: '8px',
-                    fontSize: '0.65rem',
+                    fontSize: '0.7rem',
                     fontWeight: 800,
                     lineHeight: 1
                   }}>
@@ -2844,16 +2846,17 @@ export default function App() {
                 className="btn-secondary"
                 title="Refresh data"
                 style={{
-                  minHeight: '30px',
-                  height: '30px',
-                  padding: '3px 8px',
-                  fontSize: '0.74rem',
+                  minHeight: '38px',
+                  height: '38px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '6px',
+                  borderRadius: '8px'
                 }}
               >
-                <RefreshCw size={12} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
+                <RefreshCw size={14} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
                 <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
 
@@ -2887,16 +2890,17 @@ export default function App() {
                     className="btn-secondary"
                     title="Sign Out"
                     style={{
-                      minHeight: '30px',
-                      height: '30px',
-                      padding: '3px 8px',
-                      fontSize: '0.72rem',
+                      minHeight: '38px',
+                      height: '38px',
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px'
+                      gap: '6px',
+                      borderRadius: '8px'
                     }}
                   >
-                    <LogOut size={12} style={{ flexShrink: 0 }} />
+                    <LogOut size={14} style={{ flexShrink: 0 }} />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -2993,8 +2997,10 @@ export default function App() {
                   }}
                   className={`mobile-drawer-item ${activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? 'active' : ''}`}
                 >
-                  <Scale size={14} style={{ marginRight: '6px', display: 'inline-block', verticalAlign: 'middle' }} />
-                  <span>Reconciliation</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <Scale size={16} style={{ flexShrink: 0 }} />
+                    <span>Reconciliation</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -3279,7 +3285,7 @@ export default function App() {
           tabIndex={-1}
           onKeyDown={handleSidebarKeyDown}
           style={{
-            width: isSidebarCollapsed ? '68px' : '230px',
+            width: isSidebarCollapsed ? '68px' : '260px',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',

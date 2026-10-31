@@ -2123,7 +2123,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
 function Field({ label, name, form, onChange, type='text', options, half, readOnly, highlight }) {
   const showColorPreview = name === 'colors' && getColorHex(form[name]);
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: half ? '0 0 calc(50% - 0.4rem)' : '1 1 auto', minWidth:120 }}>
+    <div className="jobcard-field-col" style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: half ? '0 0 calc(50% - 0.4rem)' : '1 1 auto', minWidth:120 }}>
       <label style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</label>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -2913,7 +2913,7 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
           {/* Section: Core IDs */}
           <div style={sectionLabel}>📋 Job Details</div>
           <div style={rowStyle}>
-            <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: '0 0 calc(50% - 0.4rem)', minWidth:120 }}>
+            <div className="jobcard-field-col" style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: '0 0 calc(50% - 0.4rem)', minWidth:120 }}>
               <Field label="Job No. *" name="jobNo" form={form} onChange={onChange} half={false} />
               {!card && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', padding: '0 2px' }}>
@@ -2948,7 +2948,7 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
                 </div>
               )}
             </div>
-            <div ref={suggestionsRef} style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: '0 0 calc(50% - 0.4rem)', minWidth:120, position:'relative' }}>
+            <div ref={suggestionsRef} className="jobcard-field-col" style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: '0 0 calc(50% - 0.4rem)', minWidth:120, position:'relative' }}>
               <label style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
                 Design No. / Design Name *
               </label>
