@@ -89,6 +89,10 @@ const whiteFabricLogSchema = new mongoose.Schema(
 );
 
 // Compound indexes for deduplication, fast lookups, and department history
+whiteFabricLogSchema.index(
+  { date: 1, challanNo: 1, lotNo: 1, fabricQuality: 1, totalMtr: 1 },
+  { unique: true, sparse: true }
+);
 whiteFabricLogSchema.index({ fabricQuality: 1, challanNo: 1, lotNo: 1, createdAt: -1 });
 whiteFabricLogSchema.index({ department: 1, createdAt: -1, date: -1 });
 

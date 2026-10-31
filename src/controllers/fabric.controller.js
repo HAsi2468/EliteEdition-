@@ -4590,6 +4590,8 @@ const createWhiteFabricLog = async (req, res) => {
   let redisLockKey = null;
   let redisClient = null;
   let acquiredRedisLock = false;
+  let lockKey = null;
+  let resolveLock = null;
 
   try {
     const body = req.body;
@@ -4612,9 +4614,10 @@ const createWhiteFabricLog = async (req, res) => {
     const cleanChallan = String(body.challanNo || '').trim();
     const cleanLot = String(body.lotNo || '').trim();
     const cleanFabric = String(body.fabricQuality || '').trim();
+    const cleanDate = String(body.date || '').trim();
 
-    // 1. In-process in-flight deduplication map
-    const lockKey = `${cleanChallan}___${cleanFabric}___${cleanLot}___${totalMtr}`;
+    // 1. In-process in-flight deduplication map (SYNCHRONOUS LOCK - sets immediately before any await!)
+    lockKey = `${cleanDate}___${cleanChallan}___${cleanFabric}___${cleanLot}___${totalMtr}`;
     if (inFlightWhiteFabricQALocks.has(lockKey)) {
       const existing = await inFlightWhiteFabricQALocks.get(lockKey);
       return res.status(200).json({
@@ -4624,22 +4627,29 @@ const createWhiteFabricLog = async (req, res) => {
       });
     }
 
+    // Set lock immediately and synchronously in memory
+    const lockPromise = new Promise(resolve => { resolveLock = resolve; });
+    inFlightWhiteFabricQALocks.set(lockKey, lockPromise);
+    setTimeout(() => inFlightWhiteFabricQALocks.delete(lockKey), 10000);
+
     // 2. Distributed Redis lock across all PM2 cluster workers
     try {
       const { getRedisClient } = require('../db/redisClient');
       redisClient = typeof getRedisClient === 'function' ? getRedisClient() : null;
       if (redisClient && redisClient.status === 'ready') {
-        redisLockKey = `lock:white_qa:${cleanChallan || 'nochallan'}:${cleanLot || 'nolot'}:${cleanFabric}:${totalMtr}`;
+        redisLockKey = `lock:white_qa:${cleanDate}:${cleanChallan || 'nochallan'}:${cleanLot || 'nolot'}:${cleanFabric}:${totalMtr}`;
         const setNxRes = await redisClient.set(redisLockKey, '1', 'EX', 12, 'NX');
         if (!setNxRes) {
           // Lock already held by a concurrent request in another PM2 cluster process
-          await new Promise(r => setTimeout(r, 250));
+          await new Promise(r => setTimeout(r, 200));
           const recentDoc = await WhiteFabricLog.findOne({
             fabricQuality: cleanFabric,
             totalMtr,
+            date: cleanDate,
             createdAt: { $gte: new Date(Date.now() - 15000) }
           }).sort({ createdAt: -1 }).lean();
           if (recentDoc) {
+            if (resolveLock) resolveLock(recentDoc);
             return res.status(200).json({
               success: true,
               data: recentDoc,
@@ -4668,6 +4678,7 @@ const createWhiteFabricLog = async (req, res) => {
       }).sort({ createdAt: -1 }).lean();
 
       if (recentDuplicate) {
+        if (resolveLock) resolveLock(recentDuplicate);
         return res.status(200).json({
           success: true,
           data: recentDuplicate,
@@ -4676,22 +4687,48 @@ const createWhiteFabricLog = async (req, res) => {
       }
     }
 
-    const creationPromise = (async () => {
-      const doc = await WhiteFabricLog.create({
-        ...body,
-        totalMtr,
-        totalDefectMtr: parseFloat(totDefect.toFixed(2)),
-        usableFreshMtr: parseFloat(Math.max(0, totalMtr - totDefect).toFixed(2))
-      });
-      return doc;
-    })();
+    const doc = await WhiteFabricLog.create({
+      ...body,
+      totalMtr,
+      totalDefectMtr: parseFloat(totDefect.toFixed(2)),
+      usableFreshMtr: parseFloat(Math.max(0, totalMtr - totDefect).toFixed(2))
+    });
 
-    inFlightWhiteFabricQALocks.set(lockKey, creationPromise);
-    setTimeout(() => inFlightWhiteFabricQALocks.delete(lockKey), 5000);
-
-    const log = await creationPromise;
-    res.json({ success: true, data: log });
+    if (resolveLock) resolveLock(doc);
+    res.json({ success: true, data: doc });
   } catch (err) {
+    // 4. Handle MongoDB Unique Constraint Duplicate Key Error (E11000)
+    if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+      try {
+        const cleanChallan = String(req.body.challanNo || '').trim();
+        const cleanLot = String(req.body.lotNo || '').trim();
+        const cleanFabric = String(req.body.fabricQuality || '').trim();
+        const totalMtr = parseFloat(req.body.totalMtr);
+        const existing = await WhiteFabricLog.findOne({
+          fabricQuality: cleanFabric,
+          totalMtr,
+          $or: [
+            { challanNo: cleanChallan },
+            { lotNo: cleanLot }
+          ].filter(o => Object.values(o)[0] !== '')
+        }).sort({ createdAt: -1 }).lean();
+
+        if (existing) {
+          if (resolveLock) resolveLock(existing);
+          return res.status(200).json({
+            success: true,
+            data: existing,
+            message: 'Deduplicated: Identical White Fabric QA entry logged moments ago.'
+          });
+        }
+      } catch (findErr) {
+        console.warn('[createWhiteFabricLog] E11000 fallback lookup failed:', findErr.message);
+      }
+    }
+
+    if (lockKey && inFlightWhiteFabricQALocks.has(lockKey)) {
+      inFlightWhiteFabricQALocks.delete(lockKey);
+    }
     if (acquiredRedisLock && redisClient && redisLockKey) {
       try { await redisClient.del(redisLockKey); } catch (e) {}
     }
