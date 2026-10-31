@@ -570,7 +570,7 @@ const bulkInward = async (req, res) => {
           results.updated++;
         } else {
           // Create new record
-          // Look up in InventoryProduct if not fully populated
+          // Look up in InventoryProduct or Product master
           let resolvedItemName = itemName;
           let resolvedSize = size;
           let resolvedImageUrl = imageUrl || '';
@@ -579,6 +579,18 @@ const bulkInward = async (req, res) => {
           let resolvedParty = party || 'Bulk Inward';
 
           const catalogProduct = await db.InventoryProduct.findOne({ skuCode: skuCode.trim() });
+          const masterProduct = catalogProduct ? null : await db.Product.findOne({
+            $or: [
+              { skuCode: skuCode.trim() },
+              { 'brandCodes': skuCode.trim() },
+              { 'brandCodes.code': skuCode.trim() }
+            ]
+          });
+
+          if (!catalogProduct && !masterProduct) {
+            throw new Error(`SKU "${skuCode}" was not found in the master product catalog.`);
+          }
+
           if (catalogProduct) {
             resolvedItemName = resolvedItemName || catalogProduct.description || skuCode;
             resolvedSize = resolvedSize || (catalogProduct.size && catalogProduct.size[0]) || 'N/A';
@@ -586,9 +598,13 @@ const bulkInward = async (req, res) => {
             resolvedPurchasePrice = purchasePrice !== undefined && purchasePrice !== null ? purchasePrice : (catalogProduct.basePrice || 0);
             resolvedSalePrice = salePrice !== undefined && salePrice !== null ? salePrice : (catalogProduct.price || 0);
             resolvedParty = resolvedParty || catalogProduct.brand || 'Uniware';
-          } else {
-            resolvedItemName = resolvedItemName || skuCode;
-            resolvedSize = resolvedSize || extractSizeFromSku(skuCode) || 'N/A';
+          } else if (masterProduct) {
+            resolvedItemName = resolvedItemName || masterProduct.description || masterProduct.skuCode || skuCode;
+            resolvedSize = resolvedSize || (masterProduct.size && masterProduct.size[0]) || extractSizeFromSku(skuCode) || 'N/A';
+            resolvedImageUrl = resolvedImageUrl || masterProduct.imageUrl || '';
+            resolvedPurchasePrice = purchasePrice !== undefined && purchasePrice !== null ? purchasePrice : (masterProduct.basePrice || 0);
+            resolvedSalePrice = salePrice !== undefined && salePrice !== null ? salePrice : (masterProduct.price || 0);
+            resolvedParty = resolvedParty || masterProduct.brand || 'Uniware';
           }
 
           await db.Inventory.create({
