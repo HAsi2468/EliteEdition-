@@ -17,6 +17,21 @@ export class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary caught error]:', error, errorInfo);
+    const msg = error?.message || '';
+    const isChunkOrInitError = msg.includes('initialization') ||
+                               msg.includes('dynamically imported module') ||
+                               msg.includes('Loading chunk') ||
+                               msg.includes('Failed to fetch') ||
+                               msg.includes('Importing a module script failed');
+    if (isChunkOrInitError) {
+      const storageKey = 'last_chunk_reload_time';
+      const now = Date.now();
+      const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+      if (now - lastReload > 10000) {
+        sessionStorage.setItem(storageKey, String(now));
+        window.location.reload();
+      }
+    }
   }
 
   componentDidMount() {
