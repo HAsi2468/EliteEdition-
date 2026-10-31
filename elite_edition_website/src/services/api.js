@@ -159,10 +159,6 @@ const request = async (path, options = {}) => {
     const headers = {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      ...(uId ? { 'X-User-Id': uId } : {}),
-      ...(uName ? { 'X-User-Name': uName } : {}),
-      ...(uRole ? { 'X-User-Role': uRole } : {}),
-      ...(uRole === 'admin' || currUser?.isAdmin || currUser?.isMainAdmin ? { 'X-Operator-Override': 'true', 'X-Is-Admin': 'true' } : {}),
       ...(activeCompanyId ? { 'X-Company-Id': activeCompanyId } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),

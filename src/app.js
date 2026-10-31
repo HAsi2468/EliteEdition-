@@ -136,6 +136,8 @@ app.use((req, res, next) => {
   delete req.headers['x-user-role'];
   delete req.headers['x-is-admin'];
   delete req.headers['x-operator-override'];
+  delete req.headers['x-user-id'];
+  delete req.headers['x-user-name'];
   next();
 });
 

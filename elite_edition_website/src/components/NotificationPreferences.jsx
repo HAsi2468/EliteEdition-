@@ -110,8 +110,7 @@ export function NotificationPreferences({ onClose }) {
       const res = await fetch('/v1/notifications/test-push', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(userId ? { 'X-User-Id': userId } : {})
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId })
       });

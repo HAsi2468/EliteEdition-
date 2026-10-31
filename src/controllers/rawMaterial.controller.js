@@ -381,6 +381,21 @@ const createOutward = async (req, res) => {
   }
 };
 
+const resolveRawCompany = (req) => {
+  const raw = req.query?.companyEntity || req.headers?.['x-company-id'] || req.companyEntity || req.query?.department || '';
+  if (!raw) return 'Elite Digital Print';
+  const clean = String(raw).trim().toLowerCase();
+  if (clean === 'elite_online' || clean === 'eon' || clean === 'elite online') return 'Elite Online';
+  if (clean === 'elite_edition' || clean === 'ee' || clean === 'elite edition') return 'Elite Edition';
+  if (clean === 'elite_fabtex' || clean === 'ef' || clean === 'elite fabtex') return 'Elite Fabtex';
+  if (clean === 'sobise' || clean === 'so') return 'Sobise';
+  if (clean === 'stitching' || clean === 'elite_stitching' || clean === 'es' || clean === 'elite stitching') return 'Elite Stitching';
+  if (clean === 'ethno_wear' || clean === 'ew' || clean === 'ethno wear') return 'Ethno wear';
+  if (clean === 'yamunaji' || clean === 'yj') return 'Yamunaji';
+  if (clean === 'all') return 'All';
+  return String(raw).trim();
+};
+
 const buildRawCompFilter = (companyEntity) => {
   const norm = companyEntity ? String(companyEntity).trim() : 'Elite Digital Print';
   if (norm.toLowerCase() === 'all') {
@@ -407,8 +422,8 @@ const buildRawCompFilter = (companyEntity) => {
 // Get all transactions
 const getTransactions = async (req, res) => {
   try {
-    const { companyEntity, dateStart, dateEnd } = req.query;
-    const filter = buildRawCompFilter(companyEntity);
+    const { dateStart, dateEnd } = req.query;
+    const filter = buildRawCompFilter(resolveRawCompany(req));
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = new Date(dateStart);
@@ -435,8 +450,9 @@ const normalizePannaStr = (val) => {
 // Get current stock overview grouped by material name and panna
 const getStockOverview = async (req, res) => {
   try {
-    const { companyEntity, dateStart, dateEnd } = req.query;
-    const matchStage = buildRawCompFilter(companyEntity);
+    const { dateStart, dateEnd } = req.query;
+    const targetComp = resolveRawCompany(req);
+    const matchStage = buildRawCompFilter(targetComp);
 
     if (dateStart || dateEnd) {
       matchStage.date = {};
@@ -590,7 +606,7 @@ const getStockOverview = async (req, res) => {
     // If date filtering is active, compute actual cumulative on-hand stock up to dateEnd
     if (dateStart || dateEnd) {
       try {
-        const cumulativeStage = buildRawCompFilter(companyEntity);
+        const cumulativeStage = buildRawCompFilter(targetComp);
         cumulativeStage.$and = cumulativeStage.$and || [];
         cumulativeStage.$and.push({
           $or: [
@@ -732,9 +748,9 @@ const deleteMaterialByName = async (req, res) => {
 // Generate Raw Material Ledger PDF
 const downloadLedgerPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd, materialName, type, companyEntity, search } = req.query;
+    const { dateStart, dateEnd, materialName, type, search } = req.query;
 
-    const matchStage = buildRawCompFilter(companyEntity);
+    const matchStage = buildRawCompFilter(resolveRawCompany(req));
     if (dateStart || dateEnd) {
       matchStage.date = {};
       if (dateStart) {

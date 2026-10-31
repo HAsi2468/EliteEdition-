@@ -302,8 +302,33 @@ const requireGroupAccess = async (req, res, next) => {
   }
 };
 
+const ROLE_RANK = { viewer: 0, operator: 1, manager: 2, admin: 3, super_admin: 3 };
+
+const requireRole = (minRole) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: 'Login required.' });
+    }
+    const userRole = String(req.user.role || 'viewer').toLowerCase();
+    const minLevel = ROLE_RANK[String(minRole).toLowerCase()] ?? 1;
+    const userLevel = req.user.isAdmin || req.user.isMainAdmin ? 3 : (ROLE_RANK[userRole] ?? 0);
+
+    if (userLevel < minLevel) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Insufficient role.' });
+    }
+    next();
+  };
+};
+
+const scoped = (req, filter = {}) => {
+  const companyId = req.company_id || req.companyId || req.user?.companyId || 'digital_print';
+  return { ...filter, companyId: String(companyId) };
+};
+
 module.exports = {
   requireAuth,
   requireAdmin,
+  requireRole,
+  scoped,
   requireGroupAccess
 };

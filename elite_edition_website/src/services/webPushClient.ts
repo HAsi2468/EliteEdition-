@@ -166,7 +166,6 @@ export class WebPushClientManager {
           'Content-Type': 'application/json',
           ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
           ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-          ...(effectiveUserId ? { 'X-User-Id': effectiveUserId } : {}),
         },
         body: JSON.stringify({
           userId: effectiveUserId,
@@ -285,7 +284,6 @@ export class WebPushClientManager {
       headers: {
         'Content-Type': 'application/json',
         ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
-        'X-User-Id': uId,
       },
       body: JSON.stringify({ roomId }),
       keepalive: true, // Ensures beacon fires even during tab teardown

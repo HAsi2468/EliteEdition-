@@ -132,43 +132,45 @@ const INVOICE_FORM_SECTIONS = [
 // Helper for Indian Currency formatting
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Number to Words Converter in Indian format
+// Number to Words Converter in Indian format (BUG-017, BUG-019)
 function numToWords(amount) {
-  const words = [
-    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
-    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
-  ];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-  function convert(n) {
-    if (n <= 0) return '';
-    if (n < 20) return words[n] || '';
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
-    if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convert(n % 100) : '');
-    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convert(n % 1000) : '');
-    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + convert(n % 100000) : '');
-    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convert(n % 10000000) : '');
-  }
-
   const numVal = Number(amount);
-  if (isNaN(numVal) || Math.abs(numVal) < 0.005) return 'Rupees Zero Only';
-  const prefix = numVal < 0 ? 'Minus ' : '';
-  const absVal = Math.abs(numVal);
-  const rupees = Math.floor(absVal);
-  const paise = Math.round((absVal - rupees) * 100);
+  if (!Number.isFinite(numVal) || Math.abs(numVal) < 0.005) return 'Rupees Zero Only';
+  if (numVal < 0) return 'Rupees Zero Only';
 
-  let result = 'Rupees ' + prefix;
-  if (rupees > 0) {
-    result += convert(rupees).trim();
-  } else {
-    result += 'Zero';
+  const paiseTotal = Math.round(numVal * 100);
+  const rupees = Math.floor(paiseTotal / 100);
+  const paise = paiseTotal % 100;
+
+  const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function below100(n) {
+    return n < 20 ? (ONES[n] || '') : `${TENS[Math.floor(n / 10)] || ''}${n % 10 ? ' ' + (ONES[n % 10] || '') : ''}`;
   }
 
-  if (paise > 0) {
-    result += ' and ' + convert(paise).trim() + ' Paise';
+  function below1000(n) {
+    const h = Math.floor(n / 100);
+    const r = n % 100;
+    return [h ? `${ONES[h] || ''} Hundred` : '', r ? below100(r) : ''].filter(Boolean).join(' ');
   }
 
-  return result + ' Only';
+  function rupeesInWords(n) {
+    if (n === 0) return 'Zero';
+    const parts = [];
+    const crore = Math.floor(n / 1e7); n %= 1e7;
+    const lakh = Math.floor(n / 1e5); n %= 1e5;
+    const thousand = Math.floor(n / 1e3); n %= 1e3;
+    if (crore) parts.push(`${rupeesInWords(crore)} Crore`);
+    if (lakh) parts.push(`${below100(lakh)} Lakh`);
+    if (thousand) parts.push(`${below100(thousand)} Thousand`);
+    if (n) parts.push(below1000(n));
+    return parts.join(' ').trim();
+  }
+
+  const rupeeStr = rupeesInWords(rupees);
+  const paiseStr = paise > 0 ? ` and ${below100(paise)} Paise` : '';
+  return `Rupees ${rupeeStr}${paiseStr} Only`.replace(/\s+/g, ' ');
 }
 
 // Helper to format job card display string cleanly
@@ -229,14 +231,14 @@ export const getDefaultInvoicePrefix = (comp) => {
   return 'EDP/26-27/1001';
 };
 
-export default function EliteBillingDepartment({ 
-  initialChallanData = null, 
-  department = 'digital_print', 
-  companyEntity: propCompanyEntity, 
-  initialTab = null 
+export default function EliteBillingDepartment({
+  initialChallanData = null,
+  department = 'digital_print',
+  companyEntity: propCompanyEntity,
+  initialTab = null
 }) {
   const companyEntity = normalizeCompanyEntity(
-    propCompanyEntity || 
+    propCompanyEntity ||
     (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : department === 'ethno_wear' ? 'Ethno wear' : department === 'yamunaji' ? 'Yamunaji' : 'Elite Digital Prints')
   );
   const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear', 'Yamunaji'].includes(companyEntity);
@@ -343,7 +345,7 @@ export default function EliteBillingDepartment({
         if (isMounted && res?.data?.purchaseTypes && Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
           setDynamicPurchaseTypes(res.data.purchaseTypes);
         }
-      } catch (err) {}
+      } catch (err) { }
     };
     fetchPurchaseTypes();
     const onRefresh = () => fetchPurchaseTypes();
@@ -805,43 +807,43 @@ export default function EliteBillingDepartment({
     const pGstRate = p.gstRate != null ? p.gstRate : 5;
     const pItems = Array.isArray(p.items) && p.items.length > 0
       ? p.items.map(it => ({
-          id: it.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          itemName: it.itemName || '',
-          description: it.description || '',
-          hsnCode: it.hsnCode || '998821',
-          qty: it.qty != null ? it.qty : (it.quantity != null ? it.quantity : 1),
-          quantity: it.quantity != null ? it.quantity : (it.qty != null ? it.qty : 1),
-          unit: it.unit || 'Meters',
-          unitPrice: it.unitPrice != null ? it.unitPrice : (it.rate != null ? it.rate : 0),
-          rate: it.rate != null ? it.rate : (it.unitPrice != null ? it.unitPrice : 0),
-          discountPct: it.discountPct || 0,
-          taxRate: it.taxRate != null ? it.taxRate : (pGstRate || 5),
-          amount: it.amount || 0,
-          totalAmount: it.totalAmount || it.amount || 0,
-          jobNo: it.jobNo || '',
-          lotNo: it.lotNo || '',
-          partyChallan: it.partyChallan || '',
-          ourChallanNo: it.ourChallanNo || ''
-        }))
+        id: it.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        itemName: it.itemName || '',
+        description: it.description || '',
+        hsnCode: it.hsnCode || '998821',
+        qty: it.qty != null ? it.qty : (it.quantity != null ? it.quantity : 1),
+        quantity: it.quantity != null ? it.quantity : (it.qty != null ? it.qty : 1),
+        unit: it.unit || 'Meters',
+        unitPrice: it.unitPrice != null ? it.unitPrice : (it.rate != null ? it.rate : 0),
+        rate: it.rate != null ? it.rate : (it.unitPrice != null ? it.unitPrice : 0),
+        discountPct: it.discountPct || 0,
+        taxRate: it.taxRate != null ? it.taxRate : (pGstRate || 5),
+        amount: it.amount || 0,
+        totalAmount: it.totalAmount || it.amount || 0,
+        jobNo: it.jobNo || '',
+        lotNo: it.lotNo || '',
+        partyChallan: it.partyChallan || '',
+        ourChallanNo: it.ourChallanNo || ''
+      }))
       : [{
-          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          itemName: p.itemName || '',
-          description: p.description || '',
-          hsnCode: '998821',
-          qty: p.quantity != null ? p.quantity : 1,
-          quantity: p.quantity != null ? p.quantity : 1,
-          unit: p.unit || 'Meters',
-          unitPrice: p.rate !== '-' && p.rate != null ? p.rate : 0,
-          rate: p.rate !== '-' && p.rate != null ? p.rate : 0,
-          discountPct: 0,
-          taxRate: pGstRate || 5,
-          amount: p.totalAmount || 0,
-          totalAmount: p.totalAmount || 0,
-          jobNo: '',
-          lotNo: '',
-          partyChallan: '',
-          ourChallanNo: ''
-        }];
+        id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        itemName: p.itemName || '',
+        description: p.description || '',
+        hsnCode: '998821',
+        qty: p.quantity != null ? p.quantity : 1,
+        quantity: p.quantity != null ? p.quantity : 1,
+        unit: p.unit || 'Meters',
+        unitPrice: p.rate !== '-' && p.rate != null ? p.rate : 0,
+        rate: p.rate !== '-' && p.rate != null ? p.rate : 0,
+        discountPct: 0,
+        taxRate: pGstRate || 5,
+        amount: p.totalAmount || 0,
+        totalAmount: p.totalAmount || 0,
+        jobNo: '',
+        lotNo: '',
+        partyChallan: '',
+        ourChallanNo: ''
+      }];
 
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
@@ -887,15 +889,15 @@ export default function EliteBillingDepartment({
       const items = Array.isArray(purchase.items) && purchase.items.length > 0
         ? purchase.items
         : [{
-            itemName: purchase.itemName || 'Material Purchase',
-            description: '',
-            hsnCode: '998821',
-            qty: purchase.quantity || 1,
-            unit: purchase.unit || 'Nos',
-            unitPrice: purchase.rate !== '-' ? (purchase.rate || 0) : 0,
-            taxRate: purchase.gstRate || 0,
-            totalAmount: purchase.totalAmount || 0
-          }];
+          itemName: purchase.itemName || 'Material Purchase',
+          description: '',
+          hsnCode: '998821',
+          qty: purchase.quantity || 1,
+          unit: purchase.unit || 'Nos',
+          unitPrice: purchase.rate !== '-' ? (purchase.rate || 0) : 0,
+          taxRate: purchase.gstRate || 0,
+          totalAmount: purchase.totalAmount || 0
+        }];
 
       const subtotal = Number(purchase.subtotal || purchase.subtotalAmount || (purchase.totalAmount - (purchase.totalTax || purchase.gstAmount || 0)) || 0);
       const discount = Number(purchase.discountTotal || 0);
@@ -1117,7 +1119,7 @@ export default function EliteBillingDepartment({
             }
           }
         });
-      } catch (cleanErr) {}
+      } catch (cleanErr) { }
 
       // Authoritative fetch from MongoDB database
       const res = await api.getBillingPurchases(companyEntity);
@@ -1126,7 +1128,7 @@ export default function EliteBillingDepartment({
       setPurchases(dbPurchases);
       try {
         localStorage.setItem(`elite_purchases_${companyEntity || 'edp'}`, JSON.stringify(dbPurchases));
-      } catch (e) {}
+      } catch (e) { }
     } catch (err) {
       console.warn('Failed to load purchases from API:', err);
       try {
@@ -1135,7 +1137,7 @@ export default function EliteBillingDepartment({
           const arr = JSON.parse(cached);
           if (Array.isArray(arr)) setPurchases(arr);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 
@@ -1417,7 +1419,7 @@ export default function EliteBillingDepartment({
               localStorage.setItem(k, JSON.stringify(cleaned));
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       });
 
       triggerPushNotification('🗑️ Purchase Deleted', 'Purchase record deleted successfully.', 'success');
@@ -1690,7 +1692,7 @@ export default function EliteBillingDepartment({
   // Helper to extract taxable amount and GST tax breakup for Tally accuracy
   const extractInvoiceTaxDetails = (inv) => {
     if (!inv) return { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0, isIgst: false };
-    
+
     let taxable = 0;
     if (inv.taxableAmount !== undefined && inv.taxableAmount !== null && Number(inv.taxableAmount) > 0) {
       taxable = Number(inv.taxableAmount);
@@ -1789,7 +1791,7 @@ export default function EliteBillingDepartment({
         const cBiz = (c.businessName || '').trim().toLowerCase();
         const cName = (c.name || '').trim().toLowerCase();
         return (cBiz && (cBiz === rawName || rawName.includes(cBiz) || cBiz.includes(rawName))) ||
-               (cName && (cName === rawName || rawName.includes(cName) || cName.includes(rawName)));
+          (cName && (cName === rawName || rawName.includes(cName) || cName.includes(rawName)));
       });
     }
 
@@ -1892,7 +1894,7 @@ export default function EliteBillingDepartment({
     const sortedInvoices = [...invoices]
       .filter(isMatch)
       .sort((a, b) => parseInvDate(a.invoiceDate || a.createdAt) - parseInvDate(b.invoiceDate || b.createdAt));
-    
+
     let openingBalance = 0;
     const periodTx = [];
 
@@ -3274,7 +3276,7 @@ export default function EliteBillingDepartment({
             invoiceSeq: nextRes.nextSeq || 1001
           }));
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [companyEntity, editingInvoiceId]);
 
@@ -3541,7 +3543,7 @@ export default function EliteBillingDepartment({
       try {
         const nextRes = await api.getNextInvoiceNo(companyEntity);
         if (nextRes?.invoiceNo) nextNo = nextRes.invoiceNo;
-      } catch (err) {}
+      } catch (err) { }
 
       if (!nextNo) {
         nextNo = `DRAFT-INV-${Date.now().toString().slice(-4)}`;
@@ -3794,8 +3796,8 @@ export default function EliteBillingDepartment({
           const latestFabric = (matchChallan.fabricName || matchChallan.fabric || matchedJob?.fabric || '').trim();
           const chNoStr = matchChallan.challanNo
             ? (String(matchChallan.challanNo).startsWith('PCH') || String(matchChallan.challanNo).startsWith('EDP')
-                ? String(matchChallan.challanNo)
-                : `EDP-${matchChallan.challanNo}`)
+              ? String(matchChallan.challanNo)
+              : `EDP-${matchChallan.challanNo}`)
             : (it.ourChallanNo || '');
 
           if (latestFabric) {
@@ -4511,392 +4513,392 @@ export default function EliteBillingDepartment({
           {/* Invoices Table */}
           <div className="table-responsive-wrapper" style={{ margin: '0 0 1rem 0' }}>
             <div className="table-responsive" style={{ padding: 0 }}>
-            {(() => {
-              const displayedInvoices = periodInvoices
-                .filter(inv => matchSearchQuery(inv, search, [
-                  'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
-                  'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
-                  'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
-                ]))
-                .filter(inv => {
-                  if (!signedCopyFilter || signedCopyFilter === 'All') return true;
-                  const sc = inv.signedCopy;
-                  const st = sc?.status;
-                  if (signedCopyFilter === 'NOT_UPLOADED') {
-                    return !sc || !st || st === 'NONE' || (!sc.images?.length && !sc.pdfUrl && !sc.fileUrl && st !== 'APPROVED' && st !== 'PENDING' && st !== 'REJECTED');
-                  }
-                  if (signedCopyFilter === 'PENDING') {
-                    return st === 'PENDING' || st === 'IN_PROCESS' || st === 'UPLOADED';
-                  }
-                  if (signedCopyFilter === 'APPROVED') {
-                    return st === 'APPROVED';
-                  }
-                  if (signedCopyFilter === 'REJECTED') {
-                    return st === 'REJECTED';
-                  }
-                  return true;
-                });
-              const sortedInvoices = [...displayedInvoices];
-              if (invoiceSortState?.columnKey && invoiceSortState?.order) {
-                const { columnKey, order } = invoiceSortState;
-                sortedInvoices.sort((a, b) => {
-                  let vA = '';
-                  let vB = '';
-                  if (columnKey === 'invoiceNo') {
-                    vA = a.invoiceNo || '';
-                    vB = b.invoiceNo || '';
-                  } else if (columnKey === 'challanNo') {
-                    vA = a.ourChallanNo || (a.linkedChallanNos && a.linkedChallanNos[0]) || '';
-                    vB = b.ourChallanNo || (b.linkedChallanNos && b.linkedChallanNos[0]) || '';
-                  } else if (columnKey === 'customerName') {
-                    vA = a.customer?.businessName || a.customer?.name || '';
-                    vB = b.customer?.businessName || b.customer?.name || '';
-                  } else if (columnKey === 'date') {
-                    vA = new Date(a.invoiceDate || a.createdAt || 0).getTime();
-                    vB = new Date(b.invoiceDate || b.createdAt || 0).getTime();
-                    return order === 'asc' ? vA - vB : vB - vA;
-                  } else if (columnKey === 'grandTotal' || columnKey === 'netReceivable') {
-                    vA = getInvoiceNetReceivable(a);
-                    vB = getInvoiceNetReceivable(b);
-                    return order === 'asc' ? vA - vB : vB - vA;
-                  } else if (columnKey === 'paidAmount') {
-                    vA = Number(a.paidAmount || 0);
-                    vB = Number(b.paidAmount || 0);
-                    return order === 'asc' ? vA - vB : vB - vA;
-                  } else if (columnKey === 'balanceDue') {
-                    const getBal = (inv) => {
-                      const net = getInvoiceNetReceivable(inv);
-                      return Number(inv.balanceDue != null ? inv.balanceDue : Math.max(0, net - (inv.paidAmount || 0)));
-                    };
-                    vA = getBal(a);
-                    vB = getBal(b);
-                    return order === 'asc' ? vA - vB : vB - vA;
-                  } else if (columnKey === 'status') {
-                    vA = a.status || '';
-                    vB = b.status || '';
-                  } else if (columnKey === 'createdBy') {
-                    vA = a.createdBy?.name || a.createdBy || '';
-                    vB = b.createdBy?.name || b.createdBy || '';
-                  }
-                  const cmp = String(vA).localeCompare(String(vB), undefined, { numeric: true, sensitivity: 'base' });
-                  return order === 'asc' ? cmp : -cmp;
-                });
-              }
-              const paginatedInvoices = sortedInvoices;
-              return (
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
-                  <thead>
-                    <tr>
-                      <MasterCheckboxTh
-                        style={{ position: 'sticky', left: 0, zIndex: 22, background: '#f8fafc' }}
-                        allSelected={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
-                        someSelected={displayedInvoices.some(i => selectedInvoiceIds.includes(i._id))}
-                        onToggleAll={() => handleToggleSelectAllInvoices(displayedInvoices)}
-                        totalCount={displayedInvoices.length}
-                        title="Select All Invoices"
-                      />
-                      <ErpTh columnKey="invoiceNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState} style={{ position: 'sticky', left: 42, zIndex: 22, background: '#f8fafc', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>Invoice No</ErpTh>
-                      <ErpTh columnKey="challanNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Challan No</ErpTh>
-                      <ErpTh columnKey="customerName" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Customer Name</ErpTh>
-                      <ErpTh columnKey="date" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Date</ErpTh>
-                      <ErpTh columnKey="netReceivable" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Net Receivable</ErpTh>
-                      <ErpTh columnKey="paidAmount" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Paid Amount</ErpTh>
-                      <ErpTh columnKey="balanceDue" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Balance Due</ErpTh>
-                      <ErpTh columnKey="status" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="center">Status</ErpTh>
-                      <ErpTh columnKey="createdBy" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Created By</ErpTh>
-                      <ErpTh hideSort align="center" style={{ position: 'sticky', right: 0, zIndex: 22, background: '#f8fafc', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>Actions</ErpTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading && invoices.length === 0 ? (
-                      [...Array(5)].map((_, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', animation: 'pulse 1.5s infinite' }}>
-                          <td style={{ padding: '1rem', textAlign: 'center' }}><div style={{ width: '16px', height: '16px', background: '#e2e8f0', borderRadius: '4px', margin: 'auto' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '80px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '140px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '20px', background: '#e2e8f0', borderRadius: '12px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '80px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
-                          <td style={{ padding: '1rem' }}><div style={{ width: '90px', height: '24px', background: '#e2e8f0', borderRadius: '6px', margin: 'auto' }} /></td>
-                        </tr>
-                      ))
-                    ) : displayedInvoices.length === 0 ? (
+              {(() => {
+                const displayedInvoices = periodInvoices
+                  .filter(inv => matchSearchQuery(inv, search, [
+                    'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
+                    'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
+                    'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
+                  ]))
+                  .filter(inv => {
+                    if (!signedCopyFilter || signedCopyFilter === 'All') return true;
+                    const sc = inv.signedCopy;
+                    const st = sc?.status;
+                    if (signedCopyFilter === 'NOT_UPLOADED') {
+                      return !sc || !st || st === 'NONE' || (!sc.images?.length && !sc.pdfUrl && !sc.fileUrl && st !== 'APPROVED' && st !== 'PENDING' && st !== 'REJECTED');
+                    }
+                    if (signedCopyFilter === 'PENDING') {
+                      return st === 'PENDING' || st === 'IN_PROCESS' || st === 'UPLOADED';
+                    }
+                    if (signedCopyFilter === 'APPROVED') {
+                      return st === 'APPROVED';
+                    }
+                    if (signedCopyFilter === 'REJECTED') {
+                      return st === 'REJECTED';
+                    }
+                    return true;
+                  });
+                const sortedInvoices = [...displayedInvoices];
+                if (invoiceSortState?.columnKey && invoiceSortState?.order) {
+                  const { columnKey, order } = invoiceSortState;
+                  sortedInvoices.sort((a, b) => {
+                    let vA = '';
+                    let vB = '';
+                    if (columnKey === 'invoiceNo') {
+                      vA = a.invoiceNo || '';
+                      vB = b.invoiceNo || '';
+                    } else if (columnKey === 'challanNo') {
+                      vA = a.ourChallanNo || (a.linkedChallanNos && a.linkedChallanNos[0]) || '';
+                      vB = b.ourChallanNo || (b.linkedChallanNos && b.linkedChallanNos[0]) || '';
+                    } else if (columnKey === 'customerName') {
+                      vA = a.customer?.businessName || a.customer?.name || '';
+                      vB = b.customer?.businessName || b.customer?.name || '';
+                    } else if (columnKey === 'date') {
+                      vA = new Date(a.invoiceDate || a.createdAt || 0).getTime();
+                      vB = new Date(b.invoiceDate || b.createdAt || 0).getTime();
+                      return order === 'asc' ? vA - vB : vB - vA;
+                    } else if (columnKey === 'grandTotal' || columnKey === 'netReceivable') {
+                      vA = getInvoiceNetReceivable(a);
+                      vB = getInvoiceNetReceivable(b);
+                      return order === 'asc' ? vA - vB : vB - vA;
+                    } else if (columnKey === 'paidAmount') {
+                      vA = Number(a.paidAmount || 0);
+                      vB = Number(b.paidAmount || 0);
+                      return order === 'asc' ? vA - vB : vB - vA;
+                    } else if (columnKey === 'balanceDue') {
+                      const getBal = (inv) => {
+                        const net = getInvoiceNetReceivable(inv);
+                        return Number(inv.balanceDue != null ? inv.balanceDue : Math.max(0, net - (inv.paidAmount || 0)));
+                      };
+                      vA = getBal(a);
+                      vB = getBal(b);
+                      return order === 'asc' ? vA - vB : vB - vA;
+                    } else if (columnKey === 'status') {
+                      vA = a.status || '';
+                      vB = b.status || '';
+                    } else if (columnKey === 'createdBy') {
+                      vA = a.createdBy?.name || a.createdBy || '';
+                      vB = b.createdBy?.name || b.createdBy || '';
+                    }
+                    const cmp = String(vA).localeCompare(String(vB), undefined, { numeric: true, sensitivity: 'base' });
+                    return order === 'asc' ? cmp : -cmp;
+                  });
+                }
+                const paginatedInvoices = sortedInvoices;
+                return (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
+                    <thead>
                       <tr>
-                        <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                          No invoices found for the selected date range ({activeRange.labelText}).
-                        </td>
+                        <MasterCheckboxTh
+                          style={{ position: 'sticky', left: 0, zIndex: 22, background: '#f8fafc' }}
+                          allSelected={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
+                          someSelected={displayedInvoices.some(i => selectedInvoiceIds.includes(i._id))}
+                          onToggleAll={() => handleToggleSelectAllInvoices(displayedInvoices)}
+                          totalCount={displayedInvoices.length}
+                          title="Select All Invoices"
+                        />
+                        <ErpTh columnKey="invoiceNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState} style={{ position: 'sticky', left: 42, zIndex: 22, background: '#f8fafc', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>Invoice No</ErpTh>
+                        <ErpTh columnKey="challanNo" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Challan No</ErpTh>
+                        <ErpTh columnKey="customerName" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Customer Name</ErpTh>
+                        <ErpTh columnKey="date" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Date</ErpTh>
+                        <ErpTh columnKey="netReceivable" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Net Receivable</ErpTh>
+                        <ErpTh columnKey="paidAmount" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Paid Amount</ErpTh>
+                        <ErpTh columnKey="balanceDue" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="right">Balance Due</ErpTh>
+                        <ErpTh columnKey="status" sortState={invoiceSortState} onSortChange={setInvoiceSortState} align="center">Status</ErpTh>
+                        <ErpTh columnKey="createdBy" sortState={invoiceSortState} onSortChange={setInvoiceSortState}>Created By</ErpTh>
+                        <ErpTh hideSort align="center" style={{ position: 'sticky', right: 0, zIndex: 22, background: '#f8fafc', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>Actions</ErpTh>
                       </tr>
-                    ) : (
-                      paginatedInvoices.map(inv => {
-                        const rawChallanStr = inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '';
-                        const challanList = rawChallanStr ? rawChallanStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+                    </thead>
+                    <tbody>
+                      {loading && invoices.length === 0 ? (
+                        [...Array(5)].map((_, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', animation: 'pulse 1.5s infinite' }}>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}><div style={{ width: '16px', height: '16px', background: '#e2e8f0', borderRadius: '4px', margin: 'auto' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '80px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '140px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '20px', background: '#e2e8f0', borderRadius: '12px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '80px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                            <td style={{ padding: '1rem' }}><div style={{ width: '90px', height: '24px', background: '#e2e8f0', borderRadius: '6px', margin: 'auto' }} /></td>
+                          </tr>
+                        ))
+                      ) : displayedInvoices.length === 0 ? (
+                        <tr>
+                          <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No invoices found for the selected date range ({activeRange.labelText}).
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedInvoices.map(inv => {
+                          const rawChallanStr = inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '';
+                          const challanList = rawChallanStr ? rawChallanStr.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-                        return (
-                          <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(selectedInvoiceIds.includes(inv._id)) }}>
-                            <RowCheckboxTd
-                              style={{ position: 'sticky', left: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)' }}
-                              checked={selectedInvoiceIds.includes(inv._id)}
-                              onChange={() => handleToggleSelectInvoice(inv._id)}
-                            />
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle', position: 'sticky', left: 42, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>
-                              <button
-                                onClick={() => setViewInvoiceModal(inv)}
-                                style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none', whiteSpace: 'nowrap' }}
-                              >
-                                {inv.invoiceNo}
-                              </button>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle', maxWidth: '220px' }}>
-                              {challanList.length === 0 ? (
-                                <span style={{ color: 'var(--text-muted)' }}>—</span>
-                              ) : challanList.length <= 2 ? (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {challanList.map((ch, idx) => (
-                                    <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                      {ch}
+                          return (
+                            <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(selectedInvoiceIds.includes(inv._id)) }}>
+                              <RowCheckboxTd
+                                style={{ position: 'sticky', left: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)' }}
+                                checked={selectedInvoiceIds.includes(inv._id)}
+                                onChange={() => handleToggleSelectInvoice(inv._id)}
+                              />
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle', position: 'sticky', left: 42, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '2px 0 6px rgba(0,0,0,0.05)' }}>
+                                <button
+                                  onClick={() => setViewInvoiceModal(inv)}
+                                  style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none', whiteSpace: 'nowrap' }}
+                                >
+                                  {inv.invoiceNo}
+                                </button>
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle', maxWidth: '220px' }}>
+                                {challanList.length === 0 ? (
+                                  <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                ) : challanList.length <= 2 ? (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {challanList.map((ch, idx) => (
+                                      <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                        {ch}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                                    {challanList.slice(0, 2).map((ch, idx) => (
+                                      <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                        {ch}
+                                      </span>
+                                    ))}
+                                    <span
+                                      title={challanList.join(', ')}
+                                      style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(124, 58, 237, 0.15)', color: '#c084fc', border: '1px solid rgba(124, 58, 237, 0.35)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    >
+                                      +{challanList.length - 2} more
                                     </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                                  {challanList.slice(0, 2).map((ch, idx) => (
-                                    <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                      {ch}
-                                    </span>
-                                  ))}
-                                  <span
-                                    title={challanList.join(', ')}
-                                    style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(124, 58, 237, 0.15)', color: '#c084fc', border: '1px solid rgba(124, 58, 237, 0.35)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                  >
-                                    +{challanList.length - 2} more
-                                  </span>
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle' }}>
-                              <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
-                              {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {formatDateDDMMYYYY(inv.invoiceDate)}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {(() => {
-                                const gross = inv.grandTotal != null ? Number(inv.grandTotal) : (inv.totalAmount != null ? Number(inv.totalAmount) : (getAmountWithoutGst ? getAmountWithoutGst(inv) : 0));
-                                const tds = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : 0;
-                                const netRec = Math.max(0, gross - tds);
-                                return (
-                                  <>
-                                    <div style={{ fontWeight: 800 }}>{fmtINR(netRec)}</div>
-                                    {tds > 0 && (
-                                      <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
-                                        Gross: ₹{Math.round(gross).toLocaleString('en-IN')} (TDS -₹{Math.round(tds).toLocaleString('en-IN')})
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.paidAmount)}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, getInvoiceNetReceivable(inv) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, getInvoiceNetReceivable(inv) - (inv.paidAmount || 0)))}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
-                              <span style={{
-                                padding: '0.28rem 0.65rem',
-                                borderRadius: 20,
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.12)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
-                                color: inv.paymentStatus === 'PAID' ? '#10b981' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#f59e0b' : '#ef4444',
-                                border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.25)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)'}`,
-                                whiteSpace: 'nowrap'
-                              }}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-                                {inv.paymentStatus === 'PARTIALLY_PAID' ? 'PARTIAL' : inv.paymentStatus}
-                              </span>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle' }}>
-                              <span style={{ padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)', whiteSpace: 'nowrap', display: 'inline-block' }}>
-                                {inv.createdByName || inv.createdBy || 'HASI'}
-                              </span>
-                            </td>
-                            <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', position: 'sticky', right: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
-                              {(() => {
-                                const sc = inv.signedCopy;
-                                const status = sc?.status;
-                                const isApproved = status === 'APPROVED';
-                                const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
-                                const isRejected = status === 'REJECTED';
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle' }}>
+                                <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
+                                {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                {formatDateDDMMYYYY(inv.invoiceDate)}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                {(() => {
+                                  const gross = inv.grandTotal != null ? Number(inv.grandTotal) : (inv.totalAmount != null ? Number(inv.totalAmount) : (getAmountWithoutGst ? getAmountWithoutGst(inv) : 0));
+                                  const tds = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : 0;
+                                  const netRec = Math.max(0, gross - tds);
+                                  return (
+                                    <>
+                                      <div style={{ fontWeight: 800 }}>{fmtINR(netRec)}</div>
+                                      {tds > 0 && (
+                                        <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
+                                          Gross: ₹{Math.round(gross).toLocaleString('en-IN')} (TDS -₹{Math.round(tds).toLocaleString('en-IN')})
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                {fmtINR(inv.paidAmount)}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, getInvoiceNetReceivable(inv) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, getInvoiceNetReceivable(inv) - (inv.paidAmount || 0)))}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
+                                <span style={{
+                                  padding: '0.28rem 0.65rem',
+                                  borderRadius: 20,
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.12)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
+                                  color: inv.paymentStatus === 'PAID' ? '#10b981' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#f59e0b' : '#ef4444',
+                                  border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.25)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                                  {inv.paymentStatus === 'PARTIALLY_PAID' ? 'PARTIAL' : inv.paymentStatus}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle' }}>
+                                <span style={{ padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                                  {inv.createdByName || inv.createdBy || 'HASI'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', position: 'sticky', right: 0, zIndex: 11, background: 'var(--bg-card, #ffffff)', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
+                                {(() => {
+                                  const sc = inv.signedCopy;
+                                  const status = sc?.status;
+                                  const isApproved = status === 'APPROVED';
+                                  const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
+                                  const isRejected = status === 'REJECTED';
 
-                                let signedIconColor = '#94a3b8';
-                                let signedBgColor = 'rgba(148, 163, 184, 0.12)';
-                                let signedBorderColor = 'rgba(148, 163, 184, 0.3)';
-                                let signedTitle = 'Signed Copy: Not Uploaded (Click to upload)';
-                                let SignedIcon = FileText;
+                                  let signedIconColor = '#94a3b8';
+                                  let signedBgColor = 'rgba(148, 163, 184, 0.12)';
+                                  let signedBorderColor = 'rgba(148, 163, 184, 0.3)';
+                                  let signedTitle = 'Signed Copy: Not Uploaded (Click to upload)';
+                                  let SignedIcon = FileText;
 
-                                if (isApproved) {
-                                  signedIconColor = '#10b981';
-                                  signedBgColor = 'rgba(16, 185, 129, 0.14)';
-                                  signedBorderColor = 'rgba(16, 185, 129, 0.35)';
-                                  signedTitle = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
-                                  SignedIcon = CheckCircle;
-                                } else if (isRejected) {
-                                  signedIconColor = '#ef4444';
-                                  signedBgColor = 'rgba(239, 68, 68, 0.14)';
-                                  signedBorderColor = 'rgba(239, 68, 68, 0.35)';
-                                  signedTitle = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
-                                  SignedIcon = AlertCircle;
-                                } else if (isPending) {
-                                  signedIconColor = '#f59e0b';
-                                  signedBgColor = 'rgba(245, 158, 11, 0.14)';
-                                  signedBorderColor = 'rgba(245, 158, 11, 0.35)';
-                                  signedTitle = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
-                                  SignedIcon = Clock;
-                                }
+                                  if (isApproved) {
+                                    signedIconColor = '#10b981';
+                                    signedBgColor = 'rgba(16, 185, 129, 0.14)';
+                                    signedBorderColor = 'rgba(16, 185, 129, 0.35)';
+                                    signedTitle = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
+                                    SignedIcon = CheckCircle;
+                                  } else if (isRejected) {
+                                    signedIconColor = '#ef4444';
+                                    signedBgColor = 'rgba(239, 68, 68, 0.14)';
+                                    signedBorderColor = 'rgba(239, 68, 68, 0.35)';
+                                    signedTitle = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
+                                    SignedIcon = AlertCircle;
+                                  } else if (isPending) {
+                                    signedIconColor = '#f59e0b';
+                                    signedBgColor = 'rgba(245, 158, 11, 0.14)';
+                                    signedBorderColor = 'rgba(245, 158, 11, 0.35)';
+                                    signedTitle = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
+                                    SignedIcon = Clock;
+                                  }
 
-                                const invoiceActions = [
-                                  {
-                                    id: 'signed_copy',
-                                    icon: SignedIcon,
-                                    label: 'Signed Copy',
-                                    tooltip: signedTitle,
-                                    color: signedIconColor,
-                                    bgColor: signedBgColor,
-                                    borderColor: signedBorderColor,
-                                    onClick: () => {
-                                      if (isApproved || isPending) {
-                                        setSignedPreviewTarget({
-                                          _id: inv._id,
-                                          docType: 'invoice',
-                                          docNumber: inv.invoiceNo,
-                                          partyName: inv.customer?.businessName || inv.customer?.name,
-                                          signedCopy: inv.signedCopy
-                                        });
-                                      } else {
-                                        setSignedUploadTarget({
-                                          id: inv._id,
-                                          docType: 'invoice',
-                                          docNumber: inv.invoiceNo,
-                                          partyName: inv.customer?.businessName || inv.customer?.name,
-                                          existingSignedCopy: isRejected ? inv.signedCopy : null
-                                        });
-                                      }
-                                    },
-                                    isPrimary: true
-                                  },
-                                  {
-                                    id: 'pdf',
-                                    icon: Download,
-                                    label: 'Download PDF',
-                                    tooltip: 'Download Tax Invoice PDF',
-                                    variant: 'purple',
-                                    color: '#a78bfa',
-                                    onClick: () => openPdfDialog(inv),
-                                    isPrimary: true
-                                  },
-                                  {
-                                    id: 'print-invoice',
-                                    icon: Printer,
-                                    label: 'Print Invoice',
-                                    tooltip: 'Print Tax Invoice (Auto-loads images)',
-                                    variant: 'blue',
-                                    color: '#38bdf8',
-                                    onClick: async () => {
-                                      try {
-                                        triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${inv.invoiceNo}...`, 'info');
-                                        await api.downloadInvoicePdf(inv._id, inv.invoiceNo, false);
-                                      } catch (err) {
-                                        alert('Failed to prepare invoice for printing: ' + err.message);
-                                      }
-                                    },
-                                    isPrimary: true
-                                  },
-                                  {
-                                    id: 'view',
-                                    icon: Eye,
-                                    label: 'View Details',
-                                    tooltip: 'View Invoice Details',
-                                    variant: 'default',
-                                    color: '#38bdf8',
-                                    onClick: () => setViewInvoiceModal(inv),
-                                    isPrimary: false
-                                  },
-                                  ...(inv.balanceDue > 0 ? [
+                                  const invoiceActions = [
                                     {
-                                      id: 'payment',
-                                      icon: CreditCard,
-                                      label: 'Record Payment',
-                                      tooltip: `Record Payment (Due: ₹${inv.balanceDue})`,
-                                      variant: 'success',
-                                      color: '#34d399',
-                                      onClick: () => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); },
+                                      id: 'signed_copy',
+                                      icon: SignedIcon,
+                                      label: 'Signed Copy',
+                                      tooltip: signedTitle,
+                                      color: signedIconColor,
+                                      bgColor: signedBgColor,
+                                      borderColor: signedBorderColor,
+                                      onClick: () => {
+                                        if (isApproved || isPending) {
+                                          setSignedPreviewTarget({
+                                            _id: inv._id,
+                                            docType: 'invoice',
+                                            docNumber: inv.invoiceNo,
+                                            partyName: inv.customer?.businessName || inv.customer?.name,
+                                            signedCopy: inv.signedCopy
+                                          });
+                                        } else {
+                                          setSignedUploadTarget({
+                                            id: inv._id,
+                                            docType: 'invoice',
+                                            docNumber: inv.invoiceNo,
+                                            partyName: inv.customer?.businessName || inv.customer?.name,
+                                            existingSignedCopy: isRejected ? inv.signedCopy : null
+                                          });
+                                        }
+                                      },
+                                      isPrimary: true
+                                    },
+                                    {
+                                      id: 'pdf',
+                                      icon: Download,
+                                      label: 'Download PDF',
+                                      tooltip: 'Download Tax Invoice PDF',
+                                      variant: 'purple',
+                                      color: '#a78bfa',
+                                      onClick: () => openPdfDialog(inv),
+                                      isPrimary: true
+                                    },
+                                    {
+                                      id: 'print-invoice',
+                                      icon: Printer,
+                                      label: 'Print Invoice',
+                                      tooltip: 'Print Tax Invoice (Auto-loads images)',
+                                      variant: 'blue',
+                                      color: '#38bdf8',
+                                      onClick: async () => {
+                                        try {
+                                          triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${inv.invoiceNo}...`, 'info');
+                                          await api.downloadInvoicePdf(inv._id, inv.invoiceNo, false);
+                                        } catch (err) {
+                                          alert('Failed to prepare invoice for printing: ' + err.message);
+                                        }
+                                      },
+                                      isPrimary: true
+                                    },
+                                    {
+                                      id: 'view',
+                                      icon: Eye,
+                                      label: 'View Details',
+                                      tooltip: 'View Invoice Details',
+                                      variant: 'default',
+                                      color: '#38bdf8',
+                                      onClick: () => setViewInvoiceModal(inv),
+                                      isPrimary: false
+                                    },
+                                    ...(inv.balanceDue > 0 ? [
+                                      {
+                                        id: 'payment',
+                                        icon: CreditCard,
+                                        label: 'Record Payment',
+                                        tooltip: `Record Payment (Due: ₹${inv.balanceDue})`,
+                                        variant: 'success',
+                                        color: '#34d399',
+                                        onClick: () => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); },
+                                        isPrimary: false
+                                      }
+                                    ] : []),
+                                    {
+                                      id: 'history',
+                                      icon: Clock,
+                                      label: 'Audit History',
+                                      tooltip: 'View Audit History & Staff Log',
+                                      variant: 'warning',
+                                      color: '#fbbf24',
+                                      onClick: () => setSelectedInvoiceHistory(inv),
+                                      isPrimary: false
+                                    },
+                                    {
+                                      id: 'edit',
+                                      icon: Edit2,
+                                      label: 'Edit',
+                                      tooltip: 'Edit Invoice',
+                                      variant: 'primary',
+                                      onClick: () => handleOpenCreateTab(inv),
+                                      isPrimary: false
+                                    },
+                                    {
+                                      id: 'clone',
+                                      icon: Copy,
+                                      label: 'Clone',
+                                      tooltip: 'Clone / Duplicate Invoice (Reset Dates/Status)',
+                                      variant: 'secondary',
+                                      color: '#8b5cf6',
+                                      onClick: () => handleCloneInvoice(inv),
+                                      isPrimary: false
+                                    },
+                                    {
+                                      id: 'delete',
+                                      icon: Trash2,
+                                      label: 'Delete',
+                                      tooltip: 'Delete Invoice',
+                                      variant: 'danger',
+                                      color: '#f87171',
+                                      onClick: () => handleDeleteInvoice(inv._id, inv.invoiceNo),
                                       isPrimary: false
                                     }
-                                  ] : []),
-                                  {
-                                    id: 'history',
-                                    icon: Clock,
-                                    label: 'Audit History',
-                                    tooltip: 'View Audit History & Staff Log',
-                                    variant: 'warning',
-                                    color: '#fbbf24',
-                                    onClick: () => setSelectedInvoiceHistory(inv),
-                                    isPrimary: false
-                                  },
-                                  {
-                                    id: 'edit',
-                                    icon: Edit2,
-                                    label: 'Edit',
-                                    tooltip: 'Edit Invoice',
-                                    variant: 'primary',
-                                    onClick: () => handleOpenCreateTab(inv),
-                                    isPrimary: false
-                                  },
-                                  {
-                                    id: 'clone',
-                                    icon: Copy,
-                                    label: 'Clone',
-                                    tooltip: 'Clone / Duplicate Invoice (Reset Dates/Status)',
-                                    variant: 'secondary',
-                                    color: '#8b5cf6',
-                                    onClick: () => handleCloneInvoice(inv),
-                                    isPrimary: false
-                                  },
-                                  {
-                                    id: 'delete',
-                                    icon: Trash2,
-                                    label: 'Delete',
-                                    tooltip: 'Delete Invoice',
-                                    variant: 'danger',
-                                    color: '#f87171',
-                                    onClick: () => handleDeleteInvoice(inv._id, inv.invoiceNo),
-                                    isPrimary: false
-                                  }
-                                ];
+                                  ];
 
-                                return <SmartActionGroup actions={invoiceActions} maxInlineMobile={2} align="center" />;
-                              })()}
-                            </td>
-                          </tr>
-                        );
-                      })
-                )}
-              </tbody>
-            </table>
-          );
-        })()}
-      </div>
-    </div>
+                                  return <SmartActionGroup actions={invoiceActions} maxInlineMobile={2} align="center" />;
+                                })()}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
@@ -4999,7 +5001,7 @@ export default function EliteBillingDepartment({
                     if (nextRes?.invoiceNo) {
                       setInvoiceForm(f => ({ ...f, invoiceNo: nextRes.invoiceNo, invoiceSeq: nextRes.nextSeq }));
                     }
-                  }).catch(() => {});
+                  }).catch(() => { });
                 }}
                 style={{
                   ...inputStyle,
@@ -5597,7 +5599,7 @@ export default function EliteBillingDepartment({
               boxShadow: '0 2px 10px -2px rgba(15, 23, 42, 0.05)',
               fontFamily: "var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)"
             }}>
-              
+
               {/* Financial Dock Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.45rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -6109,29 +6111,29 @@ export default function EliteBillingDepartment({
                             });
                           }}
                         />
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{c.businessName || '—'}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
-                        <div>{c.phone || '—'}</div>
-                        {c.email && <div style={{ fontSize: '0.7rem' }}>{c.email}</div>}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{c.gstin || 'Unregistered'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {c.billingAddress || '—'} ({c.state || 'Gujarat'})
-                      </td>
-                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                          <button onClick={() => handleEditCustomer(c)} className="btn-icon" title="Edit Customer">
-                            <Edit2 size={14} color="var(--primary)" />
-                          </button>
-                          <button onClick={() => handleDeleteCustomer(c._id, c.name)} className="btn-icon" title="Delete Customer">
-                            <Trash2 size={14} color="#f87171" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{c.businessName || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                          <div>{c.phone || '—'}</div>
+                          {c.email && <div style={{ fontSize: '0.7rem' }}>{c.email}</div>}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{c.gstin || 'Unregistered'}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {c.billingAddress || '—'} ({c.state || 'Gujarat'})
+                        </td>
+                        <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditCustomer(c)} className="btn-icon" title="Edit Customer">
+                              <Edit2 size={14} color="var(--primary)" />
+                            </button>
+                            <button onClick={() => handleDeleteCustomer(c._id, c.name)} className="btn-icon" title="Delete Customer">
+                              <Trash2 size={14} color="#f87171" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -6154,9 +6156,9 @@ export default function EliteBillingDepartment({
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <button 
+              <button
                 type="button"
-                className="btn-secondary" 
+                className="btn-secondary"
                 onClick={() => setActiveTab('purchases')}
                 style={{ fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
                 title="Return to Purchase Inward"
@@ -6166,9 +6168,9 @@ export default function EliteBillingDepartment({
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', padding: '5px 10px', background: 'var(--bg-input, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '6px' }}>
                 Vendors ({vendorsList.length})
               </div>
-              <button 
+              <button
                 type="button"
-                className="btn-primary" 
+                className="btn-primary"
                 onClick={() => {
                   setEditingVendorId(null);
                   setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier' });
@@ -6232,38 +6234,38 @@ export default function EliteBillingDepartment({
                             });
                           }}
                         />
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span>{v.name}</span>
-                          {v.vendorType && (
-                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', fontWeight: 700 }}>
-                              {v.vendorType}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{v.businessName || '—'}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
-                        <div>{v.phone || '—'}</div>
-                        {v.email && <div style={{ fontSize: '0.7rem' }}>{v.email}</div>}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0284c7' }}>{v.gstin || 'Unregistered'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {v.billingAddress || v.address || '—'} ({v.state || 'Gujarat'})
-                      </td>
-                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                          <button onClick={() => handleEditVendor(v)} className="btn-icon" title="Edit Vendor">
-                            <Edit2 size={14} color="var(--primary)" />
-                          </button>
-                          <button onClick={() => handleDeleteVendor(v._id || v.id, v.name)} className="btn-icon" title="Delete Vendor">
-                            <Trash2 size={14} color="#f87171" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span>{v.name}</span>
+                            {v.vendorType && (
+                              <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', fontWeight: 700 }}>
+                                {v.vendorType}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{v.businessName || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                          <div>{v.phone || '—'}</div>
+                          {v.email && <div style={{ fontSize: '0.7rem' }}>{v.email}</div>}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0284c7' }}>{v.gstin || 'Unregistered'}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {v.billingAddress || v.address || '—'} ({v.state || 'Gujarat'})
+                        </td>
+                        <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditVendor(v)} className="btn-icon" title="Edit Vendor">
+                              <Edit2 size={14} color="var(--primary)" />
+                            </button>
+                            <button onClick={() => handleDeleteVendor(v._id || v.id, v.name)} className="btn-icon" title="Delete Vendor">
+                              <Trash2 size={14} color="#f87171" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -6337,24 +6339,24 @@ export default function EliteBillingDepartment({
                             });
                           }}
                         />
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.hsnCode || '—'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>₹{item.unitPrice} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {item.unit || 'Meters'}</span></td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
-                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                          <button onClick={() => handleEditItem(item)} className="btn-icon" title="Edit Product">
-                            <Edit2 size={14} color="var(--primary)" />
-                          </button>
-                          <button onClick={() => handleDeleteItem(item._id, item.itemName)} className="btn-icon" title="Delete Product">
-                            <Trash2 size={14} color="#f87171" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.hsnCode || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>₹{item.unitPrice} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {item.unit || 'Meters'}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
+                        <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditItem(item)} className="btn-icon" title="Edit Product">
+                              <Edit2 size={14} color="var(--primary)" />
+                            </button>
+                            <button onClick={() => handleDeleteItem(item._id, item.itemName)} className="btn-icon" title="Delete Product">
+                              <Trash2 size={14} color="#f87171" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -6804,7 +6806,7 @@ export default function EliteBillingDepartment({
       {showPurchaseModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
           <div style={{ width: '100%', maxWidth: '1080px', maxHeight: '92vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-light, #cbd5e1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', color: 'var(--text-primary, #1e293b)' }}>
-            
+
             {/* Header */}
             <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--border-light, #e2e8f0)', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -6825,7 +6827,7 @@ export default function EliteBillingDepartment({
             </div>
 
             <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
+
               {/* Top Metadata Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', background: 'rgba(79, 70, 229, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(79, 70, 229, 0.15)' }}>
                 <div>
@@ -8298,45 +8300,45 @@ export default function EliteBillingDepartment({
 
             <div>
               <label style={labelStyle}>Contact Person / Representative Name *</label>
-              <input 
-                type="text" 
-                value={vendorForm.name} 
-                onChange={e => setVendorForm(f => ({ ...f, name: e.target.value }))} 
-                style={inputStyle} 
-                placeholder="e.g. Ramesh Patel" 
+              <input
+                type="text"
+                value={vendorForm.name}
+                onChange={e => setVendorForm(f => ({ ...f, name: e.target.value }))}
+                style={inputStyle}
+                placeholder="e.g. Ramesh Patel"
               />
             </div>
 
             <div>
               <label style={labelStyle}>Business / Supplier Firm Name</label>
-              <input 
-                type="text" 
-                value={vendorForm.businessName} 
-                onChange={e => setVendorForm(f => ({ ...f, businessName: e.target.value }))} 
-                style={inputStyle} 
-                placeholder="e.g. Surat Textile Mills Pvt Ltd" 
+              <input
+                type="text"
+                value={vendorForm.businessName}
+                onChange={e => setVendorForm(f => ({ ...f, businessName: e.target.value }))}
+                style={inputStyle}
+                placeholder="e.g. Surat Textile Mills Pvt Ltd"
               />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
               <div>
                 <label style={labelStyle}>Phone Number</label>
-                <input 
-                  type="text" 
-                  value={vendorForm.phone} 
-                  onChange={e => setVendorForm(f => ({ ...f, phone: e.target.value }))} 
-                  style={inputStyle} 
-                  placeholder="e.g. 9876543210" 
+                <input
+                  type="text"
+                  value={vendorForm.phone}
+                  onChange={e => setVendorForm(f => ({ ...f, phone: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="e.g. 9876543210"
                 />
               </div>
               <div>
                 <label style={labelStyle}>GSTIN Number</label>
-                <input 
-                  type="text" 
-                  value={vendorForm.gstin} 
-                  onChange={e => setVendorForm(f => ({ ...f, gstin: e.target.value }))} 
-                  style={inputStyle} 
-                  placeholder="e.g. 24AAAAA0000A1Z5" 
+                <input
+                  type="text"
+                  value={vendorForm.gstin}
+                  onChange={e => setVendorForm(f => ({ ...f, gstin: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="e.g. 24AAAAA0000A1Z5"
                 />
               </div>
             </div>
@@ -8344,19 +8346,19 @@ export default function EliteBillingDepartment({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
               <div>
                 <label style={labelStyle}>Email Address</label>
-                <input 
-                  type="email" 
-                  value={vendorForm.email} 
-                  onChange={e => setVendorForm(f => ({ ...f, email: e.target.value }))} 
-                  style={inputStyle} 
-                  placeholder="vendor@company.com" 
+                <input
+                  type="email"
+                  value={vendorForm.email}
+                  onChange={e => setVendorForm(f => ({ ...f, email: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="vendor@company.com"
                 />
               </div>
               <div>
                 <label style={labelStyle}>Vendor Category</label>
-                <select 
-                  value={vendorForm.vendorType} 
-                  onChange={e => setVendorForm(f => ({ ...f, vendorType: e.target.value }))} 
+                <select
+                  value={vendorForm.vendorType}
+                  onChange={e => setVendorForm(f => ({ ...f, vendorType: e.target.value }))}
                   style={inputStyle}
                 >
                   <option value="Fabric">Fabric Supplier</option>
@@ -8370,32 +8372,32 @@ export default function EliteBillingDepartment({
 
             <div>
               <label style={labelStyle}>Billing / Factory Address</label>
-              <textarea 
-                rows={2} 
-                value={vendorForm.billingAddress} 
-                onChange={e => setVendorForm(f => ({ ...f, billingAddress: e.target.value }))} 
-                style={inputStyle} 
-                placeholder="Plot no, GIDC, Ring Road, Surat..." 
+              <textarea
+                rows={2}
+                value={vendorForm.billingAddress}
+                onChange={e => setVendorForm(f => ({ ...f, billingAddress: e.target.value }))}
+                style={inputStyle}
+                placeholder="Plot no, GIDC, Ring Road, Surat..."
               />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
               <div>
                 <label style={labelStyle}>State</label>
-                <input 
-                  type="text" 
-                  value={vendorForm.state} 
-                  onChange={e => setVendorForm(f => ({ ...f, state: e.target.value }))} 
-                  style={inputStyle} 
+                <input
+                  type="text"
+                  value={vendorForm.state}
+                  onChange={e => setVendorForm(f => ({ ...f, state: e.target.value }))}
+                  style={inputStyle}
                 />
               </div>
               <div>
                 <label style={labelStyle}>State Code</label>
-                <input 
-                  type="text" 
-                  value={vendorForm.stateCode} 
-                  onChange={e => setVendorForm(f => ({ ...f, stateCode: e.target.value }))} 
-                  style={inputStyle} 
+                <input
+                  type="text"
+                  value={vendorForm.stateCode}
+                  onChange={e => setVendorForm(f => ({ ...f, stateCode: e.target.value }))}
+                  style={inputStyle}
                 />
               </div>
             </div>
@@ -8601,7 +8603,8 @@ export default function EliteBillingDepartment({
       {showLedgerModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '16px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)', color: '#0f172a', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-            
+
+
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>

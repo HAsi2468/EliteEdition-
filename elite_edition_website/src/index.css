@@ -5,6 +5,7 @@
 @import './styles/tokens.css';
 @import './styles/microInteractions.css';
 @import './styles/communication.css';
+@import './styles/responsive.css';
 
 /* Self-Hosted Inter WOFF2 Fonts (Weights 400, 500, 600) */
 @font-face {

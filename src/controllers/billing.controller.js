@@ -474,12 +474,21 @@ const getInvoices = async (req, res) => {
       if (minMs) dateQuery.$gte = new Date(minMs);
       if (maxMs) dateQuery.$lte = new Date(maxMs);
 
-      filter.$or = [
+      const dateOr = [
         { invoiceDate: dateQuery },
         { invoiceDate: { $gte: dsStr, $lte: deStr } },
         { created_at: dateQuery },
         { createdAt: dateQuery }
       ];
+
+      if (filter.$and) {
+        filter.$and.push({ $or: dateOr });
+      } else if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: dateOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = dateOr;
+      }
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -512,7 +521,7 @@ const getInvoices = async (req, res) => {
 const getInvoiceById = async (req, res) => {
   try {
     const invoice = await BillingInvoice.findById(req.params.id).lean();
-    if (!invoice) {
+    if (!invoice || !checkCompanyTenantAccess(req, invoice.companyEntity)) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
@@ -4438,12 +4447,21 @@ const getGstr1Table12Summary = async (req, res) => {
       if (minMs) dateQuery.$gte = new Date(minMs);
       if (maxMs) dateQuery.$lte = new Date(maxMs);
 
-      filter.$or = [
+      const dateOr = [
         { invoiceDate: dateQuery },
         { invoiceDate: { $gte: dsStr, $lte: deStr } },
         { created_at: dateQuery },
         { createdAt: dateQuery }
       ];
+
+      if (filter.$and) {
+        filter.$and.push({ $or: dateOr });
+      } else if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: dateOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = dateOr;
+      }
     }
 
     const invoices = await BillingInvoice.find(filter).lean();

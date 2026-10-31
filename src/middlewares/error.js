@@ -54,10 +54,45 @@ function sanitizeClientErrorMessage(statusCode, rawMessage) {
 
 const errorConverter = (err, req, res, next) => {
   let error = err;
+  const requestId = req.id || req.headers?.['x-request-id'] || 'unknown';
+
+  if (error.name === 'ValidationError') {
+    const fields = {};
+    for (const [path, e] of Object.entries(error.errors || {})) {
+      fields[path] = e.kind === 'enum'
+        ? 'Choose a value from the list.'
+        : e.kind === 'required'
+          ? 'Required.'
+          : 'Invalid value.';
+    }
+    const apiErr = new ApiError(400, 'Please correct the highlighted fields.', false, err.stack);
+    apiErr.code = 'VALIDATION_FAILED';
+    apiErr.fields = fields;
+    return next(apiErr);
+  }
+
+  if (error.name === 'CastError') {
+    const apiErr = new ApiError(400, `Invalid value for ${error.path}.`, false, err.stack);
+    apiErr.code = 'INVALID_ID';
+    apiErr.fields = { [error.path]: 'Invalid value.' };
+    return next(apiErr);
+  }
+
+  if (error.code === 11000 || error.code === '11000') {
+    const keyValue = error.keyValue || {};
+    const field = Object.keys(keyValue).find((k) => k !== 'companyId') || 'value';
+    const apiErr = new ApiError(409, `This ${field} already exists.`, false, err.stack);
+    apiErr.code = 'DUPLICATE';
+    apiErr.fields = { [field]: 'Already in use.' };
+    return next(apiErr);
+  }
+
+  if (error.fields) {
+    error.statusCode = error.status || error.statusCode || 400;
+  }
+
   if (!(error instanceof ApiError)) {
-    const statusCode =
-      error.statusCode ||
-      (error.name === 'ValidationError' ? httpStatus.BAD_REQUEST : httpStatus.INTERNAL_SERVER_ERROR);
+    const statusCode = error.statusCode || error.status || httpStatus.INTERNAL_SERVER_ERROR;
     const message = error.message || httpStatus[statusCode];
     error = new ApiError(statusCode, message, false, err.stack);
     if (err.code) error.code = err.code;
@@ -67,7 +102,7 @@ const errorConverter = (err, req, res, next) => {
 
 // eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
-  let statusCode = err.statusCode;
+  let statusCode = err.statusCode || err.status;
   if (!Number.isInteger(statusCode) || statusCode < 100 || statusCode > 599) {
     statusCode = httpStatus.INTERNAL_SERVER_ERROR;
   }
@@ -84,6 +119,7 @@ const errorHandler = (err, req, res, next) => {
     success: false,
     code: errorCode,
     message: clientMessage,
+    ...(err.fields ? { fields: err.fields } : {}),
     requestId,
     ...(config.env === 'development' && {
       stack: err.stack,
