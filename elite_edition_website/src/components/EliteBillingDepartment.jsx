@@ -15,6 +15,7 @@ import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { openPrintOptionsDialog } from '../utils/printService';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import QuickActionMenu from './common/QuickActionMenu';
@@ -312,11 +313,14 @@ export default function EliteBillingDepartment({
 
   const [purchaseSearch, setPurchaseSearch] = useState('');
   const [purchaseDatePreset, setPurchaseDatePreset] = useState('all');
-  const [purchaseDateStart, setPurchaseDateStart] = useState('');
-  const [purchaseDateEnd, setPurchaseDateEnd] = useState('');
-  const [purchaseVendorFilter, setPurchaseVendorFilter] = useState('ALL');
-  const [purchaseGstFilter, setPurchaseGstFilter] = useState('ALL');
-  const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('ALL');
+  const [customPurchaseDateStart, setCustomPurchaseDateStart] = useState('');
+  const [customPurchaseDateEnd, setCustomPurchaseDateEnd] = useState('');
+  const [purchaseFilters, setPurchaseFilters] = useState({
+    vendor: [],
+    gst: [],
+    type: [],
+    status: []
+  });
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
   const [dynamicPurchaseTypes, setDynamicPurchaseTypes] = useState([
@@ -1438,7 +1442,8 @@ export default function EliteBillingDepartment({
   const purchaseVendorsList = useMemo(() => {
     const list = new Set();
     (purchases || []).forEach(p => {
-      if (p.vendorName && p.vendorName.trim()) list.add(p.vendorName.trim());
+      const vName = p.vendor?.businessName || p.vendorName || p.vendor?.name;
+      if (vName && String(vName).trim()) list.add(String(vName).trim());
     });
     (vendorsList || []).forEach(v => {
       const vName = v.businessName || v.name;
@@ -1447,66 +1452,153 @@ export default function EliteBillingDepartment({
     return Array.from(list).sort();
   }, [purchases, vendorsList]);
 
+  // Enterprise unified filter categories
+  const purchaseFilterCategories = useMemo(() => [
+    {
+      id: 'vendor',
+      name: 'Vendor / Supplier',
+      multi: true,
+      options: purchaseVendorsList.map(v => ({ value: v, label: v }))
+    },
+    {
+      id: 'type',
+      name: 'Purchase Type',
+      multi: true,
+      options: [
+        { value: 'inventory', label: '📦 Inventory Purchase' },
+        { value: 'expense', label: '💼 Expense Purchase' },
+        { value: 'asset', label: '🏛️ Asset Purchase' },
+        ...(dynamicPurchaseTypes || []).filter(t => {
+          const l = typeof t === 'string' ? t.toLowerCase() : (t.label || t.name || '').toLowerCase();
+          return !l.includes('inventory') && !l.includes('expense') && !l.includes('asset');
+        }).map(t => {
+          const val = typeof t === 'string' ? t : (t.value || t.name || t.label);
+          const lbl = typeof t === 'string' ? t : (t.label || t.name || t.value);
+          return { value: val, label: `🏷️ ${lbl}` };
+        })
+      ]
+    },
+    {
+      id: 'gst',
+      name: 'GST Rate',
+      multi: true,
+      options: [
+        { value: '0', label: '0% GST' },
+        { value: '5', label: '5% GST' },
+        { value: '12', label: '12% GST' },
+        { value: '18', label: '18% GST' },
+        { value: '28', label: '28% GST' }
+      ]
+    },
+    {
+      id: 'status',
+      name: 'Payment Status',
+      multi: true,
+      options: [
+        { value: 'PAID', label: '🟢 Fully Paid' },
+        { value: 'PARTIALLY_PAID', label: '🟡 Partially Paid' },
+        { value: 'UNPAID', label: '🔴 Unpaid / Due' }
+      ]
+    }
+  ], [purchaseVendorsList, dynamicPurchaseTypes]);
+
   // Date range object based on preset or custom range
   const purchaseDateRange = useMemo(() => {
-    return getDatePresetRange(purchaseDatePreset, purchaseDateStart, purchaseDateEnd);
-  }, [purchaseDatePreset, purchaseDateStart, purchaseDateEnd]);
+    return getDatePresetRange(purchaseDatePreset, customPurchaseDateStart, customPurchaseDateEnd);
+  }, [purchaseDatePreset, customPurchaseDateStart, customPurchaseDateEnd]);
 
   const hasActivePurchaseFilters = Boolean(
     (purchaseSearch && purchaseSearch.trim()) ||
     purchaseDatePreset !== 'all' ||
-    purchaseVendorFilter !== 'ALL' ||
-    purchaseGstFilter !== 'ALL' ||
-    purchaseTypeFilter !== 'ALL'
+    (purchaseFilters.vendor && purchaseFilters.vendor.length > 0) ||
+    (purchaseFilters.gst && purchaseFilters.gst.length > 0) ||
+    (purchaseFilters.type && purchaseFilters.type.length > 0) ||
+    (purchaseFilters.status && purchaseFilters.status.length > 0)
   );
+
+  const clearPurchaseFilters = useCallback(() => {
+    setPurchaseSearch('');
+    setPurchaseDatePreset('all');
+    setCustomPurchaseDateStart('');
+    setCustomPurchaseDateEnd('');
+    setPurchaseFilters({
+      vendor: [],
+      gst: [],
+      type: [],
+      status: []
+    });
+  }, []);
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter(p => {
-      // 1. Text Search
+      // 1. Text Search (tokenized for multi-word search)
       if (purchaseSearch && purchaseSearch.trim()) {
-        const q = purchaseSearch.toLowerCase().trim();
-        const matchNo = (p.purchaseNo && p.purchaseNo.toLowerCase().includes(q)) || (p.billNo && p.billNo.toLowerCase().includes(q));
-        const matchVendor = p.vendorName && p.vendorName.toLowerCase().includes(q);
-        const matchItem = p.itemName && p.itemName.toLowerCase().includes(q);
-        const matchChildItems = Array.isArray(p.items) && p.items.some(it => (it.itemName && it.itemName.toLowerCase().includes(q)) || (it.description && it.description.toLowerCase().includes(q)));
-        if (!matchNo && !matchVendor && !matchItem && !matchChildItems) return false;
+        const tokens = purchaseSearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const pNo = (p.purchaseNo || '').toLowerCase();
+        const bNo = (p.billNo || '').toLowerCase();
+        const chNo = (p.ourChallanNo || '').toLowerCase();
+        const vName = (p.vendor?.businessName || p.vendorName || p.vendor?.name || '').toLowerCase();
+        const iNames = (Array.isArray(p.items) ? p.items.map(it => `${it.itemName || ''} ${it.description || ''}`).join(' ') : (p.itemName || '')).toLowerCase();
+        const combined = `${pNo} ${bNo} ${chNo} ${vName} ${iNames}`;
+        const matchAll = tokens.every(tok => combined.includes(tok));
+        if (!matchAll) return false;
       }
 
-      // 2. Vendor Filter
-      if (purchaseVendorFilter && purchaseVendorFilter !== 'ALL') {
-        if ((p.vendorName || '').trim().toLowerCase() !== purchaseVendorFilter.trim().toLowerCase()) return false;
+      // 2. Vendor Multi-Filter
+      if (purchaseFilters.vendor && purchaseFilters.vendor.length > 0) {
+        const pVendor = (p.vendor?.businessName || p.vendorName || p.vendor?.name || '').trim().toLowerCase();
+        const match = purchaseFilters.vendor.some(v => v.trim().toLowerCase() === pVendor);
+        if (!match) return false;
       }
 
-      // 3. GST Rate Filter
-      if (purchaseGstFilter && purchaseGstFilter !== 'ALL') {
-        if (Number(p.gstRate || 0) !== Number(purchaseGstFilter)) return false;
+      // 3. GST Rate Multi-Filter
+      if (purchaseFilters.gst && purchaseFilters.gst.length > 0) {
+        const itemRates = Array.isArray(p.items) ? p.items.map(it => String(it.taxRate ?? it.gstRate ?? '')) : [];
+        const rootRate = p.gstRate != null ? String(p.gstRate) : '';
+        const allRates = [rootRate, ...itemRates].filter(Boolean);
+        const match = purchaseFilters.gst.some(g => allRates.includes(String(g)));
+        if (!match) return false;
       }
 
-      // 3.5. Purchase Type Filter
-      if (purchaseTypeFilter && purchaseTypeFilter !== 'ALL') {
+      // 4. Purchase Type Multi-Filter
+      if (purchaseFilters.type && purchaseFilters.type.length > 0) {
         const pType = (p.purchaseType || 'inventory').toLowerCase();
-        const fType = purchaseTypeFilter.toLowerCase();
-        const matches = 
-          pType === fType ||
-          (pType === 'inventory' && /inventory/i.test(fType)) ||
-          (pType === 'expense' && /expense/i.test(fType)) ||
-          (pType === 'asset' && /asset/i.test(fType));
-        if (!matches) return false;
+        const match = purchaseFilters.type.some(fType => {
+          const f = fType.toLowerCase();
+          return pType === f ||
+            (pType === 'inventory' && /inventory/i.test(f)) ||
+            (pType === 'expense' && /expense/i.test(f)) ||
+            (pType === 'asset' && /asset/i.test(f));
+        });
+        if (!match) return false;
       }
 
-      // 4. Date Range Filter
+      // 5. Payment Status Multi-Filter
+      if (purchaseFilters.status && purchaseFilters.status.length > 0) {
+        const billTotal = Number(p.grandTotal || p.totalAmount || 0);
+        const paidAmt = Number(p.paidAmount || 0);
+        const balDue = p.balanceDue != null ? Number(p.balanceDue) : (p.paymentStatus === 'PAID' ? 0 : Math.max(0, billTotal - paidAmt));
+        const isPaid = p.paymentStatus === 'PAID' || (paidAmt >= billTotal && billTotal > 0);
+        const isPartial = p.paymentStatus === 'PARTIALLY_PAID' || p.paymentStatus === 'PARTIAL' || (paidAmt > 0 && balDue > 0);
+        const isUnpaid = !isPaid && !isPartial;
+        const statusKey = isPaid ? 'PAID' : isPartial ? 'PARTIALLY_PAID' : 'UNPAID';
+        if (!purchaseFilters.status.includes(statusKey)) return false;
+      }
+
+      // 6. Date Range Filter
       const pDs = purchaseDateRange?.dateStart || (purchaseDateRange?.start ? toLocalYMD(purchaseDateRange.start) : '');
       const pDe = purchaseDateRange?.dateEnd || (purchaseDateRange?.end ? toLocalYMD(purchaseDateRange.end) : '');
       if (pDs || pDe) {
-        if (!p.date) return false;
-        const pDateStr = toLocalYMD(p.date);
+        const rawDate = p.date || p.billDate || p.createdAt || p.dueDate;
+        if (!rawDate) return false;
+        const pDateStr = toLocalYMD(rawDate);
         if (pDs && pDateStr && pDateStr < pDs) return false;
         if (pDe && pDateStr && pDateStr > pDe) return false;
       }
 
       return true;
     });
-  }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseTypeFilter, purchaseDateRange]);
+  }, [purchases, purchaseSearch, purchaseFilters, purchaseDateRange]);
 
   const paginatedPurchases = useMemo(() => {
     const list = [...filteredPurchases];
@@ -2838,7 +2930,7 @@ export default function EliteBillingDepartment({
 
   useEffect(() => {
     setPurchasePage(1);
-  }, [purchaseSearch, purchaseDatePreset, purchaseDateStart, purchaseDateEnd, purchaseVendorFilter, purchaseGstFilter]);
+  }, [purchaseSearch, purchaseDatePreset, customPurchaseDateStart, customPurchaseDateEnd, purchaseFilters]);
 
   const fetchDigitalChallans = async () => {
     setLoadingChallans(true);
@@ -6130,133 +6222,56 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Filter Bar & Action Header */}
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '0.9rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '0.85rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
               {/* Search Bar */}
-              <div style={{ position: 'relative', minWidth: 220, flex: '1 1 220px', maxWidth: 300 }}>
+              <div style={{ position: 'relative', minWidth: 220, flex: '1 1 220px', maxWidth: 320 }}>
                 <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input
                   type="text"
                   placeholder="Search Purchase No (DP-01), Vendor, Item..."
                   value={purchaseSearch}
                   onChange={e => setPurchaseSearch(e.target.value)}
-                  style={{ width: '100%', paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  style={{ width: '100%', paddingLeft: 32, paddingRight: purchaseSearch ? 28 : 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {purchaseSearch && (
+                  <X size={14} onClick={() => setPurchaseSearch('')} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#94a3b8' }} />
+                )}
               </div>
 
-              {/* Date Filter Dropdown */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                <Calendar size={13} style={{ color: '#4f46e5' }} />
-                <select
-                  value={purchaseDatePreset}
-                  onChange={e => setPurchaseDatePreset(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
-                >
-                  <option value="all">📅 All Dates</option>
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="this_week">This Week</option>
-                  <option value="last_7_days">Last 7 Days</option>
-                  <option value="this_month">This Month</option>
-                  <option value="previous_month">Previous Month</option>
-                  <option value="last_30_days">Last 30 Days</option>
-                  <option value="current_fiscal_year">Current FY</option>
-                  <option value="custom">Custom Range...</option>
-                </select>
-              </div>
+              {/* Standard ERP DateRangePicker matching all other screens */}
+              <DateRangePicker
+                preset={purchaseDatePreset}
+                onChange={({ preset: p }) => {
+                  setPurchaseDatePreset(p);
+                  if (p !== 'custom') {
+                    setCustomPurchaseDateStart('');
+                    setCustomPurchaseDateEnd('');
+                  }
+                }}
+                customStart={customPurchaseDateStart}
+                customEnd={customPurchaseDateEnd}
+                onCustomChange={(s, e) => {
+                  setCustomPurchaseDateStart(s);
+                  setCustomPurchaseDateEnd(e);
+                }}
+              />
 
-              {/* Custom Date Pickers */}
-              {purchaseDatePreset === 'custom' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '4px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                  <input
-                    type="date"
-                    value={purchaseDateStart}
-                    onChange={e => setPurchaseDateStart(e.target.value)}
-                    style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', color: '#1e293b', outline: 'none' }}
-                    title="From Date"
-                  />
-                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>to</span>
-                  <input
-                    type="date"
-                    value={purchaseDateEnd}
-                    onChange={e => setPurchaseDateEnd(e.target.value)}
-                    style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', color: '#1e293b', outline: 'none' }}
-                    title="To Date"
-                  />
-                </div>
-              )}
-
-              {/* Vendor Filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                <Building size={13} style={{ color: '#0284c7' }} />
-                <select
-                  value={purchaseVendorFilter}
-                  onChange={e => setPurchaseVendorFilter(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none', maxWidth: 160 }}
-                >
-                  <option value="ALL">🏢 All Vendors</option>
-                  {purchaseVendorsList.map(v => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* GST Filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                <Percent size={12} style={{ color: '#8b5cf6' }} />
-                <select
-                  value={purchaseGstFilter}
-                  onChange={e => setPurchaseGstFilter(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
-                >
-                  <option value="ALL">All GST Rates</option>
-                  <option value="0">0% GST</option>
-                  <option value="5">5% GST</option>
-                  <option value="12">12% GST</option>
-                  <option value="18">18% GST</option>
-                  <option value="28">28% GST</option>
-                </select>
-              </div>
-
-              {/* Purchase Type Filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                <Package size={12} style={{ color: '#4f46e5' }} />
-                <select
-                  value={purchaseTypeFilter}
-                  onChange={e => setPurchaseTypeFilter(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
-                >
-                  <option value="ALL">All Types</option>
-                  {dynamicPurchaseTypes.map((type, idx) => {
-                    const typeLabel = typeof type === 'string' ? type : type.name || type.label;
-                    const isInv = /inventory/i.test(typeLabel);
-                    const isExp = /expense/i.test(typeLabel);
-                    const isAst = /asset/i.test(typeLabel);
-                    const typeVal = isInv ? 'inventory' : isExp ? 'expense' : isAst ? 'asset' : typeLabel;
-                    const icon = isAst ? '🏛️' : isExp ? '💼' : isInv ? '📦' : /fabric|gray|yarn|textile/i.test(typeLabel) ? '🧵' : '🏷️';
-                    return (
-                      <option key={idx} value={typeVal}>
-                        {icon} {typeLabel}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              {/* Enterprise Unified Multi-Filter Popover */}
+              <UnifiedFilterPopover
+                categories={purchaseFilterCategories}
+                activeFilters={purchaseFilters}
+                onChange={setPurchaseFilters}
+                placeholder="Filters"
+                showChips={false}
+              />
 
               {/* Clear Filters Button & Badge */}
               {hasActivePurchaseFilters && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPurchaseSearch('');
-                      setPurchaseDatePreset('all');
-                      setPurchaseDateStart('');
-                      setPurchaseDateEnd('');
-                      setPurchaseVendorFilter('ALL');
-                      setPurchaseGstFilter('ALL');
-                      setPurchaseTypeFilter('ALL');
-                    }}
+                    onClick={clearPurchaseFilters}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 9px',
                       fontSize: '0.76rem', fontWeight: 700, color: '#ef4444', background: '#fef2f2',
@@ -6389,14 +6404,7 @@ export default function EliteBillingDepartment({
                           </div>
                           <button
                             type="button"
-                            onClick={() => {
-                              setPurchaseSearch('');
-                              setPurchaseDatePreset('all');
-                              setPurchaseDateStart('');
-                              setPurchaseDateEnd('');
-                              setPurchaseVendorFilter('ALL');
-                              setPurchaseGstFilter('ALL');
-                            }}
+                            onClick={clearPurchaseFilters}
                             style={{ padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700, color: '#4f46e5', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer', marginTop: '0.6rem' }}
                           >
                             Reset Filters
