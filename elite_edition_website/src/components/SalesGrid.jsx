@@ -16,10 +16,11 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
-import { ErpTh } from './common/ErpTableParts';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
+  const [selectedOrderMap, setSelectedOrderMap] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [syncingOrderId, setSyncingOrderId] = useState('');
@@ -235,6 +236,10 @@ export default function SalesGrid() {
     setPage(1);
   };
 
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => matchSearchQuery(order, searchQuery, ['itemSKUCode', 'shippingAddressCity', 'shippingAddressState', 'category', 'saleOrderStatus', 'saleOrderItemCode', 'saleOrderCode']));
+  }, [orders, searchQuery]);
+
   return (
     <div className="glass-panel" style={styles.panel}>
       {/* ── Standard ERP Unified Filter Toolbar ── */}
@@ -308,6 +313,22 @@ export default function SalesGrid() {
             <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
               <thead>
                 <tr>
+                  <MasterCheckboxTh
+                    allSelected={filteredOrders.length > 0 && filteredOrders.every(o => !!selectedOrderMap[o.id || o._id || o.saleOrderItemCode])}
+                    someSelected={filteredOrders.some(o => !!selectedOrderMap[o.id || o._id || o.saleOrderItemCode])}
+                    onToggleAll={e => {
+                      if (e.target.checked) {
+                        setSelectedOrderMap(filteredOrders.reduce((acc, o) => {
+                          const k = o.id || o._id || o.saleOrderItemCode;
+                          if (k) acc[k] = true;
+                          return acc;
+                        }, {}));
+                      } else {
+                        setSelectedOrderMap({});
+                      }
+                    }}
+                    totalCount={filteredOrders.length}
+                  />
                   <ErpTh columnKey="orderDate" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>Order Date</ErpTh>
                   <ErpTh columnKey="itemSKUCode" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>SKU Code</ErpTh>
                   <ErpTh columnKey="category" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>Category</ErpTh>
@@ -320,9 +341,9 @@ export default function SalesGrid() {
                 </tr>
               </thead>
               <tbody>
-                {orders
-                  .filter(order => matchSearchQuery(order, searchQuery, ['itemSKUCode', 'shippingAddressCity', 'shippingAddressState', 'category', 'saleOrderStatus', 'saleOrderItemCode', 'saleOrderCode']))
-                  .map((order, idx) => {
+                {filteredOrders.map((order, idx) => {
+                  const orderKey = order.id || order._id || order.saleOrderItemCode || idx;
+                  const isSelected = !!selectedOrderMap[orderKey];
                   const status = (order.saleOrderStatus || '').toUpperCase();
                   let statusBg = '#eff6ff';
                   let statusColor = '#1d4ed8';
@@ -343,7 +364,18 @@ export default function SalesGrid() {
                   }
                   
                   return (
-                    <tr key={order.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={orderKey} style={{ borderBottom: '1px solid #f1f5f9', background: getRowHighlightStyle(isSelected) }}>
+                      <RowCheckboxTd
+                        checked={isSelected}
+                        onChange={e => {
+                          setSelectedOrderMap(prev => {
+                            const next = { ...prev };
+                            if (e.target.checked) next[orderKey] = true;
+                            else delete next[orderKey];
+                            return next;
+                          });
+                        }}
+                      />
                       <td style={{ color: '#334155', fontWeight: 600 }}>
                         {formatDateTimeDDMMYYYY(order.orderDate)}
                       </td>

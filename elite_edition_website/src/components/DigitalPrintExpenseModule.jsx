@@ -15,7 +15,7 @@ import { triggerGlobalDataRefresh } from './NotificationToast';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import { StandardNumericInput } from './common/StandardNumericInput';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
-import { ErpTh } from './common/ErpTableParts';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -53,6 +53,7 @@ function formatDateISO(d) {
 export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null, companyEntity = 'Elite Digital Print' }) {
   const [expenses, setExpenses] = useState([]);
   const [expenseSortState, setExpenseSortState] = useState({ columnKey: 'date', order: 'desc' });
+  const [selectedExpenseMap, setSelectedExpenseMap] = useState({});
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, totalVouchers: 0 });
   const [loading, setLoading] = useState(false);
 
@@ -2083,6 +2084,18 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                      <MasterCheckboxTh
+                        allSelected={sortedExpenses.length > 0 && sortedExpenses.every(e => !!selectedExpenseMap[e._id])}
+                        someSelected={sortedExpenses.some(e => !!selectedExpenseMap[e._id])}
+                        onToggleAll={e => {
+                          if (e.target.checked) {
+                            setSelectedExpenseMap(sortedExpenses.reduce((acc, it) => { acc[it._id] = true; return acc; }, {}));
+                          } else {
+                            setSelectedExpenseMap({});
+                          }
+                        }}
+                        totalCount={sortedExpenses.length}
+                      />
                       <ErpTh columnKey="voucherNo" sortState={expenseSortState} onSortChange={setExpenseSortState}>Voucher No</ErpTh>
                       <ErpTh columnKey="date" sortState={expenseSortState} onSortChange={setExpenseSortState}>Date</ErpTh>
                       <ErpTh columnKey="type" sortState={expenseSortState} onSortChange={setExpenseSortState}>Type</ErpTh>
@@ -2098,15 +2111,27 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   <tbody>
                     {sortedExpenses.map((item, idx) => {
                       const isIN = item.type === 'IN';
+                      const isSelected = !!selectedExpenseMap[item._id];
 
                       return (
                         <tr
                           key={item._id}
                           style={{
                             borderBottom: '1px solid rgba(255,255,255,0.04)',
-                            background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'
+                            background: getRowHighlightStyle(isSelected, idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)')
                           }}
                         >
+                          <RowCheckboxTd
+                            checked={isSelected}
+                            onChange={e => {
+                              setSelectedExpenseMap(prev => {
+                                const next = { ...prev };
+                                if (e.target.checked) next[item._id] = true;
+                                else delete next[item._id];
+                                return next;
+                              });
+                            }}
+                          />
                           <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--primary)' }}>
                             {item.voucherNo}
                           </td>

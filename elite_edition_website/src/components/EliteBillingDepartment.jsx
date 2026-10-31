@@ -329,8 +329,11 @@ export default function EliteBillingDepartment({
     'Asset Purchase'
   ]);
   const [customerSortState, setCustomerSortState] = useState({ columnKey: 'name', order: 'asc' });
+  const [selectedCustomerMap, setSelectedCustomerMap] = useState({});
   const [vendorSortState, setVendorSortState] = useState({ columnKey: 'name', order: 'asc' });
+  const [selectedVendorMap, setSelectedVendorMap] = useState({});
   const [itemSortState, setItemSortState] = useState({ columnKey: 'name', order: 'asc' });
+  const [selectedItemMap, setSelectedItemMap] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -6061,6 +6064,18 @@ export default function EliteBillingDepartment({
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr>
+                  <MasterCheckboxTh
+                    allSelected={filteredCustomers.length > 0 && filteredCustomers.every(c => !!selectedCustomerMap[c._id])}
+                    someSelected={filteredCustomers.some(c => !!selectedCustomerMap[c._id])}
+                    onToggleAll={e => {
+                      if (e.target.checked) {
+                        setSelectedCustomerMap(filteredCustomers.reduce((acc, c) => { acc[c._id] = true; return acc; }, {}));
+                      } else {
+                        setSelectedCustomerMap({});
+                      }
+                    }}
+                    totalCount={filteredCustomers.length}
+                  />
                   <ErpTh columnKey="name" sortState={customerSortState} onSortChange={setCustomerSortState}>Customer / Contact</ErpTh>
                   <ErpTh columnKey="businessName" sortState={customerSortState} onSortChange={setCustomerSortState}>Business Name</ErpTh>
                   <ErpTh columnKey="phone" sortState={customerSortState} onSortChange={setCustomerSortState}>Phone & Email</ErpTh>
@@ -6072,13 +6087,26 @@ export default function EliteBillingDepartment({
               <tbody>
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No customers found. Click "Add New Customer" to register your client!
                     </td>
                   </tr>
                 ) : (
-                  filteredCustomers.map(c => (
-                    <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  filteredCustomers.map(c => {
+                    const isSelected = !!selectedCustomerMap[c._id];
+                    return (
+                      <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(isSelected) }}>
+                        <RowCheckboxTd
+                          checked={isSelected}
+                          onChange={e => {
+                            setSelectedCustomerMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[c._id] = true;
+                              else delete next[c._id];
+                              return next;
+                            });
+                          }}
+                        />
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{c.businessName || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
@@ -6100,7 +6128,8 @@ export default function EliteBillingDepartment({
                         </div>
                       </td>
                     </tr>
-                  ))
+                  );
+                })
                 )}
               </tbody>
             </table>
@@ -6153,6 +6182,22 @@ export default function EliteBillingDepartment({
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr>
+                  <MasterCheckboxTh
+                    allSelected={(filteredVendors || []).length > 0 && (filteredVendors || []).every(v => !!selectedVendorMap[v._id || v.id])}
+                    someSelected={(filteredVendors || []).some(v => !!selectedVendorMap[v._id || v.id])}
+                    onToggleAll={e => {
+                      if (e.target.checked) {
+                        setSelectedVendorMap((filteredVendors || []).reduce((acc, v) => {
+                          const k = v._id || v.id;
+                          if (k) acc[k] = true;
+                          return acc;
+                        }, {}));
+                      } else {
+                        setSelectedVendorMap({});
+                      }
+                    }}
+                    totalCount={(filteredVendors || []).length}
+                  />
                   <ErpTh columnKey="name" sortState={vendorSortState} onSortChange={setVendorSortState}>Vendor / Contact</ErpTh>
                   <ErpTh columnKey="businessName" sortState={vendorSortState} onSortChange={setVendorSortState}>Business / Firm Name</ErpTh>
                   <ErpTh columnKey="phone" sortState={vendorSortState} onSortChange={setVendorSortState}>Phone & Email</ErpTh>
@@ -6164,13 +6209,27 @@ export default function EliteBillingDepartment({
               <tbody>
                 {(filteredVendors || []).length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No vendors found. Click "Add New Vendor" to register your supplier!
                     </td>
                   </tr>
                 ) : (
-                  (filteredVendors || []).map(v => (
-                    <tr key={v._id || v.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  (filteredVendors || []).map(v => {
+                    const vKey = v._id || v.id;
+                    const isSelected = !!selectedVendorMap[vKey];
+                    return (
+                      <tr key={vKey} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(isSelected) }}>
+                        <RowCheckboxTd
+                          checked={isSelected}
+                          onChange={e => {
+                            setSelectedVendorMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[vKey] = true;
+                              else delete next[vKey];
+                              return next;
+                            });
+                          }}
+                        />
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <span>{v.name}</span>
@@ -6201,7 +6260,8 @@ export default function EliteBillingDepartment({
                         </div>
                       </td>
                     </tr>
-                  ))
+                  );
+                })
                 )}
               </tbody>
             </table>
@@ -6232,6 +6292,18 @@ export default function EliteBillingDepartment({
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
               <thead>
                 <tr>
+                  <MasterCheckboxTh
+                    allSelected={filteredItems.length > 0 && filteredItems.every(it => !!selectedItemMap[it._id])}
+                    someSelected={filteredItems.some(it => !!selectedItemMap[it._id])}
+                    onToggleAll={e => {
+                      if (e.target.checked) {
+                        setSelectedItemMap(filteredItems.reduce((acc, it) => { acc[it._id] = true; return acc; }, {}));
+                      } else {
+                        setSelectedItemMap({});
+                      }
+                    }}
+                    totalCount={filteredItems.length}
+                  />
                   <ErpTh columnKey="name" sortState={itemSortState} onSortChange={setItemSortState}>Product / Service</ErpTh>
                   <ErpTh columnKey="category" sortState={itemSortState} onSortChange={setItemSortState}>Category</ErpTh>
                   <ErpTh columnKey="hsnCode" sortState={itemSortState} onSortChange={setItemSortState}>HSN Code</ErpTh>
@@ -6243,13 +6315,26 @@ export default function EliteBillingDepartment({
               <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No billing products found. Click "Add Billing Product" to add your service items!
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map(item => (
-                    <tr key={item._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  filteredItems.map(item => {
+                    const isSelected = !!selectedItemMap[item._id];
+                    return (
+                      <tr key={item._id} style={{ borderBottom: '1px solid var(--border-light)', background: getRowHighlightStyle(isSelected) }}>
+                        <RowCheckboxTd
+                          checked={isSelected}
+                          onChange={e => {
+                            setSelectedItemMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[item._id] = true;
+                              else delete next[item._id];
+                              return next;
+                            });
+                          }}
+                        />
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
                       <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
                       <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.hsnCode || '—'}</td>
@@ -6266,7 +6351,8 @@ export default function EliteBillingDepartment({
                         </div>
                       </td>
                     </tr>
-                  ))
+                  );
+                })
                 )}
               </tbody>
             </table>

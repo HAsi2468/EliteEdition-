@@ -648,6 +648,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [customInwardDateEnd, setCustomInwardDateEnd] = useState('');
   const [inwardSortBy, setInwardSortBy] = useState('date');
   const [inwardSortOrder, setInwardSortOrder] = useState('desc');
+  const [selectedInwardMap, setSelectedInwardMap] = useState({});
 
   const [outwardDatePreset, setOutwardDatePreset] = useState('all');
   const [outwardDateStart, setOutwardDateStart] = useState('');
@@ -656,6 +657,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [customOutwardDateEnd, setCustomOutwardDateEnd] = useState('');
   const [outwardSortBy, setOutwardSortBy] = useState('date');
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
+  const [selectedOutwardMap, setSelectedOutwardMap] = useState({});
 
   // Lot-Wise Management state
   const [lotSearch, setLotSearch] = useState('');
@@ -4078,6 +4080,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <table className="data-table">
                 <thead>
                   <tr>
+                    <MasterCheckboxTh
+                      allSelected={inwardTx.length > 0 && inwardTx.every(t => !!selectedInwardMap[t._id])}
+                      someSelected={inwardTx.some(t => !!selectedInwardMap[t._id])}
+                      onToggleAll={e => {
+                        if (e.target.checked) {
+                          setSelectedInwardMap(inwardTx.reduce((acc, t) => { acc[t._id] = true; return acc; }, {}));
+                        } else {
+                          setSelectedInwardMap({});
+                        }
+                      }}
+                      totalCount={inwardTx.length}
+                    />
                     <ErpTh columnKey="date" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Date</ErpTh>
                     <ErpTh columnKey="lotNo" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Lot No</ErpTh>
                     <ErpTh columnKey="challanNo" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Challan No</ErpTh>
@@ -4105,7 +4119,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       : (t.vendorName || t.partyName || '-');
 
                     return (
-                      <tr key={t._id}>
+                      <tr key={t._id} style={{ background: getRowHighlightStyle(!!selectedInwardMap[t._id]) }}>
+                        <RowCheckboxTd
+                          checked={!!selectedInwardMap[t._id]}
+                          onChange={e => {
+                            setSelectedInwardMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[t._id] = true;
+                              else delete next[t._id];
+                              return next;
+                            });
+                          }}
+                        />
                         <td>{formatDateDDMMYYYY(t.date)}</td>
                         <td><span style={{ fontWeight: 600 }}>#{t.lotNo}</span></td>
                         <td>
@@ -4198,7 +4223,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     );
                   })}
                   {inwardTx.length === 0 && (
-                    <tr><td colSpan="9" style={{ textAlign: 'center' }}>No inward transactions found.</td></tr>
+                    <tr><td colSpan="11" style={{ textAlign: 'center' }}>No inward transactions found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -4251,6 +4276,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <table className="data-table">
                 <thead>
                   <tr>
+                    <MasterCheckboxTh
+                      allSelected={outwardTx.length > 0 && outwardTx.every(t => !!selectedOutwardMap[t._id])}
+                      someSelected={outwardTx.some(t => !!selectedOutwardMap[t._id])}
+                      onToggleAll={e => {
+                        if (e.target.checked) {
+                          setSelectedOutwardMap(outwardTx.reduce((acc, t) => { acc[t._id] = true; return acc; }, {}));
+                        } else {
+                          setSelectedOutwardMap({});
+                        }
+                      }}
+                      totalCount={outwardTx.length}
+                    />
                     <ErpTh columnKey="date" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Date</ErpTh>
                     <ErpTh columnKey="jobNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Job Card No</ErpTh>
                     <ErpTh columnKey="challanNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Challan No</ErpTh>
@@ -4279,7 +4316,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       : (t.partyName || '-');
 
                     return (
-                      <tr key={t._id}>
+                      <tr key={t._id} style={{ background: getRowHighlightStyle(!!selectedOutwardMap[t._id]) }}>
+                        <RowCheckboxTd
+                          checked={!!selectedOutwardMap[t._id]}
+                          onChange={e => {
+                            setSelectedOutwardMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[t._id] = true;
+                              else delete next[t._id];
+                              return next;
+                            });
+                          }}
+                        />
                         <td>{formatDateDDMMYYYY(t.date)}</td>
                         <td>
                           {isTransfer ? (
@@ -4380,7 +4428,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     );
                   })}
                   {outwardTx.length === 0 && (
-                    <tr><td colSpan="10" style={{ textAlign: 'center' }}>No outward transactions found.</td></tr>
+                    <tr><td colSpan="12" style={{ textAlign: 'center' }}>No outward transactions found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -5188,25 +5236,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         <tr><td colSpan={12} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>No challans found matching filters. Click "New Challan" to create one.</td></tr>
                       )}
                       {displayedChallans.map(ch => (
-                        <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}>
-                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={!!selectedChallanMap[ch._id]}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setSelectedChallanMap(prev => ({ ...prev, [ch._id]: ch }));
-                                } else {
-                                  setSelectedChallanMap(prev => {
-                                    const copy = { ...prev };
-                                    delete copy[ch._id];
-                                    return copy;
-                                  });
-                                }
-                              }}
-                              style={{ cursor: 'pointer' }}
-                            />
-                          </td>
+                        <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s', background: getRowHighlightStyle(!!selectedChallanMap[ch._id]) }}>
+                          <RowCheckboxTd
+                            checked={!!selectedChallanMap[ch._id]}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedChallanMap(prev => ({ ...prev, [ch._id]: ch }));
+                              } else {
+                                setSelectedChallanMap(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[ch._id];
+                                  return copy;
+                                });
+                              }
+                            }}
+                          />
                           <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
                             <span style={{ padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: 900, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', fontSize: '0.78rem' }}>
                               EDP-{ch.challanNo}

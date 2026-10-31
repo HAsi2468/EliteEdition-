@@ -8,7 +8,7 @@ import {
   ShieldCheck, Check, Clock, AlertTriangle, Building2, Eye, ShieldAlert, CheckCheck, XCircle
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
-import { ErpTh } from './common/ErpTableParts';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 const parseCanSize = (val) => {
   if (val === undefined || val === null || val === '') return 0;
@@ -66,7 +66,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     let saved = [];
     try {
       saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    } catch (e) {}
+    } catch (e) { }
     const defaultGarment = [
       'Viscose Rayon Fabric',
       'Cotton Fabric',
@@ -352,6 +352,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   const [inwardMaterialType, setInwardMaterialType] = useState('All');
   const [inwardSortBy, setInwardSortBy] = useState('date');
   const [inwardSortOrder, setInwardSortOrder] = useState('desc');
+  const [selectedInwardMap, setSelectedInwardMap] = useState({});
 
   const [outwardDateStart, setOutwardDateStart] = useState('');
   const [outwardDateEnd, setOutwardDateEnd] = useState('');
@@ -361,6 +362,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   const [outwardMaterialType, setOutwardMaterialType] = useState('All');
   const [outwardSortBy, setOutwardSortBy] = useState('date');
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
+  const [selectedOutwardMap, setSelectedOutwardMap] = useState({});
 
   const [stockMaterialType, setStockMaterialType] = useState('All');
   const [stockDateStart, setStockDateStart] = useState('');
@@ -709,7 +711,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       let saved = [];
       try {
         saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      } catch (e) {}
+      } catch (e) { }
       const defaultGarment = [
         'Viscose Rayon Fabric',
         'Cotton Fabric',
@@ -1019,7 +1021,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
           saved.push(matName);
           localStorage.setItem(storageKey, JSON.stringify(saved));
         }
-      } catch (err) {}
+      } catch (err) { }
 
       setMaterialsList(prev => [...new Set([...prev, matName])]);
       setIsNewMaterialModalOpen(false);
@@ -1459,7 +1461,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       if (t.color) details.push(t.color);
       if (t.canSize) details.push(`${t.canSize} Ltr`);
     }
-    
+
     const title = isPaperGrade ? `Sublimation Paper (${t.materialName})` : t.materialName;
 
     return (
@@ -1771,19 +1773,19 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   const count = cat === 'All'
                     ? stock.length
                     : stock.filter(s => {
-                        const sc = String(s.category || '').toLowerCase();
-                        const tc = cat.toLowerCase();
-                        if (tc === 'fabric') return sc.includes('fabric');
-                        if (tc === 'trims & thread') return sc.includes('trim') || sc.includes('thread');
-                        if (tc === 'buttons & fasteners') return sc.includes('button') || sc.includes('fastener');
-                        if (tc === 'elastics & laces') return sc.includes('elastic') || sc.includes('lace');
-                        if (tc === 'interlining & fusing') return sc.includes('interlining') || sc.includes('fusing');
-                        if (tc === 'labels & tags') return sc.includes('label') || sc.includes('tag');
-                        if (tc === 'packing material') return sc.includes('pack');
-                        if (tc === 'paper') return sc.includes('paper');
-                        if (tc === 'inks & consumables') return sc.includes('ink') || sc.includes('consumable');
-                        return sc === tc;
-                      }).length;
+                      const sc = String(s.category || '').toLowerCase();
+                      const tc = cat.toLowerCase();
+                      if (tc === 'fabric') return sc.includes('fabric');
+                      if (tc === 'trims & thread') return sc.includes('trim') || sc.includes('thread');
+                      if (tc === 'buttons & fasteners') return sc.includes('button') || sc.includes('fastener');
+                      if (tc === 'elastics & laces') return sc.includes('elastic') || sc.includes('lace');
+                      if (tc === 'interlining & fusing') return sc.includes('interlining') || sc.includes('fusing');
+                      if (tc === 'labels & tags') return sc.includes('label') || sc.includes('tag');
+                      if (tc === 'packing material') return sc.includes('pack');
+                      if (tc === 'paper') return sc.includes('paper');
+                      if (tc === 'inks & consumables') return sc.includes('ink') || sc.includes('consumable');
+                      return sc === tc;
+                    }).length;
 
                   return (
                     <button
@@ -1942,7 +1944,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  
+
                   {/* 1. PAPER INVENTORY TABLE */}
                   {showPaper && (
                     <div style={tableCardStyle}>
@@ -1996,9 +1998,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                 const isLow = (item.currentStock || 0) <= 5 && !isEmpty;
 
                                 return (
-                                  <tr 
-                                    key={idx} 
-                                    style={{ 
+                                  <tr
+                                    key={idx}
+                                    style={{
                                       background: isEmpty ? 'rgba(239, 68, 68, 0.02)' : isLow ? 'rgba(245, 158, 11, 0.02)' : idx % 2 === 1 ? 'rgba(255, 255, 255, 0.015)' : 'transparent',
                                       transition: 'background-color 0.15s'
                                     }}
@@ -2060,24 +2062,24 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                        <button 
+                                        <button
                                           onClick={() => handleQuickInward(item.materialName, item.panna, '', null, { paperQuality: item.paperQuality, metersPerRoll: item.metersPerRoll })}
-                                          className="btn-primary" 
+                                          className="btn-primary"
                                           title={`Quick Inward for ${displayName} ${item.panna || ''}`}
                                           style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
                                         >
                                           <Plus size={14} />
                                         </button>
-                                        <button 
+                                        <button
                                           onClick={() => handleQuickOutward(item.materialName, item.panna, '', null, { paperQuality: item.paperQuality, metersPerRoll: item.metersPerRoll })}
-                                          className="btn-secondary" 
+                                          className="btn-secondary"
                                           title={(item.currentStock || 0) <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for ${displayName} ${item.panna || ''}`}
                                           disabled={(item.currentStock || 0) <= 0}
                                           style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: (item.currentStock || 0) <= 0 ? 0.4 : 1, cursor: (item.currentStock || 0) <= 0 ? 'not-allowed' : 'pointer' }}
                                         >
                                           <ArrowUpFromLine size={14} />
                                         </button>
-                                        <button 
+                                        <button
                                           onClick={() => handleDeleteMaterial(item)}
                                           style={{
                                             padding: '6px 10px',
@@ -2190,16 +2192,16 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                 <tr key={spec.code} style={{ borderBottom: '1px solid var(--border-light)' }}>
                                   <td style={tdStyle}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                      <span 
-                                        style={{ 
-                                          display: 'inline-block', 
-                                          width: '14px', 
-                                          height: '14px', 
-                                          borderRadius: '50%', 
+                                      <span
+                                        style={{
+                                          display: 'inline-block',
+                                          width: '14px',
+                                          height: '14px',
+                                          borderRadius: '50%',
                                           background: spec.colorVal,
                                           border: spec.dotBorder ? `1px solid ${spec.dotBorder}` : 'none',
                                           boxShadow: `0 0 6px ${spec.bg}`
-                                        }} 
+                                        }}
                                       />
                                       <div>
                                         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{spec.name}</span>
@@ -2233,17 +2235,17 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                   </td>
                                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                      <button 
+                                      <button
                                         onClick={() => handleQuickInward('Grando Ink', '', spec.key, canSize)}
-                                        className="btn-primary" 
+                                        className="btn-primary"
                                         title={`Quick Inward for Grando ${spec.name}`}
                                         style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
                                       >
                                         <Plus size={14} />
                                       </button>
-                                      <button 
+                                      <button
                                         onClick={() => handleQuickOutward('Grando Ink', '', spec.key, canSize)}
-                                        className="btn-secondary" 
+                                        className="btn-secondary"
                                         title={currentStock <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for Grando ${spec.name}`}
                                         disabled={currentStock <= 0}
                                         style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: currentStock <= 0 ? 0.4 : 1, cursor: currentStock <= 0 ? 'not-allowed' : 'pointer' }}
@@ -2321,16 +2323,16 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                 <tr key={spec.code} style={{ borderBottom: '1px solid var(--border-light)' }}>
                                   <td style={tdStyle}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                      <span 
-                                        style={{ 
-                                          display: 'inline-block', 
-                                          width: '14px', 
-                                          height: '14px', 
-                                          borderRadius: '50%', 
+                                      <span
+                                        style={{
+                                          display: 'inline-block',
+                                          width: '14px',
+                                          height: '14px',
+                                          borderRadius: '50%',
                                           background: spec.colorVal,
                                           border: spec.dotBorder ? `1px solid ${spec.dotBorder}` : 'none',
                                           boxShadow: `0 0 6px ${spec.bg}`
-                                        }} 
+                                        }}
                                       />
                                       <div>
                                         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{spec.name}</span>
@@ -2364,17 +2366,17 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                   </td>
                                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                      <button 
+                                      <button
                                         onClick={() => handleQuickInward('Printdot Ink', '', spec.key, canSize)}
-                                        className="btn-primary" 
+                                        className="btn-primary"
                                         title={`Quick Inward for Printdot ${spec.name}`}
                                         style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
                                       >
                                         <Plus size={14} />
                                       </button>
-                                      <button 
+                                      <button
                                         onClick={() => handleQuickOutward('Printdot Ink', '', spec.key, canSize)}
-                                        className="btn-secondary" 
+                                        className="btn-secondary"
                                         title={currentStock <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for Printdot ${spec.name}`}
                                         disabled={currentStock <= 0}
                                         style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: currentStock <= 0 ? 0.4 : 1, cursor: currentStock <= 0 ? 'not-allowed' : 'pointer' }}
@@ -2518,24 +2520,24 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                        <button 
+                                        <button
                                           onClick={() => handleQuickInward(item.materialName, '', '', null, { unit: item.unit, category: item.category })}
-                                          className="btn-primary" 
+                                          className="btn-primary"
                                           title={`Quick Inward for ${item.materialName}`}
                                           style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
                                         >
                                           <Plus size={14} />
                                         </button>
-                                        <button 
+                                        <button
                                           onClick={() => handleQuickOutward(item.materialName, '', '', null, { unit: item.unit, category: item.category })}
-                                          className="btn-secondary" 
+                                          className="btn-secondary"
                                           title={(item.currentStock || 0) <= 0 ? 'Out of stock - cannot dispatch outward' : `Quick Outward for ${item.materialName}`}
                                           disabled={(item.currentStock || 0) <= 0}
                                           style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', opacity: (item.currentStock || 0) <= 0 ? 0.4 : 1, cursor: (item.currentStock || 0) <= 0 ? 'not-allowed' : 'pointer' }}
                                         >
                                           <ArrowUpFromLine size={14} />
                                         </button>
-                                        <button 
+                                        <button
                                           onClick={() => handleDeleteMaterial(item)}
                                           style={{
                                             padding: '6px 10px',
@@ -2676,6 +2678,18 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               <table className="data-table">
                 <thead>
                   <tr>
+                    <MasterCheckboxTh
+                      allSelected={inwardTx.length > 0 && inwardTx.every(t => !!selectedInwardMap[t._id])}
+                      someSelected={inwardTx.some(t => !!selectedInwardMap[t._id])}
+                      onToggleAll={e => {
+                        if (e.target.checked) {
+                          setSelectedInwardMap(inwardTx.reduce((acc, t) => { acc[t._id] = true; return acc; }, {}));
+                        } else {
+                          setSelectedInwardMap({});
+                        }
+                      }}
+                      totalCount={inwardTx.length}
+                    />
                     <ErpTh columnKey="date" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Date</ErpTh>
                     <ErpTh columnKey="challanNo" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Challan No</ErpTh>
                     <ErpTh columnKey="materialName" sortState={{ columnKey: inwardSortBy, order: inwardSortOrder }} onSortChange={({ columnKey, order }) => { setInwardSortBy(columnKey); setInwardSortOrder(order || 'asc'); }}>Material Name</ErpTh>
@@ -2688,10 +2702,21 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                 </thead>
                 <tbody>
                   {inwardTx.length === 0 ? (
-                    <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No transactions found.</td></tr>
+                    <tr><td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No transactions found.</td></tr>
                   ) : (
                     inwardTx.map(t => (
-                      <tr key={t._id}>
+                      <tr key={t._id} style={{ background: getRowHighlightStyle(!!selectedInwardMap[t._id]) }}>
+                        <RowCheckboxTd
+                          checked={!!selectedInwardMap[t._id]}
+                          onChange={e => {
+                            setSelectedInwardMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[t._id] = true;
+                              else delete next[t._id];
+                              return next;
+                            });
+                          }}
+                        />
                         <td>{formatDateDDMMYYYY(t.date)}</td>
                         <td><strong>{t.challanNo || '-'}</strong></td>
                         <td>{renderMaterialCell(t)}</td>
@@ -3025,6 +3050,18 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               <table className="data-table">
                 <thead>
                   <tr>
+                    <MasterCheckboxTh
+                      allSelected={outwardTx.length > 0 && outwardTx.every(t => !!selectedOutwardMap[t._id])}
+                      someSelected={outwardTx.some(t => !!selectedOutwardMap[t._id])}
+                      onToggleAll={e => {
+                        if (e.target.checked) {
+                          setSelectedOutwardMap(outwardTx.reduce((acc, t) => { acc[t._id] = true; return acc; }, {}));
+                        } else {
+                          setSelectedOutwardMap({});
+                        }
+                      }}
+                      totalCount={outwardTx.length}
+                    />
                     <ErpTh columnKey="date" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Date</ErpTh>
                     <ErpTh columnKey="jobNo" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Job No</ErpTh>
                     <ErpTh columnKey="materialName" sortState={{ columnKey: outwardSortBy, order: outwardSortOrder }} onSortChange={({ columnKey, order }) => { setOutwardSortBy(columnKey); setOutwardSortOrder(order || 'asc'); }}>Material Name</ErpTh>
@@ -3037,10 +3074,21 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                 </thead>
                 <tbody>
                   {outwardTx.length === 0 ? (
-                    <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No transactions found.</td></tr>
+                    <tr><td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No transactions found.</td></tr>
                   ) : (
                     outwardTx.map(t => (
-                      <tr key={t._id}>
+                      <tr key={t._id} style={{ background: getRowHighlightStyle(!!selectedOutwardMap[t._id]) }}>
+                        <RowCheckboxTd
+                          checked={!!selectedOutwardMap[t._id]}
+                          onChange={e => {
+                            setSelectedOutwardMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[t._id] = true;
+                              else delete next[t._id];
+                              return next;
+                            });
+                          }}
+                        />
                         <td>{formatDateDDMMYYYY(t.date)}</td>
                         <td><span className="badge badge-info">{t.jobNo || '-'}</span></td>
                         <td>{renderMaterialCell(t)}</td>
@@ -3221,9 +3269,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Color</label>
-                      <select 
-                        style={inputStyle} 
-                        value={resolveInkColorCode(inwardForm.color)} 
+                      <select
+                        style={inputStyle}
+                        value={resolveInkColorCode(inwardForm.color)}
                         onChange={e => handleColorChange('inward', inwardTab, e.target.value)}
                       >
                         <option value="C">Cyan (C)</option>
@@ -3263,9 +3311,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Color</label>
-                      <select 
-                        style={inputStyle} 
-                        value={resolveInkColorCode(inwardForm.color)} 
+                      <select
+                        style={inputStyle}
+                        value={resolveInkColorCode(inwardForm.color)}
                         onChange={e => handleColorChange('inward', inwardTab, e.target.value)}
                       >
                         <option value="C">Cyan (C)</option>
@@ -3300,27 +3348,27 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
               {/* Other Custom Materials Form Fields */}
               {!isSublimationTab(inwardTab) &&
-               !inwardTab.toLowerCase().includes('butter') &&
-               !inwardTab.toLowerCase().includes('grando') &&
-               !inwardTab.toLowerCase().includes('printdot') && (
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ flex: 2 }}>
-                    <label style={labelStyle}>Qty</label>
-                    <input type="number" min="0" max="1000000" step="any" style={inputStyle} value={inwardForm.qty} onChange={e => setInwardForm(p => ({ ...p, qty: e.target.value }))} required={inwardItems.length === 0} />
+                !inwardTab.toLowerCase().includes('butter') &&
+                !inwardTab.toLowerCase().includes('grando') &&
+                !inwardTab.toLowerCase().includes('printdot') && (
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ flex: 2 }}>
+                      <label style={labelStyle}>Qty</label>
+                      <input type="number" min="0" max="1000000" step="any" style={inputStyle} value={inwardForm.qty} onChange={e => setInwardForm(p => ({ ...p, qty: e.target.value }))} required={inwardItems.length === 0} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>Unit</label>
+                      <select style={inputStyle} value={inwardForm.unit} onChange={e => setInwardForm(p => ({ ...p, unit: e.target.value }))}>
+                        <option value="Rolls">Rolls</option>
+                        <option value="Liters">Liters</option>
+                        <option value="Kg">Kg</option>
+                        <option value="Packets">Packets</option>
+                        <option value="Meters">Meters</option>
+                        <option value="Pcs">Pcs</option>
+                      </select>
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Unit</label>
-                    <select style={inputStyle} value={inwardForm.unit} onChange={e => setInwardForm(p => ({ ...p, unit: e.target.value }))}>
-                      <option value="Rolls">Rolls</option>
-                      <option value="Liters">Liters</option>
-                      <option value="Kg">Kg</option>
-                      <option value="Packets">Packets</option>
-                      <option value="Meters">Meters</option>
-                      <option value="Pcs">Pcs</option>
-                    </select>
-                  </div>
-                </div>
-              )}
+                )}
 
               {!editingTransaction && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3583,9 +3631,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Color</label>
-                      <select 
-                        style={inputStyle} 
-                        value={resolveInkColorCode(outwardForm.color)} 
+                      <select
+                        style={inputStyle}
+                        value={resolveInkColorCode(outwardForm.color)}
                         onChange={e => handleColorChange('outward', outwardTab, e.target.value)}
                       >
                         <option value="C">Cyan (C)</option>
@@ -3625,9 +3673,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Color</label>
-                      <select 
-                        style={inputStyle} 
-                        value={resolveInkColorCode(outwardForm.color)} 
+                      <select
+                        style={inputStyle}
+                        value={resolveInkColorCode(outwardForm.color)}
                         onChange={e => handleColorChange('outward', outwardTab, e.target.value)}
                       >
                         <option value="C">Cyan (C)</option>
@@ -3662,27 +3710,27 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
               {/* Other Custom Materials Form Fields */}
               {!isSublimationTab(outwardTab) &&
-               !outwardTab.toLowerCase().includes('butter') &&
-               !outwardTab.toLowerCase().includes('grando') &&
-               !outwardTab.toLowerCase().includes('printdot') && (
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ flex: 2 }}>
-                    <label style={labelStyle}>Qty</label>
-                    <input type="number" min="0" max="1000000" step="any" style={inputStyle} value={outwardForm.qty} onChange={e => setOutwardForm(p => ({ ...p, qty: e.target.value }))} required={outwardItems.length === 0} />
+                !outwardTab.toLowerCase().includes('butter') &&
+                !outwardTab.toLowerCase().includes('grando') &&
+                !outwardTab.toLowerCase().includes('printdot') && (
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ flex: 2 }}>
+                      <label style={labelStyle}>Qty</label>
+                      <input type="number" min="0" max="1000000" step="any" style={inputStyle} value={outwardForm.qty} onChange={e => setOutwardForm(p => ({ ...p, qty: e.target.value }))} required={outwardItems.length === 0} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>Unit</label>
+                      <select style={inputStyle} value={outwardForm.unit} onChange={e => setOutwardForm(p => ({ ...p, unit: e.target.value }))}>
+                        <option value="Rolls">Rolls</option>
+                        <option value="Liters">Liters</option>
+                        <option value="Kg">Kg</option>
+                        <option value="Packets">Packets</option>
+                        <option value="Meters">Meters</option>
+                        <option value="Pcs">Pcs</option>
+                      </select>
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Unit</label>
-                    <select style={inputStyle} value={outwardForm.unit} onChange={e => setOutwardForm(p => ({ ...p, unit: e.target.value }))}>
-                      <option value="Rolls">Rolls</option>
-                      <option value="Liters">Liters</option>
-                      <option value="Kg">Kg</option>
-                      <option value="Packets">Packets</option>
-                      <option value="Meters">Meters</option>
-                      <option value="Pcs">Pcs</option>
-                    </select>
-                  </div>
-                </div>
-              )}
+                )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {outwardForm.qty && (outwardForm.metersPerRoll || outwardForm.canSize) ? (

@@ -3,7 +3,7 @@ import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Pr
 import BrandManagerModal from './BrandManagerModal';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { SmartThumbnail } from './common/SmartThumbnail';
-import { ErpTh } from './common/ErpTableParts';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync, onOpenManager }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -11,6 +11,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   const [brandFilter, setBrandFilter] = useState('All');
   const [sortField, setSortField] = useState('description');
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [selectedItemMap, setSelectedItemMap] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [showBrandManager, setShowBrandManager] = useState(false);
   const savedBrandManagerScrollRef = useRef(0);
@@ -628,6 +629,18 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           <table className="data-table" style={{ ...styles.table, minWidth: '820px', width: '100%' }}>
             <thead>
               <tr>
+                <MasterCheckboxTh
+                  allSelected={filteredItems.length > 0 && filteredItems.every(i => !!selectedItemMap[i._id])}
+                  someSelected={filteredItems.some(i => !!selectedItemMap[i._id])}
+                  onToggleAll={e => {
+                    if (e.target.checked) {
+                      setSelectedItemMap(filteredItems.reduce((acc, it) => { acc[it._id] = true; return acc; }, {}));
+                    } else {
+                      setSelectedItemMap({});
+                    }
+                  }}
+                  totalCount={filteredItems.length}
+                />
                 <ErpTh columnKey="description" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>PRODUCT DETAILS</ErpTh>
                 <ErpTh columnKey="skuCode" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>SKU CODE</ErpTh>
                 <ErpTh columnKey="brand" sortState={{ columnKey: sortField, order: sortOrder }} onSortChange={({ columnKey, order }) => { setSortField(columnKey); setSortOrder(order || 'asc'); }}>BRAND</ErpTh>
@@ -640,6 +653,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             </thead>
             <tbody>
               {filteredItems.map((item) => {
+                const isSelected = !!selectedItemMap[item._id];
                 // Determine snapshot stock if available
                 const snapStock = item.inventorySnapshots?.inventory;
                 const hasSnapshot = snapStock !== undefined && snapStock !== null;
@@ -655,7 +669,18 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                 }
 
                 return (
-                  <tr key={item._id}>
+                  <tr key={item._id} style={{ background: getRowHighlightStyle(isSelected) }}>
+                    <RowCheckboxTd
+                      checked={isSelected}
+                      onChange={e => {
+                        setSelectedItemMap(prev => {
+                          const next = { ...prev };
+                          if (e.target.checked) next[item._id] = true;
+                          else delete next[item._id];
+                          return next;
+                        });
+                      }}
+                    />
                     <td>
                       <div style={styles.itemCell}>
                         <SmartThumbnail

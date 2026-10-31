@@ -53,7 +53,7 @@ import EntityBrandBadge from './common/EntityBrandBadge';
 import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
-import { ErpTh } from './common/ErpTableParts';
+import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -230,6 +230,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [historyFilterMode, setHistoryFilterMode] = useState('ALL'); // 'ALL' | 'PACK' | 'DELIVERY' | 'RETURN'
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historySortState, setHistorySortState] = useState({ columnKey: 'timestamp', order: 'desc' });
+  const [selectedScanMap, setSelectedScanMap] = useState({});
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // ── 🎯 Multi-Dimension & Date Range Filters for Scan Registers & Operations ──
@@ -3368,6 +3369,28 @@ export default function ScanAndPackScreen({ currentUser }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <MasterCheckboxTh
+                  allSelected={sortedHistory.length > 0 && sortedHistory.every(it => {
+                    const k = String(it.awb || it.shippingPackageCode || it.orderCode || it.id || it._id || '').toUpperCase();
+                    return !!selectedScanMap[k];
+                  })}
+                  someSelected={sortedHistory.some(it => {
+                    const k = String(it.awb || it.shippingPackageCode || it.orderCode || it.id || it._id || '').toUpperCase();
+                    return !!selectedScanMap[k];
+                  })}
+                  onToggleAll={e => {
+                    if (e.target.checked) {
+                      setSelectedScanMap(sortedHistory.reduce((acc, it) => {
+                        const k = String(it.awb || it.shippingPackageCode || it.orderCode || it.id || it._id || '').toUpperCase();
+                        if (k) acc[k] = true;
+                        return acc;
+                      }, {}));
+                    } else {
+                      setSelectedScanMap({});
+                    }
+                  }}
+                  totalCount={sortedHistory.length}
+                />
                 <ErpTh columnKey="timestamp" sortState={historySortState} onSortChange={setHistorySortState}>Timestamp</ErpTh>
                 <ErpTh columnKey="awb" sortState={historySortState} onSortChange={setHistorySortState}>AWB & Package Code</ErpTh>
                 <ErpTh columnKey="order" sortState={historySortState} onSortChange={setHistorySortState}>Order & Channel</ErpTh>
@@ -3385,7 +3408,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 if (sortedHistory.length === 0) {
                   return (
                     <tr>
-                      <td colSpan={10} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                      <td colSpan={11} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
                         <Scan size={24} style={{ margin: '0 auto 6px', color: '#cbd5e1' }} />
                         <div style={{ fontWeight: 600 }}>No scan operations match this filter.</div>
                         <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Scan or type an AWB like <strong>MYSC1359190430</strong> above to record live operations.</div>
@@ -3397,6 +3420,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 return sortedHistory.map((item) => {
                   const rowKey = String(item.awb || item.shippingPackageCode || item.orderCode || item.id || item._id || '').toUpperCase();
                   const isExpanded = expandedRowAwb === rowKey;
+                  const isSelected = !!selectedScanMap[rowKey];
                   const isCod = item.paymentMode === 'COD' || item.isCod === true;
                   const itemImg = item.productImage || item.image || item.rawOrder?.productImage;
 
@@ -3408,12 +3432,23 @@ export default function ScanAndPackScreen({ currentUser }) {
                         style={{ 
                           borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9',
                           cursor: 'pointer',
-                          backgroundColor: isExpanded ? '#f0f9ff' : 'transparent',
+                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.08)' : (isExpanded ? '#f0f9ff' : 'transparent'),
                           transition: 'background-color 0.15s ease'
                         }}
-                        onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#f8fafc'; }}
-                        onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        onMouseEnter={(e) => { if (!isExpanded && !isSelected) e.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                        onMouseLeave={(e) => { if (!isExpanded && !isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
                       >
+                        <RowCheckboxTd
+                          checked={isSelected}
+                          onChange={e => {
+                            setSelectedScanMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[rowKey] = true;
+                              else delete next[rowKey];
+                              return next;
+                            });
+                          }}
+                        />
                         {/* Timestamp + Expand Toggle */}
                         <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

@@ -191,19 +191,28 @@ export function ErpTh({
  */
 export function MasterCheckboxTh({
   allSelected,
+  allChecked,
+  checked,
   someSelected,
+  indeterminate,
   onToggleAll,
-  totalCount = 0,
+  onChange,
+  totalCount,
   style = {},
   title = "Select All Rows",
 }) {
   const checkboxRef = useRef(null);
+  const isChecked = allSelected !== undefined ? Boolean(allSelected) : (allChecked !== undefined ? Boolean(allChecked) : (checked !== undefined ? Boolean(checked) : false));
+  const isIndeterminate = someSelected !== undefined ? Boolean(someSelected) : (indeterminate !== undefined ? Boolean(indeterminate) : false);
+  const handleToggle = onToggleAll || onChange;
 
   useEffect(() => {
     if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = Boolean(someSelected && !allSelected);
+      checkboxRef.current.indeterminate = Boolean(isIndeterminate && !isChecked);
     }
-  }, [someSelected, allSelected]);
+  }, [isIndeterminate, isChecked]);
+
+  const finalChecked = totalCount !== undefined ? Boolean(isChecked && totalCount > 0) : isChecked;
 
   return (
     <th
@@ -222,8 +231,8 @@ export function MasterCheckboxTh({
       <input
         ref={checkboxRef}
         type="checkbox"
-        checked={Boolean(allSelected && totalCount > 0)}
-        onChange={onToggleAll}
+        checked={finalChecked}
+        onChange={handleToggle}
         title={title}
         style={{
           cursor: 'pointer',
