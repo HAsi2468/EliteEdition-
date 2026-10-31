@@ -6039,11 +6039,15 @@ export default function EliteBillingDepartment({
               <button 
                 type="button"
                 className="btn-secondary" 
-                onClick={() => setActiveTab('customers')}
-                style={{ fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                onClick={() => setActiveTab('purchases')}
+                style={{ fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
+                title="Return to Purchase Inward"
               >
-                <span>Customers ({customers.length})</span>
+                <span>← Back to Purchases</span>
               </button>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', padding: '5px 10px', background: 'var(--bg-input, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '6px' }}>
+                Vendors ({vendorsList.length})
+              </div>
               <button 
                 type="button"
                 className="btn-primary" 
