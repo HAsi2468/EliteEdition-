@@ -40,6 +40,14 @@ const createParty = async (req, res) => {
 const getPartys = async (req, res) => {
   try {
     const { search, limit, page } = req.query;
+
+    if (search !== undefined && search !== null && typeof search !== 'string') {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_SEARCH',
+        error: 'Search parameter must be a string'
+      });
+    }
     
     // Serve from cache if no search filter and cache is valid
     if (!search && partiesCache && (Date.now() - partiesCacheTime < PARTIES_CACHE_TTL)) {

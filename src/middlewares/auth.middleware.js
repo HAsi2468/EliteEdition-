@@ -105,7 +105,7 @@ const requireAuth = async (req, res, next) => {
       try {
         if (mongoose.Types.ObjectId.isValid(userId)) {
           user = await User.findById(userId)
-            .select('_id companyId company_id allowedCompanies permissions department role isActive status name username email isMainAdmin isAdmin')
+            .select('_id companyId company_id allowedCompanies permissions department role isActive status name username email isMainAdmin isAdmin sessionRevokedAt tokenVersion')
             .maxTimeMS(2500)
             .lean();
         }
@@ -182,6 +182,23 @@ const requireAuth = async (req, res, next) => {
         code: 'UNAUTHORIZED',
         message: 'User account is inactive or not found.'
       });
+    }
+
+    // Verify session revocation timestamp against token issuance time (SEC-001)
+    if (user.sessionRevokedAt && decoded.iat) {
+      const tokenIssuedMs = decoded.iat * 1000;
+      const revokedMs = new Date(user.sessionRevokedAt).getTime();
+      if (tokenIssuedMs < (revokedMs - 1000)) {
+        try {
+          const { clearAuthCookies } = require('../controllers/auth.controller');
+          if (typeof clearAuthCookies === 'function') clearAuthCookies(res, req);
+        } catch (_) {}
+        return res.status(401).json({
+          success: false,
+          code: 'SESSION_REVOKED',
+          message: 'Session has been logged out. Please sign in again.'
+        });
+      }
     }
 
     req.user = {

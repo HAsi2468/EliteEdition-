@@ -144,7 +144,15 @@ const getAllJobCards = async (req, res) => {
   try {
     const { status, printStatus, fusingStatus, deliveryStatus, party, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department, dateField } = req.query;
 
-    const listCacheKey = `${req.user?.role || 'user'}_${page}_${limit}_${status || 'all'}_${printStatus || 'all'}_${fusingStatus || 'all'}_${deliveryStatus || 'all'}_${party || 'all'}_${search || ''}_${category || 'all'}_${department || 'all'}_${sortBy || 'default'}_${sortOrder || 'desc'}_${dateStart || ''}_${dateEnd || ''}`;
+    if (search !== undefined && search !== null && typeof search !== 'string') {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_SEARCH',
+        error: 'Search parameter must be a string'
+      });
+    }
+
+    const listCacheKey = `${req.user?.role || 'user'}_${page}_${limit}_${status || 'all'}_${printStatus || 'all'}_${fusingStatus || 'all'}_${deliveryStatus || 'all'}_${party || 'all'}_${typeof search === 'string' ? search : ''}_${category || 'all'}_${department || 'all'}_${sortBy || 'default'}_${sortOrder || 'desc'}_${dateStart || ''}_${dateEnd || ''}`;
     const cachedList = jobCardsListCache.get(listCacheKey);
     if (cachedList && (Date.now() - cachedList.time < 10000)) {
       return res.json({ ...cachedList.payload, cached: true });
@@ -175,13 +183,63 @@ const getAllJobCards = async (req, res) => {
 
     if (category && category !== 'All') baseFilter.category = category;
 
-    if (department === 'stitching') {
-      baseAndClauses.push({
-        $or: [
-          { department: 'stitching' },
-          { category: { $regex: 'stitching', $options: 'i' } }
-        ]
-      });
+    // Tenant isolation & Department handling (SEC-002)
+    const userAllowed = Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0
+      ? req.user.allowedCompanies
+      : null;
+    const isRestrictedUser = userAllowed && !(req.user.isMainAdmin && userAllowed.length >= 5);
+
+    if (department && department !== 'all') {
+      const depLower = String(department).trim().toLowerCase();
+      if (depLower === 'stitching') {
+        baseAndClauses.push({
+          $or: [
+            { department: 'stitching' },
+            { category: { $regex: 'stitching', $options: 'i' } }
+          ]
+        });
+      } else if (depLower === 'elite_online' || depLower === 'elite online' || depLower === 'eon') {
+        baseAndClauses.push({
+          $or: [
+            { department: { $in: ['elite_online', 'Elite Online', 'eon'] } },
+            { category: { $regex: 'online', $options: 'i' } },
+            { party: { $regex: 'online', $options: 'i' } }
+          ]
+        });
+      } else if (depLower === 'digital_print' || depLower === 'edp' || depLower === 'elite digital print') {
+        baseAndClauses.push({
+          $or: [
+            { department: { $in: ['digital_print', 'Digital Print', 'Elite Digital Print', 'edp', 'Production'] } },
+            { department: { $ne: 'stitching' } }
+          ]
+        });
+      } else {
+        baseFilter.department = department;
+      }
+    } else if (isRestrictedUser) {
+      const hasOnline = userAllowed.some(c => /online/i.test(c));
+      const hasPrints = userAllowed.some(c => /print|digital/i.test(c));
+      const hasStitching = userAllowed.some(c => /stitching/i.test(c));
+
+      if (hasOnline && !hasPrints && !hasStitching) {
+        baseAndClauses.push({
+          $or: [
+            { department: { $in: ['elite_online', 'Elite Online', 'eon'] } },
+            { category: { $regex: 'online', $options: 'i' } },
+            { party: { $regex: 'online', $options: 'i' } }
+          ]
+        });
+      } else if (hasStitching && !hasPrints && !hasOnline) {
+        baseAndClauses.push({
+          $or: [
+            { department: 'stitching' },
+            { category: { $regex: 'stitching', $options: 'i' } }
+          ]
+        });
+      } else if (!party) {
+        baseFilter.department = { $ne: 'stitching' };
+        baseFilter.category = { $ne: 'Stitching' };
+      }
     } else if (department === 'all' || party) {
       // If party is specified (e.g. client portal) or department=all, do not exclude records
     } else {

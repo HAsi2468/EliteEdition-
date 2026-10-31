@@ -77,13 +77,13 @@ if (config.env !== 'test') {
 	app.use(morgan.errorHandler);
 }
 
-// Comprehensive Helmet Security Headers Suite with Enterprise CSP
+// Comprehensive Helmet Security Headers Suite with Hardened CSP (SEC-005)
 app.use(
 	helmet({
 		contentSecurityPolicy: {
 			directives: {
 				defaultSrc: ["'self'"],
-				scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+				scriptSrc: ["'self'"],
 				styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
 				fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
 				imgSrc: [
@@ -131,13 +131,58 @@ app.use(
 	})
 );
 
-// Strip any client-supplied spoofable privilege headers early (BUG-059 protection)
+// Header Deduplication: Ensure HSTS and X-Frame-Options are sent only once across proxy hops (SEC-005)
 app.use((req, res, next) => {
-  delete req.headers['x-user-role'];
-  delete req.headers['x-is-admin'];
-  delete req.headers['x-operator-override'];
+  const origSetHeader = res.setHeader;
+  const seenHeaders = new Set();
+  res.setHeader = function(name, value) {
+    const lower = String(name).toLowerCase();
+    if (lower === 'x-frame-options' || lower === 'strict-transport-security') {
+      if (seenHeaders.has(lower)) {
+        return this;
+      }
+      seenHeaders.add(lower);
+    }
+    return origSetHeader.call(this, name, value);
+  };
+  next();
+});
+
+// Strict Privilege Spoofing Gate (SEC-006): Reject requests attempting client-sent role spoofing with 403
+app.use((req, res, next) => {
+  const SPOOFABLE_PRIVILEGE_HEADERS = ['x-user-role', 'x-is-admin', 'x-operator-override'];
+  const detected = SPOOFABLE_PRIVILEGE_HEADERS.find(h => req.headers[h] !== undefined);
+  if (detected) {
+    return res.status(403).json({
+      success: false,
+      code: 'PRIVILEGE_SPOOFING_DETECTED',
+      error: `Forbidden: Client-supplied privilege header '${detected}' is strictly prohibited.`
+    });
+  }
   delete req.headers['x-user-id'];
   delete req.headers['x-user-name'];
+  next();
+});
+
+// Query & Parameter Operator Injection Guard (SEC-003): Reject query parameters with NoSQL operators
+app.use((req, res, next) => {
+  const hasOperator = (obj) => {
+    if (!obj || typeof obj !== 'object') return false;
+    for (const key of Object.keys(obj)) {
+      if (key.startsWith('$') || (typeof obj[key] === 'object' && hasOperator(obj[key]))) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (hasOperator(req.query) || hasOperator(req.params)) {
+    return res.status(400).json({
+      success: false,
+      code: 'INVALID_QUERY_PARAMETER',
+      error: 'Query parameter contains prohibited operators or malformed structure.'
+    });
+  }
   next();
 });
 

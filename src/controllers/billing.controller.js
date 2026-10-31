@@ -220,9 +220,14 @@ function checkCompanyTenantAccess(req, requestedCompany) {
   const user = req.user;
   if (!user) return true;
   const role = String(user.role || '').toLowerCase();
-  const isAdmin = user.isMainAdmin || user.isAdmin || role === 'admin' || role === 'super_admin' || role === 'superadmin' || user.email === 'harshitsidapara2468@gmail.com';
-  if (isAdmin) return true;
+  const isSuperOwner = user.isMainAdmin || role === 'super_admin' || role === 'superadmin' || user.email === 'harshitsidapara2468@gmail.com';
 
+  // Super admin has global tenant access ONLY IF allowedCompanies is unrestricted or contains all
+  if (isSuperOwner && (!Array.isArray(user.allowedCompanies) || user.allowedCompanies.length >= 5)) {
+    return true;
+  }
+
+  // Tenant enforcement: derive allowed tenant from user's allowedCompanies (SEC-002)
   if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0) {
     if (!requestedCompany) return true; // Controller will scope to allowedCompanies[0]
     const normReq = String(requestedCompany).toLowerCase().replace(/[\s_-]+/g, '');
@@ -429,17 +434,30 @@ const getInvoices = async (req, res) => {
   try {
     const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd, companyEntity } = req.query;
 
-    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'] || req.headers['company'];
-    if (!checkCompanyTenantAccess(req, activeCompany)) {
-      return res.status(403).json({
+    if (search !== undefined && search !== null && typeof search !== 'string') {
+      return res.status(400).json({
         success: false,
-        code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to view records for '${activeCompany}'.`
+        code: 'INVALID_SEARCH',
+        error: 'Search query must be a string'
       });
     }
 
-    if (!activeCompany && req.user && !req.user.isAdmin && !req.user.isMainAdmin && Array.isArray(req.user.allowedCompanies) && req.user.allowedCompanies.length > 0) {
-      activeCompany = req.user.allowedCompanies[0];
+    let activeCompany = companyEntity;
+    const isRestricted = Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0 &&
+      !(req.user.isMainAdmin && req.user.allowedCompanies.length >= 5);
+
+    if (isRestricted) {
+      if (!activeCompany) {
+        activeCompany = req.user.allowedCompanies[0];
+      } else if (!checkCompanyTenantAccess(req, activeCompany)) {
+        return res.status(403).json({
+          success: false,
+          code: 'COMPANY_FORBIDDEN',
+          error: `Access denied: You do not have permission to view records for '${activeCompany}'.`
+        });
+      }
+    } else {
+      activeCompany = activeCompany || req.headers['x-company-id'] || req.headers['x-company'] || req.headers['company'];
     }
 
     const filter = buildCompanyFilter(activeCompany);
@@ -520,7 +538,12 @@ const getInvoices = async (req, res) => {
 // ── 3. GET SINGLE INVOICE BY ID ─────────────────────────────────────────────
 const getInvoiceById = async (req, res) => {
   try {
-    const invoice = await BillingInvoice.findById(req.params.id).lean();
+    const { id } = req.params;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ success: false, error: 'Invoice not found' });
+    }
+
+    const invoice = await BillingInvoice.findById(id).lean();
     if (!invoice || !checkCompanyTenantAccess(req, invoice.companyEntity)) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
@@ -529,7 +552,11 @@ const getInvoiceById = async (req, res) => {
 
     res.json({ success: true, data: invoice });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    if (error.name === 'CastError') {
+      return res.status(404).json({ success: false, error: 'Invoice not found' });
+    }
+    logger.error('Error fetching invoice by id: %s', error.message);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
@@ -3562,14 +3589,24 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 const getCustomers = async (req, res) => {
   try {
     let { companyEntity } = req.query;
-    const activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
-    if (!checkCompanyTenantAccess(req, activeCompany)) {
-      return res.status(403).json({
-        success: false,
-        code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to access customers for '${activeCompany}'.`
-      });
+    let activeCompany = companyEntity;
+    const isRestricted = Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0 &&
+      !(req.user.isMainAdmin && req.user.allowedCompanies.length >= 5);
+
+    if (isRestricted) {
+      if (!activeCompany) {
+        activeCompany = req.user.allowedCompanies[0];
+      } else if (!checkCompanyTenantAccess(req, activeCompany)) {
+        return res.status(403).json({
+          success: false,
+          code: 'COMPANY_FORBIDDEN',
+          error: `Access denied: You do not have permission to access customers for '${activeCompany}'.`
+        });
+      }
+    } else {
+      activeCompany = activeCompany || req.headers['x-company-id'] || req.headers['x-company'];
     }
+
     const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
     const customers = await BillingCustomer.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: customers });

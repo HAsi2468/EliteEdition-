@@ -98,3 +98,4 @@ module.exports = {
   AppError,
   errorMapper
 };
+

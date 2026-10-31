@@ -103,6 +103,14 @@ const userSchema = new mongoose.Schema(
 			enum: ['Active', 'Inactive'],
 			default: 'Active',
 		},
+		sessionRevokedAt: {
+			type: Date,
+			default: null,
+		},
+		tokenVersion: {
+			type: Number,
+			default: 0,
+		},
 		created_date_time: {
 			type: Date,
 			default: Date.now,

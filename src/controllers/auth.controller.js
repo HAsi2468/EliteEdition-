@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const httpStatus = require('http-status').default;
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
@@ -50,28 +52,52 @@ function setAuthCookies(res, tokens) {
 }
 
 /**
- * Clears auth cookies upon logout, login failure, or session invalidation
+ * Clears auth cookies upon logout, login failure, or session invalidation (SEC-001)
  */
-function clearAuthCookies(res) {
+function clearAuthCookies(res, req) {
   const isProduction = process.env.NODE_ENV === 'production';
   const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
 
-  const cookieNames = ['refreshToken', 'accessToken', 'token', 'elite_auth_token', 'elite_refresh_token'];
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-    expires: new Date(0),
-  };
+  const cookieNames = ['refreshToken', 'accessToken', 'token', 'elite_auth_token', 'elite_refresh_token', 'jwt'];
+  const reqHost = req?.hostname || '';
 
-  cookieNames.forEach((name) => {
-    res.clearCookie(name, cookieOptions);
-    if (cookieDomain) {
-      res.clearCookie(name, { ...cookieOptions, domain: cookieDomain });
+  const domains = [
+    undefined,
+    cookieDomain,
+    reqHost || undefined,
+    reqHost ? `.${reqHost}` : undefined,
+    'erp.eliteedition.in',
+    '.eliteedition.in'
+  ].filter((d, i, self) => self.indexOf(d) === i);
+
+  const paths = ['/', '/v1', '/api', '/api/v1'];
+
+  for (const name of cookieNames) {
+    for (const domain of domains) {
+      for (const path of paths) {
+        res.clearCookie(name, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: 'lax',
+          path,
+          domain,
+          maxAge: 0,
+          expires: new Date(0),
+        });
+        if (isProduction) {
+          res.clearCookie(name, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path,
+            domain,
+            maxAge: 0,
+            expires: new Date(0),
+          });
+        }
+      }
     }
-  });
+  }
 }
 
 const register = catchAsync(async (req, res) => {
@@ -137,18 +163,7 @@ const logout = catchAsync(async (req, res) => {
     req.cookies?.elite_refresh_token ||
     req.headers['x-refresh-token'];
 
-  if (refreshToken) {
-    try {
-      const payload = await verifyToken(refreshToken);
-      if (payload && payload.familyId) {
-        await tokenService.revokeTokenFamily(payload.familyId, payload.userId);
-      }
-    } catch {
-      // Best-effort cleanup
-    }
-  }
-
-  // Blacklist active access token in Redis so it cannot be used again
+  // Resolve active access token
   let accessToken = null;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -157,23 +172,68 @@ const logout = catchAsync(async (req, res) => {
     accessToken = req.cookies.accessToken || req.cookies.token || req.cookies.elite_auth_token;
   }
 
+  // Resolve user identity from session, access token, or refresh token (SEC-001)
+  let userId = req.user?.id || req.user?._id || null;
+  if (!userId && accessToken) {
+    try {
+      const decoded = jwt.decode(accessToken);
+      userId = decoded?.id || decoded?.userId || decoded?.sub || decoded?._id || null;
+    } catch (_) {}
+  }
+  if (!userId && refreshToken) {
+    try {
+      const payload = await verifyToken(refreshToken);
+      userId = payload?.userId || payload?.id || payload?.sub || null;
+    } catch (_) {}
+  }
+
+  if (refreshToken) {
+    try {
+      const payload = await verifyToken(refreshToken);
+      if (payload && payload.familyId) {
+        await tokenService.revokeTokenFamily(payload.familyId, payload.userId || userId);
+      }
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
+  // Blacklist active access token in Redis / distributed memory store
   if (accessToken) {
     try {
       const { getRedisClient } = require('../db/redisClient');
       const redis = typeof getRedisClient === 'function' ? getRedisClient() : null;
       if (redis && typeof redis.set === 'function') {
-        await redis.set(`revoked_token:${accessToken}`, '1', { EX: 7200 });
+        await redis.set(`revoked_token:${accessToken}`, '1', { EX: 86400 });
       }
     } catch (_) {}
   }
 
-  if (req.user && req.user.id) {
+  // Invalidate all sessions & bump token version in MongoDB so old tokens are instantly rejected
+  if (userId) {
     try {
-      await tokenService.revokeAllUserSessions(req.user.id);
+      const User = require('../db/models/user.model');
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        await User.findByIdAndUpdate(userId, {
+          $set: { sessionRevokedAt: new Date() },
+          $inc: { tokenVersion: 1 }
+        });
+      }
+    } catch (_) {}
+
+    try {
+      const { invalidateCachedUser } = require('../middlewares/auth.middleware');
+      if (typeof invalidateCachedUser === 'function') {
+        invalidateCachedUser(userId);
+      }
+    } catch (_) {}
+
+    try {
+      await tokenService.revokeAllUserSessions(userId);
     } catch (_) {}
   }
 
-  clearAuthCookies(res);
+  clearAuthCookies(res, req);
   res.status(httpStatus.OK).send({ success: true, message: 'Logged out successfully' });
 });
 
