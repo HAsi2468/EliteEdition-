@@ -18,7 +18,13 @@ async function getUserByEmail(email) {
 }
 
 async function getUserById(id) {
-	const user = await db.user.findOne({ _id: id }).lean();
+	const user = await db.user.findOne({ _id: id }, {
+		password: 0,
+		pushSubscriptions: 0,
+		webPushSubscription: 0,
+		subscription: 0,
+		pushSubscription: 0
+	}).lean();
 	if (user) {
 		user.id = user._id.toString();
 	}

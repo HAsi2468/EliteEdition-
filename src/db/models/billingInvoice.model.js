@@ -155,4 +155,14 @@ billingInvoiceSchema.index({ invoiceSeq: -1 });
 // Signed copy approval status index
 billingInvoiceSchema.index({ 'signedCopy.status': 1 });
 
+// BUG-063 DB Schema Guard: Prevent paidAmount exceeding grandTotal
+billingInvoiceSchema.pre('validate', function(next) {
+  if (typeof this.paidAmount === 'number' && typeof this.grandTotal === 'number') {
+    if (this.paidAmount > this.grandTotal + 0.01) {
+      return next(new Error(`Overpayment rejected: paidAmount (${this.paidAmount}) cannot exceed grandTotal (${this.grandTotal})`));
+    }
+  }
+  next();
+});
+
 module.exports = mongoose.model('BillingInvoice', billingInvoiceSchema);

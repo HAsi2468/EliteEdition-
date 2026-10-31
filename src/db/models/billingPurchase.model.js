@@ -94,6 +94,16 @@ const billingPurchaseSchema = new mongoose.Schema(
 // Index for query optimization
 billingPurchaseSchema.index({ companyEntity: 1, date: -1 });
 
+// BUG-064 DB Schema Guard: Prevent paidAmount/advance exceeding grandTotal
+billingPurchaseSchema.pre('validate', function(next) {
+  if (typeof this.paidAmount === 'number' && typeof this.grandTotal === 'number') {
+    if (this.paidAmount > this.grandTotal + 0.01) {
+      return next(new Error(`Advance/paid amount rejected: paidAmount (${this.paidAmount}) cannot exceed grandTotal (${this.grandTotal})`));
+    }
+  }
+  next();
+});
+
 const BillingPurchase = mongoose.model('BillingPurchase', billingPurchaseSchema);
 
 module.exports = BillingPurchase;

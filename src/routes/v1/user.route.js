@@ -17,19 +17,11 @@ router
 			const role = String(req.user?.role || '').toLowerCase();
 			const isAdmin = role === 'admin' || role === 'superadmin' || role === 'super_admin' || req.user?.isMainAdmin === true || req.user?.isAdmin === true;
 			if (!isAdmin) {
-				// SEC-009: Non-admins receive only their own caller record to prevent directory enumeration and PII disclosure
-				const callerUser = { ...(req.user || {}) };
-				delete callerUser.password;
-				delete callerUser.pushSubscriptions;
-				delete callerUser.subscription;
-				delete callerUser.webPushSubscription;
-				delete callerUser.pushSubscription;
-				delete callerUser.tokenVersion;
-				return res.status(200).json({
-					success: true,
-					data: [callerUser],
-					count: 1,
-					users: { rows: [callerUser], count: 1 }
+				// SEC-009: Restrict user directory enumeration to administrators only
+				return res.status(403).json({
+					success: false,
+					code: 'FORBIDDEN',
+					message: 'Forbidden: Access to user directory is restricted to administrators only.'
 				});
 			}
 			next();

@@ -130,3 +130,4 @@ const purgeAllQaTestArtifacts = async () => {
 };
 
 module.exports = { purgeAllQaTestArtifacts };
+
