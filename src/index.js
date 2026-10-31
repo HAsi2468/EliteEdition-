@@ -149,8 +149,10 @@ server.listen(port, host, async () => {
   try {
     const { seedFacilitiesOnStartup } = require('./controllers/facility.controller');
     await seedFacilitiesOnStartup();
+    const { purgeAllQaTestArtifacts } = require('./utils/qaCleanup');
+    await purgeAllQaTestArtifacts();
   } catch (err) {
-    logger.warn('Failed to seed facilities on startup: ' + err.message);
+    logger.warn('Failed to seed facilities or purge test artifacts on startup: ' + err.message);
   }
 });
 
