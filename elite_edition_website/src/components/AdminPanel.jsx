@@ -714,7 +714,7 @@ export default function AdminPanel() {
     });
   };
 
-  const ALL_COMPANY_NAMES = ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno wear', 'Yamunaji'];
+  const ALL_COMPANY_NAMES = ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno wear', 'Yamunaji', 'EXEDP'];
   const DEPARTMENTS_LIST = [
     'General',
     'Executive',

@@ -60,6 +60,13 @@ const COMPANIES = [
     type: 'Textile & Corporate Sales Entity',
     aliases: ['yamunaji', 'yj', 'yamuna ji', 'yamuna'],
   },
+  {
+    id: 'exedp',
+    code: 'EXEDP',
+    name: 'EXEDP',
+    type: 'Old Data Management',
+    aliases: ['exedp', 'ex-edp', 'ex_edp', 'old edp', 'exedp old data'],
+  },
 ];
 
 const COMPANY_IDS = COMPANIES.map((c) => c.id);

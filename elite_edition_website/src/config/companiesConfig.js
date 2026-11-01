@@ -147,6 +147,23 @@ export const COMPANIES = [
     gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
     description: 'Company workspace for Yamunaji finance, invoices & billing.',
     aliases: ['yamunaji', 'yj', 'yamuna ji', 'yamuna']
+  },
+  {
+    id: 'exedp',
+    code: 'EXEDP',
+    name: 'EXEDP',
+    fullName: 'EXEDP (Elite Digital Prints - Old Data)',
+    shortName: 'EXEDP',
+    type: 'Old Data Management',
+    iconName: 'Receipt',
+    defaultTab: 'exedp_expenses',
+    invoicesTab: 'exedp_expenses',
+    settingsTab: 'company_settings',
+    badgeColor: '#475569',
+    iconColor: '#475569',
+    gradient: 'linear-gradient(135deg, #475569, #334155)',
+    description: 'Old data expense management for Elite Digital Prints.',
+    aliases: ['exedp', 'ex-edp', 'ex_edp', 'old edp', 'exedp old data']
   }
 ];
 
