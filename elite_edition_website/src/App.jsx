@@ -3075,14 +3075,9 @@ export default function App() {
               <div className="nav-section-header">Modules</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                 {activeDepartment === 'exedp' ? (
-                  <>
-                    <button onClick={() => { setActiveTab('exedp_invoices'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_invoices' ? 'active' : ''}`}>
-                      Finance
-                    </button>
-                    <button onClick={() => { setActiveTab('exedp_expenses'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_expenses' ? 'active' : ''}`}>
-                      Expenses
-                    </button>
-                  </>
+                  <button onClick={() => { setActiveTab('exedp_invoices'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_invoices' ? 'active' : ''}`}>
+                    Finance
+                  </button>
                 ) : activeDepartment === 'stitching' ? (
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) && (
@@ -3569,7 +3564,6 @@ export default function App() {
                 return (
                   <>
                     {renderNavItem('exedp_invoices', 'Finance', Receipt, null, 'Finance')}
-                    {renderNavItem('exedp_expenses', 'Expenses', Wallet, null, 'Expenses')}
                   </>
                 );
               }
@@ -4057,10 +4051,10 @@ export default function App() {
               activeDepartment === 'stitching' ? 'Elite Stitching' :
               'Elite Digital Print'
             } />
-          ) : activeTab === 'exedp_invoices' || (activeDepartment === 'exedp' && activeTab !== 'exedp_expenses' && activeTab !== 'workspace' && activeTab !== 'communication' && activeTab !== 'task_management') ? (
+          ) : activeTab === 'exedp_invoices' || (activeDepartment === 'exedp' && activeTab !== 'workspace' && activeTab !== 'communication' && activeTab !== 'task_management' && activeTab !== 'exedp_expenses') ? (
             <EliteBillingDepartment companyEntity="EXEDP" department="exedp" />
           ) : activeTab === 'exedp_expenses' ? (
-            <DigitalPrintExpenseModule companyEntity="EXEDP" />
+            <EliteBillingDepartment companyEntity="EXEDP" department="exedp" initialTab="expense" />
           ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />
           ) : activeTab === 'unicommerce' ? (
