@@ -2939,13 +2939,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           </div>
 
           {/* Sub-Tabs Bar */}
-          <div className="ent-tab-bar">
+          <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Fabric Inventory Sub-Tabs">
             {tabs.map(tab => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id)}
                   className={`ent-tab-btn ${isActive ? 'active' : ''}`}
                 >

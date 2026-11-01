@@ -8,6 +8,7 @@ import {
 import { matchesCombo, isTextInputActive } from './keyUtils';
 import {
   switchActiveSubTab,
+  switchInsideButtons,
   activateSidebarModule,
   focusSidebar,
   focusSearchInput,
@@ -256,9 +257,9 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // 6. Universal Sub-Tab Switching (Alt + ArrowRight/Left or Ctrl + ]/[)
-      if ((e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) ||
-          (isCtrlOrMeta && (e.key === ']' || e.key === '['))) {
+      // 6. Universal Primary Screen Sub-Tab Switching (Alt + ArrowRight/Left or Ctrl + ]/[)
+      if (!e.shiftKey && ((e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) ||
+          (isCtrlOrMeta && (e.key === ']' || e.key === '[')))) {
         const direction = (e.key === 'ArrowRight' || e.key === ']') ? 'next' : 'prev';
         const switched = switchActiveSubTab(direction);
         if (switched) {
@@ -268,7 +269,27 @@ export const HotkeyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // 6. Direct Sub-Tab Jump (Ctrl + 1..9)
+      // 6b. Universal Inside Buttons / Inner Sub-Tabs Switching
+      // Triggered by: Alt + ArrowDown/Up OR Alt + Shift + ArrowRight/Left OR Ctrl + Shift + ]/[
+      const isAltUpDown = e.altKey && !isCtrlOrMeta && (e.key === 'ArrowDown' || e.key === 'ArrowUp');
+      const isAltShiftArrow = e.altKey && e.shiftKey && !isCtrlOrMeta && (e.key === 'ArrowRight' || e.key === 'ArrowLeft');
+      const isCtrlShiftBracket = isCtrlOrMeta && e.shiftKey && (e.key === ']' || e.key === '[' || e.key === '}' || e.key === '{');
+
+      if (isAltUpDown || isAltShiftArrow || isCtrlShiftBracket) {
+        // Only run if not inside an active/open combobox dropdown
+        const isComboboxOpen = document.querySelector('[role="listbox"][data-expanded="true"], .combobox-dropdown-open');
+        if (!isComboboxOpen) {
+          const direction = (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ']' || e.key === '}') ? 'next' : 'prev';
+          const switched = switchInsideButtons(direction);
+          if (switched) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+      }
+
+      // 6c. Direct Sub-Tab Jump (Ctrl + 1..9)
       if (isCtrlOrMeta && !e.altKey && /^[1-9]$/.test(e.key)) {
         const switched = switchActiveSubTab(Number(e.key) - 1);
         if (switched) {

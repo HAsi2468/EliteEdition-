@@ -1578,9 +1578,11 @@ export default function InventoryGrid({
       {/* MAIN TOP NAVIGATION SUB-TAB BAR (3 Dedicated Screens)                      */}
       {/* ========================================================================= */}
       <div className="inv-sub-tab-bar-container" style={styles.subTabBarContainer}>
-        <div className="inv-sub-tab-bar" style={styles.subTabBar}>
+        <div className="inv-sub-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Inventory Primary Sub-Tabs" style={styles.subTabBar}>
           {/* Tab 1: Stock Overview */}
           <button
+            role="tab"
+            aria-selected={activeSubTab === 'overview'}
             onClick={() => setActiveSubTab('overview')}
             style={styles.subTabButton(activeSubTab === 'overview', 'overview')}
           >
@@ -1593,6 +1595,8 @@ export default function InventoryGrid({
 
           {/* Tab 2: Inward Stock */}
           <button
+            role="tab"
+            aria-selected={activeSubTab === 'inward'}
             onClick={() => setActiveSubTab('inward')}
             style={styles.subTabButton(activeSubTab === 'inward', 'inward')}
           >

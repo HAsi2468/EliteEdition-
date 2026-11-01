@@ -2133,6 +2133,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       {/* ─── Operational Stage Navigation Tabs (Drawing, Colour Match, Hold, Approved, Revisions) ── */}
       <div
         className="ent-tab-bar horizontal-scroll-tabs"
+        data-screen-subtabs="primary"
+        role="tablist"
+        aria-label="Designer Stage Navigation Tabs"
         style={{
           display: 'flex',
           gap: '0.45rem',

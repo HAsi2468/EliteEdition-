@@ -4323,6 +4323,9 @@ export default function EliteBillingDepartment({
         {/* Sub-Tabs Bar */}
         <div
           className="ent-tab-bar"
+          data-screen-subtabs="primary"
+          role="tablist"
+          aria-label="Billing Department Sub-Tabs"
           style={{
             display: 'flex',
             flexWrap: 'nowrap',
@@ -4351,6 +4354,9 @@ export default function EliteBillingDepartment({
             return (
               <button
                 key={t.id}
+                role="tab"
+                aria-selected={isActive}
+                data-subtab={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`ent-tab-btn ${isActive ? 'active' : ''}`}
                 style={{ flexShrink: 0, flex: '0 0 auto', whiteSpace: 'nowrap', minWidth: 'max-content' }}

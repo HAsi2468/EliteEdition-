@@ -163,31 +163,46 @@ export function handleGlobalEnterAsTab(e: KeyboardEvent): boolean {
 }
 
 /**
- * Universal Sub-Tab Switcher
- * Finds visible sub-tabs in the active screen and cycles forward/backward or jumps to specific index
+ * Universal Primary Sub-Tab Switcher
+ * Finds visible primary sub-tabs in the active screen and cycles forward/backward or jumps to specific index.
+ * Strictly targets top-level screen sub-tabs, avoiding nested inner tabs or inside screen buttons.
  */
 export function switchActiveSubTab(direction: 'next' | 'prev' | number): boolean {
   if (typeof document === 'undefined') return false;
 
   const contentArea = document.getElementById('main-content-area') || document.body;
 
-  const candidateSelectors = [
-    '[role="tablist"]',
+  // Primary screen sub-tab candidate selectors in hierarchical priority order
+  const primaryCandidateSelectors = [
+    '[data-screen-subtabs="primary"]',
+    '.ent-screen-header .ent-tab-bar',
+    '.ent-screen-header [role="tablist"]',
+    '.ent-screen-container > .ent-screen-header .ent-tab-bar',
+    '.inv-sub-tab-bar-container .inv-sub-tab-bar',
     '.inv-sub-tab-bar',
-    '.gst-sub-tab-bar',
-    '.sub-tab-bar',
+    '.erp-multi-tab-bar',
+    // Topmost .ent-tab-bar that is NOT a nested gst-sub-tab-bar or secondary inner tab bar
+    '.ent-tab-bar:not(.gst-sub-tab-bar):not(.inner-tab-bar):not([data-subtab-container="secondary"])',
+    '[role="tablist"]:not([data-subtab-container="secondary"]):not(.inner-tablist)',
+    '.sub-tab-bar:not(.inner-sub-tab-bar)',
     '.ent-tabs-container',
     '.nav-tabs',
     '.sub-tabs'
   ];
 
   let tabButtons: HTMLElement[] = [];
-  for (const selector of candidateSelectors) {
+  for (const selector of primaryCandidateSelectors) {
     const container = contentArea.querySelector(selector);
     if (container) {
       const btns = Array.from(
-        container.querySelectorAll<HTMLElement>('button:not([disabled]), [role="tab"]:not([disabled])')
-      ).filter((b) => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0);
+        container.querySelectorAll<HTMLElement>(
+          'button.ent-tab-btn, button.inv-sub-tab-btn, button.sub-tab, button[role="tab"], [role="tab"], button[data-subtab], button'
+        )
+      ).filter((b) => {
+        if ((b.offsetWidth || b.offsetHeight || b.getClientRects().length) === 0) return false;
+        if (b.classList.contains('btn-close') || b.classList.contains('smart-icon-btn') || b.classList.contains('btn-icon')) return false;
+        return true;
+      });
       if (btns.length > 1) {
         tabButtons = btns;
         break;
@@ -195,19 +210,21 @@ export function switchActiveSubTab(direction: 'next' | 'prev' | number): boolean
     }
   }
 
-  // Fallback: look for buttons with tab-like classes in main content
+  // Fallback: look for buttons with tab-like classes in main content header
   if (tabButtons.length === 0) {
     const standaloneTabBtns = Array.from(
       contentArea.querySelectorAll<HTMLElement>(
-        'button.ent-tab-btn, button.sub-tab, button[role="tab"], button[data-subtab]'
+        '.ent-screen-header button.ent-tab-btn, button.ent-tab-btn:not([data-subtab-container="secondary"] *), button.sub-tab, button[role="tab"], button[data-subtab]'
       )
     ).filter((b) => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0);
 
     if (standaloneTabBtns.length > 1) {
       const parent = standaloneTabBtns[0].parentElement;
       if (parent) {
-        tabButtons = Array.from(parent.querySelectorAll<HTMLElement>('button:not([disabled])')).filter(
-          (b) => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0
+        tabButtons = Array.from(
+          parent.querySelectorAll<HTMLElement>('button.ent-tab-btn, button.sub-tab, button[role="tab"], button[data-subtab], button:not([disabled])')
+        ).filter(
+          (b) => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0 && !b.classList.contains('btn-close')
         );
       }
     }
@@ -218,7 +235,7 @@ export function switchActiveSubTab(direction: 'next' | 'prev' | number): boolean
   // Determine active tab index
   let activeIndex = -1;
   tabButtons.forEach((btn, idx) => {
-    const isSelected = btn.getAttribute('aria-selected') === 'true';
+    const isSelected = btn.getAttribute('aria-selected') === 'true' || btn.getAttribute('aria-pressed') === 'true';
     const hasActiveClass =
       btn.classList.contains('active') ||
       btn.classList.contains('is-active') ||
@@ -227,6 +244,7 @@ export function switchActiveSubTab(direction: 'next' | 'prev' | number): boolean
     const hasActiveStyle =
       styleAttr.includes('font-weight: 700') ||
       styleAttr.includes('fontWeight: 700') ||
+      styleAttr.includes('font-weight: 800') ||
       styleAttr.includes('border-bottom: 2px') ||
       styleAttr.includes('border-bottom: 3px');
 
@@ -251,6 +269,137 @@ export function switchActiveSubTab(direction: 'next' | 'prev' | number): boolean
   if (targetBtn) {
     targetBtn.focus();
     targetBtn.click();
+    try {
+      targetBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    } catch (e) {}
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Universal Inside Buttons / Inner Sub-Tabs Switcher
+ * Finds secondary/inner sub-tabs, status filter pills, mode switches, and action buttons INSIDE the screen
+ * Shortcut: Alt + Up / Down Arrow, Alt + Shift + Left / Right Arrow
+ */
+export function switchInsideButtons(direction: 'next' | 'prev' | number): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const contentArea = document.getElementById('main-content-area') || document.body;
+
+  // Selectors for secondary / inside button groups & inner sub-tabs
+  const insideGroupSelectors = [
+    // Explicit secondary / inside containers
+    '[data-subtab-container="secondary"]',
+    '[data-inside-tabs="true"]',
+    '.gst-sub-tab-bar',
+    '.inner-tab-bar',
+    '.horizontal-scroll-tabs:not(.ent-screen-header .horizontal-scroll-tabs)',
+    // Status pills / Filter tab tracks (e.g. Invoices/Challan/Jobcard filter bars)
+    '.erp-filter-pills-track',
+    '.ent-filter-pill-bar',
+    '.filter-pills-bar',
+    '.status-filter-group',
+    '.segmented-control:not(.dept-switcher-header .segmented-control)',
+    // Date filter presets or mode toggles (like Party vs Master in ledger modal)
+    '.date-range-presets',
+    '.ledger-mode-selector',
+    // Card action / row action groups
+    '.smart-action-group',
+    '.erp-table-action-group'
+  ];
+
+  let targetButtons: HTMLElement[] = [];
+
+  for (const selector of insideGroupSelectors) {
+    const container = contentArea.querySelector(selector);
+    if (container) {
+      const btns = Array.from(
+        container.querySelectorAll<HTMLElement>('button:not([disabled]), [role="tab"]:not([disabled])')
+      ).filter(b => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0 && !b.classList.contains('btn-close'));
+      if (btns.length > 1) {
+        targetButtons = btns;
+        break;
+      }
+    }
+  }
+
+  // Fallback 1: Look inside content body (outside the screen header) for filter pills, secondary tabs, or mode buttons
+  if (targetButtons.length === 0) {
+    const contentBody = contentArea.querySelector('.ent-screen-container > div:not(.ent-screen-header), .ent-content, .jobcard-content, .inv-content') || contentArea;
+    const innerTabLikeBtns = Array.from(
+      contentBody.querySelectorAll<HTMLElement>(
+        '.gst-sub-tab-bar button, .filter-pill, button.status-pill, button.pill-btn, button[data-filter-pill], button.mode-btn, button.btn-filter'
+      )
+    ).filter(b => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0 && !b.classList.contains('btn-close'));
+
+    if (innerTabLikeBtns.length > 1) {
+      const parent = innerTabLikeBtns[0].parentElement;
+      if (parent) {
+        targetButtons = Array.from(parent.querySelectorAll<HTMLElement>('button:not([disabled])')).filter(
+          b => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0 && !b.classList.contains('btn-close')
+        );
+      }
+    }
+  }
+
+  // Fallback 2: Check if there's any active modal with mode/tab buttons (e.g. Ledger Modal Mode A / Mode B)
+  if (targetButtons.length === 0) {
+    const activeModal = document.querySelector('div[role="dialog"], .modal-overlay, div[style*="position: fixed"]');
+    if (activeModal) {
+      const modalBtns = Array.from(
+        activeModal.querySelectorAll<HTMLElement>('button:not([disabled])')
+      ).filter(b => (b.offsetWidth || b.offsetHeight || b.getClientRects().length) > 0 && !b.classList.contains('btn-close') && b.innerText.trim().length > 0);
+      if (modalBtns.length > 1) {
+        targetButtons = modalBtns;
+      }
+    }
+  }
+
+  if (targetButtons.length <= 1) return false;
+
+  // Determine active button index
+  let activeIndex = -1;
+  targetButtons.forEach((btn, idx) => {
+    const isSelected = btn.getAttribute('aria-selected') === 'true' || btn.getAttribute('aria-pressed') === 'true';
+    const hasActiveClass =
+      btn.classList.contains('active') ||
+      btn.classList.contains('is-active') ||
+      btn.classList.contains('selected');
+    const styleAttr = btn.getAttribute('style') || '';
+    const hasActiveStyle =
+      styleAttr.includes('#ffffff') ||
+      styleAttr.includes('rgb(255, 255, 255)') ||
+      styleAttr.includes('font-weight: 800') ||
+      styleAttr.includes('fontWeight: 800') ||
+      styleAttr.includes('linear-gradient') ||
+      btn === document.activeElement;
+
+    if (isSelected || hasActiveClass || hasActiveStyle) {
+      activeIndex = idx;
+    }
+  });
+
+  if (activeIndex === -1) activeIndex = 0;
+
+  let targetIndex: number;
+  if (typeof direction === 'number') {
+    if (direction < 0 || direction >= targetButtons.length) return false;
+    targetIndex = direction;
+  } else if (direction === 'next') {
+    targetIndex = (activeIndex + 1) % targetButtons.length;
+  } else {
+    targetIndex = (activeIndex - 1 + targetButtons.length) % targetButtons.length;
+  }
+
+  const targetBtn = targetButtons[targetIndex];
+  if (targetBtn) {
+    targetBtn.focus();
+    targetBtn.click();
+    try {
+      targetBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    } catch (e) {}
     return true;
   }
 

@@ -33,9 +33,11 @@ const SHORTCUT_DATABASE: ShortcutCategory[] = [
   {
     title: 'Sub-Screen & Sub-Tab Traversal',
     items: [
-      { key: 'Alt + Right / Ctrl + ]', description: 'Switch to next sub-tab on active screen' },
-      { key: 'Alt + Left / Ctrl + [', description: 'Switch to previous sub-tab on active screen' },
-      { key: 'Ctrl + 1 .. Ctrl + 9', description: 'Direct jump to 1st..9th sub-tab on screen' },
+      { key: 'Alt + Right / Ctrl + ]', description: 'Switch to next primary sub-tab on active screen' },
+      { key: 'Alt + Left / Ctrl + [', description: 'Switch to previous primary sub-tab on active screen' },
+      { key: 'Alt + Down / Up', description: 'Switch inside screen buttons, inner sub-tabs & filter pills' },
+      { key: 'Alt + Shift + Right / Left', description: 'Alternative: Cycle inside buttons & secondary tabs' },
+      { key: 'Ctrl + 1 .. Ctrl + 9', description: 'Direct jump to 1st..9th primary sub-tab on screen' },
     ],
   },
   {

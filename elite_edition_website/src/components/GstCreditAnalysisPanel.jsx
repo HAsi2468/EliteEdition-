@@ -1213,6 +1213,10 @@ export default function GstCreditAnalysisPanel({
       {/* ── SUB-VIEW NAVIGATION TABS ────────────────────────────────────────── */}
       <div
         className="ent-tab-bar gst-sub-tab-bar horizontal-scroll-tabs"
+        data-subtab-container="secondary"
+        data-inside-tabs="true"
+        role="tablist"
+        aria-label="GST Sub-Views"
         style={{
           display: 'flex',
           alignItems: 'center',

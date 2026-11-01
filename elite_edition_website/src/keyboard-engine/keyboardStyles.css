@@ -354,4 +354,15 @@ tr[data-erp-active-row="true"] td {
   background: #94a3b8;
 }
 
+/* Primary Screen Sub-Tabs and Inside Screen Buttons keyboard navigation styling */
+[data-screen-subtabs="primary"] button:focus-visible,
+[data-subtab-container="secondary"] button:focus-visible,
+[data-inside-tabs="true"] button:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+  position: relative;
+  z-index: 2;
+}
+
 

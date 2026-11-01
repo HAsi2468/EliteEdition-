@@ -37,6 +37,7 @@ export const HotkeyHUD: React.FC<HotkeyHUDProps> = ({ defaultHints = [] }) => {
   const fallbackHints: ShortcutHint[] = [
     { key: 'Alt+S', label: 'Sidebar Menu' },
     { key: 'Alt+→/←', label: 'Sub-Tabs' },
+    { key: 'Alt+↑/↓', label: 'Inside Buttons' },
     { key: 'Shift+←/→', label: 'Table Scroll' },
     { key: 'Enter', label: 'Next / Math Calc' },
     { key: 'Alt+N', label: 'New / Create' },

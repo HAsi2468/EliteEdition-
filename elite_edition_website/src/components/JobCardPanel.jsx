@@ -4621,9 +4621,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
           </div>
 
           {/* Sub-Tab Navigation Bar */}
-          <div className="ent-tab-bar" style={{ margin: '0 0 0.2rem 0' }}>
+          <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Job Card Primary Tabs" style={{ margin: '0 0 0.2rem 0' }}>
             <button
               type="button"
+              role="tab"
+              aria-selected={effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')}
               onClick={() => setOverrideSubTab('list')}
               className={`ent-tab-btn ${(effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'active' : ''}`}
             >
@@ -4633,6 +4635,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
             <button
               type="button"
+              role="tab"
+              aria-selected={effectiveSubTab === 'tracking'}
               onClick={() => setOverrideSubTab('tracking')}
               className={`ent-tab-btn ${effectiveSubTab === 'tracking' ? 'active' : ''}`}
             >

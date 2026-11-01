@@ -1341,9 +1341,11 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
         {/* Sub-Tab Navigation Bar */}
         {department !== 'stitching' && (
-          <div className="ent-tab-bar">
+          <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Design Room Primary Tabs">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeSubTab === 'sample' || activeSubTab === 'sample_design'}
               onClick={() => setActiveSubTab('sample')}
               className={`ent-tab-btn ${(activeSubTab === 'sample' || activeSubTab === 'sample_design') ? 'active' : ''}`}
             >
@@ -1353,6 +1355,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeSubTab === 'catalogue'}
               onClick={() => setActiveSubTab('catalogue')}
               className={`ent-tab-btn ${activeSubTab === 'catalogue' ? 'active' : ''}`}
             >
@@ -1362,6 +1366,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             
             <button
               type="button"
+              role="tab"
+              aria-selected={activeSubTab === 'master'}
               onClick={() => setActiveSubTab('master')}
               className={`ent-tab-btn ${activeSubTab === 'master' ? 'active' : ''}`}
             >
