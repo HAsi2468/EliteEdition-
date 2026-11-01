@@ -154,16 +154,17 @@ export const COMPANIES = [
     name: 'EXEDP',
     fullName: 'EXEDP (Elite Digital Prints - Old Data)',
     shortName: 'EXEDP',
-    type: 'Old Data Management',
+    type: 'Old Data Management & Finance',
     iconName: 'Receipt',
-    defaultTab: 'exedp_expenses',
-    invoicesTab: 'exedp_expenses',
+    defaultTab: 'exedp_invoices',
+    invoicesTab: 'exedp_invoices',
     settingsTab: 'company_settings',
+    invoicePrefix: 'EXEDP-2627-',
     badgeColor: '#475569',
     iconColor: '#475569',
     gradient: 'linear-gradient(135deg, #475569, #334155)',
-    description: 'Old data expense management for Elite Digital Prints.',
-    aliases: ['exedp', 'ex-edp', 'ex_edp', 'old edp', 'exedp old data']
+    description: 'Old data finance, invoices, purchases & expense management for Elite Digital Prints.',
+    aliases: ['exedp', 'ex-edp', 'ex_edp', 'old edp', 'exedp old data', 'oldedp']
   }
 ];
 

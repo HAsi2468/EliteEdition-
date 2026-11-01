@@ -208,6 +208,7 @@ const PRESET_OPTIONS = [
 export const normalizeCompanyEntity = (raw) => {
   if (!raw) return 'Elite Edition';
   const s = String(raw).trim();
+  if (/^ex[-_]?edp$/i.test(s) || /^exedp$/i.test(s)) return 'EXEDP';
   if (/^elite\s*digital\s*print/i.test(s) || /^edp$/i.test(s) || s === 'digital_print') return 'Elite Digital Prints';
   if (/^elite\s*stitch/i.test(s) || /^es$/i.test(s) || s === 'stitching') return 'Elite Stitching';
   if (/^elite\s*edition/i.test(s) || /^ee$/i.test(s) || s === 'elite_edition') return 'Elite Edition';
@@ -221,6 +222,7 @@ export const normalizeCompanyEntity = (raw) => {
 
 export const getDefaultInvoicePrefix = (comp) => {
   const c = normalizeCompanyEntity(comp);
+  if (c === 'EXEDP') return 'EXEDP-2627-0001';
   if (c === 'Elite Edition') return 'EE-2627-0001';
   if (c === 'Elite Fabtex') return 'EF-2627-0001';
   if (c === 'Sobise') return 'SO-2627-0001';
@@ -239,9 +241,9 @@ export default function EliteBillingDepartment({
 }) {
   const companyEntity = normalizeCompanyEntity(
     propCompanyEntity ||
-    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : department === 'ethno_wear' ? 'Ethno wear' : department === 'yamunaji' ? 'Yamunaji' : 'Elite Digital Prints')
+    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : department === 'ethno_wear' ? 'Ethno wear' : department === 'yamunaji' ? 'Yamunaji' : department === 'exedp' ? 'EXEDP' : 'Elite Digital Prints')
   );
-  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear', 'Yamunaji'].includes(companyEntity);
+  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear', 'Yamunaji', 'EXEDP'].includes(companyEntity);
   const isStitchingEntity = department === 'stitching' || companyEntity === 'Elite Stitching';
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -4481,10 +4483,14 @@ export default function EliteBillingDepartment({
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <div className="erp-filter-pills-track status-filter-group" data-subtab-container="secondary" data-inside-tabs="true" style={{ display: 'flex', gap: '0.35rem' }}>
               {['ALL', 'UNPAID', 'PARTIALLY_PAID', 'PAID'].map(st => (
                 <button
                   key={st}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === st}
+                  className={`status-pill filter-pill ${statusFilter === st ? 'active selected' : ''}`}
                   onClick={() => setStatusFilter(st)}
                   style={{
                     padding: '0.4rem 0.8rem',
@@ -5089,6 +5095,7 @@ export default function EliteBillingDepartment({
               >
                 <option value="Elite Edition">🏢 Elite Edition</option>
                 <option value="Elite Digital Prints">🏢 Elite Digital Prints</option>
+                <option value="EXEDP">🏢 EXEDP (Old Data)</option>
                 <option value="Elite Fabtex">🏢 Elite Fabtex</option>
                 <option value="Sobise">🏢 Sobise</option>
                 <option value="Elite Stitching">🏢 Elite Stitching</option>

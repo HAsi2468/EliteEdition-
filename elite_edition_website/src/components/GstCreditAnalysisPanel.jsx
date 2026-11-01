@@ -1249,8 +1249,10 @@ export default function GstCreditAnalysisPanel({
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => setActiveTab(tab.id)}
-              className="gst-tab-btn ent-tab-btn"
+              className={`gst-tab-btn ent-tab-btn ${active ? 'active selected' : ''}`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

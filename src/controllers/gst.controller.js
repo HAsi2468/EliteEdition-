@@ -78,6 +78,22 @@ function resolveHsnDescription(hsnCode, rawDesc, rawItemName) {
   return 'Textile Fabrics / Goods';
 }
 
+function buildGstCompanyCondition(companyEntity) {
+  if (!companyEntity || companyEntity === 'ALL') return null;
+  const norm = String(companyEntity).trim().toLowerCase();
+  if (norm === 'exedp' || norm === 'ex-edp' || norm === 'ex_edp') {
+    return { $in: ['EXEDP', 'EX-EDP', 'exedp'] };
+  }
+  if (norm === 'edp' || norm.includes('digitalprint')) {
+    return {
+      $nin: ['EXEDP', 'EX-EDP', 'exedp'],
+      $regex: 'digital\\s*print|^edp$',
+      $options: 'i'
+    };
+  }
+  return new RegExp(`^${companyEntity.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. GSTR-1 TABLE 12 OUTWARD AGGREGATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,8 +102,9 @@ exports.getTable12Aggregates = async (req, res) => {
     const { companyEntity, startDate, endDate, turnoverTier = 'LE_5CR' } = req.query;
 
     const query = { invoiceStatus: { $ne: 'CANCELLED' } };
-    if (companyEntity && companyEntity !== 'ALL') {
-      query.companyEntity = new RegExp(companyEntity.trim(), 'i');
+    const compCond = buildGstCompanyCondition(companyEntity);
+    if (compCond) {
+      query.companyEntity = compCond;
     }
 
     if (startDate || endDate) {
@@ -231,8 +248,9 @@ exports.exportTable12Excel = async (req, res) => {
     const { companyEntity, startDate, endDate, gstin = '24AANFE0044M1ZG' } = req.query;
 
     const query = { invoiceStatus: { $ne: 'CANCELLED' } };
-    if (companyEntity && companyEntity !== 'ALL') {
-      query.companyEntity = new RegExp(companyEntity.trim(), 'i');
+    const compCond = buildGstCompanyCondition(companyEntity);
+    if (compCond) {
+      query.companyEntity = compCond;
     }
     if (startDate || endDate) {
       query.invoiceDate = {};
@@ -372,8 +390,9 @@ exports.getFreightRcmLedger = async (req, res) => {
     const { companyEntity, startDate, endDate, settlementStatus, search } = req.query;
 
     const query = {};
-    if (companyEntity && companyEntity !== 'ALL') {
-      query.companyEntity = new RegExp(companyEntity.trim(), 'i');
+    const compCond = buildGstCompanyCondition(companyEntity);
+    if (compCond) {
+      query.companyEntity = compCond;
     }
 
     if (settlementStatus && settlementStatus !== 'ALL') {
@@ -644,8 +663,9 @@ exports.generateSelfInvoices = async (req, res) => {
       ]
     };
 
-    if (companyEntity && companyEntity !== 'ALL') {
-      query.companyEntity = new RegExp(companyEntity.trim(), 'i');
+    const compCond = buildGstCompanyCondition(companyEntity);
+    if (compCond) {
+      query.companyEntity = compCond;
     }
 
     const pendingBills = await db.FreightBill.find(query).sort({ billDate: 1, createdAt: 1 });
@@ -693,8 +713,9 @@ exports.exportFreightRcmExcel = async (req, res) => {
     const { companyEntity, startDate, endDate, gstin = '24AANFE0044M1ZG' } = req.query;
 
     const query = {};
-    if (companyEntity && companyEntity !== 'ALL') {
-      query.companyEntity = new RegExp(companyEntity.trim(), 'i');
+    const compCond = buildGstCompanyCondition(companyEntity);
+    if (compCond) {
+      query.companyEntity = compCond;
     }
     if (startDate || endDate) {
       query.billDate = {};

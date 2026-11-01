@@ -9,6 +9,7 @@ const PDFDocument = require('pdfkit');
 // Helper to determine prefix based on companyEntity
 const getCompanyPrefix = (entity = 'Sobise') => {
   const norm = String(entity || '').trim().toLowerCase();
+  if (norm.includes('exedp') || norm === 'ex-edp' || norm === 'ex_edp') return 'EXEDP-';
   if (norm.includes('ethno') || norm === 'ew') return 'EWC-';
   if (norm.includes('yamunaji') || norm === 'yj') return 'YJ-';
   if (norm.includes('sobise')) return 'SO-';
@@ -59,7 +60,14 @@ const getChallans = async (req, res) => {
     const query = {};
 
     if (companyEntity) {
-      query.companyEntity = companyEntity;
+      const norm = String(companyEntity).trim().toLowerCase();
+      if (norm === 'exedp' || norm === 'ex-edp' || norm === 'ex_edp') {
+        query.companyEntity = { $in: ['EXEDP', 'EX-EDP', 'exedp'] };
+      } else if (norm === 'edp' || norm.includes('digitalprint')) {
+        query.companyEntity = { $nin: ['EXEDP', 'EX-EDP', 'exedp'] };
+      } else {
+        query.companyEntity = companyEntity;
+      }
     }
 
     if (status && status !== 'ALL') {

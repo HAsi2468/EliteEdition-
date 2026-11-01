@@ -250,6 +250,10 @@ export const ROUTE_ALIASES = {
   'es_raw_materials': { tab: 'es_raw_materials', dept: 'stitching' },
   'eo_invoices': { tab: 'eo_invoices', dept: 'elite_online' },
   'eo_expenses': { tab: 'eo_expenses', dept: 'elite_online' },
+  'exedp_invoices': { tab: 'exedp_invoices', dept: 'exedp' },
+  'exedp_finance': { tab: 'exedp_invoices', dept: 'exedp' },
+  'exedp_expenses': { tab: 'exedp_expenses', dept: 'exedp' },
+  'exedp': { tab: 'exedp_invoices', dept: 'exedp' },
   'voucher': { tab: 'voucher_entry', dept: null },
   'voucher_entry': { tab: 'voucher_entry', dept: null },
   'admin': { tab: 'admin', dept: null }
@@ -265,6 +269,7 @@ export const ALL_KNOWN_ERP_TABS = new Set([
   'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials', 'yj_rfd',
   'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials',
   'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'eo_invoices',
+  'exedp_invoices', 'exedp_expenses',
   'raw_materials', 'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master',
   'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings', 'jobcards_stitching_challan',
   'jobcards_stitching_settings', 'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry',
@@ -1266,7 +1271,7 @@ export default function App() {
           else if (targetDept === 'ethno_wear') setActiveTab(getFirstEWTab());
           else if (targetDept === 'yamunaji') setActiveTab(getFirstYJTab());
           else if (targetDept === 'elite_online') setActiveTab(getFirstOnlineTab());
-          else if (targetDept === 'exedp') setActiveTab('exedp_expenses');
+          else if (targetDept === 'exedp') setActiveTab('exedp_invoices');
         }
       }
     } else {
@@ -1326,7 +1331,7 @@ export default function App() {
       const firstTab = getFirstOnlineTab();
       setActiveTab(firstTab);
     } else if (dept === 'exedp') {
-      setActiveTab('exedp_expenses');
+      setActiveTab('exedp_invoices');
     }
   };
 
@@ -1368,7 +1373,7 @@ export default function App() {
       'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
       'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials',
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
-      'exedp_expenses',
+      'exedp_invoices', 'exedp_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
@@ -1414,7 +1419,7 @@ export default function App() {
       if (YAMUNAJI_PERMISSIONS.includes(activeTab) || activeTab.startsWith('yj_')) return;
     }
     if (activeDepartment === 'exedp' && hasExedpAccess) {
-      if (activeTab === 'exedp_expenses') return;
+      if (activeTab === 'exedp_invoices' || activeTab === 'exedp_expenses') return;
     }
 
     const userPerms = currentUser.permissions || [];
@@ -1427,7 +1432,7 @@ export default function App() {
       if (activeTab.startsWith('so_') && hasSobiseAccess) return p === activeTab || p === 'so_dashboard';
       if (activeTab.startsWith('ew_') && hasEthnoWearAccess) return true;
       if (activeTab.startsWith('yj_') && hasYamunajiAccess) return true;
-      if (activeTab === 'exedp_expenses' && hasExedpAccess) return true;
+      if ((activeTab === 'exedp_invoices' || activeTab === 'exedp_expenses') && hasExedpAccess) return true;
       if (activeTab.startsWith('es_') && hasStitchingAccess) return true;
       if (activeTab.startsWith('eo_') && hasEliteOnlineAccess) return true;
       if (activeTab === 'catalog' && p === 'inventory') return true;
@@ -1461,7 +1466,7 @@ export default function App() {
       } else if (activeDepartment === 'yamunaji' && hasYamunajiAccess) {
         setActiveTab(getFirstYJTab());
       } else if (activeDepartment === 'exedp' && hasExedpAccess) {
-        setActiveTab('exedp_expenses');
+        setActiveTab('exedp_invoices');
       } else if (hasCommunicationAccess) {
         setActiveTab('communication');
       } else if (hasTaskAccess) {
@@ -3070,9 +3075,14 @@ export default function App() {
               <div className="nav-section-header">Modules</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                 {activeDepartment === 'exedp' ? (
-                  <button onClick={() => { setActiveTab('exedp_expenses'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_expenses' ? 'active' : ''}`}>
-                    Expense Screen
-                  </button>
+                  <>
+                    <button onClick={() => { setActiveTab('exedp_invoices'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_invoices' ? 'active' : ''}`}>
+                      Finance
+                    </button>
+                    <button onClick={() => { setActiveTab('exedp_expenses'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_expenses' ? 'active' : ''}`}>
+                      Expenses
+                    </button>
+                  </>
                 ) : activeDepartment === 'stitching' ? (
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) && (
@@ -3558,7 +3568,8 @@ export default function App() {
               if (activeDepartment === 'exedp' && hasExedpAccess) {
                 return (
                   <>
-                    {renderNavItem('exedp_expenses', 'Expense Screen', Receipt, null, 'Expenses')}
+                    {renderNavItem('exedp_invoices', 'Finance', Receipt, null, 'Finance')}
+                    {renderNavItem('exedp_expenses', 'Expenses', Wallet, null, 'Expenses')}
                   </>
                 );
               }
@@ -4046,7 +4057,9 @@ export default function App() {
               activeDepartment === 'stitching' ? 'Elite Stitching' :
               'Elite Digital Print'
             } />
-          ) : activeTab === 'exedp_expenses' || (activeDepartment === 'exedp' && activeTab !== 'workspace' && activeTab !== 'communication' && activeTab !== 'task_management') ? (
+          ) : activeTab === 'exedp_invoices' || (activeDepartment === 'exedp' && activeTab !== 'exedp_expenses' && activeTab !== 'workspace' && activeTab !== 'communication' && activeTab !== 'task_management') ? (
+            <EliteBillingDepartment companyEntity="EXEDP" department="exedp" />
+          ) : activeTab === 'exedp_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="EXEDP" />
           ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />

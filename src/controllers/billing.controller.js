@@ -55,6 +55,7 @@ function numToWords(amount) {
 function resolveCompanyEntity(raw) {
   if (!raw) return 'Elite Digital Print';
   const norm = String(raw).trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (norm === 'exedp' || norm === 'ex-edp' || norm === 'ex_edp' || norm === 'oldedp') return 'EXEDP';
   if (norm === 'eliteonline' || norm === 'eon' || norm === 'eo') return 'Elite Online';
   if (norm === 'eliteedition' || norm === 'ee') return 'Elite Edition';
   if (norm === 'elitefabtex' || norm === 'ef') return 'Elite Fabtex';
@@ -74,7 +75,14 @@ function buildCompanyFilter(companyEntity) {
 
   const norm = raw.toLowerCase().replace(/[\s_-]+/g, '');
 
-  if (norm === 'eliteedition' || norm === 'ee') {
+  if (norm === 'exedp' || norm === 'ex-edp' || norm === 'ex_edp' || norm === 'oldedp') {
+    return {
+      $or: [
+        { companyEntity: { $in: ['EXEDP', 'EX-EDP', 'exedp'] } },
+        { invoiceNo: { $regex: '^EXEDP', $options: 'i' } }
+      ]
+    };
+  } else if (norm === 'eliteedition' || norm === 'ee') {
     return {
       $or: [
         { companyEntity: 'Elite Edition' },
@@ -129,14 +137,20 @@ function buildCompanyFilter(companyEntity) {
     norm === 'edp' ||
     norm === 'digitalprint'
   ) {
-    // Elite Digital Print / Digital Print
+    // Elite Digital Print / Digital Print — strictly exclude EXEDP to maintain total data isolation
     return {
-      $or: [
-        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
-        { companyEntity: { $exists: false } },
-        { companyEntity: null },
-        { companyEntity: '' },
-        { invoiceNo: { $regex: '^EDP', $options: 'i' } }
+      $and: [
+        { companyEntity: { $nin: ['EXEDP', 'EX-EDP', 'exedp'] } },
+        { invoiceNo: { $not: { $regex: '^EXEDP', $options: 'i' } } },
+        {
+          $or: [
+            { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+            { companyEntity: { $exists: false } },
+            { companyEntity: null },
+            { companyEntity: '' },
+            { invoiceNo: { $regex: '^EDP', $options: 'i' } }
+          ]
+        }
       ]
     };
   } else {
@@ -153,7 +167,14 @@ function buildPurchaseCompanyFilter(companyEntity) {
   if (!companyEntity) return {};
   const ce = String(companyEntity).trim();
   if (ce === '[object Object]') return {};
-  if (ce === 'Elite Edition') {
+  if (ce === 'EXEDP' || ce === 'exedp' || ce === 'EX-EDP' || ce === 'ex_edp') {
+    return {
+      $or: [
+        { companyEntity: { $in: ['EXEDP', 'EX-EDP', 'exedp'] } },
+        { purchaseNo: { $regex: '^EXEDP', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Elite Edition') {
     return {
       $or: [
         { companyEntity: 'Elite Edition' },
@@ -204,11 +225,17 @@ function buildPurchaseCompanyFilter(companyEntity) {
     };
   } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
     return {
-      $or: [
-        { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'edp'] } },
-        { companyEntity: { $exists: false } },
-        { companyEntity: null },
-        { companyEntity: '' }
+      $and: [
+        { companyEntity: { $nin: ['EXEDP', 'EX-EDP', 'exedp'] } },
+        { purchaseNo: { $not: { $regex: '^EXEDP', $options: 'i' } } },
+        {
+          $or: [
+            { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'edp'] } },
+            { companyEntity: { $exists: false } },
+            { companyEntity: null },
+            { companyEntity: '' }
+          ]
+        }
       ]
     };
   }
@@ -236,6 +263,9 @@ function checkBillingPermission(req) {
     'so_invoices',
     'ew_invoices',
     'yj_invoices',
+    'exedp_invoices',
+    'exedp_finance',
+    'exedp_expenses',
     'finance',
     'reports'
   ];
@@ -260,6 +290,9 @@ function checkCompanyTenantAccess(req, requestedCompany) {
     const normReq = String(requestedCompany).toLowerCase().replace(/[\s_-]+/g, '');
     const isAllowed = user.allowedCompanies.some(ac => {
       const normAc = String(ac).toLowerCase().replace(/[\s_-]+/g, '');
+      if (normReq === 'exedp' || normReq === 'ex-edp' || normReq === 'ex_edp' || normReq === 'oldedp') {
+        return normAc === 'exedp' || normAc === 'elitedigitalprint' || normAc === 'edp';
+      }
       return normAc === normReq;
     });
     return isAllowed;
@@ -647,6 +680,9 @@ const getNextInvoiceNo = async (req, res) => {
       defaultStartSeq = 1;
     } else if (companyEntity === 'Yamunaji' || companyEntity === 'yamunaji') {
       defaultPrefix = 'YJ-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'EXEDP' || companyEntity === 'exedp') {
+      defaultPrefix = 'EXEDP-2627-';
       defaultStartSeq = 1;
     }
 
@@ -4160,6 +4196,7 @@ const getPurchases = async (req, res) => {
 
 const getPurchasePrefix = (entity = 'Elite Digital Prints') => {
   const norm = String(entity || '').trim().toLowerCase();
+  if (norm.includes('exedp') || norm === 'ex-edp' || norm === 'ex_edp') return 'EXEDP-';
   if (norm.includes('ethno') || norm === 'ew') return 'EWP-';
   if (norm.includes('yamunaji') || norm === 'yj') return 'YJP-';
   if (norm.includes('edition') || norm === 'ee') return 'EEP-';
