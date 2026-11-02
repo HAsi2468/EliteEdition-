@@ -13,7 +13,7 @@ const normalizeBusinessUnit = (bu) => {
   if (u === 'EON' || u === 'ELITE ONLINE') return 'Elite Online';
   if (u === 'EW' || u === 'ETHNO WEAR' || u === 'ETHNO_WEAR' || u === 'ETHNOWEAR') return 'Ethno wear';
   if (u === 'YJ' || u === 'YAMUNAJI' || u === 'YAMUNA JI' || u === 'YAMUNA') return 'Yamunaji';
-  if (u === 'EXEDP' || u === 'EX-EDP' || u === 'EX_EDP') return 'EXEDP';
+  if (u === 'EXEDP' || u === 'EX-EDP' || u === 'EX_EDP' || u === 'OLD EDP' || u === 'OLDEDP') return 'EXEDP';
   return bu;
 };
 
@@ -58,11 +58,16 @@ const buildExpenseCompFilter = (companyEntity) => {
     return { companyEntity: 'Yamunaji' };
   }
   return {
-    $or: [
-      { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
-      { companyEntity: { $exists: false } },
-      { companyEntity: null },
-      { companyEntity: '' }
+    $and: [
+      { companyEntity: { $nin: ['EXEDP', 'EX-EDP', 'exedp'] } },
+      {
+        $or: [
+          { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+          { companyEntity: { $exists: false } },
+          { companyEntity: null },
+          { companyEntity: '' }
+        ]
+      }
     ]
   };
 };

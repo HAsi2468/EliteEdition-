@@ -892,7 +892,9 @@ const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = nu
 const createInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
-    const entity = invoiceData.companyEntity || 'Elite Digital Print';
+    const rawEntity = invoiceData.companyEntity || 'Elite Digital Print';
+    const entity = resolveCompanyEntity(rawEntity);
+    invoiceData.companyEntity = entity;
 
     // Strict multi-tenant authorization
     if (!checkCompanyTenantAccess(req, entity)) {
@@ -931,7 +933,10 @@ const createInvoice = async (req, res) => {
     // Prefix & Sequence Determination
     let defaultPrefix = 'EDP/26-27/';
     let defaultStartSeq = 223;
-    if (entity === 'Elite Edition') {
+    if (entity === 'EXEDP' || entity === 'exedp') {
+      defaultPrefix = 'EXEDP-2627-';
+      defaultStartSeq = 1;
+    } else if (entity === 'Elite Edition') {
       defaultPrefix = 'EE-2627-';
       defaultStartSeq = 1;
     } else if (entity === 'Elite Fabtex') {
@@ -964,7 +969,7 @@ const createInvoice = async (req, res) => {
 
     if (explicitInvoiceNo) {
       // BUG-056: When the user explicitly supplies an invoiceNo, reject duplicate collisions with HTTP 409
-      const existingInv = await BillingInvoice.findOne({ invoiceNo: explicitInvoiceNo, companyEntity: entity }).lean();
+      const existingInv = await BillingInvoice.findOne({ invoiceNo: explicitInvoiceNo, ...filter }).lean();
       if (existingInv) {
         return res.status(409).json({
           success: false,
