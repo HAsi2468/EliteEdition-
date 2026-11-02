@@ -4170,6 +4170,22 @@ const getCompanySettings = async (req, res) => {
       config.purchaseTypes = ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase'];
     }
 
+    // Dynamic Multi-Bank Support: Ensure companyBanks is array and contains primary bank if present
+    if (!Array.isArray(config.companyBanks) || config.companyBanks.length === 0) {
+      if (config.companyBankName) {
+        config.companyBanks = [{
+          bankName: config.companyBankName,
+          accountNo: config.companyAccountNo || '',
+          ifscCode: config.companyIfscCode || '',
+          branch: '',
+          accountType: 'Current',
+          isDefault: true
+        }];
+      } else {
+        config.companyBanks = [];
+      }
+    }
+
     res.json({ success: true, data: config });
   } catch (error) {
     logger.error('Error creating billing purchase: %s', error.stack || error.message);
@@ -4180,6 +4196,17 @@ const getCompanySettings = async (req, res) => {
 const updateCompanySettings = async (req, res) => {
   try {
     const { companyEntity = 'Elite Online', ...otherFields } = req.body;
+
+    // Sync primary/default bank with legacy single fields for full backward compatibility
+    if (Array.isArray(otherFields.companyBanks) && otherFields.companyBanks.length > 0) {
+      const defaultBank = otherFields.companyBanks.find(b => b.isDefault) || otherFields.companyBanks[0];
+      if (defaultBank) {
+        otherFields.companyBankName = defaultBank.bankName || otherFields.companyBankName || '';
+        otherFields.companyAccountNo = defaultBank.accountNo || otherFields.companyAccountNo || '';
+        otherFields.companyIfscCode = defaultBank.ifscCode || otherFields.companyIfscCode || '';
+      }
+    }
+
     const PrintConfig = require('../db/models/printConfig.model');
     const updated = await PrintConfig.findOneAndUpdate(
       { companyEntity },

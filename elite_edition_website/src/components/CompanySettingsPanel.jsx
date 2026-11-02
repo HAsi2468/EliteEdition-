@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { 
   Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, 
   Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key, 
-  Lock, Check, X, Search, Edit2, Palette, Package, Tag, Layers
+  Lock, Check, X, Search, Edit2, Palette, Package, Tag, Layers, Landmark, Star
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
@@ -30,6 +30,16 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     companyBankName: companyEntity === 'Elite Edition' ? 'KOTAK MAHINDRA BANK' : '',
     companyAccountNo: companyEntity === 'Elite Edition' ? '9909866667' : '',
     companyIfscCode: companyEntity === 'Elite Edition' ? 'KKBK0000883' : '',
+    companyBanks: companyEntity === 'Elite Edition' ? [
+      {
+        bankName: 'KOTAK MAHINDRA BANK',
+        accountNo: '9909866667',
+        ifscCode: 'KKBK0000883',
+        branch: 'Surat',
+        accountType: 'Current',
+        isDefault: true
+      }
+    ] : [],
     invoicePrefix: companyEntity === 'Sobise' ? 'SO-2627-' : companyEntity === 'Elite Fabtex' ? 'EF-2627-' : companyEntity === 'Elite Edition' ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : companyEntity === 'Ethno wear' ? 'EW-2627-' : companyEntity === 'Yamunaji' ? 'YJ-2627-' : 'EDP/26-27/',
     startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
     companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
@@ -221,26 +231,42 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     try {
       const res = await api.getCompanySettings(companyEntity);
       if (res && res.data) {
-        setForm(f => ({
-          ...f,
-          ...res.data,
-          challanDesign: {
-            ...f.challanDesign,
-            ...(res.data.challanDesign || {})
-          },
-          reportDesign: {
-            ...f.reportDesign,
-            ...(res.data.reportDesign || {})
-          },
-          categories: Array.isArray(res.data.categories) ? res.data.categories : [],
-          paperTypes: Array.isArray(res.data.paperTypes) ? res.data.paperTypes : [],
-          fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
-          widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : ['36"', '44"', '58"', '64"'],
-          passes: Array.isArray(res.data.passes) ? res.data.passes : [],
-          purchaseTypes: Array.isArray(res.data.purchaseTypes)
-            ? res.data.purchaseTypes
-            : ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
-        }));
+        setForm(f => {
+          const loadedBanks = Array.isArray(res.data.companyBanks) && res.data.companyBanks.length > 0
+            ? res.data.companyBanks
+            : (res.data.companyBankName || f.companyBankName)
+              ? [{
+                  bankName: res.data.companyBankName || f.companyBankName,
+                  accountNo: res.data.companyAccountNo || f.companyAccountNo || '',
+                  ifscCode: res.data.companyIfscCode || f.companyIfscCode || '',
+                  branch: res.data.companyBranch || '',
+                  accountType: 'Current',
+                  isDefault: true
+                }]
+              : [];
+
+          return {
+            ...f,
+            ...res.data,
+            companyBanks: loadedBanks,
+            challanDesign: {
+              ...f.challanDesign,
+              ...(res.data.challanDesign || {})
+            },
+            reportDesign: {
+              ...f.reportDesign,
+              ...(res.data.reportDesign || {})
+            },
+            categories: Array.isArray(res.data.categories) ? res.data.categories : [],
+            paperTypes: Array.isArray(res.data.paperTypes) ? res.data.paperTypes : [],
+            fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
+            widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : ['36"', '44"', '58"', '64"'],
+            passes: Array.isArray(res.data.passes) ? res.data.passes : [],
+            purchaseTypes: Array.isArray(res.data.purchaseTypes)
+              ? res.data.purchaseTypes
+              : ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
+          };
+        });
       }
     } catch (err) {
       console.warn('Failed to load company settings:', err);
@@ -330,11 +356,136 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     }
   };
 
+  const [showAddBankForm, setShowAddBankForm] = useState(false);
+  const [newBankInput, setNewBankInput] = useState({
+    bankName: '',
+    accountNo: '',
+    ifscCode: '',
+    branch: '',
+    accountType: 'Current',
+    isDefault: false
+  });
+
+  const handleAddCompanyBank = () => {
+    if (!newBankInput.bankName.trim()) {
+      triggerEliteAlert('Validation Error', 'Bank Name is required.', 'error');
+      return;
+    }
+    if (!newBankInput.accountNo.trim()) {
+      triggerEliteAlert('Validation Error', 'Account Number is required.', 'error');
+      return;
+    }
+
+    const currentBanks = form.companyBanks || [];
+    const isFirst = currentBanks.length === 0;
+    const shouldBeDefault = newBankInput.isDefault || isFirst;
+
+    const newBank = {
+      bankName: newBankInput.bankName.trim(),
+      accountNo: newBankInput.accountNo.trim(),
+      ifscCode: (newBankInput.ifscCode || '').trim().toUpperCase(),
+      branch: (newBankInput.branch || '').trim(),
+      accountType: newBankInput.accountType || 'Current',
+      isDefault: shouldBeDefault
+    };
+
+    const updatedBanks = shouldBeDefault
+      ? [...currentBanks.map(b => ({ ...b, isDefault: false })), newBank]
+      : [...currentBanks, newBank];
+
+    setForm(f => {
+      const def = updatedBanks.find(b => b.isDefault) || updatedBanks[0];
+      return {
+        ...f,
+        companyBanks: updatedBanks,
+        companyBankName: def?.bankName || f.companyBankName,
+        companyAccountNo: def?.accountNo || f.companyAccountNo,
+        companyIfscCode: def?.ifscCode || f.companyIfscCode
+      };
+    });
+
+    setNewBankInput({
+      bankName: '',
+      accountNo: '',
+      ifscCode: '',
+      branch: '',
+      accountType: 'Current',
+      isDefault: false
+    });
+    setShowAddBankForm(false);
+    triggerEliteAlert('Bank Account Added', `${newBank.bankName} added for ${companyEntity}. Remember to click "Save All Company Settings".`, 'success');
+  };
+
+  const handleRemoveCompanyBank = (idx) => {
+    const currentBanks = form.companyBanks || [];
+    const bankToRemove = currentBanks[idx];
+    const updatedBanks = currentBanks.filter((_, i) => i !== idx);
+
+    if (bankToRemove?.isDefault && updatedBanks.length > 0) {
+      updatedBanks[0].isDefault = true;
+    }
+
+    setForm(f => {
+      const def = updatedBanks.find(b => b.isDefault) || updatedBanks[0];
+      return {
+        ...f,
+        companyBanks: updatedBanks,
+        companyBankName: def?.bankName || '',
+        companyAccountNo: def?.accountNo || '',
+        companyIfscCode: def?.ifscCode || ''
+      };
+    });
+  };
+
+  const handleSetDefaultCompanyBank = (idx) => {
+    const currentBanks = form.companyBanks || [];
+    const updatedBanks = currentBanks.map((b, i) => ({
+      ...b,
+      isDefault: i === idx
+    }));
+
+    const def = updatedBanks[idx];
+    setForm(f => ({
+      ...f,
+      companyBanks: updatedBanks,
+      companyBankName: def?.bankName || f.companyBankName,
+      companyAccountNo: def?.accountNo || f.companyAccountNo,
+      companyIfscCode: def?.ifscCode || f.companyIfscCode
+    }));
+  };
+
+  const handleUpdateCompanyBank = (idx, field, value) => {
+    const currentBanks = [...(form.companyBanks || [])];
+    if (!currentBanks[idx]) return;
+    currentBanks[idx] = { ...currentBanks[idx], [field]: value };
+
+    setForm(f => {
+      const def = currentBanks.find(b => b.isDefault) || currentBanks[0];
+      return {
+        ...f,
+        companyBanks: currentBanks,
+        companyBankName: def?.bankName || f.companyBankName,
+        companyAccountNo: def?.accountNo || f.companyAccountNo,
+        companyIfscCode: def?.ifscCode || f.companyIfscCode
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setSaving(true);
     try {
-      await api.updateCompanySettings({ ...form, companyEntity });
+      const banks = form.companyBanks || [];
+      const defaultBank = banks.find(b => b.isDefault) || banks[0];
+      const payload = {
+        ...form,
+        companyEntity,
+        companyBanks: banks,
+        companyBankName: defaultBank ? defaultBank.bankName : form.companyBankName,
+        companyAccountNo: defaultBank ? defaultBank.accountNo : form.companyAccountNo,
+        companyIfscCode: defaultBank ? defaultBank.ifscCode : form.companyIfscCode
+      };
+      await api.updateCompanySettings(payload);
       triggerEliteAlert('Settings Saved', `Company Settings for "${companyEntity}" updated successfully!`, 'success');
       window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'settings' } }));
       window.dispatchEvent(new CustomEvent('elite-company-settings-updated', { detail: { companyEntity, purchaseTypes: form.purchaseTypes } }));
@@ -868,49 +1019,297 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           </div>
         </div>
 
-        {/* Bank & Payment Details */}
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#10b981', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <CreditCard size={18} /> Bank Account Details (Printed on Invoices)
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+        {/* Bank & Payment Details - Dynamic Multi-Bank Per Company */}
+        <div className="glass-panel" style={{ padding: '1.5rem', borderTop: '3px solid #10b981' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div>
-              <label className="form-label">Bank Name</label>
-              <input
-                type="text"
-                name="companyBankName"
-                value={form.companyBankName}
-                onChange={handleChange}
-                placeholder="HDFC Bank / ICICI Bank"
-                className="form-control"
-              />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#059669', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                <Landmark size={18} /> Company Bank Accounts (Dynamic Multi-Bank)
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                Every company can add, manage, and use multiple bank accounts. The <strong>Primary Account</strong> is printed on Tax Invoices & Delivery Challans.
+              </p>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', background: '#ecfdf5', color: '#047857', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, border: '1px solid #a7f3d0' }}>
+                {(form.companyBanks || []).length} Bank Account{(form.companyBanks || []).length === 1 ? '' : 's'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAddBankForm(prev => !prev)}
+                className={showAddBankForm ? 'btn-secondary' : 'btn-primary'}
+                style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '7px' }}
+              >
+                {showAddBankForm ? <X size={14} /> : <Plus size={14} />}
+                <span>{showAddBankForm ? 'Cancel' : '+ Add Bank Account'}</span>
+              </button>
+            </div>
+          </div>
 
-            <div>
-              <label className="form-label">Account Number</label>
-              <input
-                type="text"
-                name="companyAccountNo"
-                value={form.companyAccountNo}
-                onChange={handleChange}
-                placeholder="50200012345678"
-                className="form-control"
-              />
+          {/* Inline Add Bank Form */}
+          {showAddBankForm && (
+            <div style={{
+              background: '#f8fafc',
+              border: '1.5px dashed #10b981',
+              borderRadius: '10px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
+            }}>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#047857', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={15} /> Add New Bank Account for {companyEntity}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Bank Name *</label>
+                  <input
+                    type="text"
+                    value={newBankInput.bankName}
+                    onChange={e => setNewBankInput(p => ({ ...p, bankName: e.target.value }))}
+                    placeholder="e.g. HDFC Bank, ICICI Bank, Kotak"
+                    className="form-control"
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Account Number *</label>
+                  <input
+                    type="text"
+                    value={newBankInput.accountNo}
+                    onChange={e => setNewBankInput(p => ({ ...p, accountNo: e.target.value }))}
+                    placeholder="e.g. 50200012345678"
+                    className="form-control"
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>IFSC Code</label>
+                  <input
+                    type="text"
+                    value={newBankInput.ifscCode}
+                    onChange={e => setNewBankInput(p => ({ ...p, ifscCode: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. HDFC0001234"
+                    className="form-control"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Branch Name</label>
+                  <input
+                    type="text"
+                    value={newBankInput.branch}
+                    onChange={e => setNewBankInput(p => ({ ...p, branch: e.target.value }))}
+                    placeholder="e.g. Ring Road Branch, Surat"
+                    className="form-control"
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Account Type</label>
+                  <select
+                    value={newBankInput.accountType}
+                    onChange={e => setNewBankInput(p => ({ ...p, accountType: e.target.value }))}
+                    className="form-control"
+                  >
+                    <option value="Current">Current Account</option>
+                    <option value="Savings">Savings Account</option>
+                    <option value="CC / OD">Cash Credit / OD</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                  <input
+                    type="checkbox"
+                    checked={newBankInput.isDefault || (form.companyBanks || []).length === 0}
+                    onChange={e => setNewBankInput(p => ({ ...p, isDefault: e.target.checked }))}
+                    style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
+                  />
+                  <span>Set as Primary Bank (Printed on Tax Invoices & Challans)</span>
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBankForm(false)}
+                    className="btn-secondary"
+                    style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCompanyBank}
+                    className="btn-primary"
+                    style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem', background: '#10b981', borderColor: '#10b981' }}
+                  >
+                    Save Bank
+                  </button>
+                </div>
+              </div>
             </div>
+          )}
 
-            <div>
-              <label className="form-label">IFSC Code</label>
-              <input
-                type="text"
-                name="companyIfscCode"
-                value={form.companyIfscCode}
-                onChange={handleChange}
-                placeholder="HDFC0001234"
-                className="form-control"
-                style={{ textTransform: 'uppercase' }}
-              />
-            </div>
+          {/* List of Configured Company Bank Cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {(!form.companyBanks || form.companyBanks.length === 0) ? (
+              <div style={{
+                padding: '2rem 1rem',
+                textAlign: 'center',
+                background: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px dashed #cbd5e1',
+                color: '#64748b',
+                fontSize: '0.86rem'
+              }}>
+                <Landmark size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5, color: '#10b981' }} />
+                <p style={{ margin: 0, fontWeight: 600 }}>No bank accounts configured for {companyEntity} yet.</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Click <strong>"+ Add Bank Account"</strong> to add this company's bank accounts.
+                </p>
+              </div>
+            ) : (
+              form.companyBanks.map((b, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: b.isDefault ? '#f0fdf4' : '#ffffff',
+                    border: b.isDefault ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '1rem 1.25rem',
+                    boxShadow: b.isDefault ? '0 2px 8px rgba(16, 185, 129, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: b.isDefault ? '#10b981' : '#e2e8f0',
+                        color: b.isDefault ? '#ffffff' : '#475569',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Landmark size={17} />
+                      </span>
+                      <div>
+                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
+                          {b.bankName || 'Unnamed Bank'}
+                        </span>
+                        <span style={{
+                          marginLeft: '8px',
+                          fontSize: '0.7rem',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          fontWeight: 700
+                        }}>
+                          {b.accountType || 'Current'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {b.isDefault ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          background: '#10b981',
+                          color: '#ffffff',
+                          boxShadow: '0 1px 4px rgba(16,185,129,0.3)'
+                        }}>
+                          <Star size={12} fill="#ffffff" /> Primary (Printed on Invoices)
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetDefaultCompanyBank(idx)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
+                            background: '#ffffff',
+                            color: '#475569',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                          title="Make this bank the primary bank printed on Invoices and Challans"
+                        >
+                          Set as Primary
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCompanyBank(idx)}
+                        style={{
+                          padding: '5px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#ef4444',
+                          cursor: 'pointer'
+                        }}
+                        title="Delete this bank account"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bank Details Inputs */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Bank Name</label>
+                      <input
+                        type="text"
+                        value={b.bankName || ''}
+                        onChange={e => handleUpdateCompanyBank(idx, 'bankName', e.target.value)}
+                        className="form-control"
+                        style={{ fontSize: '0.84rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Account Number</label>
+                      <input
+                        type="text"
+                        value={b.accountNo || ''}
+                        onChange={e => handleUpdateCompanyBank(idx, 'accountNo', e.target.value)}
+                        className="form-control"
+                        style={{ fontSize: '0.84rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>IFSC Code</label>
+                      <input
+                        type="text"
+                        value={b.ifscCode || ''}
+                        onChange={e => handleUpdateCompanyBank(idx, 'ifscCode', e.target.value.toUpperCase())}
+                        className="form-control"
+                        style={{ fontSize: '0.84rem', textTransform: 'uppercase' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Branch</label>
+                      <input
+                        type="text"
+                        value={b.branch || ''}
+                        onChange={e => handleUpdateCompanyBank(idx, 'branch', e.target.value)}
+                        placeholder="Branch Name (Optional)"
+                        className="form-control"
+                        style={{ fontSize: '0.84rem' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

@@ -535,75 +535,97 @@ export default function PdfPreviewModal() {
         >
           {previewUrl ? (
             <>
-              <iframe
-                ref={iframeRef}
-                src={`${previewUrl}#toolbar=1&navpanes=0`}
-                title={title}
+              <object
+                data={`${previewUrl}#toolbar=1&navpanes=0`}
+                type="application/pdf"
                 style={{
                   width: '100%',
                   height: '100%',
                   border: 'none',
                   backgroundColor: '#525659'
                 }}
-              />
-              {/* Fallback bar if browser plugin blocks inline preview */}
+              >
+                <embed
+                  src={`${previewUrl}#toolbar=1&navpanes=0`}
+                  type="application/pdf"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    backgroundColor: '#525659'
+                  }}
+                />
+                <iframe
+                  ref={iframeRef}
+                  src={`${previewUrl}#toolbar=1&navpanes=0`}
+                  title={title}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    backgroundColor: '#525659'
+                  }}
+                />
+              </object>
+              {/* Permanent Action Bar for instant one-click download & full tab view */}
               <div 
                 style={{
                   position: 'absolute',
                   bottom: 12,
                   left: '50%',
                   transform: 'translateX(-50%)',
-                  background: 'rgba(15, 23, 42, 0.88)',
+                  background: 'rgba(15, 23, 42, 0.92)',
                   backdropFilter: 'blur(8px)',
-                  padding: '6px 14px',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  padding: '6px 16px',
                   borderRadius: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
                   color: '#ffffff',
                   fontSize: '0.78rem',
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
                   zIndex: 20
                 }}
               >
-                <span>Preview not showing?</span>
+                <span style={{ fontWeight: 600 }}>Document Ready</span>
                 <button
                   type="button"
-                  onClick={handleOpenExternal}
+                  onClick={handleDownload}
                   style={{
                     background: '#2563eb',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '14px',
-                    padding: '3px 10px',
+                    padding: '4px 12px',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '5px'
                   }}
                 >
-                  <ExternalLink size={12} /> Open Full
+                  <Download size={13} /> Direct Download
                 </button>
                 <button
                   type="button"
-                  onClick={handleDownload}
+                  onClick={handleOpenExternal}
                   style={{
                     background: '#334155',
                     color: '#ffffff',
                     border: '1px solid #475569',
                     borderRadius: '14px',
-                    padding: '3px 10px',
+                    padding: '4px 12px',
                     fontSize: '0.75rem',
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '5px'
                   }}
                 >
-                  <Download size={12} /> Download
+                  <ExternalLink size={13} /> Open in New Tab
                 </button>
               </div>
             </>

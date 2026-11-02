@@ -232,6 +232,17 @@ const printConfigSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    companyBanks: {
+      type: [{
+        bankName: { type: String, default: '' },
+        accountNo: { type: String, default: '' },
+        ifscCode: { type: String, default: '' },
+        branch: { type: String, default: '' },
+        accountType: { type: String, default: 'Current' },
+        isDefault: { type: Boolean, default: false }
+      }],
+      default: [],
+    },
     companyTerms: {
       type: String,
       default: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',

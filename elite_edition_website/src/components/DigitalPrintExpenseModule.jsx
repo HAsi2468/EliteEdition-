@@ -158,6 +158,29 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
           }
         }
 
+        // Also fetch company-level configured banks from Company Settings
+        let companyConfigBanks = [];
+        try {
+          const compRes = await api.getCompanySettings(companyEntity);
+          if (compRes?.data?.companyBanks && Array.isArray(compRes.data.companyBanks)) {
+            companyConfigBanks = compRes.data.companyBanks;
+          }
+        } catch (e) {}
+
+        // If company has configured banks in Settings, merge them into loadedBanks so they are immediately available
+        companyConfigBanks.forEach((cb, idx) => {
+          const bName = (cb.bankName || '').trim();
+          if (bName && !loadedBanks.some(lb => lb.name.toLowerCase() === bName.toLowerCase())) {
+            loadedBanks.push({
+              id: `comp_bank_${idx}_${Date.now()}`,
+              name: bName,
+              accountNo: cb.accountNo || '',
+              ifsc: cb.ifscCode || '',
+              opening: 0
+            });
+          }
+        });
+
         const bOpeningsObj = {};
         loadedBanks.forEach(b => {
           bOpeningsObj[b.name] = b.opening;
