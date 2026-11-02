@@ -35,7 +35,12 @@ const billingPurchaseSchema = new mongoose.Schema(
 
     // Vendor / Supplier Details (counterpart to Customer details in Invoice)
     vendor: {
-      vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+      vendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null,
+        set: v => (v === '' || !v || !mongoose.Types.ObjectId.isValid(v) ? null : v)
+      },
       name: { type: String, default: '' },
       businessName: { type: String, default: '' },
       phone: { type: String, default: '' },
@@ -95,13 +100,12 @@ const billingPurchaseSchema = new mongoose.Schema(
 billingPurchaseSchema.index({ companyEntity: 1, date: -1 });
 
 // BUG-064 DB Schema Guard: Prevent paidAmount/advance exceeding grandTotal
-billingPurchaseSchema.pre('validate', function(next) {
+billingPurchaseSchema.pre('validate', function() {
   if (typeof this.paidAmount === 'number' && typeof this.grandTotal === 'number') {
     if (this.paidAmount > this.grandTotal + 0.01) {
-      return next(new Error(`Advance/paid amount rejected: paidAmount (${this.paidAmount}) cannot exceed grandTotal (${this.grandTotal})`));
+      throw new Error(`Advance/paid amount rejected: paidAmount (${this.paidAmount}) cannot exceed grandTotal (${this.grandTotal})`);
     }
   }
-  next();
 });
 
 const BillingPurchase = mongoose.model('BillingPurchase', billingPurchaseSchema);

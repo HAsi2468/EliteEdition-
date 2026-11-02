@@ -1266,7 +1266,7 @@ export default function EliteBillingDepartment({
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
       dueDate: purchaseForm.dueDate || undefined,
       vendor: {
-        vendorId: purchaseForm.vendor?.vendorId || undefined,
+        vendorId: (purchaseForm.vendor?.vendorId && /^[0-9a-fA-F]{24}$/.test(purchaseForm.vendor.vendorId)) ? purchaseForm.vendor.vendorId : undefined,
         name: purchaseForm.vendor?.name || vendorFinalName.trim(),
         businessName: purchaseForm.vendor?.businessName || vendorFinalName.trim(),
         phone: purchaseForm.vendor?.phone || '',
@@ -1355,21 +1355,10 @@ export default function EliteBillingDepartment({
       }
     } catch (err) {
       console.error('Error saving purchase to DB:', err);
-      if (err.message && (err.message.includes('Duplicate') || err.message.includes('already exists'))) {
-        alert(err.message);
-        setIsSavingPurchase(false);
-        return;
-      }
-      const fallbackPur = {
-        ...payload,
-        id: editingPurchaseId || `pur_${Date.now()}`
-      };
-      if (editingPurchaseId) {
-        setPurchases(prev => prev.map(p => (p.id === editingPurchaseId || p._id === editingPurchaseId ? fallbackPur : p)));
-        setEditingPurchaseId(null);
-      } else {
-        setPurchases(prev => [fallbackPur, ...prev]);
-      }
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save purchase to database. Please check values and try again.';
+      alert(`⚠️ Save Failed: ${errMsg}`);
+      setIsSavingPurchase(false);
+      return;
     } finally {
       setIsSavingPurchase(false);
     }

@@ -403,6 +403,7 @@ const getBillingDashboardStats = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -623,6 +624,7 @@ const getInvoices = async (req, res) => {
       pages: Math.ceil(total / parseInt(limit))
     });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -706,6 +708,7 @@ const getNextInvoiceNo = async (req, res) => {
 
     res.json({ success: true, nextSeq, prefix, invoiceNo });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -1796,6 +1799,7 @@ const mergeChallans = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -1829,6 +1833,7 @@ const deleteInvoice = async (req, res) => {
     invalidateInvoicePdfCache(req.params.id);
     res.json({ success: true, message: 'Invoice deleted successfully' });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -1882,6 +1887,7 @@ const recordPayment = async (req, res) => {
     invalidateInvoicePdfCache(req.params.id);
     res.json({ success: true, data: invoice });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3752,6 +3758,7 @@ const getCustomers = async (req, res) => {
     const customers = await BillingCustomer.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: customers });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3778,6 +3785,7 @@ const createCustomer = async (req, res) => {
     const customer = await BillingCustomer.create(req.body);
     res.status(201).json({ success: true, data: customer });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3804,6 +3812,7 @@ const updateCustomer = async (req, res) => {
     const customer = await BillingCustomer.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json({ success: true, data: customer });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3813,6 +3822,7 @@ const deleteCustomer = async (req, res) => {
     await BillingCustomer.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Customer deleted successfully' });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3844,6 +3854,7 @@ const getVendors = async (req, res) => {
     const vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: vendors || [] });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3891,6 +3902,7 @@ const createVendor = async (req, res) => {
     const vendor = await BillingVendor.create(req.body);
     res.status(201).json({ success: true, data: vendor });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3907,6 +3919,7 @@ const updateVendor = async (req, res) => {
     }
     res.json({ success: true, data: vendor });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3919,6 +3932,7 @@ const deleteVendor = async (req, res) => {
     }
     res.json({ success: true, message: 'Vendor deleted successfully' });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3949,6 +3963,7 @@ const getItems = async (req, res) => {
     const items = await BillingItem.find(filter).sort({ itemName: 1 }).lean();
     res.json({ success: true, data: items });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4002,6 +4017,7 @@ const createItem = async (req, res) => {
     const item = await BillingItem.create(req.body);
     res.status(201).json({ success: true, data: item });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4018,6 +4034,7 @@ const updateItem = async (req, res) => {
     }
     res.json({ success: true, data: item });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4027,6 +4044,7 @@ const deleteItem = async (req, res) => {
     await BillingItem.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Billing item deleted successfully' });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4127,6 +4145,7 @@ const getCompanySettings = async (req, res) => {
 
     res.json({ success: true, data: config });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4142,6 +4161,7 @@ const updateCompanySettings = async (req, res) => {
     );
     res.json({ success: true, data: updated });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4195,6 +4215,7 @@ const getPurchases = async (req, res) => {
     const purchases = await BillingPurchase.find(query).sort({ date: -1, createdAt: -1 }).lean();
     res.json({ success: true, data: purchases });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4246,6 +4267,7 @@ const getNextPurchaseNo = async (req, res) => {
     const purchaseNo = `${prefix}${String(nextSeq).padStart(2, '0')}`;
     res.json({ success: true, nextSeq, prefix, purchaseNo });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4283,6 +4305,11 @@ const createPurchase = async (req, res) => {
     }
     if (!purchaseData.vendorName && purchaseData.vendor) {
       purchaseData.vendorName = purchaseData.vendor.businessName || purchaseData.vendor.name || '';
+    }
+    if (purchaseData.vendor) {
+      if (!purchaseData.vendor.vendorId || !mongoose.Types.ObjectId.isValid(purchaseData.vendor.vendorId)) {
+        delete purchaseData.vendor.vendorId;
+      }
     }
     if (purchaseData._id && !mongoose.Types.ObjectId.isValid(purchaseData._id)) {
       delete purchaseData._id;
@@ -4443,6 +4470,7 @@ const createPurchase = async (req, res) => {
 
     res.status(201).json({ success: true, data: purchase });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4458,6 +4486,11 @@ const updatePurchase = async (req, res) => {
     }
     if (!purchaseData.vendorName && purchaseData.vendor) {
       purchaseData.vendorName = purchaseData.vendor.businessName || purchaseData.vendor.name || '';
+    }
+    if (purchaseData.vendor) {
+      if (!purchaseData.vendor.vendorId || !mongoose.Types.ObjectId.isValid(purchaseData.vendor.vendorId)) {
+        delete purchaseData.vendor.vendorId;
+      }
     }
     delete purchaseData._id;
 
@@ -4620,6 +4653,7 @@ const updatePurchase = async (req, res) => {
 
     res.json({ success: true, data: purchase });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4656,6 +4690,7 @@ const deletePurchase = async (req, res) => {
       deletedCount: result.deletedCount
     });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4700,6 +4735,7 @@ const bulkSyncPurchases = async (req, res) => {
     }
     res.json({ success: true, syncedCount, data: syncedRecords });
   } catch (error) {
+    logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };

@@ -40,7 +40,13 @@ const billingInvoiceSchema = new mongoose.Schema(
 
     // Customer / Client Details
     customer: {
-      customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'BillingCustomer', default: null, required: false },
+      customerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BillingCustomer',
+        default: null,
+        required: false,
+        set: v => (v === '' || !v || !mongoose.Types.ObjectId.isValid(v) ? null : v)
+      },
       name: { type: String, required: true },
       businessName: { type: String, default: '' },
       phone: { type: String, default: '' },
@@ -156,13 +162,12 @@ billingInvoiceSchema.index({ invoiceSeq: -1 });
 billingInvoiceSchema.index({ 'signedCopy.status': 1 });
 
 // BUG-063 DB Schema Guard: Prevent paidAmount exceeding grandTotal
-billingInvoiceSchema.pre('validate', function(next) {
+billingInvoiceSchema.pre('validate', function() {
   if (typeof this.paidAmount === 'number' && typeof this.grandTotal === 'number') {
     if (this.paidAmount > this.grandTotal + 0.01) {
-      return next(new Error(`Overpayment rejected: paidAmount (${this.paidAmount}) cannot exceed grandTotal (${this.grandTotal})`));
+      throw new Error(`Overpayment rejected: paidAmount (${this.paidAmount}) cannot exceed grandTotal (${this.grandTotal})`);
     }
   }
-  next();
 });
 
 module.exports = mongoose.model('BillingInvoice', billingInvoiceSchema);
