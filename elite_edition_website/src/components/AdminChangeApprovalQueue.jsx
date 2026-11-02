@@ -24,7 +24,7 @@ import {
   FileText
 } from 'lucide-react';
 
-export default function AdminChangeApprovalQueue({ onCountChange }) {
+export default function AdminChangeApprovalQueue({ onCountChange, companyEntity = 'Elite Digital Print', currentUser }) {
   const socket = useSocket();
   const [requests, setRequests] = useState([]);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
@@ -56,7 +56,7 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
   // Fetch summary stats
   const fetchStats = useCallback(async () => {
     try {
-      const res = await api.getChangeApprovalStats();
+      const res = await api.getChangeApprovalStats({ companyEntity });
       if (res && res.data) {
         setStats(res.data);
         if (typeof onCountChange === 'function') {
@@ -66,7 +66,7 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
     } catch (err) {
       console.warn('Failed to fetch approval stats:', err);
     }
-  }, [onCountChange]);
+  }, [onCountChange, companyEntity]);
 
   // Fetch approval requests
   const fetchRequests = useCallback(async () => {
@@ -75,6 +75,7 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
       const res = await api.getChangeApprovals({
         status: statusFilter,
         module: moduleFilter,
+        companyEntity,
         search,
         page,
         limit: 30,
@@ -95,17 +96,17 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, moduleFilter, search, page]);
+  }, [statusFilter, moduleFilter, companyEntity, search, page]);
 
   // Fetch settings
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await api.getChangeApprovalSettings();
+      const res = await api.getChangeApprovalSettings({ companyEntity });
       if (res && res.data) {
         setApprovalSettingsState(res.data);
       }
     } catch (e) {}
-  }, []);
+  }, [companyEntity]);
 
   useEffect(() => {
     fetchStats();
@@ -255,24 +256,25 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
     }
   };
 
-  // Master Toggle: Enable / Disable Approvals
+  // Master Toggle: Enable / Disable Approvals (Per-Company Decentralized)
   const handleToggleMasterApproval = async () => {
     const nextState = !approvalSettings.enabled;
+    const companyLabel = companyEntity && companyEntity !== 'ALL' ? companyEntity : 'all companies';
     const msg = nextState
-      ? 'Enable Admin Approval requirement? All non-admin user edits will be held for your review.'
-      : 'Disable Admin Approval requirement? User edits will apply directly without your review.';
+      ? `Enable Admin Approval requirement for ${companyLabel}?\n\nAll non-admin edits and deletes in ${companyLabel} will be held in this review queue until approved.`
+      : `Disable Admin Approval requirement for ${companyLabel}?\n\nNon-admin staff in ${companyLabel} will be able to edit and delete records directly without waiting for approval.`;
 
     if (!window.confirm(msg)) return;
 
     setUpdatingSettings(true);
     try {
-      const res = await api.updateChangeApprovalSettings({ enabled: nextState });
+      const res = await api.updateChangeApprovalSettings({ enabled: nextState, companyEntity });
       if (res && res.data) {
         setApprovalSettingsState(res.data);
       }
       triggerPushNotification(
-        'Settings Updated',
-        `Admin approval requirement is now ${nextState ? 'ACTIVE' : 'BYPASSED'}.`,
+        'Policy Updated',
+        `Approval requirement for ${companyLabel} is now ${nextState ? 'ACTIVE' : 'DISABLED'}.`,
         'success'
       );
     } catch (err) {
@@ -381,10 +383,10 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
         }}>
           <div>
             <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
-              Approval Enforcement
+              Approval Policy • {companyEntity || 'Enterprise'}
             </div>
             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: approvalSettings.enabled ? '#1d4ed8' : '#64748b' }}>
-              {approvalSettings.enabled ? 'ACTIVE (User edits held for review)' : 'BYPASSED (Direct edits allowed)'}
+              {approvalSettings.enabled ? 'ACTIVE (User edits held for review)' : 'DISABLED (User edits apply immediately)'}
             </div>
           </div>
           <button
@@ -760,6 +762,21 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
                         }}>
                           {item.module}
                         </span>
+
+                        {/* Company Badge */}
+                        {item.companyEntity && (
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            background: '#f8fafc',
+                            color: '#0f172a',
+                            border: '1px solid #cbd5e1'
+                          }}>
+                            {item.companyEntity}
+                          </span>
+                        )}
 
                         {/* Action Badge */}
                         <span style={{

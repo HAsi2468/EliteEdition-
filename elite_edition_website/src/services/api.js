@@ -3201,6 +3201,7 @@ export const api = {
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.module) qs.set('module', params.module);
+    if (params.companyEntity) qs.set('companyEntity', params.companyEntity);
     if (params.search) qs.set('search', params.search);
     if (params.page) qs.set('page', params.page);
     if (params.limit) qs.set('limit', params.limit);
@@ -3208,8 +3209,11 @@ export const api = {
     return request(`/change-approvals${query}`);
   },
 
-  async getChangeApprovalStats() {
-    return request('/change-approvals/stats');
+  async getChangeApprovalStats(params = {}) {
+    const qs = new URLSearchParams();
+    if (params?.companyEntity) qs.set('companyEntity', params.companyEntity);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/change-approvals/stats${query}`);
   },
 
   async approveChangeRequest(id, notes = '') {
@@ -3240,8 +3244,11 @@ export const api = {
     });
   },
 
-  async getChangeApprovalSettings() {
-    return request('/change-approvals/settings');
+  async getChangeApprovalSettings(params = {}) {
+    const qs = new URLSearchParams();
+    if (params?.companyEntity) qs.set('companyEntity', params.companyEntity);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/change-approvals/settings${query}`);
   },
 
   async updateChangeApprovalSettings(settings) {

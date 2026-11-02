@@ -32,13 +32,19 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-export default function AdminUserDataReview() {
+export default function AdminUserDataReview({ companyEntity }) {
   const [entries, setEntries] = useState([]);
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState('ALL');
   const [selectedModule, setSelectedModule] = useState('ALL');
-  const [selectedCompany, setSelectedCompany] = useState('ALL');
+  const [selectedCompany, setSelectedCompany] = useState(() => (companyEntity && companyEntity !== 'All') ? companyEntity : 'ALL');
+
+  useEffect(() => {
+    if (companyEntity && companyEntity !== 'All') {
+      setSelectedCompany(companyEntity);
+    }
+  }, [companyEntity]);
   const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [datePreset, setDatePreset] = useState('ALL'); // 'TODAY', 'YESTERDAY', 'WEEK', 'MONTH', 'ALL'
   const [startDate, setStartDate] = useState('');

@@ -5,14 +5,36 @@ const { ChangeApprovalRequest, ...models } = require('../db/models');
 const logger = require('../config/logger');
 const { getApprovalSettings, setApprovalSettings } = require('../middlewares/approvalInterceptor.middleware');
 
+const MASTER_ADMIN_EMAIL = 'harshitsidapara2468@gmail.com';
+
 /**
  * List Approval Requests with filters & pagination
  */
 const getApprovalRequests = async (req, res) => {
   try {
-    const { status = 'PENDING', module: moduleFilter, search = '', page = 1, limit = 50 } = req.query;
+    const { status = 'PENDING', module: moduleFilter, companyEntity: companyFilter, search = '', page = 1, limit = 50 } = req.query;
 
     const query = {};
+
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    // Scope to company
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        if (!allowed.includes(companyFilter)) {
+          return res.status(403).json({ success: false, message: 'Access denied to company approval queue' });
+        }
+        query.companyEntity = companyFilter;
+      } else {
+        query.companyEntity = { $in: allowed };
+      }
+    } else if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+      query.companyEntity = companyFilter;
+    }
 
     if (status && status !== 'ALL') {
       query.status = status.toUpperCase();
@@ -43,7 +65,7 @@ const getApprovalRequests = async (req, res) => {
         .limit(limitNum)
         .lean(),
       ChangeApprovalRequest.countDocuments(query),
-      ChangeApprovalRequest.countDocuments({ status: 'PENDING' }),
+      ChangeApprovalRequest.countDocuments({ ...query, status: 'PENDING' }),
     ]);
 
     return res.status(200).json({
@@ -68,11 +90,30 @@ const getApprovalRequests = async (req, res) => {
  */
 const getApprovalStats = async (req, res) => {
   try {
+    const { companyEntity: companyFilter } = req.query;
+    const baseQuery = {};
+
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        baseQuery.companyEntity = companyFilter;
+      } else {
+        baseQuery.companyEntity = { $in: allowed };
+      }
+    } else if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+      baseQuery.companyEntity = companyFilter;
+    }
+
     const [pending, approved, rejected, total] = await Promise.all([
-      ChangeApprovalRequest.countDocuments({ status: 'PENDING' }),
-      ChangeApprovalRequest.countDocuments({ status: 'APPROVED' }),
-      ChangeApprovalRequest.countDocuments({ status: 'REJECTED' }),
-      ChangeApprovalRequest.countDocuments({}),
+      ChangeApprovalRequest.countDocuments({ ...baseQuery, status: 'PENDING' }),
+      ChangeApprovalRequest.countDocuments({ ...baseQuery, status: 'APPROVED' }),
+      ChangeApprovalRequest.countDocuments({ ...baseQuery, status: 'REJECTED' }),
+      ChangeApprovalRequest.countDocuments(baseQuery),
     ]);
 
     return res.status(200).json({
@@ -404,6 +445,19 @@ const approveRequest = async (req, res) => {
       });
     }
 
+    // Role check: Company Admin can only approve requests for their company
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      if (approval.companyEntity && !allowed.includes(approval.companyEntity)) {
+        return res.status(403).json({ success: false, message: 'You can only approve changes for your assigned company.' });
+      }
+    }
+
     // Execute the approved changes
     const executionResult = await executeApprovedAction(approval, req.user);
 
@@ -453,6 +507,19 @@ const rejectRequest = async (req, res) => {
       });
     }
 
+    // Role check: Company Admin can only reject requests for their company
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      if (approval.companyEntity && !allowed.includes(approval.companyEntity)) {
+        return res.status(403).json({ success: false, message: 'You can only reject changes for your assigned company.' });
+      }
+    }
+
     approval.status = 'REJECTED';
     approval.rejectionReason = reason || 'Rejected by Administrator';
     approval.reviewedBy = {
@@ -488,10 +555,21 @@ const bulkApprove = async (req, res) => {
       return res.status(400).json({ success: false, message: 'IDs array required' });
     }
 
-    const pendingRequests = await ChangeApprovalRequest.find({
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    const findFilter = {
       _id: { $in: ids },
       status: 'PENDING',
-    });
+    };
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      findFilter.companyEntity = { $in: allowed };
+    }
+
+    const pendingRequests = await ChangeApprovalRequest.find(findFilter);
 
     const results = [];
     for (const reqItem of pendingRequests) {
@@ -536,10 +614,21 @@ const bulkReject = async (req, res) => {
       return res.status(400).json({ success: false, message: 'IDs array required' });
     }
 
-    const pendingRequests = await ChangeApprovalRequest.find({
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    const findFilter = {
       _id: { $in: ids },
       status: 'PENDING',
-    });
+    };
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      findFilter.companyEntity = { $in: allowed };
+    }
+
+    const pendingRequests = await ChangeApprovalRequest.find(findFilter);
 
     for (const reqItem of pendingRequests) {
       reqItem.status = 'REJECTED';
@@ -564,16 +653,50 @@ const bulkReject = async (req, res) => {
 };
 
 /**
- * Get and Update Approval Settings (Master Toggle)
+ * Get and Update Approval Settings (Master & Company Level Decentralized Policies)
  */
-const getSettings = (req, res) => {
-  const settings = getApprovalSettings();
-  return res.status(200).json({ success: true, data: settings });
+const getSettings = async (req, res) => {
+  try {
+    const { companyEntity } = req.query;
+    if (companyEntity && companyEntity !== 'ALL' && models.CompanyApprovalPolicy) {
+      let policy = await models.CompanyApprovalPolicy.findOne({ companyEntity }).lean();
+      if (!policy) {
+        policy = { companyEntity, enabled: true, interceptEdit: true, interceptDelete: true };
+      }
+      return res.status(200).json({ success: true, data: policy });
+    }
+    const settings = getApprovalSettings();
+    return res.status(200).json({ success: true, data: settings });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 };
 
-const updateSettings = (req, res) => {
-  const updated = setApprovalSettings(req.body);
-  return res.status(200).json({ success: true, message: 'Approval settings updated', data: updated });
+const updateSettings = async (req, res) => {
+  try {
+    const { companyEntity, enabled, interceptEdit, interceptDelete } = req.body;
+    if (companyEntity && companyEntity !== 'ALL' && models.CompanyApprovalPolicy) {
+      const policy = await models.CompanyApprovalPolicy.findOneAndUpdate(
+        { companyEntity },
+        {
+          $set: {
+            enabled: enabled !== undefined ? Boolean(enabled) : true,
+            interceptEdit: interceptEdit !== undefined ? Boolean(interceptEdit) : true,
+            interceptDelete: interceptDelete !== undefined ? Boolean(interceptDelete) : true,
+            updatedBy: req.user?.name || req.user?.username || 'Admin',
+            updatedByEmail: req.user?.email || '',
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+      return res.status(200).json({ success: true, message: `Approval policy for ${companyEntity} updated`, data: policy });
+    }
+
+    const updated = setApprovalSettings(req.body);
+    return res.status(200).json({ success: true, message: 'Approval settings updated', data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 /**
@@ -584,7 +707,7 @@ const getUserDataEntries = async (req, res) => {
     const {
       user = 'ALL',
       module: moduleFilter = 'ALL',
-      company: companyFilter = 'ALL',
+      company: rawCompanyFilter = 'ALL',
       department: departmentFilter = 'ALL',
       startDate = '',
       endDate = '',
@@ -592,6 +715,24 @@ const getUserDataEntries = async (req, res) => {
       page = 1,
       limit = 40
     } = req.query;
+
+    const requesterEmail = (req.user?.email || '').toLowerCase();
+    const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+    const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+    const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+    let companyFilter = rawCompanyFilter;
+    if (isCompanyAdmin) {
+      const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+      if (rawCompanyFilter && rawCompanyFilter !== 'ALL' && rawCompanyFilter !== 'All') {
+        if (!allowed.includes(rawCompanyFilter)) {
+          return res.status(403).json({ success: false, message: 'Access denied to company data entries' });
+        }
+        companyFilter = rawCompanyFilter;
+      } else {
+        companyFilter = allowed[0] || 'Elite Digital Print';
+      }
+    }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 40));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -137,7 +137,53 @@ const INFRASTRUCTURE_SERVICES_KNOWLEDGE = {
   }
 };
 
-export default function AdminPanel() {
+export default function AdminPanel({ companyEntity: initialCompanyEntity, currentUser: propCurrentUser, activeDepartment, onNavigate }) {
+  const currentUser = propCurrentUser || api.getCurrentUser();
+  const MASTER_ADMIN_EMAIL = 'harshitsidapara2468@gmail.com';
+  const userEmail = (currentUser?.email || '').toLowerCase();
+  const isMasterAdmin = userEmail === MASTER_ADMIN_EMAIL;
+  const isMainAdmin = Boolean(currentUser?.isMainAdmin) || isMasterAdmin;
+  const isCompanyAdmin = currentUser?.role === 'admin' && !isMainAdmin;
+
+  const ALL_COMPANIES = [
+    'Elite Digital Print',
+    'Yamunaji',
+    'Elite Stitching',
+    'EXEDP',
+    'Elite Edition',
+    'Elite Fabtex',
+    'Elite Online',
+    'Sobise',
+    'Ethno wear'
+  ];
+
+  const allowedCompaniesList = useMemo(() => {
+    if (isMasterAdmin || isMainAdmin) {
+      return ['All', ...ALL_COMPANIES];
+    }
+    const userAllowed = Array.isArray(currentUser?.allowedCompanies) && currentUser.allowedCompanies.length > 0
+      ? currentUser.allowedCompanies
+      : ['Elite Digital Print'];
+    return userAllowed;
+  }, [isMasterAdmin, isMainAdmin, currentUser]);
+
+  const defaultCompany = useMemo(() => {
+    if (initialCompanyEntity && (isMasterAdmin || isMainAdmin || allowedCompaniesList.includes(initialCompanyEntity))) {
+      return initialCompanyEntity;
+    }
+    return isCompanyAdmin ? (allowedCompaniesList[0] || 'Elite Digital Print') : (initialCompanyEntity || 'All');
+  }, [initialCompanyEntity, isMasterAdmin, isMainAdmin, isCompanyAdmin, allowedCompaniesList]);
+
+  const [selectedCompany, setSelectedCompany] = useState(defaultCompany);
+
+  useEffect(() => {
+    if (initialCompanyEntity && initialCompanyEntity !== selectedCompany) {
+      if (isMasterAdmin || isMainAdmin || allowedCompaniesList.includes(initialCompanyEntity)) {
+        setSelectedCompany(initialCompanyEntity);
+      }
+    }
+  }, [initialCompanyEntity]);
+
   const [users, setUsers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('All');
@@ -651,20 +697,15 @@ export default function AdminPanel() {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-    api.getPrintConfig().then(cfg => {
-      if (cfg && Array.isArray(cfg.designers)) {
-        setAvailableDesigners(cfg.designers);
-      }
-    }).catch(() => {});
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await api.getUsers({ limit: 100 });
+      const params = { limit: 150 };
+      if (selectedCompany && selectedCompany !== 'All') {
+        params.companyEntity = selectedCompany;
+      }
+      const res = await api.getUsers(params);
       if (res && res.users) {
         setUsers(res.users.rows || []);
       }
@@ -673,7 +714,19 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCompany]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    api.getPrintConfig().then(cfg => {
+      if (cfg && Array.isArray(cfg.designers)) {
+        setAvailableDesigners(cfg.designers);
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -1100,9 +1153,19 @@ export default function AdminPanel() {
 
   const handleDeleteUser = async (user) => {
     setActiveActionMenuUserId(null);
-    const currentUser = api.getCurrentUser();
-    if (currentUser && currentUser.id === user.id) {
+    const loggedInUser = currentUser || api.getCurrentUser();
+    if (loggedInUser && loggedInUser.id === user.id) {
       setError("You cannot delete your own logged-in account.");
+      return;
+    }
+
+    if (String(user.email).toLowerCase() === MASTER_ADMIN_EMAIL) {
+      setError("Root Master Admin account is permanently protected and cannot be deleted.");
+      return;
+    }
+
+    if (isCompanyAdmin && (user.role === 'admin' || user.isMainAdmin)) {
+      setError("Company Admins cannot delete other Administrators.");
       return;
     }
 
@@ -1307,30 +1370,91 @@ export default function AdminPanel() {
         <div style={styles.topBarLeft}>
           <ShieldAlert size={22} color="var(--primary)" />
           <div>
-            <h2 style={styles.pageTitle}>
-              {activeSubTab === 'users'
-                ? 'Admin User Management'
-                : activeSubTab === 'approvals'
-                ? 'Review & Approvals Queue'
-                : activeSubTab === 'dataReview'
-                ? 'User Data Entry Review & Audit Feed'
-                : activeSubTab === 'clients'
-                ? 'Client Details & Accounts'
-                : activeSubTab === 'billing'
-                ? 'Infrastructure Billing Management'
-                : activeSubTab === 'backup'
-                ? 'System Data Backup & Export'
-                : activeSubTab === 'signedDocs'
-                ? 'Signed Documents Approval'
-                : 'Department Expense Settings'}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <h2 style={styles.pageTitle}>
+                {isCompanyAdmin ? `${selectedCompany} Admin Panel` : isMasterAdmin ? 'Master Admin Panel' : 'Enterprise Admin Panel'}
+              </h2>
+              {/* 4-Tier Hierarchy Badge */}
+              {isMasterAdmin ? (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  color: '#92400e',
+                  border: '1px solid #f59e0b',
+                  fontWeight: 900,
+                  fontSize: '0.72rem'
+                }}>
+                  👑 MASTER ADMIN (ROOT)
+                </span>
+              ) : isMainAdmin ? (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  background: '#d1fae5',
+                  color: '#065f46',
+                  border: '1px solid #10b981',
+                  fontWeight: 900,
+                  fontSize: '0.72rem'
+                }}>
+                  🌐 MAIN ADMIN (ALL COMPANIES)
+                </span>
+              ) : (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  background: '#eff6ff',
+                  color: '#1e40af',
+                  border: '1px solid #3b82f6',
+                  fontWeight: 900,
+                  fontSize: '0.72rem'
+                }}>
+                  🏢 COMPANY ADMIN
+                </span>
+              )}
+
+              {/* Company Context Selector */}
+              {allowedCompaniesList.length > 1 && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Company:</span>
+                  <select
+                    value={selectedCompany}
+                    onChange={(e) => setSelectedCompany(e.target.value)}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {allowedCompaniesList.map((c) => (
+                      <option key={c} value={c}>{c === 'All' ? '🌐 All Companies' : c}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
-                ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
+                ? `Manage user accounts and screen privileges for ${selectedCompany === 'All' ? 'all companies' : selectedCompany}.`
                 : activeSubTab === 'approvals'
-                ? 'Review, authorize, or reject data modifications and deletion requests submitted by non-admin staff.'
+                ? `Review, authorize, or reject change requests for ${selectedCompany === 'All' ? 'all companies' : selectedCompany}.`
                 : activeSubTab === 'dataReview'
-                ? 'Audit and inspect all data entries, invoices, job cards, expenses, and fabric transactions entered by users.'
+                ? `Audit and inspect all data entries entered by users in ${selectedCompany === 'All' ? 'all companies' : selectedCompany}.`
                 : activeSubTab === 'clients'
                 ? 'Manage client user accounts, company codes, credentials, and Cloudflare R2 profile images.'
                 : activeSubTab === 'billing'
@@ -1344,37 +1468,39 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {/* Lock / Unlock System Button */}
+        {/* Lock / Unlock System Button (Only for Master & Main Admins) */}
         <div style={styles.topBarRight}>
-          <button
-            type="button"
-            onClick={handleToggleSystemLock}
-            disabled={systemLockLoading}
-            style={isSystemLocked ? styles.systemLockBtnActive : styles.systemLockBtn}
-            title={
-              isSystemLocked
-                ? 'System is currently LOCKED. Non-admin users see a 404 Not Found error page. Click to Unlock.'
-                : 'Click to lock the ERP system. Non-admin users will immediately see a 404 Not Found error page.'
-            }
-          >
-            {systemLockLoading ? (
-              <>
-                <RotateCw size={16} className="spin-loader" />
-                <span>Updating...</span>
-              </>
-            ) : isSystemLocked ? (
-              <>
-                <Unlock size={17} />
-                <span>System Locked • Click to Unlock</span>
-                <span style={styles.lockBadgeActive}>404 ACTIVE</span>
-              </>
-            ) : (
-              <>
-                <Lock size={17} />
-                <span>Lock System</span>
-              </>
-            )}
-          </button>
+          {(isMasterAdmin || isMainAdmin) && (
+            <button
+              type="button"
+              onClick={handleToggleSystemLock}
+              disabled={systemLockLoading}
+              style={isSystemLocked ? styles.systemLockBtnActive : styles.systemLockBtn}
+              title={
+                isSystemLocked
+                  ? 'System is currently LOCKED. Non-admin users see a 404 Not Found error page. Click to Unlock.'
+                  : 'Click to lock the ERP system. Non-admin users will immediately see a 404 Not Found error page.'
+              }
+            >
+              {systemLockLoading ? (
+                <>
+                  <RotateCw size={16} className="spin-loader" />
+                  <span>Updating...</span>
+                </>
+              ) : isSystemLocked ? (
+                <>
+                  <Unlock size={17} />
+                  <span>System Locked • Click to Unlock</span>
+                  <span style={styles.lockBadgeActive}>404 ACTIVE</span>
+                </>
+              ) : (
+                <>
+                  <Lock size={17} />
+                  <span>Lock System</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1441,20 +1567,24 @@ export default function AdminPanel() {
         >
           <Settings size={16} /> Expense Settings
         </button>
-        <button
-          onClick={() => { setActiveSubTab('billing'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'billing' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', flexShrink: 0, whiteSpace: 'nowrap' }}
-        >
-          <CreditCard size={16} /> Infrastructure Billing
-        </button>
-        <button
-          onClick={() => { setActiveSubTab('backup'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'backup' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
-        >
-          <Database size={16} /> Data Backup
-        </button>
+        {(isMasterAdmin || isMainAdmin) && (
+          <button
+            onClick={() => { setActiveSubTab('billing'); setError(''); setSuccess(''); }}
+            className={activeSubTab === 'billing' ? 'btn-primary' : 'btn-secondary'}
+            style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            <CreditCard size={16} /> Infrastructure Billing
+          </button>
+        )}
+        {(isMasterAdmin || isMainAdmin) && (
+          <button
+            onClick={() => { setActiveSubTab('backup'); setError(''); setSuccess(''); }}
+            className={activeSubTab === 'backup' ? 'btn-primary' : 'btn-secondary'}
+            style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            <Database size={16} /> Data Backup
+          </button>
+        )}
         <button
           onClick={() => { setActiveSubTab('signedDocs'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'signedDocs' ? 'btn-primary' : 'btn-secondary'}
@@ -3665,23 +3795,23 @@ export default function AdminPanel() {
       )}
 
       {activeSubTab === 'approvals' && (
-        <AdminChangeApprovalQueue onCountChange={setPendingApprovalsCount} />
+        <AdminChangeApprovalQueue companyEntity={selectedCompany} currentUser={currentUser} onCountChange={setPendingApprovalsCount} />
       )}
 
       {activeSubTab === 'dataReview' && (
-        <AdminUserDataReview />
+        <AdminUserDataReview companyEntity={selectedCompany} />
       )}
 
       {activeSubTab === 'settings' && (
-        <PrintSettings expenseOnly={true} />
+        <PrintSettings companyEntity={selectedCompany} expenseOnly={true} />
       )}
 
       {activeSubTab === 'signedDocs' && (
-        <AdminSignedDocumentsApproval />
+        <AdminSignedDocumentsApproval companyEntity={selectedCompany} />
       )}
 
       {activeSubTab === 'clients' && (
-        <AdminClientDetails />
+        <AdminClientDetails companyEntity={selectedCompany} />
       )}
 
     </div>

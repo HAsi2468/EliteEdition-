@@ -5,6 +5,8 @@ const { encryptData } = require('../utils/auth');
 const config = require('../config/config.js');
 const db = require('../db/models');
 
+const MASTER_ADMIN_EMAIL = 'harshitsidapara2468@gmail.com';
+
 async function getUserByEmail(email) {
 	if (!email) return null;
 	const cleanEmail = String(email).trim().toLowerCase();
@@ -52,6 +54,27 @@ async function createUser(req) {
   if (!role) {
     throw new ApiError(httpStatus.BAD_REQUEST, '`role` is required');
   }
+
+  const requesterEmail = (req.user?.email || '').toLowerCase();
+  const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+  const isRequesterMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+  const isCompanyAdmin = req.user?.role === 'admin' && !isRequesterMainAdmin;
+
+  let finalAllowedCompanies = Array.isArray(allowedCompanies)
+    ? allowedCompanies
+    : ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno wear', 'Yamunaji', 'EXEDP'];
+
+  if (isCompanyAdmin) {
+    if (isMainAdmin) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Company Admins cannot create Main Admin accounts.');
+    }
+    const requesterAllowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+    finalAllowedCompanies = finalAllowedCompanies.filter(c => requesterAllowed.includes(c));
+    if (finalAllowedCompanies.length === 0) {
+      finalAllowedCompanies = requesterAllowed;
+    }
+  }
+
   const hashedPassword = await encryptData(password);
   const user = await getUserByEmail(email);
 
@@ -64,8 +87,8 @@ async function createUser(req) {
     email,
     password: hashedPassword,
     role,
-    isMainAdmin: Boolean(isMainAdmin),
-    allowedCompanies: Array.isArray(allowedCompanies) ? allowedCompanies : ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno wear', 'Yamunaji'],
+    isMainAdmin: isCompanyAdmin ? false : Boolean(isMainAdmin),
+    allowedCompanies: finalAllowedCompanies,
     permissions: permissions || [],
     department: department || 'General',
     canManageTasks: canManageTasks !== undefined ? Boolean(canManageTasks) : true,
@@ -105,7 +128,7 @@ async function createUser(req) {
 
 async function getUsers(req) {
 	const { page: defaultPage, limit: defaultLimit } = config.pagination;
-	const { page = defaultPage, limit = defaultLimit } = req.query;
+	const { page = defaultPage, limit = defaultLimit, companyEntity } = req.query;
 
 	const offset = getOffset(page, limit);
 
@@ -115,6 +138,22 @@ async function getUsers(req) {
 		email: { $not: /test-load|qa-bot|testbot/i },
 		isTest: { $ne: true }
 	};
+
+	const requesterEmail = (req.user?.email || '').toLowerCase();
+	const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+	const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+	const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+	if (isCompanyAdmin) {
+		const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+		if (companyEntity && companyEntity !== 'ALL') {
+			userFilter.allowedCompanies = companyEntity;
+		} else {
+			userFilter.allowedCompanies = { $in: allowed };
+		}
+	} else if (companyEntity && companyEntity !== 'ALL') {
+		userFilter.allowedCompanies = companyEntity;
+	}
 
 	const usersList = await db.user.find(userFilter, {
 		password: 0,
@@ -136,7 +175,32 @@ async function getUsers(req) {
 	};
 }
 
-async function deleteUserById(userId) {
+async function deleteUserById(userId, requesterUser) {
+	const targetUser = await db.user.findById(userId).lean();
+	if (!targetUser) {
+		throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+	}
+
+	if (String(targetUser.email).toLowerCase() === MASTER_ADMIN_EMAIL) {
+		throw new ApiError(httpStatus.FORBIDDEN, 'Root Master Admin account is permanently protected and cannot be deleted.');
+	}
+
+	const requesterEmail = (requesterUser?.email || '').toLowerCase();
+	const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+	const isMainAdmin = requesterUser?.isMainAdmin === true || isMasterAdmin;
+	const isCompanyAdmin = requesterUser?.role === 'admin' && !isMainAdmin;
+
+	if (isCompanyAdmin) {
+		if (targetUser.role === 'admin' || targetUser.isMainAdmin) {
+			throw new ApiError(httpStatus.FORBIDDEN, 'Company Admins cannot delete other Administrators.');
+		}
+		const allowed = Array.isArray(requesterUser?.allowedCompanies) ? requesterUser.allowedCompanies : [];
+		const hasOverlap = (targetUser.allowedCompanies || []).some(c => allowed.includes(c));
+		if (!hasOverlap) {
+			throw new ApiError(httpStatus.FORBIDDEN, 'You can only delete staff members belonging to your assigned company.');
+		}
+	}
+
 	const result = await db.user.deleteOne({ _id: userId });
 
 	if (result.deletedCount === 0) {
@@ -149,6 +213,44 @@ async function deleteUserById(userId) {
 async function updateUser(req) {
 	const { password, email } = req.body;
 	const userId = req.params.id || req.body.id;
+
+	const targetUser = await db.user.findById(userId).lean();
+	if (!targetUser) {
+		throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+	}
+
+	const requesterEmail = (req.user?.email || '').toLowerCase();
+	const targetEmail = String(targetUser.email).toLowerCase();
+	const isMasterAdmin = requesterEmail === MASTER_ADMIN_EMAIL;
+	const isMainAdmin = req.user?.isMainAdmin === true || isMasterAdmin;
+	const isCompanyAdmin = req.user?.role === 'admin' && !isMainAdmin;
+
+	// Master Admin Protection
+	if (targetEmail === MASTER_ADMIN_EMAIL) {
+		if (requesterEmail !== MASTER_ADMIN_EMAIL) {
+			throw new ApiError(httpStatus.FORBIDDEN, 'Root Master Admin account can only be edited by the Master Admin.');
+		}
+		// Preserve root authority
+		req.body.role = 'admin';
+		req.body.isMainAdmin = true;
+		req.body.status = 'Active';
+	}
+
+	if (isCompanyAdmin) {
+		if (req.body.isMainAdmin) {
+			delete req.body.isMainAdmin;
+		}
+		if (targetUser.role === 'admin' && requesterEmail !== targetEmail) {
+			throw new ApiError(httpStatus.FORBIDDEN, 'Company Admins cannot modify other Administrators.');
+		}
+		if (Array.isArray(req.body.allowedCompanies)) {
+			const allowed = Array.isArray(req.user?.allowedCompanies) ? req.user.allowedCompanies : [];
+			req.body.allowedCompanies = req.body.allowedCompanies.filter(c => allowed.includes(c));
+			if (req.body.allowedCompanies.length === 0) {
+				req.body.allowedCompanies = allowed;
+			}
+		}
+	}
 
 	if (password && String(password).trim()) {
 		const hashedPassword = await encryptData(String(password).trim());

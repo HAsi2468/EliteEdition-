@@ -83,6 +83,7 @@ const db = {
   Lead: require('./lead.model'),
   PushSubscription: require('./pushSubscription.model'),
   ChangeApprovalRequest: require('./changeApprovalRequest.model'),
+  CompanyApprovalPolicy: require('./companyApprovalPolicy.model'),
   FreightBill: require('./freightBill.model'),
   DocumentTemplate: require('./documentTemplate.model'),
   DocumentPrintLog: require('./documentPrintLog.model'),

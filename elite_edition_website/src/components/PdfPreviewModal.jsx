@@ -528,21 +528,13 @@ export default function PdfPreviewModal() {
             position: 'relative',
             overflow: 'hidden',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center'
           }}
         >
           {previewUrl ? (
-            <object
-              data={`${previewUrl}#toolbar=1&navpanes=0`}
-              type="application/pdf"
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                backgroundColor: '#525659'
-              }}
-            >
+            <>
               <iframe
                 ref={iframeRef}
                 src={`${previewUrl}#toolbar=1&navpanes=0`}
@@ -553,30 +545,68 @@ export default function PdfPreviewModal() {
                   border: 'none',
                   backgroundColor: '#525659'
                 }}
+              />
+              {/* Fallback bar if browser plugin blocks inline preview */}
+              <div 
+                style={{
+                  position: 'absolute',
+                  bottom: 12,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(15, 23, 42, 0.88)',
+                  backdropFilter: 'blur(8px)',
+                  padding: '6px 14px',
+                  borderRadius: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  color: '#ffffff',
+                  fontSize: '0.78rem',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                  zIndex: 20
+                }}
               >
-                <div style={{ color: '#ffffff', textAlign: 'center', padding: '2rem' }}>
-                  <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
-                  <p style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 600 }}>
-                    PDF preview is not supported directly in this browser view.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    style={{
-                      padding: '0.6rem 1.2rem',
-                      borderRadius: '8px',
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Download PDF Document
-                  </button>
-                </div>
-              </iframe>
-            </object>
+                <span>Preview not showing?</span>
+                <button
+                  type="button"
+                  onClick={handleOpenExternal}
+                  style={{
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '3px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <ExternalLink size={12} /> Open Full
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  style={{
+                    background: '#334155',
+                    color: '#ffffff',
+                    border: '1px solid #475569',
+                    borderRadius: '14px',
+                    padding: '3px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Download size={12} /> Download
+                </button>
+              </div>
+            </>
           ) : (
             <div style={{ color: '#ffffff', textAlign: 'center', padding: '2rem' }}>
               <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.6 }} />

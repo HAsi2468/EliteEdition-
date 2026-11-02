@@ -28,7 +28,7 @@ const deleteUser = catchAsync(async (req, res) => {
 	if (!userId) {
 		throw new ApiError(httpStatus.BAD_REQUEST, '`id` param is required');
 	}
-	await userService.deleteUserById(userId);
+	await userService.deleteUserById(userId, req.user);
 	res.send({ success: true });
 });
 

@@ -30,6 +30,37 @@ const EXCLUDED_PREFIXES = [
 ];
 
 // Helper to map route paths to friendly module names and Mongoose models
+const resolveCompanyEntity = (req, beforeData) => {
+  const headerCompany = req.headers['x-company-entity'];
+  if (headerCompany && typeof headerCompany === 'string' && headerCompany.trim()) {
+    return headerCompany.trim();
+  }
+  const bodyCompany = req.body?.companyEntity || req.body?.companyName || req.body?.company;
+  if (bodyCompany && typeof bodyCompany === 'string' && bodyCompany.trim()) {
+    return bodyCompany.trim();
+  }
+  const queryCompany = req.query?.companyEntity || req.query?.company;
+  if (queryCompany && typeof queryCompany === 'string' && queryCompany.trim()) {
+    return queryCompany.trim();
+  }
+  const beforeCompany = beforeData?.companyEntity || beforeData?.companyName || beforeData?.company;
+  if (beforeCompany && typeof beforeCompany === 'string' && beforeCompany.trim()) {
+    return beforeCompany.trim();
+  }
+
+  const url = (req.originalUrl || req.url || '').toLowerCase();
+  if (url.includes('/yamunaji')) return 'Yamunaji';
+  if (url.includes('/stitching')) return 'Elite Stitching';
+  if (url.includes('/exedp')) return 'EXEDP';
+  if (url.includes('/ethno_wear') || url.includes('/ethno-wear')) return 'Ethno wear';
+  if (url.includes('/sobise')) return 'Sobise';
+  if (url.includes('/elite_online') || url.includes('/elite-online')) return 'Elite Online';
+  if (url.includes('/elite_fabtex') || url.includes('/elite-fabtex')) return 'Elite Fabtex';
+  if (url.includes('/elite_edition') || url.includes('/elite-edition')) return 'Elite Edition';
+
+  return 'Elite Digital Print';
+};
+
 const getModuleAndModel = (urlPath) => {
   const lower = urlPath.toLowerCase();
 
@@ -331,12 +362,35 @@ const approvalInterceptor = async (req, res, next) => {
       targetIdentifier = targetId ? `#${String(targetId).slice(-6)}` : `${moduleName} Record`;
     }
 
+    // Resolve company entity for decentralized company admin control
+    const resolvedCompany = resolveCompanyEntity(req, beforeData);
+
+    // Check company-specific approval policy
+    let isApprovalEnabledForCompany = true;
+    try {
+      if (models.CompanyApprovalPolicy) {
+        const policy = await models.CompanyApprovalPolicy.findOne({ companyEntity: resolvedCompany }).lean();
+        if (policy && policy.enabled === false) {
+          isApprovalEnabledForCompany = false;
+        }
+      }
+    } catch (polErr) {
+      logger.warn('[ApprovalInterceptor] Could not check CompanyApprovalPolicy for %s: %s', resolvedCompany, polErr.message);
+    }
+
+    if (!isApprovalEnabledForCompany) {
+      // Company Admin explicitly disabled approval requirement for this company!
+      // Allow user changes to execute immediately without intercepting!
+      return next();
+    }
+
     // Calculate diff between existing document and proposed changes
     const diffSummary = computeDiff(beforeData, req.body || {});
 
-    // 7. Create Pending Change Approval Request
+    // 7. Create Pending Change Approval Request with companyEntity
     const approval = await ChangeApprovalRequest.create({
       module: moduleName,
+      companyEntity: resolvedCompany,
       action: isDelete ? 'DELETE' : 'EDIT',
       targetId: String(targetId || ''),
       targetIdentifier,
@@ -358,10 +412,11 @@ const approvalInterceptor = async (req, res, next) => {
     });
 
     logger.info(
-      '[ApprovalInterceptor] Captured non-admin %s on %s (%s) by %s',
+      '[ApprovalInterceptor] Captured non-admin %s on %s (%s) [%s] by %s',
       approval.action,
       approval.module,
       approval.targetIdentifier,
+      approval.companyEntity,
       approval.requestedBy.name
     );
 
@@ -372,6 +427,7 @@ const approvalInterceptor = async (req, res, next) => {
         io.emit('new-approval-request', {
           id: approval._id,
           module: approval.module,
+          companyEntity: approval.companyEntity,
           action: approval.action,
           targetIdentifier: approval.targetIdentifier,
           requestedBy: approval.requestedBy,

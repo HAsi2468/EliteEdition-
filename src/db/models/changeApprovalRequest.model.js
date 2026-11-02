@@ -9,6 +9,13 @@ const changeApprovalRequestSchema = new mongoose.Schema(
       trim: true,
       // e.g. 'JobCard', 'Billing', 'Expense', 'FabricChallan', 'Inventory', 'Vendor', 'Party', 'Design', etc.
     },
+    companyEntity: {
+      type: String,
+      required: true,
+      index: true,
+      trim: true,
+      default: 'Elite Digital Print',
+    },
     action: {
       type: String,
       required: true,

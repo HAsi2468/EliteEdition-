@@ -4066,7 +4066,22 @@ export default function App() {
           ) : activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? (
             <LedgerReconciliationPanel />
           ) : activeTab === 'admin' ? (
-            <AdminPanel />
+            <AdminPanel
+              companyEntity={
+                activeDepartment === 'elite_online' ? 'Elite Online' :
+                activeDepartment === 'elite_edition' ? 'Elite Edition' :
+                activeDepartment === 'elite_fabtex' ? 'Elite Fabtex' :
+                activeDepartment === 'sobise' ? 'Sobise' :
+                activeDepartment === 'ethno_wear' ? 'Ethno wear' :
+                activeDepartment === 'yamunaji' ? 'Yamunaji' :
+                activeDepartment === 'stitching' ? 'Elite Stitching' :
+                activeDepartment === 'exedp' ? 'EXEDP' :
+                'Elite Digital Print'
+              }
+              currentUser={currentUser}
+              activeDepartment={activeDepartment}
+              onNavigate={(t) => setActiveTab(t)}
+            />
           ) : activeTab === 'not-found' ? (
             <div style={styles.noAccessContainer}>
               <HelpCircle size={48} color="var(--primary)" />
