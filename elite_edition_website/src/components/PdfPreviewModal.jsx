@@ -533,17 +533,50 @@ export default function PdfPreviewModal() {
           }}
         >
           {previewUrl ? (
-            <iframe
-              ref={iframeRef}
-              src={`${previewUrl}#toolbar=1&navpanes=0`}
-              title={title}
+            <object
+              data={`${previewUrl}#toolbar=1&navpanes=0`}
+              type="application/pdf"
               style={{
                 width: '100%',
                 height: '100%',
                 border: 'none',
                 backgroundColor: '#525659'
               }}
-            />
+            >
+              <iframe
+                ref={iframeRef}
+                src={`${previewUrl}#toolbar=1&navpanes=0`}
+                title={title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  backgroundColor: '#525659'
+                }}
+              >
+                <div style={{ color: '#ffffff', textAlign: 'center', padding: '2rem' }}>
+                  <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+                  <p style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 600 }}>
+                    PDF preview is not supported directly in this browser view.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    style={{
+                      padding: '0.6rem 1.2rem',
+                      borderRadius: '8px',
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Download PDF Document
+                  </button>
+                </div>
+              </iframe>
+            </object>
           ) : (
             <div style={{ color: '#ffffff', textAlign: 'center', padding: '2rem' }}>
               <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.6 }} />

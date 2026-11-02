@@ -1864,7 +1864,7 @@ export const api = {
     downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Report' });
   },
 
-  async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName, filters = {}) {
+  async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName, filters = {}, options = {}) {
     const baseUrl = getBaseUrl();
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
@@ -1888,7 +1888,7 @@ export const api = {
       throw new Error(errText);
     }
     const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName || 'Elite_Digital_Prints_Combined_Report.pdf', { title: 'Digital Prints Combined Report' });
+    downloadOrPreviewPdf(blob, fileName || 'Elite_Digital_Prints_Combined_Report.pdf', { title: 'Digital Prints Combined Report', ...options });
   },
 
   async getInfraBills() {
