@@ -13,6 +13,7 @@ const path = require('path');
 const fs = require('fs');
 const { updateWithOCC } = require('../services/concurrencyService');
 const logger = require('../config/logger');
+const { normalizeCompanyId } = require('../config/company.constants');
 
 // Helper to convert number to Indian Currency Words
 function numToWords(amount) {
@@ -144,7 +145,7 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $not: { $regex: '^EXEDP', $options: 'i' } } },
         {
           $or: [
-            { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+            { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints', 'EDP', 'edp'] } },
             { companyEntity: { $exists: false } },
             { companyEntity: null },
             { companyEntity: '' },
@@ -167,70 +168,77 @@ function buildPurchaseCompanyFilter(companyEntity) {
   if (!companyEntity) return {};
   const ce = String(companyEntity).trim();
   if (ce === '[object Object]') return {};
-  if (ce === 'EXEDP' || ce === 'exedp' || ce === 'EX-EDP' || ce === 'ex_edp') {
+  const norm = ce.toLowerCase().replace(/[\s_-]+/g, '');
+
+  if (norm === 'exedp' || norm === 'ex-edp' || norm === 'ex_edp' || norm === 'oldedp') {
     return {
       $or: [
         { companyEntity: { $in: ['EXEDP', 'EX-EDP', 'exedp'] } },
         { purchaseNo: { $regex: '^EXEDP', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Edition') {
+  } else if (norm === 'eliteedition' || norm === 'ee') {
     return {
       $or: [
         { companyEntity: 'Elite Edition' },
         { purchaseNo: { $regex: '^EE', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Fabtex') {
+  } else if (norm === 'elitefabtex' || norm === 'ef') {
     return {
       $or: [
         { companyEntity: 'Elite Fabtex' },
         { purchaseNo: { $regex: '^EF', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Sobise') {
+  } else if (norm === 'sobise' || norm === 'so') {
     return {
       $or: [
         { companyEntity: 'Sobise' },
         { purchaseNo: { $regex: '^SO', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Stitching') {
+  } else if (norm === 'elitestitching' || norm === 'es') {
     return {
       $or: [
         { companyEntity: 'Elite Stitching' },
         { purchaseNo: { $regex: '^ES', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Elite Online') {
+  } else if (norm === 'eliteonline' || norm === 'eo' || norm === 'eon') {
     return {
       $or: [
         { companyEntity: 'Elite Online' },
         { purchaseNo: { $regex: '^EO', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Ethno wear' || ce === 'ethno_wear' || ce === 'EW') {
+  } else if (norm === 'ethnowear' || norm === 'ew') {
     return {
       $or: [
         { companyEntity: 'Ethno wear' },
         { purchaseNo: { $regex: '^EW', $options: 'i' } }
       ]
     };
-  } else if (ce === 'Yamunaji' || ce === 'yamunaji' || ce === 'YJ') {
+  } else if (norm === 'yamunaji' || norm === 'yamunajicreation' || norm === 'yj') {
     return {
       $or: [
         { companyEntity: 'Yamunaji' },
         { purchaseNo: { $regex: '^YJ', $options: 'i' } }
       ]
     };
-  } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
+  } else if (
+    norm === 'edp' ||
+    norm === 'elitedigitalprint' ||
+    norm === 'elitedigitalprints' ||
+    norm === 'digitalprint'
+  ) {
     return {
       $and: [
         { companyEntity: { $nin: ['EXEDP', 'EX-EDP', 'exedp'] } },
         { purchaseNo: { $not: { $regex: '^EXEDP', $options: 'i' } } },
         {
           $or: [
-            { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'edp'] } },
+            { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'EDP', 'edp'] } },
             { companyEntity: { $exists: false } },
             { companyEntity: null },
             { companyEntity: '' }
@@ -239,7 +247,8 @@ function buildPurchaseCompanyFilter(companyEntity) {
       ]
     };
   }
-  return { companyEntity: ce };
+  const escaped = ce.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return { companyEntity: { $regex: `^${escaped}$`, $options: 'i' } };
 }
 
 // Strict billing module permission guard (SEC-008)
@@ -257,6 +266,7 @@ function checkBillingPermission(req) {
     'jobcards_billing_fabtex',
     'jobcards_billing_sobise',
     'invoices',
+    'purchases',
     'eo_invoices',
     'ee_invoices',
     'ef_invoices',
@@ -279,30 +289,70 @@ function checkCompanyTenantAccess(req, requestedCompany) {
   const role = String(user.role || '').toLowerCase();
   const isSuperOwner = user.isMainAdmin || role === 'super_admin' || role === 'superadmin' || user.email === 'harshitsidapara2468@gmail.com';
 
-  // Super admin has global tenant access ONLY IF allowedCompanies is unrestricted or contains all
-  if (isSuperOwner && (!Array.isArray(user.allowedCompanies) || user.allowedCompanies.length >= 5)) {
+  // Master Admin and Main Admin have global tenant access across all companies
+  if (isSuperOwner) {
     return true;
   }
 
-  // Tenant enforcement: derive allowed tenant from user's allowedCompanies (SEC-002 & SEC-008)
-  if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0) {
-    if (!requestedCompany) return false;
-    const normReq = String(requestedCompany).toLowerCase().replace(/[\s_-]+/g, '');
-    const isAllowed = user.allowedCompanies.some(ac => {
-      const normAc = String(ac).toLowerCase().replace(/[\s_-]+/g, '');
-      if (normReq === 'exedp' || normReq === 'ex-edp' || normReq === 'ex_edp' || normReq === 'oldedp') {
-        return normAc === 'exedp' || normAc === 'elitedigitalprint' || normAc === 'edp';
-      }
-      return normAc === normReq;
-    });
-    return isAllowed;
+  // If no company or ALL requested, permit default access if user has company context
+  if (!requestedCompany || requestedCompany === 'ALL') {
+    return true;
   }
 
-  // Standard user without allowedCompanies is not permitted to access tenant data
-  if (!isSuperOwner && role !== 'admin') {
-    return false;
+  const canonReq = normalizeCompanyId(requestedCompany);
+  const normReq = String(requestedCompany).toLowerCase().replace(/[\s_-]+/g, '');
+  const normReqStem = normReq.replace(/s$/, '');
+
+  // 1. Tenant enforcement: derive allowed tenant from user's allowedCompanies
+  if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0) {
+    if (user.allowedCompanies.includes('ALL')) return true;
+    const isAllowed = user.allowedCompanies.some(ac => {
+      const canonAc = normalizeCompanyId(ac);
+      if (canonReq && canonAc && canonReq === canonAc) return true;
+      const normAc = String(ac).toLowerCase().replace(/[\s_-]+/g, '');
+      const normAcStem = normAc.replace(/s$/, '');
+      if (normReq === 'exedp' || normReq === 'ex-edp' || normReq === 'ex_edp' || normReq === 'oldedp') {
+        return normAc === 'exedp' || normAc === 'elitedigitalprint' || normAc === 'edp' || canonAc === 'digital_print';
+      }
+      return normAc === normReq || normAcStem === normReqStem;
+    });
+    if (isAllowed) return true;
   }
-  return true;
+
+  // 2. Direct user company assignment fallback (company_id / companyId / department)
+  const userDirectComp = user.company_id || user.companyId || user.department;
+  if (userDirectComp) {
+    const canonUserComp = normalizeCompanyId(userDirectComp);
+    if (canonReq && canonUserComp && canonReq === canonUserComp) return true;
+    const normUserComp = String(userDirectComp).toLowerCase().replace(/[\s_-]+/g, '');
+    if (normUserComp === normReq || normUserComp.replace(/s$/, '') === normReqStem) return true;
+  }
+
+  // 3. Admin role without explicit allowedCompanies array restriction defaults to allowed
+  if (role === 'admin') {
+    return true;
+  }
+
+  return false;
+}
+
+// Master Directory Read Access Guard (Customers/Parties, Vendors, Items)
+// Allows operational staff (Job Cards, Fabric, Challans, Purchases) to view master directories for their assigned company
+function checkDirectoryReadPermission(req, requestedCompany) {
+  const user = req.user;
+  if (!user) return false;
+
+  const role = String(user.role || '').toLowerCase();
+  if (user.isMainAdmin || role === 'super_admin' || role === 'superadmin' || role === 'admin') {
+    return true;
+  }
+
+  if (checkBillingPermission(req)) {
+    return true;
+  }
+
+  // Any authenticated user who has access to this company tenant can view party/vendor/item directories
+  return checkCompanyTenantAccess(req, requestedCompany);
 }
 
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
@@ -3719,7 +3769,16 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 // ── 10. CUSTOMER CRUD ────────────────────────────────────────────────────────
 const getCustomers = async (req, res) => {
   try {
-    if (!checkBillingPermission(req)) {
+    let { companyEntity } = req.query;
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
+    if (!activeCompany) {
+      activeCompany = req.user?.company_id || req.user?.companyId || 'Elite Digital Prints';
+    }
+
+    if (!checkDirectoryReadPermission(req, activeCompany)) {
       return res.status(403).json({
         success: false,
         code: 'PERMISSION_DENIED',
@@ -3727,38 +3786,11 @@ const getCustomers = async (req, res) => {
       });
     }
 
-    let { companyEntity } = req.query;
-    let activeCompany = companyEntity;
-    const isRestricted = Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0 &&
-      !(req.user.isMainAdmin && req.user.allowedCompanies.length >= 5);
-
-    if (isRestricted) {
-      if (!activeCompany) {
-        activeCompany = req.user.allowedCompanies[0];
-      } else if (!checkCompanyTenantAccess(req, activeCompany)) {
-        return res.status(403).json({
-          success: false,
-          code: 'COMPANY_FORBIDDEN',
-          error: `Access denied: You do not have permission to access customers for '${activeCompany}'.`
-        });
-      }
-    } else {
-      activeCompany = activeCompany || req.headers['x-company-id'] || req.headers['x-company'];
-    }
-
-    if (!checkCompanyTenantAccess(req, activeCompany)) {
-      return res.status(403).json({
-        success: false,
-        code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to access customers for '${activeCompany || 'unspecified company'}'.`
-      });
-    }
-
-    const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
+    const filter = buildCompanyFilter(activeCompany);
     const customers = await BillingCustomer.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: customers });
   } catch (error) {
-    logger.error('Error creating billing purchase: %s', error.stack || error.message);
+    logger.error('Error fetching billing customers: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3830,31 +3862,28 @@ const deleteCustomer = async (req, res) => {
 // ── 10B. VENDOR CRUD (Billing Vendors Collection) ──────────────────────────
 const getVendors = async (req, res) => {
   try {
-    if (!checkBillingPermission(req)) {
+    let { companyEntity } = req.query;
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
+    if (!activeCompany) {
+      activeCompany = req.user?.company_id || req.user?.companyId || 'Elite Digital Prints';
+    }
+
+    if (!checkDirectoryReadPermission(req, activeCompany)) {
       return res.status(403).json({
         success: false,
         code: 'PERMISSION_DENIED',
         error: 'Access denied: You do not have permission to access Vendor records.'
       });
     }
-    let { companyEntity } = req.query;
-    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
-    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
-      activeCompany = req.user.allowedCompanies[0];
-    }
-    if (!checkCompanyTenantAccess(req, activeCompany)) {
-      return res.status(403).json({
-        success: false,
-        code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to access vendors for '${activeCompany || 'unspecified company'}'.`
-      });
-    }
-    const filter = buildPurchaseCompanyFilter(activeCompany);
 
+    const filter = buildPurchaseCompanyFilter(activeCompany);
     const vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: vendors || [] });
   } catch (error) {
-    logger.error('Error creating billing purchase: %s', error.stack || error.message);
+    logger.error('Error fetching billing vendors: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -3940,30 +3969,28 @@ const deleteVendor = async (req, res) => {
 // ── 11. ITEM CRUD ────────────────────────────────────────────────────────────
 const getItems = async (req, res) => {
   try {
-    if (!checkBillingPermission(req)) {
+    let { companyEntity } = req.query;
+    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
+    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
+      activeCompany = req.user.allowedCompanies[0];
+    }
+    if (!activeCompany) {
+      activeCompany = req.user?.company_id || req.user?.companyId || 'Elite Digital Prints';
+    }
+
+    if (!checkDirectoryReadPermission(req, activeCompany)) {
       return res.status(403).json({
         success: false,
         code: 'PERMISSION_DENIED',
         error: 'Access denied: You do not have permission to access Item catalog records.'
       });
     }
-    let { companyEntity } = req.query;
-    let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
-    if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
-      activeCompany = req.user.allowedCompanies[0];
-    }
-    if (!checkCompanyTenantAccess(req, activeCompany)) {
-      return res.status(403).json({
-        success: false,
-        code: 'COMPANY_FORBIDDEN',
-        error: `Access denied: You do not have permission to access item catalog for '${activeCompany || 'unspecified company'}'.`
-      });
-    }
-    const filter = buildCompanyFilter(activeCompany || (req.user?.allowedCompanies?.[0]));
+
+    const filter = buildCompanyFilter(activeCompany);
     const items = await BillingItem.find(filter).sort({ itemName: 1 }).lean();
     res.json({ success: true, data: items });
   } catch (error) {
-    logger.error('Error creating billing purchase: %s', error.stack || error.message);
+    logger.error('Error fetching billing items: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4180,6 +4207,9 @@ const getPurchases = async (req, res) => {
     let activeCompany = companyEntity || req.headers['x-company-id'] || req.headers['x-company'];
     if (!activeCompany && Array.isArray(req.user?.allowedCompanies) && req.user.allowedCompanies.length > 0) {
       activeCompany = req.user.allowedCompanies[0];
+    }
+    if (!activeCompany) {
+      activeCompany = req.user?.company_id || req.user?.companyId || 'Elite Digital Prints';
     }
     if (!checkCompanyTenantAccess(req, activeCompany)) {
       return res.status(403).json({

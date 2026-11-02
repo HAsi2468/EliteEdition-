@@ -6182,7 +6182,17 @@ export default function EliteBillingDepartment({
                             });
                           }}
                         />
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <span
+                            onClick={() => handleEditCustomer(c)}
+                            style={{ cursor: 'pointer', color: 'var(--primary, #4f46e5)', textDecoration: 'none' }}
+                            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                            title="Click to view customer details"
+                          >
+                            {c.name}
+                          </span>
+                        </td>
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{c.businessName || '—'}</td>
                         <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
                           <div>{c.phone || '—'}</div>
@@ -6194,6 +6204,9 @@ export default function EliteBillingDepartment({
                         </td>
                         <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditCustomer(c)} className="btn-icon" title="View / Edit Customer Details">
+                              <Eye size={14} color="#0284c7" />
+                            </button>
                             <button onClick={() => handleEditCustomer(c)} className="btn-icon" title="Edit Customer">
                               <Edit2 size={14} color="var(--primary)" />
                             </button>
@@ -6307,7 +6320,15 @@ export default function EliteBillingDepartment({
                         />
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span>{v.name}</span>
+                            <span
+                              onClick={() => handleEditVendor(v)}
+                              style={{ cursor: 'pointer', color: 'var(--primary, #4f46e5)', textDecoration: 'none' }}
+                              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                              title="Click to view vendor details"
+                            >
+                              {v.name}
+                            </span>
                             {v.vendorType && (
                               <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', fontWeight: 700 }}>
                                 {v.vendorType}
@@ -6326,6 +6347,9 @@ export default function EliteBillingDepartment({
                         </td>
                         <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditVendor(v)} className="btn-icon" title="View / Edit Vendor Details">
+                              <Eye size={14} color="#0284c7" />
+                            </button>
                             <button onClick={() => handleEditVendor(v)} className="btn-icon" title="Edit Vendor">
                               <Edit2 size={14} color="var(--primary)" />
                             </button>
@@ -6410,13 +6434,26 @@ export default function EliteBillingDepartment({
                             });
                           }}
                         />
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <span
+                            onClick={() => handleEditItem(item)}
+                            style={{ cursor: 'pointer', color: 'var(--primary, #4f46e5)', textDecoration: 'none' }}
+                            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                            title="Click to view product details"
+                          >
+                            {item.itemName}
+                          </span>
+                        </td>
                         <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
                         <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.hsnCode || '—'}</td>
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>₹{item.unitPrice} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {item.unit || 'Meters'}</span></td>
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
                         <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditItem(item)} className="btn-icon" title="View / Edit Product Details">
+                              <Eye size={14} color="#0284c7" />
+                            </button>
                             <button onClick={() => handleEditItem(item)} className="btn-icon" title="Edit Product">
                               <Edit2 size={14} color="var(--primary)" />
                             </button>
@@ -8320,7 +8357,9 @@ export default function EliteBillingDepartment({
         <div className="modal-overlay" style={{ alignItems: 'center' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '450px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Add New Customer / Client</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                {editingCustomerId ? 'Customer / Client Details' : 'Add New Customer / Client'}
+              </h3>
               <button onClick={() => setShowCustomerModal(false)} className="btn-icon"><X size={16} /></button>
             </div>
 
@@ -8352,7 +8391,9 @@ export default function EliteBillingDepartment({
 
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowCustomerModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleSaveCustomer}>Save Customer</button>
+              <button className="btn-primary" onClick={handleSaveCustomer}>
+                {editingCustomerId ? 'Update Customer' : 'Save Customer'}
+              </button>
             </div>
           </div>
         </div>
@@ -8489,7 +8530,7 @@ export default function EliteBillingDepartment({
           <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>
-                {showPurchaseModal ? 'Add New Item to Catalog & Purchase' : 'Add Billing Product / Service'}
+                {showPurchaseModal ? 'Add New Item to Catalog & Purchase' : editingItemId ? 'Billing Product / Service Details' : 'Add Billing Product / Service'}
               </h3>
               <button onClick={() => setShowItemModal(false)} className="btn-icon"><X size={16} /></button>
             </div>
@@ -8578,7 +8619,9 @@ export default function EliteBillingDepartment({
 
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowItemModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleSaveItem}>Save Product</button>
+              <button className="btn-primary" onClick={handleSaveItem}>
+                {editingItemId ? 'Update Product' : 'Save Product'}
+              </button>
             </div>
           </div>
         </div>

@@ -36,3 +36,4 @@ const companyApprovalPolicySchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model('CompanyApprovalPolicy', companyApprovalPolicySchema);
+
