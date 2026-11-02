@@ -218,6 +218,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return [];
   });
 
+  const [companySettings, setCompanySettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`elite_company_settings_${companyEntity || 'Yamunaji'}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialSyncDone = useRef(false);
 
@@ -235,6 +243,13 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         : (purchasesRes.status === 'fulfilled' && Array.isArray(purchasesRes.value) ? purchasesRes.value : []);
 
       const backendSettings = (settingsRes.status === 'fulfilled' && settingsRes.value?.data) ? settingsRes.value.data : {};
+
+      if (backendSettings && (backendSettings.companyName || backendSettings.companyGstin)) {
+        setCompanySettings(backendSettings);
+        try {
+          localStorage.setItem(`elite_company_settings_${companyEntity || 'Yamunaji'}`, JSON.stringify(backendSettings));
+        } catch (e) {}
+      }
 
       if (backendSettings.purchaseTypes && Array.isArray(backendSettings.purchaseTypes) && backendSettings.purchaseTypes.length > 0) {
         setDynamicPurchaseTypes(backendSettings.purchaseTypes);
@@ -534,16 +549,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   useEffect(() => {
     let isMounted = true;
-    const fetchPurchaseTypes = async () => {
+    const fetchCompanyProfile = async () => {
       try {
         const res = await api.getCompanySettings(companyEntity);
-        if (isMounted && res?.data?.purchaseTypes && Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
-          setDynamicPurchaseTypes(res.data.purchaseTypes);
+        if (isMounted && res?.data) {
+          setCompanySettings(res.data);
+          if (res.data.purchaseTypes && Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
+            setDynamicPurchaseTypes(res.data.purchaseTypes);
+          }
+          try {
+            localStorage.setItem(`elite_company_settings_${companyEntity || 'Yamunaji'}`, JSON.stringify(res.data));
+          } catch (e) {}
         }
       } catch (err) {}
     };
-    fetchPurchaseTypes();
-    const onRefresh = () => fetchPurchaseTypes();
+    fetchCompanyProfile();
+    const onRefresh = () => fetchCompanyProfile();
     window.addEventListener('elite-data-refresh', onRefresh);
     window.addEventListener('elite-company-settings-updated', onRefresh);
     return () => {
@@ -2881,7 +2902,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Delivery Challan ${showPrintChallanModal?.challanNo || ''} - 2 Copies A4</title>
+          <title>${companySettings?.companyName || 'Yamunaji'} - Mill Challan ${showPrintChallanModal?.challanNo || ''} (2 Copies A4)</title>
           <style>
             @page {
               size: A4 portrait;
@@ -6911,6 +6932,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               }
 
               const renderCopy = (copyLabel, copyColor, extraProps = {}) => {
+                const legalCompanyName = (companySettings?.companyName || (companyEntity ? companyEntity.toUpperCase() : 'YAMUNAJI CREATION')).trim();
+                const legalGstin = (companySettings?.companyGstin || '').trim();
+                const legalPhone = (companySettings?.companyPhone || '').trim();
+                const legalEmail = (companySettings?.companyEmail && companySettings.companyEmail !== 'billing@company.com') ? companySettings.companyEmail.trim() : '';
+                const legalAddress = (companySettings?.companyAddress && companySettings.companyAddress !== 'Full address printed on Tax Invoices') 
+                  ? companySettings.companyAddress.trim() 
+                  : (companySettings?.companyState ? `Surat, ${companySettings.companyState}${companySettings.companyStateCode ? ` - ${companySettings.companyStateCode}` : ''}` : 'Surat, Gujarat');
+                const legalLogo = companySettings?.companyLogo || '';
+                const challanTitle = companySettings?.challanDesign?.title || 'DELIVERY CHALLAN (PROCESSING MILL)';
+                const signLeft = companySettings?.challanDesign?.signatureLeft || "Receiver's Signature (Mill)";
+                const signRight = companySettings?.challanDesign?.signatureRight ? `For ${legalCompanyName} (${companySettings.challanDesign.signatureRight})` : `For ${legalCompanyName} (Authorized)`;
+
                 const tableRows = Array.from({ length: numRows }, (_, rowIdx) => {
                   return Array.from({ length: numCols }, (_, colIdx) => {
                     const itemIdx = colIdx * numRows + rowIdx;
@@ -6937,15 +6970,27 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     <div>
                       {/* Company Header */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1.5px solid #0f172a', paddingBottom: '3px', marginBottom: headerMarginBottom }}>
-                        <div>
-                          <div style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '0.03em', lineHeight: 1.1, color: '#0f172a' }}>
-                            YAMUNAJI
-                          </div>
-                          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#1e293b', marginTop: 1 }}>
-                            TEXTILE GRAY & RFD PROCESSING DIVISION — SURAT, GUJARAT
-                          </div>
-                          <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 1 }}>
-                            GSTIN: <strong>24AAGFY0182C1ZP</strong> | Ring Road Textile Market, Surat - 395002 | Phone: +91 98250 12345
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {legalLogo && (
+                            <img
+                              src={legalLogo}
+                              alt="Logo"
+                              style={{ maxHeight: '38px', maxWidth: '65px', objectFit: 'contain' }}
+                            />
+                          )}
+                          <div>
+                            <div style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '0.03em', lineHeight: 1.1, color: '#0f172a' }}>
+                              {legalCompanyName}
+                            </div>
+                            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#1e293b', marginTop: 1 }}>
+                              TEXTILE GRAY & RFD PROCESSING DIVISION — SURAT, GUJARAT
+                            </div>
+                            <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 1 }}>
+                              {legalGstin && <>GSTIN: <strong>{legalGstin}</strong></>}
+                              {legalAddress && <>{legalGstin ? ' | ' : ''}{legalAddress}</>}
+                              {legalPhone && <> | Phone: {legalPhone}</>}
+                              {legalEmail && <> | Email: {legalEmail}</>}
+                            </div>
                           </div>
                         </div>
 
@@ -6954,7 +6999,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             {copyLabel}
                           </span>
                           <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0f172a', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                            DELIVERY CHALLAN (PROCESSING MILL)
+                            {challanTitle}
                           </div>
                         </div>
                       </div>
@@ -7048,14 +7093,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <div>
                         <div style={{ height: signatureLineHeight }}></div>
                         <div style={{ borderTop: '1px solid #0f172a', width: '135px', fontWeight: 700 }}>
-                          Receiver's Signature (Mill)
+                          {signLeft}
                         </div>
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ height: signatureLineHeight }}></div>
-                        <div style={{ borderTop: '1px solid #0f172a', width: '135px', marginLeft: 'auto', fontWeight: 700 }}>
-                          For YAMUNAJI (Authorized)
+                        <div style={{ borderTop: '1px solid #0f172a', width: '155px', marginLeft: 'auto', fontWeight: 700 }}>
+                          {signRight}
                         </div>
                       </div>
                     </div>
