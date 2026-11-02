@@ -165,13 +165,13 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {(companyEntity === 'Yamunaji' || companyEntity === 'yamunaji' || companyEntity === 'YJ') && (
+          {((companyEntity === 'Yamunaji' || companyEntity === 'yamunaji' || companyEntity === 'YJ') || (companyEntity === 'Elite Fabtex' || companyEntity === 'elite_fabtex' || companyEntity === 'EF')) && (
             <button
-              onClick={() => onNavigate && onNavigate('yj_rfd')}
+              onClick={() => onNavigate && onNavigate((companyEntity === 'Elite Fabtex' || companyEntity === 'elite_fabtex' || companyEntity === 'EF') ? 'ef_rfd' : 'yj_rfd')}
               className="btn-secondary"
               style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
             >
-              <Layers size={15} color="#0ea5e9" /> RFD Fabric Hub
+              <Layers size={15} color="#0ea5e9" /> Fabric Process
             </button>
           )}
           <button

@@ -40,9 +40,10 @@ export const AVAILABLE_SCREENS = [
 
   // Elite Fabtex (Company)
   { id: 'ef_dashboard', label: 'Elite Fabtex: Dashboard Overview', category: 'Elite Fabtex' },
+  { id: 'ef_rfd', label: 'Elite Fabtex: Fabric Process', category: 'Elite Fabtex' },
+  { id: 'ef_raw_materials', label: 'Elite Fabtex: Raw Materials', category: 'Elite Fabtex' },
   { id: 'ef_invoices', label: 'Elite Fabtex: Invoices & GST Billing', category: 'Elite Fabtex' },
   { id: 'ef_expenses', label: 'Elite Fabtex: Expense Ledger', category: 'Elite Fabtex' },
-  { id: 'ef_raw_materials', label: 'Elite Fabtex: Raw Materials', category: 'Elite Fabtex' },
   { id: 'ef_complaints', label: 'Elite Fabtex: Complaints Module', category: 'Elite Fabtex' },
   { id: 'ef_settings', label: 'Elite Fabtex: Company Settings', category: 'Elite Fabtex' },
 

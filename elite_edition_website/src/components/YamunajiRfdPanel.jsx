@@ -45,10 +45,11 @@ import EnterpriseEmptyState from './common/EnterpriseEmptyState';
 import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
 import { getDatePresetRange } from './DateRangePicker';
 
-const STORAGE_GRAY_KEY = 'yamunaji_gray_lots_data';
-const STORAGE_MILL_CHALLAN_KEY = 'yamunaji_mill_challans_data';
-const STORAGE_RFD_KEY = 'yamunaji_rfd_lots_data';
-const STORAGE_CONFIGS_KEY = 'yamunaji_master_configurations';
+export const getRfdStorageKey = (comp, key) => {
+  const norm = (comp || 'Yamunaji').toLowerCase().replace(/[^a-z0-9]/g, '_');
+  if (norm === 'yamunaji') return `yamunaji_${key}`;
+  return `${norm}_${key}`;
+};
 
 // ==========================================
 // DEFAULT MASTER CONFIGURATIONS (SURAT TEXTILES)
@@ -134,6 +135,11 @@ const SEED_MILL_CHALLANS = [];
 const SEED_RFD_LOTS = [];
 
 export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigate }) {
+  const STORAGE_GRAY_KEY = getRfdStorageKey(companyEntity, 'gray_lots_data');
+  const STORAGE_MILL_CHALLAN_KEY = getRfdStorageKey(companyEntity, 'mill_challans_data');
+  const STORAGE_RFD_KEY = getRfdStorageKey(companyEntity, 'rfd_lots_data');
+  const STORAGE_CONFIGS_KEY = getRfdStorageKey(companyEntity, 'master_configurations');
+
   // Master Screen Mode: 'gray' (Gray Fabric) or 'rfd' (RFD Fabric)
   const [screenMode, setScreenMode] = useState('gray');
 
@@ -226,6 +232,32 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return null;
   });
 
+  // When companyEntity changes, reload local cache for that company
+  useEffect(() => {
+    try {
+      const savedG = localStorage.getItem(STORAGE_GRAY_KEY);
+      setGrayLots(savedG ? JSON.parse(savedG) : []);
+      const savedM = localStorage.getItem(STORAGE_MILL_CHALLAN_KEY);
+      setMillChallans(savedM ? JSON.parse(savedM) : []);
+      const savedR = localStorage.getItem(STORAGE_RFD_KEY);
+      setRfdLots(savedR ? JSON.parse(savedR) : []);
+      const savedC = localStorage.getItem(STORAGE_CONFIGS_KEY);
+      if (savedC) {
+        const p = JSON.parse(savedC);
+        setConfigs({
+          weavers: Array.isArray(p.weavers) ? p.weavers.map(w => normalizeParty(w)) : [],
+          qualities: Array.isArray(p.qualities) ? p.qualities : [],
+          mills: Array.isArray(p.mills) ? p.mills.map(m => normalizeParty(m)) : [],
+          processes: Array.isArray(p.processes) ? p.processes : []
+        });
+      } else {
+        setConfigs({ weavers: [], qualities: [], mills: [], processes: [] });
+      }
+      const savedS = localStorage.getItem(`elite_company_settings_${companyEntity || 'Yamunaji'}`);
+      setCompanySettings(savedS ? JSON.parse(savedS) : null);
+    } catch (e) {}
+  }, [companyEntity, STORAGE_GRAY_KEY, STORAGE_MILL_CHALLAN_KEY, STORAGE_RFD_KEY, STORAGE_CONFIGS_KEY]);
+
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialSyncDone = useRef(false);
 
@@ -276,7 +308,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         // 2. Also recover any purchases from Billing Register not yet in grayLots
         if (purchases.length > 0) {
           purchases.forEach(p => {
-            const isGrayPurchase = p.purchaseType === 'inventory' || p.purchaseType === 'Inventory Purchase' || (p.notes && /Yamunaji Gray/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
+            const isGrayPurchase = p.purchaseType === 'inventory' || p.purchaseType === 'Inventory Purchase' || (p.notes && /(Yamunaji|Fabtex|Gray)/i.test(p.notes)) || (p.items && p.items.some(it => /Gray Fabric/i.test(it.itemName || it.description || '')));
             if (!isGrayPurchase) return;
 
             const lotNum = (p.ourChallanNo || p.items?.[0]?.lotNo || '').trim() || `GRAY-LOT-${p.purchaseNo || p._id}`;
@@ -1216,7 +1248,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           },
           items: [{
             itemName: `${weaverForm.fabricQuality} (Gray Fabric)`,
-            description: `Yamunaji Gray Lot ${lotNumber} from ${weaverForm.weaverParty.trim()} (${validTps.length} TPs)`,
+            description: `${companyEntity || 'Yamunaji'} Gray Lot ${lotNumber} from ${weaverForm.weaverParty.trim()} (${validTps.length} TPs)`,
             fabric: weaverForm.fabricQuality,
             fabricName: weaverForm.fabricQuality,
             lotNo: lotNumber,
@@ -1259,7 +1291,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           paidAmount: 0,
           balanceDue: totalInvAmt,
           paymentStatus: 'UNPAID',
-          notes: `Yamunaji Gray Fabric Inward Lot ${lotNumber} | Weaver: ${weaverForm.weaverParty.trim()} | Challan: ${weaverForm.weaverChallanNo || 'N/A'}`,
+          notes: `${companyEntity || 'Yamunaji'} Gray Fabric Inward Lot ${lotNumber} | Weaver: ${weaverForm.weaverParty.trim()} | Challan: ${weaverForm.weaverChallanNo || 'N/A'}`,
           terms: term
         };
 
@@ -1484,7 +1516,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           },
           items: [{
             itemName: `${attachingInvoiceLot.fabricQuality} (Gray Fabric)`,
-            description: `Yamunaji Gray Lot ${attachingInvoiceLot.lotNumber} from ${attachingInvoiceLot.weaverParty}`,
+            description: `${companyEntity || 'Yamunaji'} Gray Lot ${attachingInvoiceLot.lotNumber} from ${attachingInvoiceLot.weaverParty}`,
             fabric: attachingInvoiceLot.fabricQuality,
             fabricName: attachingInvoiceLot.fabricQuality,
             lotNo: attachingInvoiceLot.lotNumber,
@@ -2902,7 +2934,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${companySettings?.companyName || 'Yamunaji'} - Mill Challan ${showPrintChallanModal?.challanNo || ''} (2 Copies A4)</title>
+          <title>${companySettings?.companyName || companyEntity || 'Yamunaji'} - Mill Challan ${showPrintChallanModal?.challanNo || ''} (2 Copies A4)</title>
           <style>
             @page {
               size: A4 portrait;
@@ -3046,7 +3078,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
-                Yamunaji — Fabric Process
+                {companyEntity || 'Yamunaji'} — Fabric Process
               </h2>
               <span
                 style={{
@@ -4664,7 +4696,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                    Yamunaji Master Configuration Settings
+                    {companyEntity || 'Yamunaji'} Master Configuration Settings
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     Configure dropdown values for Weaver Names, Fabric Qualities, Processing Mills & Process Types.
@@ -6888,13 +6920,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               const signatureLineHeight = '14px';
 
               const renderCopy = (copyLabel, copyColor = '#0f172a', extraProps = {}) => {
-                const legalCompanyName = (companySettings?.companyName || (companyEntity ? companyEntity.toUpperCase() : 'YAMUNAJI CREATION')).trim();
-                const legalGstin = (companySettings?.companyGstin || '24AAEFY0361N1ZZ').trim();
-                const legalPhone = (companySettings?.companyPhone || '9979112777').trim();
+                const isYamunaji = !companyEntity || companyEntity === 'Yamunaji' || companyEntity.toLowerCase().includes('yamunaji');
+                const legalCompanyName = (companySettings?.companyName || (companyEntity ? companyEntity.toUpperCase() : (isYamunaji ? 'YAMUNAJI CREATION' : 'ELITE FABTEX'))).trim();
+                const legalGstin = (companySettings?.companyGstin || (isYamunaji ? '24AAEFY0361N1ZZ' : '')).trim();
+                const legalPhone = (companySettings?.companyPhone || (isYamunaji ? '9979112777' : '')).trim();
                 const legalEmail = (companySettings?.companyEmail && companySettings.companyEmail !== 'billing@company.com') ? companySettings.companyEmail.trim() : '';
                 const legalAddress = (companySettings?.companyAddress && companySettings.companyAddress !== 'Full address printed on Tax Invoices') 
                   ? companySettings.companyAddress.trim() 
-                  : 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat';
+                  : (isYamunaji ? 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat' : (companySettings?.companyState ? `Surat, ${companySettings.companyState}` : 'Surat, Gujarat'));
                 const legalLogo = companySettings?.companyLogo || '';
 
                 const tableRows = Array.from({ length: numRows }, (_, rowIdx) => {
