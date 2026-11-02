@@ -2906,7 +2906,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           <style>
             @page {
               size: A4 portrait;
-              margin: 5mm 7mm;
+              margin: 4mm 6mm;
             }
             * {
               box-sizing: border-box;
@@ -2929,8 +2929,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             }
             .single-page-print {
               width: 100%;
-              height: 285mm;
-              max-height: 285mm;
+              height: 288mm;
+              max-height: 288mm;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
@@ -2940,8 +2940,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               break-inside: avoid;
             }
             .single-page-print .challan-copy-block {
-              height: 138mm;
-              max-height: 138mm;
+              height: 141mm;
+              max-height: 141mm;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
@@ -2951,7 +2951,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               break-inside: avoid;
             }
             .single-page-print .challan-cut-line {
-              height: 7mm;
+              height: 4mm;
               display: flex;
               align-items: center;
               justify-content: center;
@@ -6771,7 +6771,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             <style>{`
               @page {
                 size: A4 portrait;
-                margin: 5mm 7mm;
+                margin: 4mm 6mm;
               }
               @media print {
                 html, body {
@@ -6802,8 +6802,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 }
                 .single-page-print {
                   width: 100% !important;
-                  height: 285mm !important;
-                  max-height: 285mm !important;
+                  height: 288mm !important;
+                  max-height: 288mm !important;
                   display: flex !important;
                   flex-direction: column !important;
                   justify-content: space-between !important;
@@ -6813,8 +6813,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   break-inside: avoid !important;
                 }
                 .single-page-print .challan-copy-block {
-                  height: 138mm !important;
-                  max-height: 138mm !important;
+                  height: 141mm !important;
+                  max-height: 141mm !important;
                   box-sizing: border-box !important;
                   display: flex !important;
                   flex-direction: column !important;
@@ -6824,7 +6824,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   break-inside: avoid !important;
                 }
                 .single-page-print .challan-cut-line {
-                  height: 7mm !important;
+                  height: 4mm !important;
                   display: flex !important;
                   align-items: center !important;
                   justify-content: center !important;
@@ -6873,90 +6873,46 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             {(() => {
               const tpsList = showPrintChallanModal.tps || [];
               const numCols = 4;
-              const numRows = Math.ceil(tpsList.length / numCols);
-              const isMultiPage = numRows > 13; // > 13 rows per copy means each copy needs full A4 page
+              const isMultiPage = tpsList.length > 60;
+              const numRows = isMultiPage ? Math.ceil(tpsList.length / numCols) : 15;
 
-              // Dynamic sizing for fit-to-paper without dead whitespace at the bottom
-              let rowPaddingY = '1.5px';
-              let tableFontSize = '0.60rem';
-              let headerFontSize = '0.62rem';
-              let tableSrFontSize = '0.58rem';
-              let cellPaddingX = '2px';
-              let metaGridMarginBottom = '4px';
-              let metaGridPaddingBottom = '4px';
-              let headerMarginBottom = '4px';
-              let signatureLineHeight = '14px';
+              // Sizing for 60-TP compact layout (15 rows x 4 cols)
+              const rowPaddingY = isMultiPage ? '2px' : '1.2px';
+              const tableFontSize = isMultiPage ? '0.62rem' : '0.58rem';
+              const headerFontSize = isMultiPage ? '0.64rem' : '0.60rem';
+              const tableSrFontSize = isMultiPage ? '0.58rem' : '0.54rem';
+              const cellPaddingX = '2px';
+              const metaGridMarginBottom = '3px';
+              const metaGridPaddingBottom = '3px';
+              const headerMarginBottom = '3px';
+              const signatureLineHeight = '14px';
 
-              if (!isMultiPage) {
-                if (numRows <= 4) {
-                  rowPaddingY = '6px';
-                  tableFontSize = '0.68rem';
-                  headerFontSize = '0.68rem';
-                  tableSrFontSize = '0.64rem';
-                  cellPaddingX = '3px';
-                  metaGridMarginBottom = '6px';
-                  metaGridPaddingBottom = '5px';
-                  headerMarginBottom = '5px';
-                  signatureLineHeight = '22px';
-                } else if (numRows <= 7) {
-                  rowPaddingY = '4.5px';
-                  tableFontSize = '0.64rem';
-                  headerFontSize = '0.64rem';
-                  tableSrFontSize = '0.60rem';
-                  cellPaddingX = '3px';
-                  metaGridMarginBottom = '5px';
-                  metaGridPaddingBottom = '4px';
-                  headerMarginBottom = '4px';
-                  signatureLineHeight = '18px';
-                } else if (numRows <= 10) {
-                  rowPaddingY = '3px';
-                  tableFontSize = '0.62rem';
-                  headerFontSize = '0.62rem';
-                  tableSrFontSize = '0.58rem';
-                  cellPaddingX = '2px';
-                  metaGridMarginBottom = '4px';
-                  metaGridPaddingBottom = '4px';
-                  headerMarginBottom = '4px';
-                  signatureLineHeight = '16px';
-                } else {
-                  rowPaddingY = '1.5px';
-                  tableFontSize = '0.60rem';
-                  headerFontSize = '0.60rem';
-                  tableSrFontSize = '0.56rem';
-                  cellPaddingX = '2px';
-                  metaGridMarginBottom = '3px';
-                  metaGridPaddingBottom = '3px';
-                  headerMarginBottom = '3px';
-                  signatureLineHeight = '13px';
-                }
-              }
-
-              const renderCopy = (copyLabel, copyColor, extraProps = {}) => {
+              const renderCopy = (copyLabel, copyColor = '#0f172a', extraProps = {}) => {
                 const legalCompanyName = (companySettings?.companyName || (companyEntity ? companyEntity.toUpperCase() : 'YAMUNAJI CREATION')).trim();
-                const legalGstin = (companySettings?.companyGstin || '').trim();
-                const legalPhone = (companySettings?.companyPhone || '').trim();
+                const legalGstin = (companySettings?.companyGstin || '24AAEFY0361N1ZZ').trim();
+                const legalPhone = (companySettings?.companyPhone || '9979112777').trim();
                 const legalEmail = (companySettings?.companyEmail && companySettings.companyEmail !== 'billing@company.com') ? companySettings.companyEmail.trim() : '';
                 const legalAddress = (companySettings?.companyAddress && companySettings.companyAddress !== 'Full address printed on Tax Invoices') 
                   ? companySettings.companyAddress.trim() 
-                  : (companySettings?.companyState ? `Surat, ${companySettings.companyState}${companySettings.companyStateCode ? ` - ${companySettings.companyStateCode}` : ''}` : 'Surat, Gujarat');
+                  : 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat';
                 const legalLogo = companySettings?.companyLogo || '';
-                const challanTitle = companySettings?.challanDesign?.title || 'DELIVERY CHALLAN (PROCESSING MILL)';
-                const signLeft = companySettings?.challanDesign?.signatureLeft || "Receiver's Signature (Mill)";
-                const signRight = companySettings?.challanDesign?.signatureRight ? `For ${legalCompanyName} (${companySettings.challanDesign.signatureRight})` : `For ${legalCompanyName} (Authorized)`;
 
                 const tableRows = Array.from({ length: numRows }, (_, rowIdx) => {
                   return Array.from({ length: numCols }, (_, colIdx) => {
+                    const srNo = colIdx * numRows + rowIdx + 1;
                     const itemIdx = colIdx * numRows + rowIdx;
-                    return tpsList[itemIdx] || null;
+                    const item = tpsList[itemIdx] || null;
+                    return { srNo, item };
                   });
                 });
+
                 return (
                   <div
                     className={`challan-copy-block ${extraProps.className || ''}`}
                     style={{
                       border: '1.5px solid #0f172a',
-                      padding: '6px 12px',
-                      borderRadius: 4,
+                      padding: '5px 10px',
+                      borderRadius: 3,
                       background: '#ffffff',
                       fontFamily: 'system-ui, -apple-system, sans-serif',
                       color: '#0f172a',
@@ -6975,17 +6931,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             <img
                               src={legalLogo}
                               alt="Logo"
-                              style={{ maxHeight: '38px', maxWidth: '65px', objectFit: 'contain' }}
+                              style={{ maxHeight: '34px', maxWidth: '55px', objectFit: 'contain' }}
                             />
                           )}
                           <div>
                             <div style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '0.03em', lineHeight: 1.1, color: '#0f172a' }}>
                               {legalCompanyName}
                             </div>
-                            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#1e293b', marginTop: 1 }}>
-                              TEXTILE GRAY & RFD PROCESSING DIVISION — SURAT, GUJARAT
-                            </div>
-                            <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 1 }}>
+                            <div style={{ fontSize: '0.58rem', color: '#1e293b', marginTop: 2, lineHeight: 1.25 }}>
                               {legalGstin && <>GSTIN: <strong>{legalGstin}</strong></>}
                               {legalAddress && <>{legalGstin ? ' | ' : ''}{legalAddress}</>}
                               {legalPhone && <> | Phone: {legalPhone}</>}
@@ -6995,39 +6948,47 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </div>
 
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ display: 'inline-block', border: `1.5px solid ${copyColor}`, background: `${copyColor}15`, color: copyColor, padding: '2px 8px', fontSize: '0.64rem', fontWeight: 900, borderRadius: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            border: '1.5px solid #0f172a',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            padding: '3px 14px',
+                            fontSize: '0.80rem',
+                            fontWeight: 900,
+                            borderRadius: 2,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase'
+                          }}>
                             {copyLabel}
                           </span>
-                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0f172a', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                            {challanTitle}
-                          </div>
                         </div>
                       </div>
 
                       {/* Meta Info Grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '0.75rem', borderBottom: '1px solid #0f172a', paddingBottom: metaGridPaddingBottom, marginBottom: metaGridMarginBottom, fontSize: '0.68rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '0.75rem', borderBottom: '1px solid #0f172a', paddingBottom: metaGridPaddingBottom, marginBottom: metaGridMarginBottom, fontSize: '0.66rem' }}>
                         <div>
-                          <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>TO (PROCESSING MILL):</div>
+                          <div style={{ fontSize: '0.64rem', color: '#0f172a', fontWeight: 800 }}>TO:</div>
                           <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a', marginTop: 1 }}>{showPrintChallanModal.millParty}</div>
                           {showPrintChallanModal.millGst && (
-                            <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#0369a1', marginTop: 1 }}>
+                            <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#0369a1', marginTop: 1 }}>
                               GSTIN: {showPrintChallanModal.millGst}
                             </div>
                           )}
                           {(showPrintChallanModal.millAddress || showPrintChallanModal.millCity) && (
-                            <div style={{ fontSize: '0.62rem', color: '#334155', marginTop: 1 }}>
+                            <div style={{ fontSize: '0.60rem', color: '#334155', marginTop: 1 }}>
                               {showPrintChallanModal.millAddress ? `${showPrintChallanModal.millAddress}, ` : ''}{showPrintChallanModal.millCity || ''}
                             </div>
                           )}
                           {showPrintChallanModal.millPhone && (
-                            <div style={{ fontSize: '0.61rem', color: '#475569', marginTop: 1 }}>
+                            <div style={{ fontSize: '0.60rem', color: '#475569', marginTop: 1 }}>
                               Phone: {showPrintChallanModal.millPhone} {showPrintChallanModal.millContact ? `(${showPrintChallanModal.millContact})` : ''}
                             </div>
                           )}
-                          <div style={{ marginTop: 2, fontSize: '0.66rem' }}><strong>Process Required:</strong> {showPrintChallanModal.processRequired}</div>
+                          <div style={{ marginTop: 2, fontSize: '0.64rem' }}><strong>Process Required:</strong> {showPrintChallanModal.processRequired}</div>
                         </div>
 
-                        <div style={{ textAlign: 'right', fontSize: '0.68rem', lineHeight: 1.35 }}>
+                        <div style={{ textAlign: 'right', fontSize: '0.66rem', lineHeight: 1.35 }}>
                           <div><strong>Challan No:</strong> <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
                           <div><strong>Date:</strong> {showPrintChallanModal.challanDate}</div>
                           <div><strong>Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
@@ -7036,7 +6997,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     </div>
 
                     {/* 4-Column TP Breakdown Table */}
-                    <div className="challan-table-wrapper" style={{ flex: !isMultiPage ? '1 1 auto' : 'none', display: 'flex', flexDirection: 'column', minHeight: 0, marginBottom: '3px' }}>
+                    <div className="challan-table-wrapper" style={{ flex: !isMultiPage ? '1 1 auto' : 'none', display: 'flex', flexDirection: 'column', minHeight: 0, marginBottom: '2px' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', height: !isMultiPage ? '100%' : 'auto', fontSize: tableFontSize, border: '1.5px solid #0f172a' }}>
                         <thead>
                           <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #0f172a', textAlign: 'center', fontWeight: 800 }}>
@@ -7052,16 +7013,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         <tbody>
                           {tableRows.map((cols, rIdx) => (
                             <tr key={rIdx} style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'center', background: rIdx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                              {cols.map((item, cIdx) => (
+                              {cols.map((cell, cIdx) => (
                                 <React.Fragment key={cIdx}>
-                                  <td style={{ padding: `${rowPaddingY} ${cellPaddingX}`, borderRight: '1px solid #cbd5e1', fontWeight: 700, color: item ? '#475569' : 'transparent', fontSize: tableSrFontSize }}>
-                                    {item ? item.srNo : '-'}
+                                  <td style={{ padding: `${rowPaddingY} ${cellPaddingX}`, borderRight: '1px solid #cbd5e1', fontWeight: 700, color: '#475569', fontSize: tableSrFontSize }}>
+                                    {cell.srNo}
                                   </td>
-                                  <td style={{ padding: `${rowPaddingY} ${cellPaddingX}`, borderRight: '1px solid #cbd5e1', fontWeight: 800, color: item ? '#0f172a' : 'transparent', fontSize: tableFontSize }}>
-                                    {item ? item.tpNo : '-'}
+                                  <td style={{ padding: `${rowPaddingY} ${cellPaddingX}`, borderRight: '1px solid #cbd5e1', fontWeight: 800, color: '#0f172a', fontSize: tableFontSize }}>
+                                    {cell.item ? cell.item.tpNo : ''}
                                   </td>
-                                  <td style={{ padding: `${rowPaddingY} ${cellPaddingX}`, fontWeight: 800, color: item ? '#0f172a' : 'transparent', borderRight: cIdx < 3 ? '1.5px solid #0f172a' : 'none', fontSize: tableFontSize }}>
-                                    {item ? Number(item.tpMtr).toFixed(1) : '-'}
+                                  <td style={{ padding: `${rowPaddingY} ${cellPaddingX}`, fontWeight: 800, color: '#0f172a', borderRight: cIdx < 3 ? '1.5px solid #0f172a' : 'none', fontSize: tableFontSize }}>
+                                    {cell.item ? Number(cell.item.tpMtr).toFixed(1) : ''}
                                   </td>
                                 </React.Fragment>
                               ))}
@@ -7070,10 +7031,10 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </tbody>
                         <tfoot>
                           <tr style={{ background: '#f8fafc', borderTop: '1.5px solid #0f172a', fontWeight: 900 }}>
-                            <td colSpan={6} style={{ padding: '3px 6px', borderRight: '1.5px solid #0f172a', textAlign: 'left', fontSize: '0.68rem' }}>
+                            <td colSpan={6} style={{ padding: '2px 6px', borderRight: '1.5px solid #0f172a', textAlign: 'left', fontSize: '0.66rem' }}>
                               TOTAL TPs: {showPrintChallanModal.totalTps}
                             </td>
-                            <td colSpan={6} style={{ padding: '3px 6px', textAlign: 'right', fontSize: '0.70rem' }}>
+                            <td colSpan={6} style={{ padding: '2px 6px', textAlign: 'right', fontSize: '0.68rem' }}>
                               GRAND TOTAL METERS: {showPrintChallanModal.totalMeters.toFixed(1)} Mtr
                             </td>
                           </tr>
@@ -7083,24 +7044,25 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                     {/* Notes if any */}
                     {showPrintChallanModal.notes && (
-                      <div style={{ fontSize: '0.62rem', marginBottom: '4px', background: '#f8fafc', padding: '2px 6px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.60rem', marginBottom: '2px', background: '#f8fafc', padding: '1px 5px', border: '1px solid #e2e8f0' }}>
                         <strong>Notes:</strong> {showPrintChallanModal.notes}
                       </div>
                     )}
 
                     {/* Signatures */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: 'auto', paddingTop: '4px', fontSize: '0.64rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: 'auto', paddingTop: '2px', fontSize: '0.62rem' }}>
                       <div>
                         <div style={{ height: signatureLineHeight }}></div>
                         <div style={{ borderTop: '1px solid #0f172a', width: '135px', fontWeight: 700 }}>
-                          {signLeft}
+                          Receiver's Signature
                         </div>
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ height: signatureLineHeight }}></div>
-                        <div style={{ borderTop: '1px solid #0f172a', width: '155px', marginLeft: 'auto', fontWeight: 700 }}>
-                          {signRight}
+                        <div style={{ borderTop: '1px solid #0f172a', width: '160px', marginLeft: 'auto', fontWeight: 700 }}>
+                          <div>For {legalCompanyName}</div>
+                          <div style={{ fontSize: '0.56rem', fontWeight: 600, color: '#475569' }}>(Authorized Signatory)</div>
                         </div>
                       </div>
                     </div>
@@ -7114,29 +7076,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   className={isMultiPage ? 'multi-page-print' : 'single-page-print'}
                   style={isMultiPage ? { display: 'block' } : { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '280mm', boxSizing: 'border-box' }}
                 >
-                  {renderCopy('ORIGINAL - MILL COPY', '#0284c7', {
+                  {renderCopy('ORIGINAL', '#0f172a', {
                     style: isMultiPage ? { pageBreakAfter: 'always', breakAfter: 'page', marginBottom: '24px' } : {}
                   })}
 
-                  {/* Cut Line for 1-Page (<= 50 TPs) or Page Break Banner for 2-Pages (> 50 TPs) */}
+                  {/* Cut Line completely removed — clean spacing between copies */}
                   {!isMultiPage ? (
                     <div
                       className="challan-cut-line"
                       style={{
-                        height: '7mm',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                        margin: '0',
-                        textAlign: 'center'
+                        height: '4mm',
+                        margin: '0'
                       }}
-                    >
-                      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', borderTop: '1.5px dashed #475569' }} />
-                      <span style={{ position: 'relative', background: '#ffffff', padding: '0 12px', fontSize: '0.62rem', color: '#475569', fontWeight: 800, letterSpacing: '0.06em' }}>
-                        ✂ CUT HERE — 2 COPIES ON A4 (ORIGINAL ABOVE • DUPLICATE BELOW) ✂
-                      </span>
-                    </div>
+                    />
                   ) : (
                     <div className="no-print" style={{ borderTop: '2px dashed #9333ea', margin: '14px 0', position: 'relative', textAlign: 'center' }}>
                       <span style={{ position: 'relative', top: '-9px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 4, padding: '3px 14px', fontSize: '0.64rem', color: '#7c3aed', fontWeight: 900, letterSpacing: '0.05em' }}>
@@ -7145,7 +7097,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     </div>
                   )}
 
-                  {renderCopy('DUPLICATE - SENDER / OFFICE COPY', '#7c3aed', {
+                  {renderCopy('DUPLICATE', '#0f172a', {
                     className: isMultiPage ? 'page-break-always' : '',
                     style: isMultiPage ? { pageBreakBefore: 'always', breakBefore: 'page' } : {}
                   })}
