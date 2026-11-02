@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
-  PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
+  Plus, PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
   CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2,
   User, FileText, ArrowRight, Calendar, Wallet, TrendingUp, TrendingDown, DollarSign, CreditCard,
   Users, Building2, CheckSquare, Square, ShoppingBag, Settings, Landmark, ArrowUpRight, ArrowDownLeft,
@@ -58,8 +58,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [loading, setLoading] = useState(false);
 
   // ── Chartered Ledger Balances State (Cash/Bank Opening, Movements & Closing) ──
-  // Selected Bank Ledger Filter ('KOTAK EDP', 'ELITE ICICI', or 'ALL')
-  const [selectedBank, setSelectedBank] = useState('KOTAK EDP');
+  // Selected Bank Ledger Filter ('ALL' or specific Bank Name)
+  const [selectedBank, setSelectedBank] = useState('ALL');
 
   const [ledgerBalances, setLedgerBalances] = useState({
     cashOpening: 0,
@@ -71,9 +71,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     bankExpense: 0,
     bankClosing: 0,
     banks: {},
-    availableBanks: ['KOTAK EDP', 'ELITE ICICI'],
+    availableBanks: [],
     totalTransactions: 0,
-    bankAccountName: 'KOTAK EDP',
+    bankAccountName: '',
     effectiveDate: ''
   });
 
@@ -81,16 +81,21 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
-    businessUnit: 'EDP',
+    businessUnit: '',
     companyEntity: companyEntity || 'Elite Digital Print',
     initialCashOpening: 0,
     initialBankOpening: 0,
-    kotakOpening: 0,
-    iciciOpening: 0,
+    banks: [], // [{ id, name, accountNo, ifsc, opening }]
+    bankOpenings: {},
     effectiveDate: '2024-04-01',
-    bankAccountName: 'KOTAK EDP',
+    bankAccountName: '',
     notes: ''
   });
+
+  // Inline Quick Add Bank in Expense Form
+  const [showInlineAddBank, setShowInlineAddBank] = useState(false);
+  const [inlineBankForm, setInlineBankForm] = useState({ name: '', accountNo: '', ifsc: '', opening: '' });
+  const [addingInlineBank, setAddingInlineBank] = useState(false);
 
   // Dynamic Categories from PrintConfig
   const [inCategories, setInCategories] = useState(DEFAULT_IN_CATEGORIES);
@@ -122,18 +127,51 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       const res = await api.getLedgerSettings({ companyEntity });
       if (res && res.settings) {
         const s = res.settings;
-        const bOpenings = s.bankOpenings || {};
-        const kVal = bOpenings['KOTAK EDP'] !== undefined ? bOpenings['KOTAK EDP'] : (s.initialBankOpening || 0);
-        const iVal = bOpenings['ELITE ICICI'] !== undefined ? bOpenings['ELITE ICICI'] : 0;
+        let loadedBanks = [];
+        if (Array.isArray(s.banks) && s.banks.length > 0) {
+          loadedBanks = s.banks.map((b, idx) => ({
+            id: b._id || b.id || `bank_${idx}_${Date.now()}`,
+            name: typeof b === 'string' ? b : (b.name || ''),
+            accountNo: b.accountNo || '',
+            ifsc: b.ifsc || '',
+            opening: Number(b.opening) || 0
+          })).filter(b => b.name && b.name.trim());
+        } else if (s.bankOpenings && Object.keys(s.bankOpenings).length > 0) {
+          loadedBanks = Object.entries(s.bankOpenings).map(([name, op], idx) => ({
+            id: `bank_${idx}_${Date.now()}`,
+            name,
+            accountNo: '',
+            ifsc: '',
+            opening: Number(op) || 0
+          })).filter(b => b.name && b.name.trim());
+        } else {
+          const isEDP = companyEntity.toLowerCase().includes('digital');
+          if (isEDP) {
+            loadedBanks = [
+              { id: 'b_kotak', name: 'KOTAK EDP', accountNo: '', ifsc: '', opening: s.initialBankOpening || 0 },
+              { id: 'b_icici', name: 'ELITE ICICI', accountNo: '', ifsc: '', opening: 0 }
+            ];
+          } else {
+            loadedBanks = [
+              { id: `b_${Date.now()}`, name: s.bankAccountName || `${companyEntity} Bank`, accountNo: '', ifsc: '', opening: s.initialBankOpening || 0 }
+            ];
+          }
+        }
+
+        const bOpeningsObj = {};
+        loadedBanks.forEach(b => {
+          bOpeningsObj[b.name] = b.opening;
+        });
+
         setSettingsForm({
-          businessUnit: s.businessUnit || 'EDP',
+          businessUnit: s.businessUnit || '',
           companyEntity: s.companyEntity || companyEntity,
           initialCashOpening: s.initialCashOpening || 0,
           initialBankOpening: s.initialBankOpening || 0,
-          kotakOpening: kVal,
-          iciciOpening: iVal,
+          banks: loadedBanks,
+          bankOpenings: bOpeningsObj,
           effectiveDate: s.effectiveDate || '2024-04-01',
-          bankAccountName: s.bankAccountName || 'KOTAK EDP',
+          bankAccountName: s.bankAccountName || loadedBanks[0]?.name || '',
           notes: s.notes || ''
         });
       }
@@ -142,26 +180,43 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     }
   };
 
-  const handleSaveLedgerSettings = async (e) => {
+  const handleSaveLedgerSettings = async (e, customBanks = null) => {
     if (e && e.preventDefault) e.preventDefault();
     setSavingSettings(true);
     try {
-      const kVal = Number(settingsForm.kotakOpening) || 0;
-      const iVal = Number(settingsForm.iciciOpening) || 0;
-      const totalBank = kVal + iVal;
+      const banksToSave = customBanks || settingsForm.banks || [];
+      const cleanBanks = banksToSave
+        .map(b => ({
+          name: (b.name || '').trim(),
+          accountNo: (b.accountNo || '').trim(),
+          ifsc: (b.ifsc || '').trim(),
+          opening: Number(b.opening) || 0
+        }))
+        .filter(b => b.name);
+
+      const bankOpeningsObj = {};
+      let totalBank = 0;
+      cleanBanks.forEach(b => {
+        bankOpeningsObj[b.name] = b.opening;
+        totalBank += b.opening;
+      });
+
+      const primaryBank = cleanBanks[0]?.name || settingsForm.bankAccountName || 'Bank Account';
+
       await api.saveLedgerSettings({
         ...settingsForm,
         companyEntity,
         initialCashOpening: Number(settingsForm.initialCashOpening) || 0,
         initialBankOpening: totalBank,
-        bankOpenings: {
-          'KOTAK EDP': kVal,
-          'ELITE ICICI': iVal
-        }
+        banks: cleanBanks,
+        bankOpenings: bankOpeningsObj,
+        bankAccountName: primaryBank
       });
+
       triggerEliteAlert('✅ Initial Opening Balances configured successfully!');
       setShowSettingsModal(false);
       triggerGlobalDataRefresh('expenses');
+      await loadLedgerSettings();
       fetchExpenses();
     } catch (err) {
       console.error('Failed to save ledger settings:', err);
@@ -170,6 +225,124 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       setSavingSettings(false);
     }
   };
+
+  // Inline Quick Bank Creation from Expense Entry
+  const handleInlineCreateBank = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const name = (inlineBankForm.name || '').trim();
+    if (!name) {
+      triggerEliteAlert('Please enter a valid Bank Name');
+      return;
+    }
+
+    setAddingInlineBank(true);
+    try {
+      const currentBanks = settingsForm.banks || [];
+      const exists = currentBanks.some(b => (b.name || '').toLowerCase() === name.toLowerCase());
+      const newBankObj = {
+        id: `bank_${Date.now()}`,
+        name,
+        accountNo: (inlineBankForm.accountNo || '').trim(),
+        ifsc: (inlineBankForm.ifsc || '').trim(),
+        opening: Number(inlineBankForm.opening) || 0
+      };
+
+      const updatedBanks = exists
+        ? currentBanks.map(b => (b.name || '').toLowerCase() === name.toLowerCase() ? { ...b, ...newBankObj } : b)
+        : [...currentBanks, newBankObj];
+
+      const bankOpeningsObj = {};
+      let totalBank = 0;
+      updatedBanks.forEach(b => {
+        const op = Number(b.opening) || 0;
+        bankOpeningsObj[b.name] = op;
+        totalBank += op;
+      });
+
+      await api.saveLedgerSettings({
+        ...settingsForm,
+        companyEntity,
+        initialCashOpening: Number(settingsForm.initialCashOpening) || 0,
+        initialBankOpening: totalBank,
+        banks: updatedBanks,
+        bankOpenings: bankOpeningsObj,
+        bankAccountName: updatedBanks[0]?.name || name
+      });
+
+      setSettingsForm(prev => ({
+        ...prev,
+        banks: updatedBanks,
+        bankOpenings: bankOpeningsObj
+      }));
+
+      // Auto-select this newly created bank in current form
+      setFormVal(prev => ({
+        ...prev,
+        bankAccount: name,
+        paymentMode: prev.paymentMode === 'Cash' ? 'Bank Transfer (NEFT/RTGS)' : prev.paymentMode
+      }));
+
+      setInlineBankForm({ name: '', accountNo: '', ifsc: '', opening: '' });
+      setShowInlineAddBank(false);
+      triggerGlobalDataRefresh('expenses');
+      fetchExpenses();
+      triggerEliteAlert(`✅ Bank account "${name}" added and selected!`);
+    } catch (err) {
+      console.error('Failed to add bank inline:', err);
+      triggerEliteAlert(`Failed to add bank: ${err.message}`);
+    } finally {
+      setAddingInlineBank(false);
+    }
+  };
+
+  // Harmonized dynamic bank palette generator
+  const BANK_PALETTES = [
+    { bg: '#0284c7', lightBg: 'rgba(2,132,199,0.12)', border: '#0284c7', text: '#0284c7' },
+    { bg: '#ea580c', lightBg: 'rgba(234,88,12,0.12)', border: '#ea580c', text: '#ea580c' },
+    { bg: '#7c3aed', lightBg: 'rgba(124,58,237,0.12)', border: '#7c3aed', text: '#7c3aed' },
+    { bg: '#0d9488', lightBg: 'rgba(13,148,136,0.12)', border: '#0d9488', text: '#0d9488' },
+    { bg: '#d97706', lightBg: 'rgba(217,119,6,0.12)', border: '#d97706', text: '#d97706' },
+    { bg: '#e11d48', lightBg: 'rgba(225,29,72,0.12)', border: '#e11d48', text: '#e11d48' },
+    { bg: '#4f46e5', lightBg: 'rgba(79,70,229,0.12)', border: '#4f46e5', text: '#4f46e5' },
+    { bg: '#059669', lightBg: 'rgba(5,150,105,0.12)', border: '#059669', text: '#059669' }
+  ];
+
+  const getBankPalette = useCallback((bankName, index = 0) => {
+    if (!bankName || bankName === 'Cash in Hand') {
+      return { bg: '#10b981', lightBg: 'rgba(16,185,129,0.12)', border: '#10b981', text: '#10b981' };
+    }
+    let hash = 0;
+    for (let i = 0; i < bankName.length; i++) {
+      hash = (hash << 5) - hash + bankName.charCodeAt(i);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash + index) % BANK_PALETTES.length;
+    return BANK_PALETTES[idx];
+  }, []);
+
+  // Compute all effective unique banks for the active company
+  const effectiveBanks = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    if (Array.isArray(ledgerBalances.availableBanks)) {
+      ledgerBalances.availableBanks.forEach(b => {
+        if (b && !seen.has(b.toLowerCase()) && b !== 'Cash in Hand') {
+          seen.add(b.toLowerCase());
+          list.push(b);
+        }
+      });
+    }
+    if (Array.isArray(settingsForm.banks)) {
+      settingsForm.banks.forEach(b => {
+        const name = typeof b === 'string' ? b : b?.name;
+        if (name && !seen.has(name.toLowerCase()) && name !== 'Cash in Hand') {
+          seen.add(name.toLowerCase());
+          list.push(name);
+        }
+      });
+    }
+    return list;
+  }, [ledgerBalances.availableBanks, settingsForm.banks]);
 
   // Dynamically resolve metrics for the currently selected bank dropdown
   const currentBankData = React.useMemo(() => {
@@ -192,25 +365,16 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
         bankClosing: Number(bData.bankClosing || 0)
       };
     }
-    if (selectedBank === 'KOTAK EDP') {
-      return {
-        name: 'KOTAK EDP',
-        opening: Number(ledgerBalances.bankOpening || 0),
-        bankIn: Number(ledgerBalances.bankIn || 0),
-        bankExpense: Number(ledgerBalances.bankExpense || 0),
-        bankClosing: Number(ledgerBalances.bankClosing || 0)
-      };
-    }
     return {
       name: selectedBank,
-      opening: 0,
+      opening: Number(settingsForm.bankOpenings?.[selectedBank] || 0),
       bankIn: 0,
       bankExpense: 0,
-      bankClosing: 0
+      bankClosing: Number(settingsForm.bankOpenings?.[selectedBank] || 0)
     };
-  }, [selectedBank, ledgerBalances]);
+  }, [selectedBank, ledgerBalances, settingsForm.bankOpenings]);
 
-  // Dedicated metrics for Kotak EDP Bank
+  // Dedicated metrics for Kotak EDP Bank (backward compatibility)
   const kotakBankData = React.useMemo(() => {
     const bData = ledgerBalances.banks?.['KOTAK EDP'];
     if (bData) {
@@ -231,7 +395,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     };
   }, [ledgerBalances]);
 
-  // Dedicated metrics for Elite ICICI Bank
+  // Dedicated metrics for Elite ICICI Bank (backward compatibility)
   const iciciBankData = React.useMemo(() => {
     const bData = ledgerBalances.banks?.['ELITE ICICI'];
     if (bData) {
@@ -1140,9 +1304,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       bankAccount: item.bankAccount || (
         item.paymentMode === 'Cash' 
           ? 'Cash in Hand' 
-          : (String(item.paymentMode || '').toUpperCase().includes('ICICI') 
-              ? 'ELITE ICICI' 
-              : (ledgerBalances.settings?.bankAccountName || 'KOTAK EDP'))
+          : (effectiveBanks[0] || ledgerBalances.settings?.bankAccountName || 'Bank Account')
       ),
       paidToOrReceivedFrom: item.paidToOrReceivedFrom || '',
       billNo: item.billNo || '',
@@ -1407,7 +1569,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       <body>
         <div class="header">
           <div>
-            <div class="company-title">ELITE DIGITAL PRINTS</div>
+            <div class="company-title">${(companyEntity || 'ELITE DIGITAL PRINTS').toUpperCase()}</div>
             <div class="report-title">DEPARTMENT EXPENSE & CASH LEDGER REPORT</div>
           </div>
           <div class="meta-info">
@@ -1583,7 +1745,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 Financial Ledgers &amp; Bank Accounts
               </span>
               <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 8px', borderRadius: '12px', background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                Cash in Hand • Kotak EDP • Elite ICICI
+                Cash in Hand{effectiveBanks.length > 0 ? ` • ${effectiveBanks.join(' • ')}` : ''}
               </span>
             </div>
 
@@ -1611,7 +1773,33 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 title="Configure Initial Opening Balances & Bank Accounts"
               >
                 <Settings size={13} color="#64748b" />
-                <span>Setup Openings</span>
+                <span>Setup Openings &amp; Banks</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  loadLedgerSettings();
+                  setShowSettingsModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.28rem 0.65rem',
+                  borderRadius: '8px',
+                  border: '1px solid #bae6fd',
+                  background: '#f0f9ff',
+                  color: '#0284c7',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                }}
+                title="Add New Bank Account"
+              >
+                <Plus size={13} />
+                <span>+ Add Bank</span>
               </button>
 
               <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '8px', padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
@@ -1786,221 +1974,174 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
               </div>
             </div>
 
-            {/* 2. Kotak EDP Bank Ledger Card */}
-            <div
-              className="glass-panel ledger-bank-card"
-              style={{
-                flex: '0 0 calc(50% - 0.5rem)',
-                width: 'calc(50% - 0.5rem)',
-                minWidth: '460px',
-                padding: '0.95rem 1.15rem',
-                borderRadius: '14px',
-                border: '1px solid var(--border-light, #e2e8f0)',
-                background: 'var(--bg-card, #ffffff)',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                scrollSnapAlign: 'start',
-                boxSizing: 'border-box'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7', border: '1px solid #bae6fd' }}>
-                    <CreditCard size={18} />
+            {/* Dynamic Company Bank Ledger Cards */}
+            {effectiveBanks.map((bName, bIdx) => {
+              const bData = ledgerBalances.banks?.[bName] || {
+                name: bName,
+                opening: Number(settingsForm.bankOpenings?.[bName] || 0),
+                bankIn: 0,
+                bankExpense: 0,
+                bankClosing: Number(settingsForm.bankOpenings?.[bName] || 0)
+              };
+              const palette = getBankPalette(bName, bIdx);
+              const isPositive = Number(bData.bankClosing || 0) >= 0;
+
+              return (
+                <div
+                  key={bName}
+                  className="glass-panel ledger-bank-card"
+                  style={{
+                    flex: '0 0 calc(50% - 0.5rem)',
+                    width: 'calc(50% - 0.5rem)',
+                    minWidth: '460px',
+                    padding: '0.95rem 1.15rem',
+                    borderRadius: '14px',
+                    border: '1px solid var(--border-light, #e2e8f0)',
+                    background: 'var(--bg-card, #ffffff)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    scrollSnapAlign: 'start',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '10px', background: palette.lightBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: palette.text, border: `1px solid ${palette.border}30` }}>
+                        <Landmark size={18} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.84rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
+                            {bName} Ledger
+                          </h4>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+                            Opening: ₹{Number(bData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>
+                          NEFT / RTGS / UPI / Settlements ({bName})
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.84rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
-                        Kotak EDP Bank Ledger
-                      </h4>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
-                        Opening: ₹{Number(kotakBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+
+                  {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                    {/* 1. Opening */}
+                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                        Opening
+                      </span>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(bData.opening || 0).toLocaleString('en-IN')}`}>
+                        ₹{Number(bData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
+                    </div>
+
+                    {/* 2. Cash IN */}
+                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                          Cash IN
+                        </span>
+                        <TrendingUp size={13} color="#16a34a" />
+                      </div>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                        +₹{Number(bData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
+                    </div>
+
+                    {/* 3. Cash OUT */}
+                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                          Cash OUT
+                        </span>
+                        <TrendingDown size={13} color="#dc2626" />
+                      </div>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                        -₹{Number(bData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <span style={{ fontSize: '0.63rem', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
+                    </div>
+
+                    {/* 4. Closing */}
+                    <div style={{
+                      padding: '0.65rem 0.6rem',
+                      borderRadius: '10px',
+                      background: isPositive ? '#ecfdf5' : '#fef2f2',
+                      border: isPositive ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      minWidth: 0
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: isPositive ? '#15803d' : '#b91c1c', whiteSpace: 'nowrap' }}>
+                          Closing
+                        </span>
+                        <Landmark size={13} color={isPositive ? '#16a34a' : '#dc2626'} />
+                      </div>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 900, color: isPositive ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                        ₹{Number(bData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <span style={{ fontSize: '0.63rem', fontWeight: 700, color: isPositive ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>
+                        Net {bName}
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>
-                      NEFT / RTGS / UPI / Settlements (KOTAK EDP)
-                    </span>
                   </div>
                 </div>
-              </div>
+              );
+            })}
 
-              {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
-                {/* 1. Opening */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                    Opening
-                  </span>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(kotakBankData.opening || 0).toLocaleString('en-IN')}`}>
-                    ₹{Number(kotakBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
-                </div>
-
-                {/* 2. Cash IN */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                      Cash IN
-                    </span>
-                    <TrendingUp size={13} color="#16a34a" />
-                  </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    +₹{Number(kotakBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
-                </div>
-
-                {/* 3. Cash OUT */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                      Cash OUT
-                    </span>
-                    <TrendingDown size={13} color="#dc2626" />
-                  </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    -₹{Number(kotakBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
-                </div>
-
-                {/* 4. Closing */}
-                <div style={{
-                  padding: '0.65rem 0.6rem',
-                  borderRadius: '10px',
-                  background: Number(kotakBankData.bankClosing || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
-                  border: Number(kotakBankData.bankClosing || 0) >= 0 ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
+            {/* If company has no bank accounts yet */}
+            {effectiveBanks.length === 0 && (
+              <div
+                className="glass-panel ledger-bank-card"
+                style={{
+                  flex: '0 0 calc(50% - 0.5rem)',
+                  width: 'calc(50% - 0.5rem)',
+                  minWidth: '460px',
+                  padding: '1.25rem',
+                  borderRadius: '14px',
+                  border: '1.5px dashed var(--border-light, #e2e8f0)',
+                  background: 'var(--bg-card, #ffffff)',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minWidth: 0
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#15803d' : '#b91c1c', whiteSpace: 'nowrap' }}>
-                      Closing
-                    </span>
-                    <CreditCard size={13} color={Number(kotakBankData.bankClosing || 0) >= 0 ? '#16a34a' : '#dc2626'} />
-                  </div>
-                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    ₹{Number(kotakBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>
-                    Net KOTAK EDP
-                  </span>
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  gap: '0.6rem'
+                }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: '12px', background: 'rgba(2,132,199,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                  <Landmark size={24} />
                 </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    No Bank Accounts Configured for {companyEntity}
+                  </h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Add your company's bank accounts to track deposits, transfers, and real-time ledger balances.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadLedgerSettings();
+                    setShowSettingsModal(true);
+                  }}
+                  className="btn-primary"
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.9rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Plus size={14} />
+                  <span>Configure Bank Accounts</span>
+                </button>
               </div>
-            </div>
-
-            {/* 3. Elite ICICI Bank Ledger Card */}
-            <div
-              className="glass-panel ledger-bank-card"
-              style={{
-                flex: '0 0 calc(50% - 0.5rem)',
-                width: 'calc(50% - 0.5rem)',
-                minWidth: '460px',
-                padding: '0.95rem 1.15rem',
-                borderRadius: '14px',
-                border: '1px solid var(--border-light, #e2e8f0)',
-                background: 'var(--bg-card, #ffffff)',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                scrollSnapAlign: 'start',
-                boxSizing: 'border-box'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', border: '1px solid #e2e8f0' }}>
-                    <Landmark size={18} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.84rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
-                        Elite ICICI Bank Ledger
-                      </h4>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
-                        Opening: ₹{Number(iciciBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>
-                      NEFT / RTGS / UPI / Settlements (ELITE ICICI)
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
-                {/* 1. Opening */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                    Opening
-                  </span>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(iciciBankData.opening || 0).toLocaleString('en-IN')}`}>
-                    ₹{Number(iciciBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
-                </div>
-
-                {/* 2. Cash IN */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                      Cash IN
-                    </span>
-                    <TrendingUp size={13} color="#16a34a" />
-                  </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    +₹{Number(iciciBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
-                </div>
-
-                {/* 3. Cash OUT */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                      Cash OUT
-                    </span>
-                    <TrendingDown size={13} color="#dc2626" />
-                  </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    -₹{Number(iciciBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
-                </div>
-
-                {/* 4. Closing */}
-                <div style={{
-                  padding: '0.65rem 0.6rem',
-                  borderRadius: '10px',
-                  background: Number(iciciBankData.bankClosing || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
-                  border: Number(iciciBankData.bankClosing || 0) >= 0 ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minWidth: 0
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#15803d' : '#b91c1c', whiteSpace: 'nowrap' }}>
-                      Closing
-                    </span>
-                    <Landmark size={13} color={Number(iciciBankData.bankClosing || 0) >= 0 ? '#16a34a' : '#dc2626'} />
-                  </div>
-                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    ₹{Number(iciciBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>
-                    Net ELITE ICICI
-                  </span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Toolbar & Filters */}
@@ -2185,16 +2326,19 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                               <span style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem' }}>
                                 {item.paymentMode || 'Cash'}
                               </span>
-                              {item.bankAccount && (
-                                <span style={{
-                                  fontSize: '0.64rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px',
-                                  background: item.bankAccount === 'Cash in Hand' ? 'rgba(16,185,129,0.1)' : (item.bankAccount === 'ELITE ICICI' ? 'rgba(234,88,12,0.1)' : 'rgba(2,132,199,0.1)'),
-                                  color: item.bankAccount === 'Cash in Hand' ? '#10b981' : (item.bankAccount === 'ELITE ICICI' ? '#ea580c' : '#0284c7'),
-                                  border: `1px solid ${item.bankAccount === 'Cash in Hand' ? 'rgba(16,185,129,0.3)' : (item.bankAccount === 'ELITE ICICI' ? 'rgba(234,88,12,0.3)' : 'rgba(2,132,199,0.3)')}`
-                                }}>
-                                  {item.bankAccount === 'Cash in Hand' ? '💵 Cash in Hand' : `🏦 ${item.bankAccount}`}
-                                </span>
-                              )}
+                              {item.bankAccount && (() => {
+                                const pal = getBankPalette(item.bankAccount);
+                                return (
+                                  <span style={{
+                                    fontSize: '0.64rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px',
+                                    background: pal.lightBg,
+                                    color: pal.text,
+                                    border: `1px solid ${pal.border}40`
+                                  }}>
+                                    {item.bankAccount === 'Cash in Hand' ? '💵 Cash in Hand' : `🏦 ${item.bankAccount}`}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
@@ -2894,12 +3038,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                       let targetBank = formVal.bankAccount;
                       if (isCash) {
                         targetBank = 'Cash in Hand';
-                      } else if (newMode === 'ELITE ICICI') {
-                        targetBank = 'ELITE ICICI';
-                      } else if (newMode === 'KOTAK EDP') {
-                        targetBank = 'KOTAK EDP';
-                      } else if (targetBank === 'Cash in Hand') {
-                        targetBank = selectedBank !== 'ALL' ? selectedBank : 'KOTAK EDP';
+                      } else {
+                        const matchedBank = effectiveBanks.find(b => b.toLowerCase() === newMode.toLowerCase());
+                        if (matchedBank) {
+                          targetBank = matchedBank;
+                        } else if (targetBank === 'Cash in Hand') {
+                          targetBank = effectiveBanks[0] || 'Bank Account';
+                        }
                       }
                       setFormVal(prev => ({
                         ...prev,
@@ -2924,14 +3069,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     <span style={{
                       fontSize: '0.68rem',
                       fontWeight: 800,
-                      color: formVal.bankAccount === 'Cash in Hand' ? '#10b981' : (formVal.bankAccount === 'ELITE ICICI' ? '#ea580c' : '#0284c7')
+                      color: formVal.bankAccount === 'Cash in Hand' ? '#10b981' : getBankPalette(formVal.bankAccount).text
                     }}>
                       Routes to: {formVal.bankAccount === 'Cash in Hand' ? '💵 Cash Balance' : `🏦 ${formVal.bankAccount}`}
                     </span>
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
                   {/* 1. Cash in Hand */}
                   <button
                     type="button"
@@ -2955,66 +3100,136 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     </div>
                   </button>
 
-                  {/* 2. KOTAK EDP */}
-                  <button
-                    type="button"
-                    onClick={() => setFormVal(prev => ({
-                      ...prev,
-                      bankAccount: 'KOTAK EDP',
-                      paymentMode: (prev.paymentMode === 'Cash' || prev.paymentMode === 'ELITE ICICI') ? 'KOTAK EDP' : prev.paymentMode
-                    }))}
-                    style={{
-                      padding: '0.5rem 0.6rem', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800,
-                      border: formVal.bankAccount === 'KOTAK EDP' ? '2px solid #0284c7' : '1px solid var(--border-light)',
-                      background: formVal.bankAccount === 'KOTAK EDP' ? 'rgba(2,132,199,0.15)' : 'rgba(255,255,255,0.02)',
-                      color: formVal.bankAccount === 'KOTAK EDP' ? '#0284c7' : 'var(--text-muted)',
-                      cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px'
-                    }}
-                  >
-                    <span style={{ fontSize: '1.1rem' }}>🏦</span>
-                    <div>
-                      <div>KOTAK EDP</div>
-                      <div style={{ fontSize: '0.6rem', fontWeight: 500, opacity: 0.8 }}>Kotak Bank</div>
-                    </div>
-                  </button>
+                  {/* Dynamic Company Banks */}
+                  {effectiveBanks.map((bName, bIdx) => {
+                    const isSelected = formVal.bankAccount === bName;
+                    const palette = getBankPalette(bName, bIdx);
+                    const bBal = ledgerBalances.banks?.[bName]?.bankClosing;
+                    return (
+                      <button
+                        key={bName}
+                        type="button"
+                        onClick={() => setFormVal(prev => ({
+                          ...prev,
+                          bankAccount: bName,
+                          paymentMode: prev.paymentMode === 'Cash' ? 'Bank Transfer (NEFT/RTGS)' : prev.paymentMode
+                        }))}
+                        style={{
+                          padding: '0.5rem 0.6rem', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800,
+                          border: isSelected ? `2px solid ${palette.border}` : '1px solid var(--border-light)',
+                          background: isSelected ? palette.lightBg : 'rgba(255,255,255,0.02)',
+                          color: isSelected ? palette.text : 'var(--text-primary)',
+                          cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                      >
+                        <span style={{ fontSize: '1.1rem' }}>🏦</span>
+                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bName}</div>
+                          {bBal !== undefined && (
+                            <div style={{ fontSize: '0.6rem', fontWeight: 600, opacity: 0.85, color: Number(bBal) >= 0 ? '#15803d' : '#b91c1c' }}>
+                              ₹{Number(bBal).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
 
-                  {/* 3. ELITE ICICI */}
+                  {/* + Add Bank Quick Button */}
                   <button
                     type="button"
-                    onClick={() => setFormVal(prev => ({
-                      ...prev,
-                      bankAccount: 'ELITE ICICI',
-                      paymentMode: (prev.paymentMode === 'Cash' || prev.paymentMode === 'KOTAK EDP') ? 'ELITE ICICI' : prev.paymentMode
-                    }))}
+                    onClick={() => setShowInlineAddBank(prev => !prev)}
                     style={{
-                      padding: '0.5rem 0.6rem', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800,
-                      border: formVal.bankAccount === 'ELITE ICICI' ? '2px solid #ea580c' : '1px solid var(--border-light)',
-                      background: formVal.bankAccount === 'ELITE ICICI' ? 'rgba(234,88,12,0.15)' : 'rgba(255,255,255,0.02)',
-                      color: formVal.bankAccount === 'ELITE ICICI' ? '#ea580c' : 'var(--text-muted)',
-                      cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px'
+                      padding: '0.5rem 0.6rem',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      border: '1.5px dashed #38bdf8',
+                      background: showInlineAddBank ? 'rgba(56,189,248,0.15)' : 'rgba(56,189,248,0.04)',
+                      color: '#0284c7',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px'
                     }}
+                    title="Add new bank account for this company"
                   >
-                    <span style={{ fontSize: '1.1rem' }}>🏦</span>
-                    <div>
-                      <div>ELITE ICICI</div>
-                      <div style={{ fontSize: '0.6rem', fontWeight: 500, opacity: 0.8 }}>ICICI Bank</div>
-                    </div>
+                    <Plus size={14} />
+                    <span>+ Add Bank</span>
                   </button>
                 </div>
 
+                {/* Inline Quick Add Bank Panel */}
+                {showInlineAddBank && (
+                  <div style={{ marginTop: '0.4rem', padding: '0.65rem 0.75rem', borderRadius: '8px', background: 'var(--bg-card, #ffffff)', border: '1.5px solid #38bdf8', boxShadow: '0 4px 12px rgba(2,132,199,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Landmark size={13} /> Add Bank Account for {companyEntity}
+                      </span>
+                      <button type="button" onClick={() => setShowInlineAddBank(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
+                      <div>
+                        <label style={{ fontSize: '0.64rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Bank Name *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. HDFC Bank, SBI..."
+                          value={inlineBankForm.name}
+                          onChange={e => setInlineBankForm(prev => ({ ...prev, name: e.target.value }))}
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '4px 8px', marginTop: 2 }}
+                          autoFocus
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.64rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>A/C Number (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 5020001234..."
+                          value={inlineBankForm.accountNo}
+                          onChange={e => setInlineBankForm(prev => ({ ...prev, accountNo: e.target.value }))}
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '4px 8px', marginTop: 2 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.64rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Opening Bal ₹ (Optional)</label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={inlineBankForm.opening}
+                          onChange={e => setInlineBankForm(prev => ({ ...prev, opening: e.target.value }))}
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '4px 8px', marginTop: 2 }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          disabled={addingInlineBank || !inlineBankForm.name.trim()}
+                          onClick={handleInlineCreateBank}
+                          className="btn-primary"
+                          style={{ padding: '0.35rem 0.8rem', fontSize: '0.72rem', fontWeight: 800, height: '30px', whiteSpace: 'nowrap' }}
+                        >
+                          {addingInlineBank ? 'Saving...' : '💾 Save & Select'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Real-Time Live Projected Closing Balance Impact */}
                 {Number(formVal.amount) > 0 && (() => {
-                  const currentClosing = formVal.bankAccount === 'Cash in Hand'
+                  const target = formVal.bankAccount || (formVal.paymentMode === 'Cash' ? 'Cash in Hand' : effectiveBanks[0]);
+                  const currentClosing = target === 'Cash in Hand'
                     ? Number(ledgerBalances.cashClosing || 0)
-                    : (formVal.bankAccount === 'ELITE ICICI'
-                        ? Number(ledgerBalances.banks?.['ELITE ICICI']?.bankClosing ?? 0)
-                        : Number(ledgerBalances.banks?.['KOTAK EDP']?.bankClosing ?? ledgerBalances.bankClosing ?? 0));
+                    : Number(ledgerBalances.banks?.[target]?.bankClosing ?? 0);
                   const delta = (formVal.type === 'IN' || transactionMode === 'PARTY') ? Number(formVal.amount) : -Number(formVal.amount);
                   const projected = currentClosing + delta;
                   return (
                     <div style={{ fontSize: '0.68rem', padding: '5px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                       <span>
-                        Current {formVal.bankAccount} Closing: ₹{currentClosing.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        Current {target} Closing: ₹{currentClosing.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                       <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
                         Projected Closing: ₹{projected.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -3213,7 +3428,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
             <form onSubmit={handleSaveLedgerSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Business Unit</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Business Unit / Company</label>
                   <input
                     type="text"
                     readOnly
@@ -3222,82 +3437,180 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Primary Bank Account Name *</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Effective Opening Date *</label>
                   <input
-                    type="text"
+                    type="date"
                     required
-                    value={settingsForm.bankAccountName}
-                    onChange={e => setSettingsForm(prev => ({ ...prev, bankAccountName: e.target.value }))}
-                    placeholder="e.g. KOTAK EDP"
-                    style={{ width: '100%', marginTop: 4, fontWeight: 700 }}
+                    value={settingsForm.effectiveDate}
+                    onChange={e => setSettingsForm(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                    style={{ width: '100%', marginTop: 4 }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Effective Opening Date *</label>
-                <input
-                  type="date"
-                  required
-                  value={settingsForm.effectiveDate}
-                  onChange={e => setSettingsForm(prev => ({ ...prev, effectiveDate: e.target.value }))}
-                  style={{ width: '100%', marginTop: 4 }}
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
+                  💵 Cash in Hand Opening Balance (₹) *
+                </label>
+                <StandardNumericInput
+                  mode="currency"
+                  decimals={2}
+                  prefix="₹"
+                  value={settingsForm.initialCashOpening}
+                  onChange={e => setSettingsForm(prev => ({ ...prev, initialCashOpening: e.target.value }))}
+                  placeholder="0.00"
+                  style={{ width: '100%', marginTop: 4, fontWeight: 800 }}
                 />
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: 3 }}>
-                  All historical vouchers logged after this date will adjust from this baseline opening.
-                </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.65rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
-                    💵 Cash Opening (₹) *
-                  </label>
-                  <StandardNumericInput
-                    mode="currency"
-                    decimals={2}
-                    prefix="₹"
-                    value={settingsForm.initialCashOpening}
-                    onChange={e => setSettingsForm(prev => ({ ...prev, initialCashOpening: e.target.value }))}
-                    placeholder="0.00"
-                    style={{ width: '100%', marginTop: 4, fontWeight: 800 }}
-                  />
+              {/* Dynamic Bank Accounts Configuration List */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Landmark size={14} color="#0284c7" /> Configured Bank Accounts ({settingsForm.banks?.length || 0})
+                    </h4>
+                    <span style={{ fontSize: '0.66rem', color: '#64748b' }}>
+                      Add or edit bank accounts specific to {companyEntity} with their baseline openings.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettingsForm(prev => ({
+                        ...prev,
+                        banks: [
+                          ...(prev.banks || []),
+                          { id: `bank_${Date.now()}`, name: '', accountNo: '', ifsc: '', opening: 0 }
+                        ]
+                      }));
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      padding: '0.3rem 0.65rem',
+                      borderRadius: '6px',
+                      border: '1px solid #0284c7',
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>+ Add Bank Account</span>
+                  </button>
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>
-                    🏦 KOTAK EDP Opening (₹) *
-                  </label>
-                  <StandardNumericInput
-                    mode="currency"
-                    decimals={2}
-                    prefix="₹"
-                    value={settingsForm.kotakOpening}
-                    onChange={e => setSettingsForm(prev => ({ ...prev, kotakOpening: e.target.value }))}
-                    placeholder="0.00"
-                    style={{ width: '100%', marginTop: 4, fontWeight: 800 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase' }}>
-                    🏦 ELITE ICICI Opening (₹) *
-                  </label>
-                  <StandardNumericInput
-                    mode="currency"
-                    decimals={2}
-                    prefix="₹"
-                    value={settingsForm.iciciOpening}
-                    onChange={e => setSettingsForm(prev => ({ ...prev, iciciOpening: e.target.value }))}
-                    placeholder="0.00"
-                    style={{ width: '100%', marginTop: 4, fontWeight: 800 }}
-                  />
-                </div>
-              </div>
 
-              <div style={{ padding: '0.45rem 0.75rem', borderRadius: '6px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.72rem', color: '#475569', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                <span>Combined Bank Opening Total:</span>
-                <span style={{ color: '#0f172a', fontWeight: 900 }}>
-                  ₹{((Number(settingsForm.kotakOpening) || 0) + (Number(settingsForm.iciciOpening) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '240px', overflowY: 'auto' }}>
+                  {(settingsForm.banks || []).map((b, idx) => (
+                    <div
+                      key={b.id || idx}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.4fr 1.2fr 1fr 34px',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                        background: '#ffffff',
+                        padding: '0.45rem 0.6rem',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0'
+                      }}
+                    >
+                      <div>
+                        <label style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 2 }}>
+                          Bank Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={b.name}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setSettingsForm(prev => ({
+                              ...prev,
+                              banks: prev.banks.map((item, i) => i === idx ? { ...item, name: val } : item)
+                            }));
+                          }}
+                          placeholder="e.g. HDFC Bank, SBI..."
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '4px 6px', fontWeight: 700 }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 2 }}>
+                          A/C Number (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={b.accountNo || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setSettingsForm(prev => ({
+                              ...prev,
+                              banks: prev.banks.map((item, i) => i === idx ? { ...item, accountNo: val } : item)
+                            }));
+                          }}
+                          placeholder="e.g. 502000123456"
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '4px 6px' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.62rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', display: 'block', marginBottom: 2 }}>
+                          Opening (₹)
+                        </label>
+                        <StandardNumericInput
+                          mode="currency"
+                          decimals={2}
+                          prefix="₹"
+                          value={b.opening}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setSettingsForm(prev => ({
+                              ...prev,
+                              banks: prev.banks.map((item, i) => i === idx ? { ...item, opening: val } : item)
+                            }));
+                          }}
+                          placeholder="0.00"
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '4px 6px', fontWeight: 800 }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingTop: 14 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSettingsForm(prev => ({
+                              ...prev,
+                              banks: prev.banks.filter((_, i) => i !== idx)
+                            }));
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
+                          title="Remove this bank"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!settingsForm.banks || settingsForm.banks.length === 0) && (
+                    <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.75rem' }}>
+                      No bank accounts added yet. Click <strong>"+ Add Bank Account"</strong> to configure.
+                    </div>
+                  )}
+                </div>
+
+                {/* Combined Total */}
+                <div style={{ marginTop: '0.65rem', padding: '0.45rem 0.75rem', borderRadius: '6px', background: '#e0f2fe', border: '1px solid #bae6fd', fontSize: '0.72rem', color: '#0369a1', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                  <span>Combined Bank Opening Total:</span>
+                  <span style={{ color: '#0f172a', fontWeight: 900 }}>
+                    ₹{(settingsForm.banks || []).reduce((sum, b) => sum + (Number(b.opening) || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
 
               <div>
