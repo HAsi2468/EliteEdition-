@@ -1945,6 +1945,10 @@ export default function EliteBillingDepartment({
           prodService = inv.itemName || inv.productName || (inv.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"');
         }
 
+        const invTdsAmount = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : (Number(inv.tdsAmount) || 0);
+        const invTdsRate = Number(inv.tdsRate) || 0;
+        const invTdsSection = inv.tdsSection || (invTdsAmount > 0 ? '194C' : '');
+
         periodTx.push({
           date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
           rawDate: invDate,
@@ -1966,6 +1970,11 @@ export default function EliteBillingDepartment({
           totalTax: taxDetails.totalTax,
           debit: grandTotal,
           credit: 0,
+          enableTds: Boolean(inv.enableTds),
+          tdsRate: invTdsRate,
+          tdsAmount: invTdsAmount,
+          tdsSection: invTdsSection,
+          netReceivable: Math.max(0, grandTotal - invTdsAmount),
           narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo || ''}`
         });
       }
@@ -1995,6 +2004,11 @@ export default function EliteBillingDepartment({
           totalTax: 0,
           debit: 0,
           credit: paidAmount,
+          enableTds: false,
+          tdsRate: 0,
+          tdsAmount: 0,
+          tdsSection: '',
+          netReceivable: paidAmount,
           narration: `Payment received against Invoice #${inv.invoiceNo || ''} via ${payMode}`
         });
       }
@@ -2338,7 +2352,7 @@ export default function EliteBillingDepartment({
         const sortedPartyTransactions = sortVouchersInSeries(ledger.transactions);
 
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'TDS Rate (%)', 'TDS Amount (₹)', 'TDS Section', 'Net Amount (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         sortedPartyTransactions.forEach(t => {
@@ -2365,6 +2379,12 @@ export default function EliteBillingDepartment({
           const roundedTotal = Math.round(rawTaxSum);
           const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
 
+          // TDS Details (Tax Deducted at Source)
+          const rawTdsAmount = Number(t.tdsAmount) || 0;
+          const rawTdsRate = Number(t.tdsRate) || 0;
+          const tdsSection = rawTdsAmount > 0 ? (t.tdsSection || '194C') : (t.enableTds && t.tdsSection ? t.tdsSection : '');
+          const netAmount = parseFloat(Math.max(0, roundedTotal - rawTdsAmount).toFixed(2));
+
           tallyRows.push([
             t.date,
             vType,
@@ -2376,6 +2396,10 @@ export default function EliteBillingDepartment({
             rawSgst,
             rawIgst,
             roundOff,
+            rawTdsRate,
+            rawTdsAmount,
+            tdsSection || '—',
+            netAmount,
             roundedTotal,
             rowState,
             cleanRowGst
@@ -2394,6 +2418,10 @@ export default function EliteBillingDepartment({
           { wch: 12 }, // SGST (₹)
           { wch: 12 }, // IGST (₹)
           { wch: 14 }, // Round Off (₹)
+          { wch: 14 }, // TDS Rate (%)
+          { wch: 16 }, // TDS Amount (₹)
+          { wch: 14 }, // TDS Section
+          { wch: 18 }, // Net Amount (₹)
           { wch: 18 }, // Total Amount (₹)
           { wch: 18 }, // Place of Supply
           { wch: 18 }, // Party GSTIN
@@ -2630,6 +2658,10 @@ export default function EliteBillingDepartment({
               prodService = inv.itemName || inv.productName || (inv.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"');
             }
 
+            const invTdsAmount = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : (Number(inv.tdsAmount) || 0);
+            const invTdsRate = Number(inv.tdsRate) || 0;
+            const invTdsSection = inv.tdsSection || (invTdsAmount > 0 ? '194C' : '');
+
             allTransactions.push({
               date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
               rawDate: invDate,
@@ -2650,6 +2682,11 @@ export default function EliteBillingDepartment({
               totalTax: taxD.totalTax,
               debit: grandTotal,
               credit: 0,
+              enableTds: Boolean(inv.enableTds),
+              tdsRate: invTdsRate,
+              tdsAmount: invTdsAmount,
+              tdsSection: invTdsSection,
+              netReceivable: Math.max(0, grandTotal - invTdsAmount),
               narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo}`
             });
           }
@@ -2702,7 +2739,7 @@ export default function EliteBillingDepartment({
         });
 
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'TDS Rate (%)', 'TDS Amount (₹)', 'TDS Section', 'Net Amount (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         allTransactions.forEach(t => {
@@ -2729,6 +2766,12 @@ export default function EliteBillingDepartment({
           const roundedTotal = Math.round(rawTaxSum);
           const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
 
+          // TDS Details (Tax Deducted at Source)
+          const rawTdsAmount = Number(t.tdsAmount) || 0;
+          const rawTdsRate = Number(t.tdsRate) || 0;
+          const tdsSection = rawTdsAmount > 0 ? (t.tdsSection || '194C') : (t.enableTds && t.tdsSection ? t.tdsSection : '');
+          const netAmount = parseFloat(Math.max(0, roundedTotal - rawTdsAmount).toFixed(2));
+
           tallyRows.push([
             t.date,
             vType,
@@ -2740,6 +2783,10 @@ export default function EliteBillingDepartment({
             rawSgst,
             rawIgst,
             roundOff,
+            rawTdsRate,
+            rawTdsAmount,
+            tdsSection || '—',
+            netAmount,
             roundedTotal,
             rowState,
             cleanRowGst
@@ -2758,6 +2805,10 @@ export default function EliteBillingDepartment({
           { wch: 12 }, // SGST (₹)
           { wch: 12 }, // IGST (₹)
           { wch: 14 }, // Round Off (₹)
+          { wch: 14 }, // TDS Rate (%)
+          { wch: 16 }, // TDS Amount (₹)
+          { wch: 14 }, // TDS Section
+          { wch: 18 }, // Net Amount (₹)
           { wch: 18 }, // Total Amount (₹)
           { wch: 18 }, // Place of Supply
           { wch: 18 }, // Party GSTIN
