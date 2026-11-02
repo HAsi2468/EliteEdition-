@@ -1945,6 +1945,10 @@ export default function EliteBillingDepartment({
           prodService = inv.itemName || inv.productName || (inv.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"');
         }
 
+        const invTdsAmount = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : (Number(inv.tdsAmount) || 0);
+        const invTdsRate = Number(inv.tdsRate) || 0;
+        const invTdsSection = inv.tdsSection || (invTdsAmount > 0 ? '194C' : '');
+
         periodTx.push({
           date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
           rawDate: invDate,
@@ -1966,6 +1970,11 @@ export default function EliteBillingDepartment({
           totalTax: taxDetails.totalTax,
           debit: grandTotal,
           credit: 0,
+          enableTds: Boolean(inv.enableTds),
+          tdsRate: invTdsRate,
+          tdsAmount: invTdsAmount,
+          tdsSection: invTdsSection,
+          netReceivable: Math.max(0, grandTotal - invTdsAmount),
           narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo || ''}`
         });
       }
@@ -1995,6 +2004,11 @@ export default function EliteBillingDepartment({
           totalTax: 0,
           debit: 0,
           credit: paidAmount,
+          enableTds: false,
+          tdsRate: 0,
+          tdsAmount: 0,
+          tdsSection: '',
+          netReceivable: paidAmount,
           narration: `Payment received against Invoice #${inv.invoiceNo || ''} via ${payMode}`
         });
       }
@@ -2236,87 +2250,7 @@ export default function EliteBillingDepartment({
         const pPhone = selectedParty?.phone || 'N/A';
         const pState = selectedParty?.state || (cleanPGst.startsWith('24') ? 'Gujarat (24)' : (cleanPGst ? 'Inter-State' : 'Gujarat (24)'));
 
-        const rows = [
-          ['ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT'],
-          ['Party Name:', partyName],
-          ['GSTIN:', selectedPartyId === 'ALL' ? 'Various / Multi-Party' : (cleanPGst || 'Unregistered'), 'State / POS:', pState, 'Phone:', pPhone],
-          ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
-          ['Opening Balance (₹):', Number(ledger.openingBalance) || 0],
-          [],
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Party GSTIN', 'Particulars', 'Taxable (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
-        ];
-
-        let sumTaxable = 0;
-        let sumCgst = 0;
-        let sumSgst = 0;
-        let sumIgst = 0;
-
-        ledger.transactions.forEach(t => {
-          sumTaxable += (t.taxableAmount || 0);
-          sumCgst += (t.cgstAmount || 0);
-          sumSgst += (t.sgstAmount || 0);
-          sumIgst += (t.igstAmount || 0);
-
-          const rowParty = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
-          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
-          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
-
-          rows.push([
-            t.date,
-            t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt'),
-            t.voucherNo,
-            rowParty,
-            cleanRowGst,
-            t.particulars,
-            Number(t.taxableAmount) || 0,
-            Number(t.cgstAmount) || 0,
-            Number(t.sgstAmount) || 0,
-            Number(t.igstAmount) || 0,
-            Number(t.debit) || 0,
-            Number(t.credit) || 0,
-            Number(Math.abs(t.runningBalance)) || 0,
-            t.balType
-          ]);
-        });
-
-        rows.push([]);
-        rows.push([
-          'TOTALS',
-          '',
-          '',
-          '',
-          '',
-          '',
-          parseFloat(sumTaxable.toFixed(2)),
-          parseFloat(sumCgst.toFixed(2)),
-          parseFloat(sumSgst.toFixed(2)),
-          parseFloat(sumIgst.toFixed(2)),
-          Number(ledger.totalDebit) || 0,
-          Number(ledger.totalCredit) || 0,
-          Number(Math.abs(ledger.closingBalance)) || 0,
-          ledger.closingBalance >= 0 ? 'Dr' : 'Cr'
-        ]);
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = [
-          { wch: 13 }, // Date
-          { wch: 14 }, // Voucher Type
-          { wch: 20 }, // Voucher No
-          { wch: 32 }, // Party Ledger Name
-          { wch: 18 }, // Party GSTIN
-          { wch: 42 }, // Particulars
-          { wch: 15 }, // Taxable
-          { wch: 12 }, // CGST
-          { wch: 12 }, // SGST
-          { wch: 12 }, // IGST
-          { wch: 15 }, // Debit
-          { wch: 15 }, // Credit
-          { wch: 18 }, // Running Bal
-          { wch: 8 },  // Dr/Cr
-        ];
-        XLSX.utils.book_append_sheet(wb, ws, 'Party Statement');
-
-        // ── SHEET 2: TALLY PRIME / ACCOUNTING IMPORT FORMAT ──
+        // ── 1. TALLY PRIME / ACCOUNTING IMPORT FORMAT (SHEET 1 - PRIMARY DEFAULT VIEW) ──
         const sortVouchersInSeries = (list) => {
           return [...(list || [])].sort((a, b) => {
             const parseSeq = (str) => {
@@ -2338,7 +2272,7 @@ export default function EliteBillingDepartment({
         const sortedPartyTransactions = sortVouchersInSeries(ledger.transactions);
 
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'TDS Rate (%)', 'TDS Amount (₹)', 'TDS Section', 'Net Amount (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         sortedPartyTransactions.forEach(t => {
@@ -2365,6 +2299,12 @@ export default function EliteBillingDepartment({
           const roundedTotal = Math.round(rawTaxSum);
           const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
 
+          // TDS Details (Tax Deducted at Source)
+          const rawTdsAmount = Number(t.tdsAmount) || 0;
+          const rawTdsRate = Number(t.tdsRate) || 0;
+          const tdsSection = rawTdsAmount > 0 ? (t.tdsSection || '194C') : (t.enableTds && t.tdsSection ? t.tdsSection : '');
+          const netAmount = parseFloat(Math.max(0, roundedTotal - rawTdsAmount).toFixed(2));
+
           tallyRows.push([
             t.date,
             vType,
@@ -2376,6 +2316,10 @@ export default function EliteBillingDepartment({
             rawSgst,
             rawIgst,
             roundOff,
+            rawTdsRate,
+            rawTdsAmount,
+            tdsSection || '—',
+            netAmount,
             roundedTotal,
             rowState,
             cleanRowGst
@@ -2394,11 +2338,136 @@ export default function EliteBillingDepartment({
           { wch: 12 }, // SGST (₹)
           { wch: 12 }, // IGST (₹)
           { wch: 14 }, // Round Off (₹)
+          { wch: 14 }, // TDS Rate (%)
+          { wch: 16 }, // TDS Amount (₹)
+          { wch: 14 }, // TDS Section
+          { wch: 18 }, // Net Amount (₹)
           { wch: 18 }, // Total Amount (₹)
           { wch: 18 }, // Place of Supply
           { wch: 18 }, // Party GSTIN
         ];
+        // Append Tally Import Format FIRST so it opens immediately when opened in Excel
         XLSX.utils.book_append_sheet(wb, wsTally, 'Tally Import Format');
+
+        // ── 2. SHEET 2: PARTY LEDGER STATEMENT (ALSO INCLUDES TDS & ROUND OFF) ──
+        const rows = [
+          ['ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT'],
+          ['Party Name:', partyName],
+          ['GSTIN:', selectedPartyId === 'ALL' ? 'Various / Multi-Party' : (cleanPGst || 'Unregistered'), 'State / POS:', pState, 'Phone:', pPhone],
+          ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
+          ['Opening Balance (₹):', Number(ledger.openingBalance) || 0],
+          [],
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Party GSTIN', 'Particulars', 'Taxable (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'TDS Rate (%)', 'TDS Amount (₹)', 'TDS Section', 'Net Amount (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
+        ];
+
+        let sumTaxable = 0;
+        let sumCgst = 0;
+        let sumSgst = 0;
+        let sumIgst = 0;
+        let sumRoundOff = 0;
+        let sumTdsAmount = 0;
+        let sumNetAmount = 0;
+        let sumTotalAmount = 0;
+
+        ledger.transactions.forEach(t => {
+          sumTaxable += (t.taxableAmount || 0);
+          sumCgst += (t.cgstAmount || 0);
+          sumSgst += (t.sgstAmount || 0);
+          sumIgst += (t.igstAmount || 0);
+
+          const rowParty = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+
+          const baseTot = Number(t.debit > 0 ? t.debit : t.credit) || 0;
+          let rawTaxSum = parseFloat(((Number(t.taxableAmount) || 0) + (Number(t.cgstAmount) || 0) + (Number(t.sgstAmount) || 0) + (Number(t.igstAmount) || 0)).toFixed(2));
+          if (rawTaxSum === 0 && baseTot > 0) {
+            rawTaxSum = parseFloat(baseTot.toFixed(2));
+          }
+          const roundedTotal = Math.round(rawTaxSum);
+          const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
+          const rawTdsAmount = Number(t.tdsAmount) || 0;
+          const rawTdsRate = Number(t.tdsRate) || 0;
+          const tdsSection = rawTdsAmount > 0 ? (t.tdsSection || '194C') : (t.enableTds && t.tdsSection ? t.tdsSection : '');
+          const netAmount = parseFloat(Math.max(0, roundedTotal - rawTdsAmount).toFixed(2));
+
+          sumRoundOff += roundOff;
+          sumTdsAmount += rawTdsAmount;
+          sumNetAmount += netAmount;
+          sumTotalAmount += roundedTotal;
+
+          rows.push([
+            t.date,
+            t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt'),
+            t.voucherNo,
+            rowParty,
+            cleanRowGst,
+            t.particulars,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
+            roundOff,
+            rawTdsRate,
+            rawTdsAmount,
+            tdsSection || '—',
+            netAmount,
+            roundedTotal,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            Number(Math.abs(t.runningBalance)) || 0,
+            t.balType
+          ]);
+        });
+
+        rows.push([]);
+        rows.push([
+          'TOTALS',
+          '',
+          '',
+          '',
+          '',
+          '',
+          parseFloat(sumTaxable.toFixed(2)),
+          parseFloat(sumCgst.toFixed(2)),
+          parseFloat(sumSgst.toFixed(2)),
+          parseFloat(sumIgst.toFixed(2)),
+          parseFloat(sumRoundOff.toFixed(2)),
+          '',
+          parseFloat(sumTdsAmount.toFixed(2)),
+          '',
+          parseFloat(sumNetAmount.toFixed(2)),
+          parseFloat(sumTotalAmount.toFixed(2)),
+          Number(ledger.totalDebit) || 0,
+          Number(ledger.totalCredit) || 0,
+          Number(Math.abs(ledger.closingBalance)) || 0,
+          ledger.closingBalance >= 0 ? 'Dr' : 'Cr'
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [
+          { wch: 13 }, // Date
+          { wch: 14 }, // Voucher Type
+          { wch: 20 }, // Voucher No
+          { wch: 32 }, // Party Ledger Name
+          { wch: 18 }, // Party GSTIN
+          { wch: 42 }, // Particulars
+          { wch: 15 }, // Taxable
+          { wch: 12 }, // CGST
+          { wch: 12 }, // SGST
+          { wch: 12 }, // IGST
+          { wch: 14 }, // Round Off (₹)
+          { wch: 14 }, // TDS Rate (%)
+          { wch: 16 }, // TDS Amount (₹)
+          { wch: 14 }, // TDS Section
+          { wch: 18 }, // Net Amount (₹)
+          { wch: 18 }, // Total Amount (₹)
+          { wch: 15 }, // Debit
+          { wch: 15 }, // Credit
+          { wch: 18 }, // Running Bal
+          { wch: 8 },  // Dr/Cr
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Party Statement');
 
         const fileName = `Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(wb, fileName);
@@ -2630,6 +2699,10 @@ export default function EliteBillingDepartment({
               prodService = inv.itemName || inv.productName || (inv.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"');
             }
 
+            const invTdsAmount = (inv.enableTds && Number(inv.tdsAmount) > 0) ? Number(inv.tdsAmount) : (Number(inv.tdsAmount) || 0);
+            const invTdsRate = Number(inv.tdsRate) || 0;
+            const invTdsSection = inv.tdsSection || (invTdsAmount > 0 ? '194C' : '');
+
             allTransactions.push({
               date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
               rawDate: invDate,
@@ -2650,6 +2723,11 @@ export default function EliteBillingDepartment({
               totalTax: taxD.totalTax,
               debit: grandTotal,
               credit: 0,
+              enableTds: Boolean(inv.enableTds),
+              tdsRate: invTdsRate,
+              tdsAmount: invTdsAmount,
+              tdsSection: invTdsSection,
+              netReceivable: Math.max(0, grandTotal - invTdsAmount),
               narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo}`
             });
           }
@@ -2682,9 +2760,8 @@ export default function EliteBillingDepartment({
           { wch: 22 },
           { wch: 12 },
         ];
-        XLSX.utils.book_append_sheet(wb, ws, 'Master Summary');
 
-        // ── SHEET 2: ALL VOUCHERS FOR TALLY IMPORT (INVOICES IN SERIES) ──
+        // ── 1. SHEET 1: ALL VOUCHERS FOR TALLY IMPORT (INVOICES IN SERIES) — PRIMARY OPEN SHEET ──
         allTransactions.sort((a, b) => {
           const parseSeq = (str) => {
             if (!str) return null;
@@ -2702,7 +2779,7 @@ export default function EliteBillingDepartment({
         });
 
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'TDS Rate (%)', 'TDS Amount (₹)', 'TDS Section', 'Net Amount (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         allTransactions.forEach(t => {
@@ -2729,6 +2806,12 @@ export default function EliteBillingDepartment({
           const roundedTotal = Math.round(rawTaxSum);
           const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
 
+          // TDS Details (Tax Deducted at Source)
+          const rawTdsAmount = Number(t.tdsAmount) || 0;
+          const rawTdsRate = Number(t.tdsRate) || 0;
+          const tdsSection = rawTdsAmount > 0 ? (t.tdsSection || '194C') : (t.enableTds && t.tdsSection ? t.tdsSection : '');
+          const netAmount = parseFloat(Math.max(0, roundedTotal - rawTdsAmount).toFixed(2));
+
           tallyRows.push([
             t.date,
             vType,
@@ -2740,6 +2823,10 @@ export default function EliteBillingDepartment({
             rawSgst,
             rawIgst,
             roundOff,
+            rawTdsRate,
+            rawTdsAmount,
+            tdsSection || '—',
+            netAmount,
             roundedTotal,
             rowState,
             cleanRowGst
@@ -2758,11 +2845,19 @@ export default function EliteBillingDepartment({
           { wch: 12 }, // SGST (₹)
           { wch: 12 }, // IGST (₹)
           { wch: 14 }, // Round Off (₹)
+          { wch: 14 }, // TDS Rate (%)
+          { wch: 16 }, // TDS Amount (₹)
+          { wch: 14 }, // TDS Section
+          { wch: 18 }, // Net Amount (₹)
           { wch: 18 }, // Total Amount (₹)
           { wch: 18 }, // Place of Supply
           { wch: 18 }, // Party GSTIN
         ];
+        // Append Tally All Vouchers FIRST so Excel opens it immediately by default
         XLSX.utils.book_append_sheet(wb, wsTally, 'Tally All Vouchers');
+
+        // ── 2. SHEET 2: ALL-PARTIES MASTER SUMMARY ──
+        XLSX.utils.book_append_sheet(wb, ws, 'Master Summary');
 
         const fileName = `Master_Ledger_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(wb, fileName);
