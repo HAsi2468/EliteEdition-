@@ -6433,12 +6433,35 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => setShowMillChallanModal(false)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setSettingsActiveTab('mills'); setShowSettingsModal(true); }}
+                  className="btn-secondary"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #bae6fd',
+                    color: '#0284c7',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <Settings size={13} /> Manage
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMillChallanModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Form */}
@@ -6481,18 +6504,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
-                      Processing / Dyeing Mill Name *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => { setSettingsActiveTab('mills'); setShowSettingsModal(true); }}
-                      style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ⚙️ Manage
-                    </button>
-                  </div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Processing / Dyeing Mill Name *
+                  </label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <input
                       type="text"
@@ -6555,18 +6569,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
-                    Process Instructions for Mill
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => { setSettingsActiveTab('processes'); setShowSettingsModal(true); }}
-                    style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ⚙️ Manage
-                  </button>
-                </div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                  Process Instructions for Mill
+                </label>
                 <input
                   type="text"
                   list="processes-master-datalist"
