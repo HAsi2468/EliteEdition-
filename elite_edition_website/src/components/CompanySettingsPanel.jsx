@@ -48,6 +48,7 @@ export const getInitialFormForCompany = (companyEntity) => {
       }
     ] : [],
     invoicePrefix: isSO ? 'SO-2627-' : isEF ? 'EF-2627-' : isEE ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : isEW ? 'EW-2627-' : isYJ ? 'YJ-2627-' : 'EDP/26-27/',
+    invoiceSuffix: '',
     startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
     companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
     challanDesign: {
@@ -1351,28 +1352,35 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
 
         {/* Invoice Numbering & Sequence */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f59e0b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <FileText size={18} /> Invoice Prefix & Numbering Sequence
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <FileText size={18} /> Invoice Prefix, Starting Sequence & Suffix Settings
           </h3>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1.15rem' }}>
+            Configure invoice numbering format: place a Prefix (before / front), Starting Sequence Number (middle), and Suffix (behind / after). Both sides are customizable based on your business requirements.
+          </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
             <div>
-              <label className="form-label">Invoice Prefix</label>
+              <label className="form-label" style={{ fontWeight: 700 }}>
+                1. Prefix (Before / Front)
+              </label>
               <input
                 type="text"
                 name="invoicePrefix"
-                value={form.invoicePrefix}
+                value={form.invoicePrefix || ''}
                 onChange={handleChange}
                 placeholder={companyEntity === 'Elite Fabtex' ? 'EF-2627-' : 'EE-2627-'}
                 className="form-control"
               />
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                Preview generated invoice: <strong>{form.invoicePrefix}{String(form.startingInvoiceNo || 1).padStart(4, '0')}</strong>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                Text before number (e.g. <code>{companyEntity === 'Elite Fabtex' ? 'EF-2627-' : 'EE-2627-'}</code> or <code>INV/</code>)
               </span>
             </div>
 
             <div>
-              <label className="form-label">Starting Sequence Number</label>
+              <label className="form-label" style={{ fontWeight: 700 }}>
+                2. Starting Sequence Number
+              </label>
               <input
                 type="number"
                 name="startingInvoiceNo"
@@ -1380,6 +1388,56 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
                 onChange={handleChange}
                 className="form-control"
               />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                Next counter (e.g. <code>1</code> or <code>1001</code>)
+              </span>
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 700 }}>
+                3. Suffix (Behind / After)
+              </label>
+              <input
+                type="text"
+                name="invoiceSuffix"
+                value={form.invoiceSuffix || ''}
+                onChange={handleChange}
+                placeholder="e.g. /26-27 or -GST (Optional)"
+                className="form-control"
+              />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                Optional text behind number (e.g. <code>/26-27</code>)
+              </span>
+            </div>
+          </div>
+
+          {/* Live Invoice Preview Box */}
+          <div style={{
+            marginTop: '1.15rem',
+            padding: '0.85rem 1.15rem',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.04))',
+            borderRadius: '10px',
+            border: '1.5px solid rgba(245, 158, 11, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', letterSpacing: '0.5px', display: 'block' }}>
+                Live Invoice Number Preview
+              </span>
+              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#92400e', marginTop: '3px', fontFamily: 'monospace' }}>
+                {form.invoicePrefix || ''}
+                <span style={{ color: '#2563eb', textDecoration: 'underline' }}>
+                  {(form.invoicePrefix || '').endsWith('-') ? String(form.startingInvoiceNo || 1).padStart(4, '0') : (form.startingInvoiceNo || 1)}
+                </span>
+                {form.invoiceSuffix || ''}
+              </div>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#78350f', background: '#fef3c7', padding: '0.35rem 0.65rem', borderRadius: '6px', fontWeight: 700, border: '1px solid #fde68a' }}>
+              Format: [Prefix] + [Sequence] + [Suffix]
             </div>
           </div>
 

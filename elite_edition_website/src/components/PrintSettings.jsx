@@ -60,7 +60,8 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
     companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
     paymentDueDays: 30,
     startingInvoiceNo: 1001,
-    invoicePrefix: 'EDP/26-27/'
+    invoicePrefix: 'EDP/26-27/',
+    invoiceSuffix: ''
   });
 
   useEffect(() => {
@@ -88,7 +89,8 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
           companyTerms: data.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
           paymentDueDays: data.paymentDueDays !== undefined ? data.paymentDueDays : 30,
           startingInvoiceNo: data.startingInvoiceNo !== undefined ? data.startingInvoiceNo : 1001,
-          invoicePrefix: data.invoicePrefix || 'EDP/26-27/'
+          invoicePrefix: data.invoicePrefix || 'EDP/26-27/',
+          invoiceSuffix: data.invoiceSuffix || ''
         });
       }
     } catch (err) {

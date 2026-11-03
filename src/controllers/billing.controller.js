@@ -742,21 +742,21 @@ const getNextInvoiceNo = async (req, res) => {
     const config = await PrintConfig.findOne(filter).lean() || {};
     const isLegacyEdpConfigOnEo = companyEntity === 'Elite Online' && /^EDP/i.test(config.invoicePrefix || '');
     const START_SEQ = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
-    const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
+    const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix !== undefined) ? config.invoicePrefix : defaultPrefix;
+    const suffix = config.invoiceSuffix || '';
 
     const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
     const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, START_SEQ) : START_SEQ;
     
-    let invoiceNo;
-    if (prefix.endsWith('/')) {
-      invoiceNo = `${prefix}${nextSeq}`;
-    } else if (prefix.endsWith('-')) {
-      invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
-    } else {
-      invoiceNo = `${prefix}${nextSeq}`;
+    let formattedSeq = nextSeq;
+    if (prefix && prefix.endsWith('-')) {
+      formattedSeq = String(nextSeq).padStart(4, '0');
     }
+    const cleanPrefix = prefix || '';
+    const cleanSuffix = suffix || '';
+    const invoiceNo = `${cleanPrefix}${formattedSeq}${cleanSuffix}`;
 
-    res.json({ success: true, nextSeq, prefix, invoiceNo });
+    res.json({ success: true, nextSeq, prefix: cleanPrefix, suffix: cleanSuffix, invoiceNo });
   } catch (error) {
     logger.error('Error creating billing purchase: %s', error.stack || error.message);
     res.status(500).json({ success: false, error: error.message });
@@ -1015,7 +1015,8 @@ const createInvoice = async (req, res) => {
     const PrintConfig = require('../db/models/printConfig.model');
     const config = await PrintConfig.findOne(filter).lean() || {};
     const isLegacyEdpConfigOnEo = entity === 'Elite Online' && /^EDP/i.test(config.invoicePrefix || '');
-    const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix) ? config.invoicePrefix : defaultPrefix;
+    const prefix = (!isLegacyEdpConfigOnEo && config.invoicePrefix !== undefined) ? config.invoicePrefix : defaultPrefix;
+    const suffix = config.invoiceSuffix || '';
     const startSeq = (!isLegacyEdpConfigOnEo && config.startingInvoiceNo != null) ? Number(config.startingInvoiceNo) : defaultStartSeq;
 
     const explicitInvoiceNo = invoiceData.invoiceNo ? String(invoiceData.invoiceNo).trim() : '';
@@ -1035,11 +1036,13 @@ const createInvoice = async (req, res) => {
       const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
       const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, startSeq) : startSeq;
       invoiceData.invoiceSeq = nextSeq;
-      if (prefix.endsWith('/')) {
-        invoiceData.invoiceNo = `${prefix}${nextSeq}`;
-      } else {
-        invoiceData.invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+      invoiceData.invoicePrefix = prefix || '';
+      invoiceData.invoiceSuffix = suffix || '';
+      let formattedSeq = nextSeq;
+      if (prefix && prefix.endsWith('-')) {
+        formattedSeq = String(nextSeq).padStart(4, '0');
       }
+      invoiceData.invoiceNo = `${prefix || ''}${formattedSeq}${suffix || ''}`;
     }
 
     // Strict Numerical Upper Bound & Tax Consistency Recomputation (BUG-057 & BUG-060)
@@ -4105,6 +4108,7 @@ const getCompanySettings = async (req, res) => {
         companyEntity,
         companyName: isEE ? 'ELITE EDITION' : compName,
         invoicePrefix: prefix,
+        invoiceSuffix: '',
         startingInvoiceNo: startNo,
         companyGstin: isEE ? '24BSWPA7682P1ZS' : '',
         companyAddress: isEE ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' : '',

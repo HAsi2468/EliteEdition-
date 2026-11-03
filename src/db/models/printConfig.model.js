@@ -259,6 +259,10 @@ const printConfigSchema = new mongoose.Schema(
       type: String,
       default: 'EDP-INV-',
     },
+    invoiceSuffix: {
+      type: String,
+      default: '',
+    },
     challanDesign: {
       title: { type: String, default: 'DELIVERY CHALLAN' },
       prefix: { type: String, default: 'DC-2627-' },

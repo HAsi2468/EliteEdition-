@@ -29,6 +29,7 @@ const billingInvoiceSchema = new mongoose.Schema(
     companyEntity: { type: String, default: 'Elite Online', index: true },
     invoiceNo: { type: String, required: true },
     invoicePrefix: { type: String, default: 'EDP-INV-' },
+    invoiceSuffix: { type: String, default: '' },
     invoiceSeq: { type: Number, required: true },
     ourChallanNo: { type: String, default: '' },
     deliveryBy: { type: String, default: '' },

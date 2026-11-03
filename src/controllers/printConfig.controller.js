@@ -149,6 +149,7 @@ const updatePrintConfig = async (req, res) => {
         if (companyData.paymentDueDays !== undefined) config.paymentDueDays = Number(companyData.paymentDueDays) || 30;
         if (companyData.startingInvoiceNo !== undefined) config.startingInvoiceNo = Number(companyData.startingInvoiceNo) || 1001;
         if (companyData.invoicePrefix !== undefined) config.invoicePrefix = companyData.invoicePrefix || 'EDP-INV-';
+        if (companyData.invoiceSuffix !== undefined) config.invoiceSuffix = companyData.invoiceSuffix || '';
 
         await config.save();
         return res.status(httpStatus.OK).send(config);
@@ -167,7 +168,7 @@ const updatePrintConfig = async (req, res) => {
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
       'deliveryOptions', 'lotPartyMap', 'companyName', 'companyGstin', 'companyAddress',
       'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms',
-      'paymentDueDays', 'startingInvoiceNo', 'invoicePrefix',
+      'paymentDueDays', 'startingInvoiceNo', 'invoicePrefix', 'invoiceSuffix',
       'stitchingCategories', 'stitchingLabels', 'finishingOptions', 'stitchingParties', 'stitchingBillTo', 'stitchingShipTo', 'stitchingDeliveryBy',
       'expenseInCategories', 'expenseOutCategories', 'expensePaymentModes'
     ];
@@ -214,6 +215,8 @@ const updatePrintConfig = async (req, res) => {
       config.paymentDueDays = Number(value) || 30;
     } else if (field === 'invoicePrefix') {
       config.invoicePrefix = value;
+    } else if (field === 'invoiceSuffix') {
+      config.invoiceSuffix = value;
     } else if (field.startsWith('company')) {
       config[field] = value;
     } else {
