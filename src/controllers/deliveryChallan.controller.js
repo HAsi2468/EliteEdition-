@@ -536,6 +536,7 @@ const convertToInvoice = async (req, res) => {
 
 // ── GET /delivery-challans/:id/pdf ────────────────────────────────────────────
 // Generate printable vector PDF for Delivery Challan
+// Page 1: Original in Company Brand Color; Page 2: Duplicate in Black & White
 const downloadChallanPdf = async (req, res) => {
   try {
     const challan = await DeliveryChallan.findById(req.params.id).lean();
@@ -543,126 +544,137 @@ const downloadChallanPdf = async (req, res) => {
       return res.status(404).send('Delivery Challan not found');
     }
 
-    const doc = new PDFDocument({ margin: 36, size: 'A4' });
+    const { getCompanyBrandColor } = require('../services/tallyInvoicePdfService');
+    const resolvedCompany = challan.companyEntity || 'Sobise';
+    const companyBrandColor = getCompanyBrandColor(resolvedCompany);
+
+    const doc = new PDFDocument({ margin: 36, size: 'A4', autoFirstPage: true });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Challan_${challan.challanNo}.pdf"`);
 
     doc.pipe(res);
 
-    // Color definitions
-    const primaryColor = '#e11d48'; // Sobise rose
-    const textColor = '#0f172a';
-    const mutedColor = '#64748b';
+    const renderChallanPage = (isColor) => {
+      // Color definitions
+      const primaryColor = isColor ? companyBrandColor : '#000000';
+      const textColor = '#0f172a';
+      const mutedColor = isColor ? '#64748b' : '#555555';
+      const copyBadge = isColor ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
 
-    // Header Title
-    doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text(challan.companyEntity || 'SOBISE', 36, 36);
-    doc.fillColor(mutedColor).fontSize(9).font('Helvetica').text('Corporate & Fashion Apparel Delivery Division', 36, 60);
+      // Header Title
+      doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text(resolvedCompany.toUpperCase(), 36, 36);
+      doc.fillColor(mutedColor).fontSize(9).font('Helvetica').text('Corporate & Fashion Apparel Delivery Division', 36, 60);
 
-    // Document Badge
-    doc.roundedRect(420, 36, 140, 26, 4).fillAndStroke(`${primaryColor}15`, primaryColor);
-    doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text('DELIVERY CHALLAN', 432, 44);
+      // Copy label & Document Badge
+      doc.fillColor(primaryColor).fontSize(7.5).font('Helvetica-Bold').text(copyBadge, 360, 24, { width: 200, align: 'right' });
+      doc.roundedRect(420, 36, 140, 26, 4).fillAndStroke(isColor ? `${primaryColor}15` : '#f1f5f9', primaryColor);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text('DELIVERY CHALLAN', 432, 44);
 
-    doc.moveDown(2);
+      doc.moveDown(2);
 
-    // Challan Meta Box
-    const metaY = 82;
-    doc.rect(36, metaY, 523, 78).stroke('#e2e8f0');
+      // Challan Meta Box
+      const metaY = 82;
+      doc.rect(36, metaY, 523, 78).stroke(isColor ? '#cbd5e1' : '#000000');
 
-    // Left Column: Customer details
-    doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold').text('CONSIGNEE / DELIVER TO:', 46, metaY + 8);
-    doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(challan.customer?.name || 'Party Name', 46, metaY + 22);
-    if (challan.customer?.businessName) {
-      doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text(challan.customer.businessName, 46, metaY + 34);
-    }
-    const custAddr = challan.customer?.shippingAddress || challan.customer?.billingAddress || '';
-    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text(custAddr.slice(0, 50), 46, metaY + 46);
-    if (challan.customer?.gstin) {
-      doc.fillColor(textColor).fontSize(8).font('Helvetica-Bold').text(`GSTIN: ${challan.customer.gstin}`, 46, metaY + 57);
-    }
-
-    // Right Column: Challan & Dispatch Details
-    const rightX = 330;
-    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Challan No:', rightX, metaY + 8);
-    doc.fillColor(textColor).fontSize(9.5).font('Helvetica-Bold').text(challan.challanNo, rightX + 65, metaY + 8);
-
-    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Date:', rightX, metaY + 21);
-    const dt = challan.challanDate ? new Date(challan.challanDate).toLocaleDateString('en-IN') : '-';
-    doc.fillColor(textColor).fontSize(8.5).font('Helvetica').text(dt, rightX + 65, metaY + 21);
-
-    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Vehicle No:', rightX, metaY + 34);
-    doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold').text(challan.dispatchDetails?.vehicleNo || 'N/A', rightX + 65, metaY + 34);
-
-    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Transporter:', rightX, metaY + 47);
-    doc.fillColor(textColor).fontSize(8).font('Helvetica').text(challan.dispatchDetails?.transporter || 'Direct', rightX + 65, metaY + 47);
-
-    const extraDispatch = [
-      challan.dispatchDetails?.lrNo ? `LR: ${challan.dispatchDetails.lrNo}` : '',
-      challan.dispatchDetails?.eWayBillNo ? `E-Way: ${challan.dispatchDetails.eWayBillNo}` : ''
-    ].filter(Boolean).join(' | ');
-
-    if (extraDispatch) {
-      doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(extraDispatch, rightX, metaY + 61);
-    }
-
-    // Line Items Table Header
-    const tableY = metaY + 90;
-    doc.rect(36, tableY, 523, 22).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold');
-    doc.text('#', 44, tableY + 6);
-    doc.text('Item Description', 70, tableY + 6);
-    doc.text('HSN Code', 260, tableY + 6);
-    doc.text('Qty', 330, tableY + 6, { width: 40, align: 'right' });
-    doc.text('Unit', 380, tableY + 6);
-    doc.text('Rate (₹)', 420, tableY + 6, { width: 55, align: 'right' });
-    doc.text('Total (₹)', 485, tableY + 6, { width: 65, align: 'right' });
-
-    let rowY = tableY + 22;
-    (challan.items || []).forEach((it, idx) => {
-      if (rowY > 700) {
-        doc.addPage();
-        rowY = 40;
+      // Left Column: Customer details
+      doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold').text('CONSIGNEE / DELIVER TO:', 46, metaY + 8);
+      doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(challan.customer?.name || 'Party Name', 46, metaY + 22);
+      if (challan.customer?.businessName) {
+        doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text(challan.customer.businessName, 46, metaY + 34);
       }
-      doc.rect(36, rowY, 523, 20).stroke('#f1f5f9');
+      const custAddr = challan.customer?.shippingAddress || challan.customer?.billingAddress || '';
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text(custAddr.slice(0, 50), 46, metaY + 46);
+      if (challan.customer?.gstin) {
+        doc.fillColor(textColor).fontSize(8).font('Helvetica-Bold').text(`GSTIN: ${challan.customer.gstin}`, 46, metaY + 57);
+      }
+
+      // Right Column: Challan & Dispatch Details
+      const rightX = 330;
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Challan No:', rightX, metaY + 8);
+      doc.fillColor(textColor).fontSize(9.5).font('Helvetica-Bold').text(challan.challanNo, rightX + 65, metaY + 8);
+
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Date:', rightX, metaY + 21);
+      const dt = challan.challanDate ? new Date(challan.challanDate).toLocaleDateString('en-IN') : '-';
+      doc.fillColor(textColor).fontSize(8.5).font('Helvetica').text(dt, rightX + 65, metaY + 21);
+
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Vehicle No:', rightX, metaY + 34);
+      doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold').text(challan.dispatchDetails?.vehicleNo || 'N/A', rightX + 65, metaY + 34);
+
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Transporter:', rightX, metaY + 47);
+      doc.fillColor(textColor).fontSize(8).font('Helvetica').text(challan.dispatchDetails?.transporter || 'Direct', rightX + 65, metaY + 47);
+
+      const extraDispatch = [
+        challan.dispatchDetails?.lrNo ? `LR: ${challan.dispatchDetails.lrNo}` : '',
+        challan.dispatchDetails?.eWayBillNo ? `E-Way: ${challan.dispatchDetails.eWayBillNo}` : ''
+      ].filter(Boolean).join(' | ');
+
+      if (extraDispatch) {
+        doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(extraDispatch, rightX, metaY + 61);
+      }
+
+      // Line Items Table Header
+      const tableY = metaY + 90;
+      doc.rect(36, tableY, 523, 22).fill(isColor ? '#f8fafc' : '#f1f5f9').stroke(isColor ? '#cbd5e1' : '#000000');
+      doc.fillColor(primaryColor).fontSize(8.5).font('Helvetica-Bold');
+      doc.text('#', 44, tableY + 6);
+      doc.text('Item Description', 70, tableY + 6);
+      doc.text('HSN Code', 260, tableY + 6);
+      doc.text('Qty', 330, tableY + 6, { width: 40, align: 'right' });
+      doc.text('Unit', 380, tableY + 6);
+      doc.text('Rate (₹)', 420, tableY + 6, { width: 55, align: 'right' });
+      doc.text('Total (₹)', 485, tableY + 6, { width: 65, align: 'right' });
+
+      let rowY = tableY + 22;
+      (challan.items || []).forEach((it, idx) => {
+        doc.rect(36, rowY, 523, 20).stroke('#e2e8f0');
+        doc.fillColor(textColor).fontSize(8.5).font('Helvetica');
+        doc.text(String(idx + 1), 44, rowY + 5);
+        doc.text(it.itemName || '', 70, rowY + 5, { width: 180, ellipsis: true });
+        doc.text(it.hsnCode || '-', 260, rowY + 5);
+        doc.text(Number(it.qty || 0).toLocaleString('en-IN'), 330, rowY + 5, { width: 40, align: 'right' });
+        doc.text(it.unit || 'Pcs', 380, rowY + 5);
+        doc.text(Number(it.unitPrice || 0).toFixed(2), 420, rowY + 5, { width: 55, align: 'right' });
+        doc.text(Number(it.totalAmount || 0).toFixed(2), 485, rowY + 5, { width: 65, align: 'right' });
+        rowY += 20;
+      });
+
+      // Summary Box
+      const sumY = Math.max(rowY + 10, 480);
+      doc.rect(36, sumY, 320, 75).stroke(isColor ? '#e2e8f0' : '#000000');
+      doc.fillColor(primaryColor).fontSize(8).font('Helvetica-Bold').text('TERMS & CONDITIONS:', 44, sumY + 8);
+      doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(challan.terms || '1. Goods delivered in good order.\n2. Receiver acknowledgment required.', 44, sumY + 22, { width: 300 });
+
+      // Totals Box
+      doc.rect(370, sumY, 189, 75).fill(isColor ? '#f8fafc' : '#f1f5f9').stroke(isColor ? '#cbd5e1' : '#000000');
       doc.fillColor(textColor).fontSize(8.5).font('Helvetica');
-      doc.text(String(idx + 1), 44, rowY + 5);
-      doc.text(it.itemName || '', 70, rowY + 5, { width: 180, ellipsis: true });
-      doc.text(it.hsnCode || '-', 260, rowY + 5);
-      doc.text(Number(it.qty || 0).toLocaleString('en-IN'), 330, rowY + 5, { width: 40, align: 'right' });
-      doc.text(it.unit || 'Pcs', 380, rowY + 5);
-      doc.text(Number(it.unitPrice || 0).toFixed(2), 420, rowY + 5, { width: 55, align: 'right' });
-      doc.text(Number(it.totalAmount || 0).toFixed(2), 485, rowY + 5, { width: 65, align: 'right' });
-      rowY += 20;
-    });
+      doc.text('Total Quantity:', 380, sumY + 12);
+      doc.font('Helvetica-Bold').text(`${challan.totalQty || 0} Pcs/Mtr`, 480, sumY + 12, { align: 'right', width: 70 });
 
-    // Summary Box
-    const sumY = Math.max(rowY + 10, 480);
-    doc.rect(36, sumY, 320, 75).stroke('#e2e8f0');
-    doc.fillColor(primaryColor).fontSize(8).font('Helvetica-Bold').text('TERMS & CONDITIONS:', 44, sumY + 8);
-    doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(challan.terms || '1. Goods delivered in good order.\n2. Receiver acknowledgment required.', 44, sumY + 22, { width: 300 });
+      doc.font('Helvetica').text('Subtotal:', 380, sumY + 28);
+      doc.font('Helvetica-Bold').text(`₹ ${(challan.subtotal || 0).toFixed(2)}`, 480, sumY + 28, { align: 'right', width: 70 });
 
-    // Totals Box
-    doc.rect(370, sumY, 189, 75).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor(textColor).fontSize(8.5).font('Helvetica');
-    doc.text('Total Quantity:', 380, sumY + 12);
-    doc.font('Helvetica-Bold').text(`${challan.totalQty || 0} Pcs/Mtr`, 480, sumY + 12, { align: 'right', width: 70 });
+      doc.font('Helvetica').text('Taxes (GST):', 380, sumY + 44);
+      doc.font('Helvetica-Bold').text(`₹ ${(challan.taxTotal || 0).toFixed(2)}`, 480, sumY + 44, { align: 'right', width: 70 });
 
-    doc.font('Helvetica').text('Subtotal:', 380, sumY + 28);
-    doc.font('Helvetica-Bold').text(`₹ ${(challan.subtotal || 0).toFixed(2)}`, 480, sumY + 28, { align: 'right', width: 70 });
+      doc.rect(370, sumY + 58, 189, 17).fill(primaryColor);
+      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold').text('Grand Total:', 380, sumY + 62);
+      doc.text(`₹ ${(challan.grandTotal || 0).toFixed(2)}`, 480, sumY + 62, { align: 'right', width: 70 });
 
-    doc.font('Helvetica').text('Taxes (GST):', 380, sumY + 44);
-    doc.font('Helvetica-Bold').text(`₹ ${(challan.taxTotal || 0).toFixed(2)}`, 480, sumY + 44, { align: 'right', width: 70 });
+      // Signatures
+      const sigY = sumY + 110;
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica');
+      doc.text("Receiver's Signature & Stamp", 50, sigY);
+      doc.fillColor(primaryColor).font('Helvetica-Bold').text(`For ${resolvedCompany.toUpperCase()}`, 430, sigY);
+      doc.fillColor(mutedColor).font('Helvetica').text('Authorized Signatory', 430, sigY + 30);
+    };
 
-    doc.rect(370, sumY + 58, 189, 17).fill(primaryColor);
-    doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold').text('Grand Total:', 380, sumY + 62);
-    doc.text(`₹ ${(challan.grandTotal || 0).toFixed(2)}`, 480, sumY + 62, { align: 'right', width: 70 });
+    // Page 1: Original in Company Brand Color
+    renderChallanPage(true);
 
-    // Signatures
-    const sigY = sumY + 110;
-    doc.fillColor(mutedColor).fontSize(8).font('Helvetica');
-    doc.text("Receiver's Signature & Stamp", 50, sigY);
-    doc.text(`For ${challan.companyEntity || 'SOBISE'}`, 430, sigY);
-    doc.text('Authorized Signatory', 430, sigY + 30);
+    // Page 2: Duplicate in Black & White
+    doc.addPage({ margin: 36, size: 'A4' });
+    renderChallanPage(false);
 
     doc.end();
   } catch (error) {

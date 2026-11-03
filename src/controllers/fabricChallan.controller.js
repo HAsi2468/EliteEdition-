@@ -1785,8 +1785,14 @@ const downloadChallanPdf = async (req, res) => {
       creatorName = 'HASI';
     }
 
+    const { getCompanyBrandColor } = require('../services/tallyInvoicePdfService');
+    const companyBrandColor = getCompanyBrandColor(challan.companyEntity || 'Elite Digital Print');
+
     const getColor = (colorStr, isColorPage) => {
-      if (isColorPage) return colorStr;
+      if (isColorPage) {
+        if (colorStr === '#0000ff') return companyBrandColor;
+        return colorStr;
+      }
       if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No & Total TP in RED!
       if (colorStr === '#475569') return '#555555'; // Expected Pcs text in Gray
       return '#000000'; // Everything else B&W
@@ -1796,6 +1802,11 @@ const downloadChallanPdf = async (req, res) => {
       // Draw border
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
          .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
+
+      // Copy Label
+      const copyBadge = isColorPage ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(7.5).font('Helvetica-Bold')
+         .text(copyBadge, ML, MR - 12, { width: contentWidth, align: 'right' });
 
       // Top line texts
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
