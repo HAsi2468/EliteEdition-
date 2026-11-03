@@ -8,15 +8,16 @@ const PDFDocument = require('pdfkit');
 
 // Central Brand Color registry for all companies
 const COMPANY_BRAND_COLORS = {
-  'Elite Digital Print': '#0284c7', // EDP (Sky blue)
-  'Elite Stitching': '#10b981',     // ES (Emerald green)
-  'Elite Edition': '#8b5cf6',       // EE (Royal violet)
-  'Elite Fabtex': '#f59e0b',        // EF (Amber orange)
-  'Elite Online': '#6366f1',        // EON (Indigo)
-  'Sobise': '#e11d48',              // SO (Rose red)
-  'Ethno wear': '#8b5a2b',          // EW (Warm brown)
-  'Yamunaji': '#0ea5e9',            // YJ (Cerulean blue)
-  'EXEDP': '#64748b'                // EXEDP (Slate gray)
+  'Elite Digital Print': '#1d4ed8', // EDP (Royal Blue)
+  'Elite Stitching': '#059669',     // ES (Emerald Green)
+  'Elite Edition': '#7c3aed',       // EE (Royal Violet)
+  'Elite Fabtex': '#d97706',        // EF (Amber Orange)
+  'Elite Online': '#4f46e5',        // EON (Indigo)
+  'Sobise': '#e11d48',              // SO (Rose Red)
+  'Ethno wear': '#8b5a2b',          // EW (Warm Brown)
+  'Yamunaji': '#0284c7',            // YJ (Sky Blue)
+  'Yamunaji Creation': '#0284c7',
+  'EXEDP': '#475569'                // EXEDP (Slate Gray)
 };
 
 function getCompanyBrandColor(entityName, customColor) {
@@ -25,15 +26,15 @@ function getCompanyBrandColor(entityName, customColor) {
   if (COMPANY_BRAND_COLORS[raw]) return COMPANY_BRAND_COLORS[raw];
   const norm = raw.toLowerCase().replace(/[\s_-]+/g, '');
   if (norm === 'ethnowear' || norm === 'ew') return '#8b5a2b';
-  if (norm === 'yamunaji' || norm === 'yj' || norm === 'yamunajicreation') return '#0ea5e9';
-  if (norm === 'elitefabtex' || norm === 'ef' || norm === 'fabtex') return '#f59e0b';
-  if (norm === 'eliteedition' || norm === 'ee') return '#8b5cf6';
-  if (norm === 'elitestitching' || norm === 'es' || norm === 'stitching') return '#10b981';
-  if (norm === 'elitedigitalprint' || norm === 'elitedigitalprints' || norm === 'edp' || norm === 'digitalprint') return '#0284c7';
+  if (norm === 'yamunaji' || norm === 'yj' || norm === 'yamunajicreation') return '#0284c7';
+  if (norm === 'elitefabtex' || norm === 'ef' || norm === 'fabtex') return '#d97706';
+  if (norm === 'eliteedition' || norm === 'ee') return '#7c3aed';
+  if (norm === 'elitestitching' || norm === 'es' || norm === 'stitching') return '#059669';
+  if (norm === 'elitedigitalprint' || norm === 'elitedigitalprints' || norm === 'edp' || norm === 'digitalprint') return '#1d4ed8';
   if (norm === 'sobise' || norm === 'so') return '#e11d48';
-  if (norm === 'eliteonline' || norm === 'eon' || norm === 'eo') return '#6366f1';
-  if (norm === 'exedp' || norm === 'ex-edp') return '#64748b';
-  return '#0284c7';
+  if (norm === 'eliteonline' || norm === 'eon' || norm === 'eo') return '#4f46e5';
+  if (norm === 'exedp' || norm === 'ex-edp') return '#475569';
+  return '#1d4ed8';
 }
 
 function hexToRgb(hex) {
@@ -120,7 +121,10 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
   const defaultLabel = isDuplicate ? '(DUPLICATE FOR TRANSPORTER)' : '(ORIGINAL FOR RECIPIENT)';
   const copyLabel = options.copyLabel || defaultLabel;
 
-  const resolvedCompany = companyConfig.companyName || invoice.companyEntity || 'Elite Digital Print';
+  // Determine issuing company - invoice.companyEntity is the authoritative source
+  const rawCompany = String(invoice.companyEntity || companyConfig.companyEntity || companyConfig.companyName || 'Elite Digital Print').trim();
+  const resolvedCompany = rawCompany;
+  const isDirectConfig = companyConfig.companyEntity === resolvedCompany;
   const baseBrandColor = getCompanyBrandColor(resolvedCompany, companyConfig.brandColor || companyConfig.badgeColor);
 
   // Palette selection
@@ -139,14 +143,16 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
   const halfCW = Math.floor(CW / 2); // 277
   const rightColW = CW - halfCW; // 278.28
 
-  // Seller & Buyer details resolution
-  const companyDisplayName = (companyConfig.companyName || invoice.companyEntity || 'Yamunaji Creation').toUpperCase().replace(/\s*\([^)]*\)/g, '').trim();
-  const companyAddress = (companyConfig.companyAddress || 'Plot No. 12, Surat, Gujarat').toUpperCase();
-  const companyGstin = companyConfig.companyGstin || '24AAEFY0361N1ZZ';
-  const companyState = companyConfig.companyState || 'Gujarat';
-  const companyStateCode = companyConfig.companyStateCode || '24';
-  const companyEmail = companyConfig.companyEmail || companyConfig.companyPhone || 'parth6070@gmail.com';
-  const companyCity = companyConfig.companyCity || 'Surat';
+  // Seller details resolution strictly honoring the issuing company
+  let companyDisplayName = (isDirectConfig && companyConfig.companyName) ? companyConfig.companyName : resolvedCompany.toUpperCase();
+  companyDisplayName = companyDisplayName.replace(/\s*\([^)]*\)/g, '').trim();
+
+  const companyAddress = ((isDirectConfig && companyConfig.companyAddress) ? companyConfig.companyAddress : (resolvedCompany === 'Elite Online' ? 'Plot No. 12, Surat, Gujarat' : (companyConfig.companyAddress || 'Plot No. 12, Surat, Gujarat'))).toUpperCase();
+  const companyGstin = (isDirectConfig && companyConfig.companyGstin) ? companyConfig.companyGstin : (resolvedCompany === 'Elite Online' ? '24AANFE0044M1ZG' : (resolvedCompany === 'Elite Digital Print' ? '24AANFE0044M1ZG' : (resolvedCompany === 'Yamunaji' ? '24AAEFY0361N1ZZ' : (companyConfig.companyGstin || ''))));
+  const companyState = (isDirectConfig && companyConfig.companyState) ? companyConfig.companyState : 'Gujarat';
+  const companyStateCode = (isDirectConfig && companyConfig.companyStateCode) ? companyConfig.companyStateCode : '24';
+  const companyEmail = (isDirectConfig && (companyConfig.companyEmail || companyConfig.companyPhone)) ? (companyConfig.companyEmail || companyConfig.companyPhone) : (resolvedCompany === 'Elite Digital Print' ? 'elitedigitalprint@gmail.com' : 'info@company.com');
+  const companyCity = (isDirectConfig && companyConfig.companyCity) ? companyConfig.companyCity : 'Surat';
 
   const cust = invoice.customer || {};
   const consigneeName = (cust.businessName || cust.name || 'Party Name').trim();

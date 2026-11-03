@@ -2241,24 +2241,6 @@ const downloadInvoicePdf = async (req, res) => {
 
     const noCache = req.query?.nocache === 'true' || req.query?.refresh === 'true';
 
-    // Fast Disk Caching for Invoice PDFs to eliminate 25s hangs on preview
-    const cacheDir = path.join(__dirname, '../../uploads/cached_invoices');
-    if (!fs.existsSync(cacheDir)) {
-      try { fs.mkdirSync(cacheDir, { recursive: true }); } catch (e) {}
-    }
-    const rawUpdatedAt = invoice.updated_at || invoice.updatedAt || invoice.created_at || invoice.createdAt;
-    const invUpdatedAt = rawUpdatedAt ? new Date(rawUpdatedAt).getTime() : (invoice.version || 0);
-    const cacheFileName = `inv_${invoice._id}_${invUpdatedAt}_${includeDuplicate ? 'dup' : 'orig'}_tally_v2.pdf`;
-    const cachedFilePath = path.join(cacheDir, cacheFileName);
-
-    if (!noCache && fs.existsSync(cachedFilePath)) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo}.pdf"`);
-      return fs.createReadStream(cachedFilePath).pipe(res);
-    }
-
-    await enrichInvoiceItemsWithImages(invoice);
-
     // Ensure customer details are up to date from BillingCustomer
     if (invoice.customer) {
       try {
@@ -2295,143 +2277,30 @@ const downloadInvoicePdf = async (req, res) => {
     }
 
     const PrintConfig = require('../db/models/printConfig.model');
-    const JobCard = require('../db/models/jobCard.model');
     const companyEntity = resolveCompanyEntity(invoice.companyEntity || 'Elite Digital Print');
-    const filter = buildCompanyFilter(companyEntity);
-    const config = await PrintConfig.findOne(filter).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
-
-    const isDirectConfig = config.companyEntity === companyEntity || (companyEntity === 'Elite Online' && config.companyName && !/DIGITAL/i.test(config.companyName));
-    let companyDisplayName = (isDirectConfig && config.companyName) ? config.companyName : companyEntity.toUpperCase();
-    if (companyEntity === 'Elite Online' && (/DIGITAL/i.test(companyDisplayName) || !isDirectConfig)) {
-      companyDisplayName = 'ELITE ONLINE';
+    let config = await PrintConfig.findOne({ companyEntity }).lean();
+    if (!config) {
+      config = await PrintConfig.findOne({ companyEntity: { $regex: new RegExp(`^${companyEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }).lean();
     }
-    companyDisplayName = companyDisplayName.replace(/\s*\([^)]*\)/g, '').trim();
-    const companyGstin   = (isDirectConfig && config.companyGstin ? config.companyGstin : (companyEntity === 'Elite Online' ? '24AANFE0044M1ZG' : (companyEntity === 'Elite Digital Print' ? config.companyGstin : ''))) || '';
-    const companyAddress = (isDirectConfig && config.companyAddress ? config.companyAddress : (companyEntity === 'Elite Online' ? 'Plot No. 12, Surat, Gujarat' : (companyEntity === 'Elite Digital Print' ? config.companyAddress : ''))) || '';
-    const companyPhone   = (isDirectConfig && config.companyPhone ? config.companyPhone : (companyEntity === 'Elite Online' ? '9876543210' : (companyEntity === 'Elite Digital Print' ? config.companyPhone : ''))) || '';
-    const companyState   = (isDirectConfig ? config.companyState : 'Gujarat') || 'Gujarat';
-    const companyStateCode = (isDirectConfig ? config.companyStateCode : '24') || '24';
-    const companyTerms   = invoice.terms || config.companyTerms ||
-      'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
-    const bankName   = config.companyBankName || '';
-    const bankAcNo   = config.companyAccountNo || '';
-    const bankIfsc   = config.companyIfscCode || '';
+    if (!config) {
+      config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
+    }
+    // Strict assignment of issuing company entity
+    config.companyEntity = companyEntity;
+    if (!config.companyName || config.companyEntity !== companyEntity) {
+      config.companyName = companyEntity.toUpperCase();
+    }
+
+    // Set anti-cache and direct download headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo || 'Draft'}.pdf"`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true, bufferPages: true, autoPageBreak: false });
     doc.options.autoPageBreak = false;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo}.pdf"`);
     doc.pipe(res);
-
-    const tempCachedPath = `${cachedFilePath}.tmp_${Date.now()}`;
-    const fileStream = fs.createWriteStream(tempCachedPath);
-    doc.pipe(fileStream);
-
-    fileStream.on('finish', () => {
-      try {
-        fs.renameSync(tempCachedPath, cachedFilePath);
-      } catch (e) {}
-    });
-
-    const PW = 595.28, PH = 841.89;
-    const PAD = 18;
-    const CW = PW - PAD * 2;
-    let logoBufferOrPath = path.join(__dirname, 'Logo.png');
-    if (config.companyLogo && typeof config.companyLogo === 'string' && config.companyLogo.trim()) {
-      const logoStr = config.companyLogo.trim();
-      if (logoStr.startsWith('data:image/')) {
-        try {
-          const base64Data = logoStr.split(',')[1];
-          if (base64Data) {
-            logoBufferOrPath = Buffer.from(base64Data, 'base64');
-          }
-        } catch (e) {}
-      } else if (fs.existsSync(logoStr)) {
-        logoBufferOrPath = logoStr;
-      }
-    }
-
-    // ── HELPERS ─────────────────────────────────────────────────────────────────
-    const formatDate = (d) => {
-      if (!d) return '--';
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return String(d);
-      return `${String(dt.getDate()).padStart(2,'0')}-${String(dt.getMonth()+1).padStart(2,'0')}-${dt.getFullYear()}`;
-    };
-
-    // ── COLUMN WIDTHS ────────────────────────────────────────────────────────────
-    const COL = [20, 52, 180, 50, 34, 56, 54, 30, 83.28];
-    const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
-
-    // ── OPTIMIZED HIGH-SPEED PRE-LOAD IMAGES (STRICT JOB NUMBER MATCHING ONLY) ──
-    const items = invoice.items || [];
-    const imageCache = new Map();
-
-    const allJobNumsSet = new Set();
-    items.forEach(it => {
-      const textToScan = [it.jobNo, it.description, it.itemName].filter(Boolean).join(' ');
-      const matches = textToScan.match(/\d+/g) || [];
-      matches.forEach(n => {
-        if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
-      });
-    });
-    const jobNumArray = Array.from(allJobNumsSet);
-
-    const jobCardMap = {};
-    if (jobNumArray.length > 0) {
-      try {
-        const queryOr = [];
-        jobNumArray.forEach(n => {
-          queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` }, { jobNo: Number(n) });
-        });
-        const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 image proofing.artworkUrl').lean();
-        foundJobCards.forEach(jc => {
-          const nums = String(jc.jobNo).match(/\d+/g) || [];
-          nums.forEach(n => { if (!jobCardMap[n]) jobCardMap[n] = jc; });
-        });
-      } catch(e) {}
-    }
-
-    const itemImages = await resolveItemsImages(items, jobCardMap, imageCache);
-
-    const taxType = invoice.taxType || (invoice.customer && invoice.customer.stateCode && String(invoice.customer.stateCode).trim() !== '24' ? 'IGST' : 'CGST_SGST');
-    const isIgst = taxType === 'IGST';
-
-    const hsnMap = {};
-    items.forEach(it => {
-      const hsn  = it.hsnCode || '998821';
-      const rate = Number(it.taxRate !== undefined && it.taxRate !== null ? it.taxRate : 5);
-      const key  = `${hsn}_${rate}`;
-      if (!hsnMap[key]) hsnMap[key] = { hsn, rate, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
-      const taxable = Number(it.totalAmount || 0);
-      hsnMap[key].taxable += taxable;
-      if (isIgst) {
-        hsnMap[key].igst += Math.round((taxable * (rate / 100)) * 100) / 100;
-      } else {
-        hsnMap[key].cgst += Math.round((taxable * (rate / 2 / 100)) * 100) / 100;
-        hsnMap[key].sgst += Math.round((taxable * (rate / 2 / 100)) * 100) / 100;
-      }
-    });
-    const hsnRows      = Object.values(hsnMap);
-    const totalTaxable = (invoice.subtotal != null && Number(invoice.subtotal) > 0) ? Number(invoice.subtotal) : hsnRows.reduce((s, r) => s + r.taxable, 0);
-    const totalCgst    = (invoice.cgstAmount != null && Number(invoice.cgstAmount) > 0) ? Number(invoice.cgstAmount) : ((invoice.cgstTotal != null && Number(invoice.cgstTotal) > 0) ? Number(invoice.cgstTotal) : hsnRows.reduce((s, r) => s + r.cgst, 0));
-    const totalSgst    = (invoice.sgstAmount != null && Number(invoice.sgstAmount) > 0) ? Number(invoice.sgstAmount) : ((invoice.sgstTotal != null && Number(invoice.sgstTotal) > 0) ? Number(invoice.sgstTotal) : hsnRows.reduce((s, r) => s + r.sgst, 0));
-    const totalIgst    = (invoice.igstAmount != null && Number(invoice.igstAmount) > 0) ? Number(invoice.igstAmount) : ((invoice.igstTotal != null && Number(invoice.igstTotal) > 0) ? Number(invoice.igstTotal) : hsnRows.reduce((s, r) => s + r.igst, 0));
-    // BUG-070: Total tax must strictly equal sum of CGST + SGST (or IGST) to prevent ₹0.01 tax mismatch
-    const totalTax     = isIgst ? totalIgst : parseFloat((totalCgst + totalSgst).toFixed(2));
-
-    let delByVal = invoice.deliveryBy || '';
-    if (!delByVal && Array.isArray(invoice.linkedChallanIds) && invoice.linkedChallanIds.length > 0) {
-      try {
-        const FabricChallan = require('../db/models/fabricChallan.model');
-        const StitchingChallan = require('../db/models/stitchingChallan.model');
-        const fChs = await FabricChallan.find({ _id: { $in: invoice.linkedChallanIds } }, 'deliveryBy').lean();
-        const sChs = await StitchingChallan.find({ _id: { $in: invoice.linkedChallanIds } }, 'deliveryBy').lean();
-        const allDel = [...fChs, ...sChs].map(c => c.deliveryBy).filter(Boolean);
-        if (allDel.length > 0) delByVal = [...new Set(allDel)].join(', ');
-      } catch(e) {}
-    }
-    if (!delByVal) delByVal = 'By Road';
 
     const { renderTallyInvoice } = require('../services/tallyInvoicePdfService');
 
@@ -2444,7 +2313,7 @@ const downloadInvoicePdf = async (req, res) => {
       renderTallyInvoice(doc, invoice, config, { isColor: false, isDuplicate: true, copyLabel: '(DUPLICATE FOR TRANSPORTER)' });
     }
 
-    console.log(`[PDF Performance] Invoice ${invoice.invoiceNo} PDF generated in ${Date.now() - startTime}ms (${items.length} items)`);
+    console.log(`[PDF Performance] Invoice ${invoice.invoiceNo} PDF generated in ${Date.now() - startTime}ms (${(invoice.items || []).length} items)`);
     doc.end();
 
   } catch (error) {
@@ -2476,48 +2345,31 @@ const downloadBulkInvoicesPdf = async (req, res) => {
     }
 
     const PrintConfig = require('../db/models/printConfig.model');
-    const JobCard = require('../db/models/jobCard.model');
-    const FabricChallan = require('../db/models/fabricChallan.model');
-    const StitchingChallan = require('../db/models/stitchingChallan.model');
-    const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
-
-    const rawCompName = config.companyName || 'ELITE DIGITAL PRINTS';
-    const companyDisplayName = rawCompName.replace(/\s*\([^)]*\)/g, '').trim();
-    const companyGstin   = config.companyGstin   || '24AANFE0044M1ZG';
-    const companyAddress = config.companyAddress  || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006';
-    const companyPhone   = config.companyPhone   || '+91 98790 00000';
-    const companyState   = config.companyState   || 'Gujarat';
-    const companyStateCode = config.companyStateCode || '24';
-    const bankName   = config.companyBankName  || 'ICICI Bank';
-    const bankAcNo   = config.companyAccountNo || 'N/A';
-    const bankIfsc   = config.companyIfscCode  || 'N/A';
 
     const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true, bufferPages: true, autoPageBreak: false });
     doc.options.autoPageBreak = false;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Combined_Tax_Invoices_${invoices.length}_Items.pdf"`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     doc.pipe(res);
-
-    const PW = 595.28, PH = 841.89;
-    const PAD = 18;
-    const CW = PW - PAD * 2;
-    const logoPath = path.join(__dirname, 'Logo.png');
-
-    const formatDate = (d) => {
-      if (!d) return '--';
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return String(d);
-      return `${String(dt.getDate()).padStart(2,'0')}-${String(dt.getMonth()+1).padStart(2,'0')}-${dt.getFullYear()}`;
-    };
-
-    const COL = [20, 52, 180, 50, 34, 56, 54, 30, 83.28];
-    const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
     const { renderTallyInvoice } = require('../services/tallyInvoicePdfService');
     for (let invIdx = 0; invIdx < invoices.length; invIdx++) {
       const invoice = invoices[invIdx];
-      const companyEntity = resolveCompanyEntity(invoice.companyEntity || 'Elite Online');
-      const companyConfig = await PrintConfig.findOne({ companyEntity }).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
+      const companyEntity = resolveCompanyEntity(invoice.companyEntity || 'Elite Digital Print');
+      let companyConfig = await PrintConfig.findOne({ companyEntity }).lean();
+      if (!companyConfig) {
+        companyConfig = await PrintConfig.findOne({ companyEntity: { $regex: new RegExp(`^${companyEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }).lean();
+      }
+      if (!companyConfig) {
+        companyConfig = await PrintConfig.findOne({ isConfig: true }).lean() || {};
+      }
+      companyConfig.companyEntity = companyEntity;
+      if (!companyConfig.companyName || companyConfig.companyEntity !== companyEntity) {
+        companyConfig.companyName = companyEntity.toUpperCase();
+      }
 
       if (invIdx > 0) {
         doc.addPage({ margin: 0, size: 'A4' });

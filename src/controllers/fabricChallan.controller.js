@@ -1785,8 +1785,36 @@ const downloadChallanPdf = async (req, res) => {
       creatorName = 'HASI';
     }
 
+    const resolvedCompany = challan.companyEntity || 'Elite Digital Print';
     const { getCompanyBrandColor } = require('../services/tallyInvoicePdfService');
-    const companyBrandColor = getCompanyBrandColor(challan.companyEntity || 'Elite Digital Print');
+    const companyBrandColor = getCompanyBrandColor(resolvedCompany);
+
+    const PrintConfig = require('../db/models/printConfig.model');
+    let companyConfig = await PrintConfig.findOne({ companyEntity: resolvedCompany }).lean();
+    if (!companyConfig) {
+      companyConfig = await PrintConfig.findOne({ companyEntity: { $regex: new RegExp(`^${resolvedCompany.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }).lean();
+    }
+    if (!companyConfig) {
+      companyConfig = await PrintConfig.findOne({ isConfig: true }).lean() || {};
+    }
+    const isDirectConfig = companyConfig.companyEntity === resolvedCompany;
+    const compGstin = (isDirectConfig && companyConfig.companyGstin) ? companyConfig.companyGstin : (resolvedCompany === 'Elite Digital Print' ? '24AANFE0044M1ZG' : (companyConfig.companyGstin || ''));
+    const compPhone = (isDirectConfig && companyConfig.companyPhone) ? companyConfig.companyPhone : '+91 99098 66667';
+    const compAddress = (isDirectConfig && companyConfig.companyAddress) ? companyConfig.companyAddress : 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
+
+    let prefix = 'EDP-';
+    const normComp = resolvedCompany.toLowerCase().replace(/[\s_-]+/g, '');
+    if (normComp === 'ethnowear' || normComp === 'ew') prefix = 'EW-';
+    else if (normComp === 'elitestitching' || normComp === 'es') prefix = 'ES-';
+    else if (normComp === 'eliteedition' || normComp === 'ee') prefix = 'EE-';
+    else if (normComp === 'elitefabtex' || normComp === 'ef') prefix = 'EF-';
+    else if (normComp === 'sobise' || normComp === 'so') prefix = 'SO-';
+    else if (normComp === 'yamunaji' || normComp === 'yj') prefix = 'YJ-';
+    else if (normComp === 'eliteonline' || normComp === 'eon') prefix = 'EON-';
+    else if (normComp === 'exedp') prefix = 'EXEDP-';
+
+    const rawChNo = String(challan.challanNo || '—');
+    const challanValue = rawChNo.startsWith(prefix) ? rawChNo : `${prefix}${rawChNo}`;
 
     const getColor = (colorStr, isColorPage) => {
       if (isColorPage) {
@@ -1810,11 +1838,11 @@ const downloadChallanPdf = async (req, res) => {
 
       // Top line texts
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
-        .text('GST : 24AANFE0044M1ZG', ML + 12, MR + 4, { lineBreak: false });
+        .text(compGstin ? `GST : ${compGstin}` : '', ML + 12, MR + 4, { lineBreak: false });
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
         .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
-        .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
+        .text(`Mo. ${compPhone}`, ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
         .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
@@ -1853,7 +1881,7 @@ const downloadChallanPdf = async (req, res) => {
         d.restore();
       };
 
-      const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
+      const addressText = compAddress;
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold');
       const textWidth = doc.widthOfString(addressText);
       const startX = ML + (contentWidth - textWidth) / 2;
@@ -1878,7 +1906,6 @@ const downloadChallanPdf = async (req, res) => {
 
       // CH. NO. label — right-aligned
       const challanLabel = 'CH. NO.:';
-      const challanValue = 'EDP-' + (challan.challanNo || '—');
       const rightEdge = PW - MR - 8;          
       const chNoValueW = 70;                   
       const chNoLabelW = 58;                   
@@ -2068,31 +2095,31 @@ const downloadChallanPdf = async (req, res) => {
         doc.addPage();
         
         // Draw Outer Border
-        doc.strokeColor('#0000ff').lineWidth(1)
+        doc.strokeColor(companyBrandColor).lineWidth(1)
            .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
 
         // Top Header
-        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
-           .text('GST : 24AANFE0044M1ZG', ML + 12, MR + 4, { lineBreak: false });
-        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+        doc.fillColor(companyBrandColor).fontSize(10.5).font('Helvetica-Bold')
+           .text(compGstin ? `GST : ${compGstin}` : '', ML + 12, MR + 4, { lineBreak: false });
+        doc.fillColor(companyBrandColor).fontSize(10.5).font('Helvetica-Bold')
            .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
-        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica')
-           .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
+        doc.fillColor(companyBrandColor).fontSize(10.5).font('Helvetica')
+           .text(`Mo. ${compPhone}`, ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
 
-        doc.strokeColor('#0000ff').lineWidth(0.5)
+        doc.strokeColor(companyBrandColor).lineWidth(0.5)
            .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
 
         // Annexure Title Banner
-        doc.fillColor('#0000ff').fontSize(13).font('Helvetica-Bold')
-           .text('ELITE DIGITAL PRINT — DESIGN IMAGES ANNEXURE', ML, MR + 20, { width: contentWidth, align: 'center' });
+        doc.fillColor(companyBrandColor).fontSize(13).font('Helvetica-Bold')
+           .text(`${resolvedCompany.toUpperCase()} — DESIGN IMAGES ANNEXURE`, ML, MR + 20, { width: contentWidth, align: 'center' });
 
         // Metadata Strip
         const metaY = MR + 38;
         doc.rect(ML + 8, metaY, contentWidth - 16, 22).fill('#f8fafc');
-        doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + 8, metaY, contentWidth - 16, 22).stroke();
+        doc.strokeColor(companyBrandColor).lineWidth(0.5).rect(ML + 8, metaY, contentWidth - 16, 22).stroke();
 
-        doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
-           .text(`CHALLAN #: EDP-${challan.challanNo}`, ML + 14, metaY + 6);
+        doc.fillColor(companyBrandColor).fontSize(9.5).font('Helvetica-Bold')
+           .text(`CHALLAN #: ${challanValue}`, ML + 14, metaY + 6);
         doc.text(`DATE: ${formattedDate}`, ML + 150, metaY + 6);
         doc.text(`PARTY: ${challan.partyName || '—'}`, ML + 270, metaY + 6, { width: 150, lineBreak: false });
         doc.text(`PAGE: ${3 + pIdx}`, PW - MR - 75, metaY + 6, { width: 60, align: 'right' });
@@ -2115,7 +2142,7 @@ const downloadChallanPdf = async (req, res) => {
           const cardY = gridStartY + row * (cardH + rowGap);
 
           // Card Outer Border
-          doc.strokeColor('#0000ff').lineWidth(0.6)
+          doc.strokeColor(companyBrandColor).lineWidth(0.6)
              .rect(cardX, cardY, cardW, cardH).stroke();
 
           // Image Box Container (128px high)
@@ -2148,7 +2175,7 @@ const downloadChallanPdf = async (req, res) => {
         });
 
         // Bottom Footer Notice
-        doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
+        doc.fillColor(companyBrandColor).fontSize(8.5).font('Helvetica-Bold')
            .text(`Delivery Challan Annexure — Page ${3 + pIdx} of ${2 + totalAnnexurePages}`, ML, PH - MR - 16, { width: contentWidth, align: 'center' });
       }
     }
