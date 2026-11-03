@@ -5377,7 +5377,7 @@ export default function EliteBillingDepartment({
                                       color: '#38bdf8',
                                       onClick: async () => {
                                         try {
-                                          triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${inv.invoiceNo}...`, 'info');
+                                          triggerPushNotification('🖨️ Preparing Invoice', `Generating GST Tax Invoice for #${inv.invoiceNo}...`, 'info');
                                           await api.downloadInvoicePdf(inv._id, inv.invoiceNo, true);
                                         } catch (err) {
                                           alert('Failed to prepare invoice for printing: ' + err.message);
@@ -8894,7 +8894,7 @@ export default function EliteBillingDepartment({
                 onClick={async () => {
                   setPrintingInvoiceId(viewInvoiceModal._id);
                   try {
-                    triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${viewInvoiceModal.invoiceNo}...`, 'info');
+                    triggerPushNotification('🖨️ Preparing Invoice', `Generating GST Tax Invoice for #${viewInvoiceModal.invoiceNo}...`, 'info');
                     await api.downloadInvoicePdf(viewInvoiceModal._id, viewInvoiceModal.invoiceNo, true);
                   } catch (err) {
                     alert('Failed to load invoice for printing: ' + err.message);

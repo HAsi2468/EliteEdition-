@@ -2444,7 +2444,7 @@ export const api = {
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
-    const url = `${baseUrl}/billing/invoices/${id}/pdf?t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
+    const url = `${baseUrl}/billing/invoices/${id}/pdf?nocache=true&t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
     const response = await authFetch(url);
     if (!response.ok) {
       let errMsg = 'Failed to generate Invoice PDF';
@@ -2471,7 +2471,7 @@ export const api = {
     if (!ids || ids.length === 0) return;
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
-    const url = `${baseUrl}/billing/invoices-bulk-pdf?ids=${ids.join(',')}`;
+    const url = `${baseUrl}/billing/invoices-bulk-pdf?nocache=true&t=${Date.now()}&ids=${ids.join(',')}`;
     const response = await authFetch(url);
     if (!response.ok) {
       let errMsg = 'Failed to generate combined Invoices PDF';

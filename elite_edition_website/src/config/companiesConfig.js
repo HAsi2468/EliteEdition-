@@ -17,9 +17,9 @@ export const COMPANIES = [
     settingsTab: 'company_settings',
     invoicePrefix: 'EDP-2627-',
     invoiceSuffix: '',
-    badgeColor: '#0284c7',
-    iconColor: '#0284c7',
-    gradient: 'linear-gradient(135deg, #0284c7, #0369a1)',
+    badgeColor: '#1d4ed8',
+    iconColor: '#1d4ed8',
+    gradient: 'linear-gradient(135deg, #1d4ed8, #1e40af)',
     description: 'Job cards, printing logs, fabric inventory & production tracking.',
     aliases: ['digital_print', 'digital_prints', 'edp', 'elite digital print', 'elite digital prints', 'digital print', 'printing']
   },
