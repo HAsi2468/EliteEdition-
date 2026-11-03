@@ -208,6 +208,36 @@ const request = async (path, options = {}) => {
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
+
+      // Automatically store in IndexedDB offline queue if network fails on mutating transaction across any module
+      if (isTransient && isMutating && !cleanPath.includes('/auth/')) {
+        try {
+          const { queueOfflineMutation } = await import('./offlineSyncQueue');
+          let parsedData = null;
+          if (options.body) {
+            try {
+              parsedData = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+            } catch (e) {
+              parsedData = options.body;
+            }
+          }
+          await queueOfflineMutation({
+            url: cleanPath,
+            method,
+            data: parsedData,
+            headers: options.headers || {},
+            companyEntity: activeCompanyId
+          });
+          return {
+            success: true,
+            offlineQueued: true,
+            message: 'Transaction saved to local offline database. It will sync automatically as soon as connection is restored.'
+          };
+        } catch (queueErr) {
+          console.warn('[OfflineQueue] Fallback queue failed:', queueErr);
+        }
+      }
+
       throw new Error(err.message || 'Server connection failed. Please check network.');
     } finally {
       clearTimeout(timeoutId);
@@ -291,6 +321,41 @@ const request = async (path, options = {}) => {
 };
 
 export const api = {
+  // Generic request methods for offline replay and uniform HTTP access across all modules
+  post(path, data, options = {}) {
+    return request(path, {
+      ...options,
+      method: 'POST',
+      body: data instanceof FormData ? data : (data !== undefined && data !== null ? JSON.stringify(data) : undefined),
+    });
+  },
+  put(path, data, options = {}) {
+    return request(path, {
+      ...options,
+      method: 'PUT',
+      body: data instanceof FormData ? data : (data !== undefined && data !== null ? JSON.stringify(data) : undefined),
+    });
+  },
+  patch(path, data, options = {}) {
+    return request(path, {
+      ...options,
+      method: 'PATCH',
+      body: data instanceof FormData ? data : (data !== undefined && data !== null ? JSON.stringify(data) : undefined),
+    });
+  },
+  delete(path, options = {}) {
+    return request(path, {
+      ...options,
+      method: 'DELETE',
+    });
+  },
+  get(path, options = {}) {
+    return request(path, {
+      ...options,
+      method: 'GET',
+    });
+  },
+
   // Auth
   async login(emailOrCredentials, password) {
     let emailVal = emailOrCredentials;

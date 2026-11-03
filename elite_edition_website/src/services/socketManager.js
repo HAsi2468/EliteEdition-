@@ -147,6 +147,13 @@ class SocketManager {
 
       // Flush optimistic offline queue
       this.flushPendingQueue();
+
+      // Flush project-wide IndexedDB offline sync queue across all company modules
+      import('./offlineSyncQueue').then(({ syncPendingMutations }) => {
+        import('./api').then(({ api }) => {
+          syncPendingMutations(api);
+        });
+      }).catch((e) => console.warn('[SocketManager] Failed to trigger offline queue sync:', e));
     });
 
     this.socket.on('disconnect', (reason) => {
