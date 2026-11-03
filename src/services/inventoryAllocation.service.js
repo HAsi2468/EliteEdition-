@@ -61,13 +61,13 @@ async function allocateInventoryBatch(items, context = {}) {
       const cleanSku = (skuCode || '').trim();
       const facilityQuery = facility && facility !== 'All' ? { facility } : {};
 
-      // Find inventory matching exact SKU or brand code
+      // Find inventory matching exact SKU or brand code (prioritize highest available stock)
       const queryOpts = session ? { session } : {};
 
       let inventoryItem = await db.Inventory.findOne({
         skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') },
         ...facilityQuery
-      }, null, queryOpts);
+      }, null, queryOpts).sort({ currentlyAvailableStock: -1 });
 
       if (!inventoryItem) {
         const matchedProd = await db.Product.findOne({
@@ -81,7 +81,7 @@ async function allocateInventoryBatch(items, context = {}) {
           inventoryItem = await db.Inventory.findOne({
             skuCode: { $regex: new RegExp(`^${masterSku}$`, 'i') },
             ...facilityQuery
-          }, null, queryOpts);
+          }, null, queryOpts).sort({ currentlyAvailableStock: -1 });
         }
       }
 
@@ -89,13 +89,13 @@ async function allocateInventoryBatch(items, context = {}) {
         inventoryItem = await db.Inventory.findOne({
           $or: [{ 'brandCodes': cleanSku }, { 'brandCodes.code': cleanSku }],
           ...facilityQuery
-        }, null, queryOpts);
+        }, null, queryOpts).sort({ currentlyAvailableStock: -1 });
       }
 
       if (!inventoryItem && facility) {
         inventoryItem = await db.Inventory.findOne({
           skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') }
-        }, null, queryOpts);
+        }, null, queryOpts).sort({ currentlyAvailableStock: -1 });
       }
 
       if (!inventoryItem) {

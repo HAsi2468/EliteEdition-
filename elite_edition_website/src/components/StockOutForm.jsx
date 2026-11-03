@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check, Plus, Minus, Trash2, Sparkles, Package, Building2, Warehouse } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
@@ -66,7 +66,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [bulkChallanNo, setBulkChallanNo] = useState('');
   const [facilities, setFacilities] = useState([]);
   const [selectedFacility, setSelectedFacility] = useState(() => {
-    return (prefilledItem && prefilledItem.facility) ? prefilledItem.facility : 'All';
+    return (prefilledItem && prefilledItem.facility) ? prefilledItem.facility : 'Pankhudi';
   });
 
   const [scanInput, setScanInput] = useState('');
@@ -114,6 +114,72 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     return [createEmptyRow()];
   });
 
+  // Filter inventory items strictly by currently selected facility
+  const facilityFilteredItems = useMemo(() => {
+    if (!selectedFacility || selectedFacility === 'All') {
+      return items || [];
+    }
+    const targetFac = selectedFacility.trim().toLowerCase();
+    const isDefaultFac = facilities.some(f => (f.name?.toLowerCase() === targetFac) && (f.isDefault === true || f.isDefault === 'true'));
+    return (items || []).filter(item => {
+      const itemFac = (item.facility || item.warehouse || '').trim().toLowerCase();
+      if (!itemFac) {
+        return isDefaultFac;
+      }
+      return itemFac === targetFac;
+    });
+  }, [items, selectedFacility, facilities]);
+
+  // Deduplicated SKUs for the autocomplete datalist so only the current facility's records show
+  const uniqueFacilityItems = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const item of facilityFilteredItems) {
+      const code = (item.skuCode || '').trim();
+      if (code && !seen.has(code.toLowerCase())) {
+        seen.add(code.toLowerCase());
+        result.push(item);
+      }
+    }
+    return result;
+  }, [facilityFilteredItems]);
+
+  // When facility is changed in dropdown, re-sync all rows to the new facility's inventory & available stock
+  const handleFacilityChange = (newFacility) => {
+    setSelectedFacility(newFacility);
+    setError('');
+
+    setFormRows(prev => prev.map(row => {
+      const cleanSku = (row.skuCode || '').trim();
+      if (!cleanSku) {
+        return {
+          ...row,
+          facility: newFacility !== 'All' ? newFacility : undefined
+        };
+      }
+
+      let matchedInv = null;
+      if (newFacility && newFacility !== 'All') {
+        const targetFac = newFacility.trim().toLowerCase();
+        matchedInv = (items || []).find(it => {
+          const itFac = (it.facility || it.warehouse || '').trim().toLowerCase();
+          return itFac === targetFac && matchSkuOrBrandCode(it, cleanSku);
+        });
+      } else {
+        matchedInv = (items || []).find(it => matchSkuOrBrandCode(it, cleanSku));
+      }
+
+      const newStock = matchedInv ? (matchedInv.currentlyAvailableStock ?? matchedInv.qty ?? 0) : 0;
+
+      return {
+        ...row,
+        facility: (matchedInv && matchedInv.facility) ? matchedInv.facility : (newFacility !== 'All' ? newFacility : undefined),
+        availableStock: newStock,
+        originalItem: matchedInv || row.originalItem
+      };
+    }));
+  };
+
   // Auto-listen to physical hardware USB/Bluetooth barcode scanners globally
   useHardwareBarcodeSniffer((scanData) => {
     if (scanData && scanData.code) {
@@ -131,11 +197,11 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
 
   useEffect(() => {
     api.getFacilities().then(res => {
-      if (Array.isArray(res)) {
+      if (Array.isArray(res) && res.length > 0) {
         setFacilities(res);
         if (!prefilledItem?.facility) {
-          const def = res.find(f => f.isDefault);
-          if (def) {
+          const def = res.find(f => f.isDefault === true || f.isDefault === 'true') || res.find(f => f.name?.toLowerCase() === 'pankhudi') || res[0];
+          if (def && (!selectedFacility || selectedFacility === 'All')) {
             setSelectedFacility(def.name);
             setFormRows(prev => prev.map(r => ({ ...r, facility: r.facility || def.name })));
           }
@@ -263,18 +329,22 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     }
     lastScanTimestampRef.current = { code: cleanSku, time: now };
 
-    // 1. Search in current inventory items
-    let foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
+    // 1. Search in current facility's inventory items first
+    let foundInv = (facilityFilteredItems || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
     
     // 2. Search in catalogItems (for brand barcodes like Myntra, Flipkart, Brand Barcodes)
     const matchedCatalog = (catalogItems || []).find((cat) => matchSkuOrBrandCode(cat, cleanSku));
 
     if (!foundInv && matchedCatalog) {
-      // Find matching inventory item for this catalog item
-      foundInv = (items || []).find((item) => 
+      // Find matching inventory item for this catalog item in the selected facility
+      foundInv = (facilityFilteredItems || []).find((item) => 
         (item.skuCode && matchedCatalog.skuCode && item.skuCode.trim().toLowerCase() === matchedCatalog.skuCode.trim().toLowerCase()) ||
         matchSkuOrBrandCode(item, matchedCatalog.skuCode)
       );
+    }
+
+    if (!foundInv && (!selectedFacility || selectedFacility === 'All')) {
+      foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
     }
 
     const available = foundInv ? (foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0) : 0;
@@ -282,6 +352,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     const masterSku = resolveMasterSku(foundInv, (matchedCatalog?.skuCode || cleanSku), resolvedSize);
     const itemName = foundInv?.itemName || matchedCatalog?.description || masterSku;
     const imageUrl = foundInv?.imageUrl || matchedCatalog?.imageUrl || '';
+    const targetFacility = (foundInv && foundInv.facility) ? foundInv.facility : (selectedFacility !== 'All' ? selectedFacility : undefined);
 
     playSuccessBeep();
     setError('');
@@ -313,6 +384,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
           skuCode: masterSku,
           size: resolvedSize !== 'N/A' ? resolvedSize : existingItem.size,
           availableStock: available || existingItem.availableStock,
+          facility: targetFacility || existingItem.facility,
           party: partyValue || existingItem.party,
           qtyOut: newQty
         };
@@ -334,6 +406,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             size: resolvedSize,
             qtyOut: 1,
             availableStock: available,
+            facility: targetFacility,
             party: partyValue,
             imageUrl,
             originalItem: foundInv || matchedCatalog
@@ -411,13 +484,16 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     } else if (field === 'skuCode') {
       const skuRaw = value.trim();
       updated[index].skuCode = value;
-      let foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, skuRaw));
+      let foundInv = (facilityFilteredItems || []).find((item) => matchSkuOrBrandCode(item, skuRaw));
       const matchedCatalog = (catalogItems || []).find((cat) => matchSkuOrBrandCode(cat, skuRaw));
       if (!foundInv && matchedCatalog) {
-        foundInv = (items || []).find((item) => 
+        foundInv = (facilityFilteredItems || []).find((item) => 
           (item.skuCode && matchedCatalog.skuCode && item.skuCode.trim().toLowerCase() === matchedCatalog.skuCode.trim().toLowerCase()) ||
           matchSkuOrBrandCode(item, matchedCatalog.skuCode)
         );
+      }
+      if (!foundInv && (!selectedFacility || selectedFacility === 'All')) {
+        foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, skuRaw));
       }
       if (foundInv || matchedCatalog) {
         const resolvedSize = resolveEffectiveSize(foundInv || matchedCatalog, skuRaw);
@@ -426,6 +502,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
         updated[index].itemName = foundInv?.itemName || matchedCatalog?.description || masterSku;
         updated[index].size = resolvedSize;
         updated[index].availableStock = foundInv ? (foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0) : 0;
+        updated[index].facility = (foundInv && foundInv.facility) ? foundInv.facility : (selectedFacility !== 'All' ? selectedFacility : undefined);
         updated[index].party = updated[index].party || defaultParty || '';
         updated[index].imageUrl = foundInv?.imageUrl || matchedCatalog?.imageUrl || '';
         setError('');
@@ -433,6 +510,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
         updated[index].itemName = skuRaw;
         updated[index].size = extractSizeFromSku(value) || 'N/A';
         updated[index].availableStock = 0;
+        updated[index].facility = selectedFacility !== 'All' ? selectedFacility : undefined;
         updated[index].party = updated[index].party || defaultParty || '';
         updated[index].imageUrl = '';
       }
@@ -533,7 +611,9 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
               <Package size={isMobile ? 18 : 22} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 800, color: '#0f172a' }}>Outward Dispatch (EON)</h3>
+              <h3 style={{ margin: 0, fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                Outward Dispatch{selectedFacility && selectedFacility !== 'All' ? ` (${selectedFacility})` : ''}
+              </h3>
               <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>Scan barcodes to auto-map Master SKUs and dispatch stock</p>
             </div>
           </div>
@@ -716,11 +796,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   </label>
                   <select
                     value={selectedFacility}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedFacility(val);
-                      setFormRows(prev => prev.map(r => ({ ...r, facility: val !== 'All' ? val : undefined })));
-                    }}
+                    onChange={(e) => handleFacilityChange(e.target.value)}
                     style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a', background: '#fff', fontWeight: 600, boxSizing: 'border-box' }}
                   >
                     <option value="All">All Facilities</option>
@@ -1050,11 +1126,13 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             </div>
           )}
 
-          {/* Datalists for Autocomplete */}
+          {/* Datalists for Autocomplete - Only contains currently selected facility's items */}
           <datalist id="outward-master-skus">
-            {items.map((item, i) => (
-              <option key={i} value={item.skuCode}>
-                {item.itemName ? `${item.skuCode} — ${item.itemName} (${item.currentlyAvailableStock || 0} in stock)` : item.skuCode}
+            {uniqueFacilityItems.map((item, i) => (
+              <option key={item._id || `${item.skuCode}_${i}`} value={item.skuCode}>
+                {item.itemName
+                  ? `${item.skuCode} — ${item.itemName} (${item.currentlyAvailableStock || 0} in stock)`
+                  : `${item.skuCode} (${item.currentlyAvailableStock || 0} in stock)`}
               </option>
             ))}
           </datalist>
