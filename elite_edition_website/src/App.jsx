@@ -266,10 +266,10 @@ export const ROUTE_ALIASES = {
 export const ALL_KNOWN_ERP_TABS = new Set([
   'dashboard', 'workspace', 'communication', 'chat', 'task_management', 'tasks', 'task', 'task-manager',
   'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
-  'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
+  'ee_dashboard', 'ee_rfd', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
   'ef_dashboard', 'ef_rfd', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
-  'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
-  'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+  'so_dashboard', 'so_rfd', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
+  'ew_dashboard', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
   'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials', 'yj_rfd',
   'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials',
   'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'eo_invoices',
@@ -1042,10 +1042,10 @@ export default function App() {
 
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'eo_scan_pack', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials'];
-  const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses', 'ee_raw_materials'];
+  const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_rfd', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses', 'ee_raw_materials'];
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_rfd', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses', 'ef_raw_materials'];
-  const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses', 'so_raw_materials'];
-  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_complaints', 'ew_settings', 'ew_expenses', 'ew_raw_materials'];
+  const SOBISE_PERMISSIONS = ['so_dashboard', 'so_rfd', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses', 'so_raw_materials'];
+  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_rfd', 'ew_complaints', 'ew_settings', 'ew_expenses', 'ew_raw_materials'];
   const YAMUNAJI_PERMISSIONS = ['yj_rfd', 'yj_invoices', 'yj_dashboard', 'yj_complaints', 'yj_settings', 'yj_expenses', 'yj_raw_materials'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
@@ -1380,10 +1380,10 @@ export default function App() {
 
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'communication', 'task_management', 'tasks', 'task', 'task-manager', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
-      'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
+      'ee_dashboard', 'ee_rfd', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
       'ef_dashboard', 'ef_rfd', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
-      'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
-      'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+      'so_dashboard', 'so_rfd', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
+      'ew_dashboard', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
       'yj_dashboard', 'yj_rfd', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials',
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
       'exedp_invoices', 'exedp_expenses',
@@ -3617,6 +3617,9 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_dashboard')) &&
                       renderNavItem('ew_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
                     }
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_rfd')) &&
+                      renderNavItem('ew_rfd', 'Fabric Process', Layers, null, 'Fabric Process')
+                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_raw_materials')) &&
                       renderNavItem('ew_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
                     }
@@ -3638,6 +3641,9 @@ export default function App() {
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_dashboard')) &&
                       renderNavItem('ee_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_rfd')) &&
+                      renderNavItem('ee_rfd', 'Fabric Process', Layers, null, 'Fabric Process')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_raw_materials')) &&
                       renderNavItem('ee_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
@@ -3685,6 +3691,9 @@ export default function App() {
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_dashboard')) &&
                       renderNavItem('so_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('so_rfd')) &&
+                      renderNavItem('so_rfd', 'Fabric Process', Layers, null, 'Fabric Process')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_raw_materials')) &&
                       renderNavItem('so_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
@@ -3929,7 +3938,7 @@ export default function App() {
             {activeTab === 'dashboard' || activeTab === 'elite_online' ? (
               <DashboardStats items={items} sales={sales} />
           ) : activeTab === 'eo_settings' ? (
-            <CompanySettingsPanel companyEntity="Elite Online" />
+            <CompanySettingsPanel companyEntity="Elite Online" currentUser={currentUser} />
           ) : activeTab === 'inventory' ? (
             <InventoryGrid
               items={items}
@@ -3978,8 +3987,10 @@ export default function App() {
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'ee_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'ee_rfd' ? (
+            <YamunajiRfdPanel companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ee_settings' ? (
-            <CompanySettingsPanel companyEntity="Elite Edition" />
+            <CompanySettingsPanel companyEntity="Elite Edition" currentUser={currentUser} />
           ) : activeTab === 'ee_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Edition" />
           ) : activeTab === 'ee_expenses' ? (
@@ -3993,7 +4004,7 @@ export default function App() {
           ) : activeTab === 'ef_rfd' ? (
             <YamunajiRfdPanel companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ef_settings' ? (
-            <CompanySettingsPanel companyEntity="Elite Fabtex" />
+            <CompanySettingsPanel companyEntity="Elite Fabtex" currentUser={currentUser} />
           ) : activeTab === 'ef_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Fabtex" />
           ) : activeTab === 'ef_expenses' ? (
@@ -4004,8 +4015,10 @@ export default function App() {
             <EliteBillingDepartment companyEntity="Elite Fabtex" department="elite_fabtex" />
           ) : activeTab === 'so_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'so_rfd' ? (
+            <YamunajiRfdPanel companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'so_settings' ? (
-            <CompanySettingsPanel companyEntity="Sobise" />
+            <CompanySettingsPanel companyEntity="Sobise" currentUser={currentUser} />
           ) : activeTab === 'so_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Sobise" />
           ) : activeTab === 'so_expenses' ? (
@@ -4016,8 +4029,10 @@ export default function App() {
             <EliteBillingDepartment companyEntity="Sobise" />
           ) : activeTab === 'ew_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'ew_rfd' ? (
+            <YamunajiRfdPanel companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ew_settings' ? (
-            <CompanySettingsPanel companyEntity="Ethno wear" />
+            <CompanySettingsPanel companyEntity="Ethno wear" currentUser={currentUser} />
           ) : activeTab === 'ew_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Ethno wear" />
           ) : activeTab === 'ew_expenses' ? (
@@ -4031,7 +4046,7 @@ export default function App() {
           ) : activeTab === 'yj_rfd' ? (
             <YamunajiRfdPanel companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'yj_settings' ? (
-            <CompanySettingsPanel companyEntity="Yamunaji" />
+            <CompanySettingsPanel companyEntity="Yamunaji" currentUser={currentUser} />
           ) : activeTab === 'yj_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Yamunaji" />
           ) : activeTab === 'yj_expenses' ? (
@@ -4044,7 +4059,7 @@ export default function App() {
             <GarmentJobCardDashboard />
           ) : activeTab === 'es_settings' || activeTab === 'jobcards_stitching_settings' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <CompanySettingsPanel companyEntity="Elite Stitching" />
+              <CompanySettingsPanel companyEntity="Elite Stitching" currentUser={currentUser} />
               <StitchingSettings />
             </div>
           ) : activeTab === 'es_complaints' ? (

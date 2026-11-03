@@ -141,6 +141,15 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
     return 'ee_invoices';
   };
 
+  const getRfdTab = (entity) => {
+    const norm = String(entity || '').toLowerCase().trim();
+    if (norm === 'sobise' || norm === 'so') return 'so_rfd';
+    if (norm === 'elite fabtex' || norm === 'elite_fabtex' || norm === 'ef') return 'ef_rfd';
+    if (norm === 'ethno wear' || norm === 'ethno_wear' || norm === 'ew') return 'ew_rfd';
+    if (norm === 'yamunaji' || norm === 'yj') return 'yj_rfd';
+    return 'ee_rfd';
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
       {/* 👑 Top Header Banner */}
@@ -165,15 +174,13 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {((companyEntity === 'Yamunaji' || companyEntity === 'yamunaji' || companyEntity === 'YJ') || (companyEntity === 'Elite Fabtex' || companyEntity === 'elite_fabtex' || companyEntity === 'EF')) && (
-            <button
-              onClick={() => onNavigate && onNavigate((companyEntity === 'Elite Fabtex' || companyEntity === 'elite_fabtex' || companyEntity === 'EF') ? 'ef_rfd' : 'yj_rfd')}
-              className="btn-secondary"
-              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
-            >
-              <Layers size={15} color="#0ea5e9" /> Fabric Process
-            </button>
-          )}
+          <button
+            onClick={() => onNavigate && onNavigate(getRfdTab(companyEntity))}
+            className="btn-secondary"
+            style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+          >
+            <Layers size={15} color="#0ea5e9" /> Fabric Process
+          </button>
           <button
             onClick={() => onNavigate && onNavigate(getInvoicesTab(companyEntity))}
             className="btn-primary"

@@ -3,86 +3,83 @@ import { api } from '../services/api';
 import { 
   Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, 
   Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key, 
-  Lock, Check, X, Search, Edit2, Palette, Package, Tag, Layers, Landmark, Star
+  Lock, Check, X, Search, Edit2, Palette, Package, Tag, Layers, Landmark, Star,
+  ShieldCheck
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import CompanyDesignStudio from './CompanyDesignStudio';
 import DocumentDesignStudio from './DesignStudio/DocumentDesignStudio';
+import AdminChangeApprovalQueue from './AdminChangeApprovalQueue';
 
 const getCompanyAccentColor = (entity) => {
   return 'var(--primary)';
 };
 
-export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }) {
-  const accentColor = getCompanyAccentColor(companyEntity);
-  const [loading, setLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(() => {
-    const isEE = companyEntity === 'Elite Edition';
-    const isYJ = companyEntity === 'Yamunaji';
-    const isEF = companyEntity === 'Elite Fabtex';
-    const isSO = companyEntity === 'Sobise';
-    const isEW = companyEntity === 'Ethno wear';
+export const getInitialFormForCompany = (companyEntity) => {
+  const isEE = companyEntity === 'Elite Edition';
+  const isYJ = companyEntity === 'Yamunaji';
+  const isEF = companyEntity === 'Elite Fabtex';
+  const isSO = companyEntity === 'Sobise';
+  const isEW = companyEntity === 'Ethno wear';
 
-    const baseForm = {
-      companyName: isYJ ? 'YAMUNAJI CREATION' : companyEntity.toUpperCase(),
-      companyGstin: isEE ? '24BSWPA7682P1ZS' : (isYJ ? '24AAEFY0361N1ZZ' : ''),
-      companyAddress: isEE 
-        ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' 
-        : (isYJ ? 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat' : ''),
-      companyPhone: isEE ? '+91 76006 65058' : (isYJ ? '9979112777' : ''),
-      companyEmail: isEE ? 'INFO.ELITEEDITION@GMAIL.COM' : '',
-      companyLogo: '',
-      companyState: 'Gujarat',
-      companyStateCode: '24',
-      companyBankName: isEE ? 'KOTAK MAHINDRA BANK' : '',
-      companyAccountNo: isEE ? '9909866667' : '',
-      companyIfscCode: isEE ? 'KKBK0000883' : '',
-      companyBanks: isEE ? [
-        {
-          bankName: 'KOTAK MAHINDRA BANK',
-          accountNo: '9909866667',
-          ifscCode: 'KKBK0000883',
-          branch: 'Surat',
-          accountType: 'Current',
-          isDefault: true
-        }
-      ] : [],
-      invoicePrefix: isSO ? 'SO-2627-' : isEF ? 'EF-2627-' : isEE ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : isEW ? 'EW-2627-' : isYJ ? 'YJ-2627-' : 'EDP/26-27/',
-      startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
-      companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
-      challanDesign: {
-        title: 'DELIVERY CHALLAN',
-        prefix: isSO ? 'SO-' : isEF ? 'EF-' : companyEntity === 'Elite Stitching' ? 'ES/SC/' : isEE ? 'EE-' : isEW ? 'EWC-' : isYJ ? 'YJ-' : 'EDP/DC/',
-        startingNo: 1,
-        paperSize: 'A4',
-        orientation: 'portrait',
-        copies: ['Original for Consignee', 'Duplicate for Transporter', 'Triplicate for Supplier'],
-        showLogo: true,
-        showGstin: true,
-        showPhoneEmail: true,
-        showBankDetails: false,
-        showDesignImage: true,
-        showHsnCode: true,
-        showRateAndAmount: true,
-        showRemarks: true,
-        signatureLeft: "Receiver's Signature",
-        signatureCenter: "Prepared / Checked By",
-        signatureRight: "Authorized Signatory",
-        termsAndConditions: '1. Goods received in good condition and as per specification.\n2. Dispute if any subject to Surat jurisdiction only.\n3. Goods once dispatched/delivered will not be taken back.',
-        footerNote: 'This is a computer generated delivery challan.'
-      },
-      reportDesign: {
-        themeColor: '#0284c7',
-        paperSize: 'A4',
-        orientation: 'landscape',
-        density: 'compact',
-        showLogo: true,
-        showKpiSummary: true,
-        showGeneratedBy: true,
-        showTimestamp: true,
+  const baseForm = {
+    companyName: isYJ ? 'YAMUNAJI CREATION' : (companyEntity || 'Elite Edition').toUpperCase(),
+    companyGstin: isEE ? '24BSWPA7682P1ZS' : (isYJ ? '24AAEFY0361N1ZZ' : ''),
+    companyAddress: isEE 
+      ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' 
+      : (isYJ ? 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat' : ''),
+    companyPhone: isEE ? '+91 76006 65058' : (isYJ ? '9979112777' : ''),
+    companyEmail: isEE ? 'INFO.ELITEEDITION@GMAIL.COM' : '',
+    companyLogo: '',
+    companyState: 'Gujarat',
+    companyStateCode: '24',
+    companyBankName: isEE ? 'KOTAK MAHINDRA BANK' : '',
+    companyAccountNo: isEE ? '9909866667' : '',
+    companyIfscCode: isEE ? 'KKBK0000883' : '',
+    companyBanks: isEE ? [
+      {
+        bankName: 'KOTAK MAHINDRA BANK',
+        accountNo: '9909866667',
+        ifscCode: 'KKBK0000883',
+        branch: 'Surat',
+        accountType: 'Current',
+        isDefault: true
+      }
+    ] : [],
+    invoicePrefix: isSO ? 'SO-2627-' : isEF ? 'EF-2627-' : isEE ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : isEW ? 'EW-2627-' : isYJ ? 'YJ-2627-' : 'EDP/26-27/',
+    startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
+    companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+    challanDesign: {
+      title: 'DELIVERY CHALLAN',
+      prefix: isSO ? 'SO-' : isEF ? 'EF-' : companyEntity === 'Elite Stitching' ? 'ES/SC/' : isEE ? 'EE-' : isEW ? 'EWC-' : isYJ ? 'YJ-' : 'EDP/DC/',
+      startingNo: 1,
+      paperSize: 'A4',
+      orientation: 'portrait',
+      copies: ['Original for Consignee', 'Duplicate for Transporter', 'Triplicate for Supplier'],
+      showLogo: true,
+      showGstin: true,
+      showPhoneEmail: true,
+      showBankDetails: false,
+      showDesignImage: true,
+      showHsnCode: true,
+      showRateAndAmount: true,
+      showRemarks: true,
+      signatureLeft: "Receiver's Signature",
+      signatureCenter: "Prepared / Checked By",
+      signatureRight: "Authorized Signatory",
+      termsAndConditions: '1. Goods received in good condition and as per specification.\n2. Dispute if any subject to Surat jurisdiction only.\n3. Goods once dispatched/delivered will not be taken back.',
+      footerNote: 'This is a computer generated delivery challan.'
+    },
+    reportDesign: {
+      themeColor: '#0284c7',
+      paperSize: 'A4',
+      orientation: 'landscape',
+      density: 'compact',
+      showLogo: true,
+      showKpiSummary: true,
+      showGeneratedBy: true,
+      showTimestamp: true,
       watermarkText: '',
       footerDisclaimer: 'Confidential ERP Report - For Internal Operations Only.'
     },
@@ -92,19 +89,27 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     widths: ['36"', '44"', '58"', '64"'],
     passes: ['2 Pass (High Speed)', '3 Pass (Standard)', '4 Pass (High Density)', '6 Pass (Super HD)'],
     purchaseTypes: ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
-    };
+  };
 
-    try {
-      const cached = localStorage.getItem(`elite_company_settings_${companyEntity}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && typeof parsed === 'object') {
-          return { ...baseForm, ...parsed };
-        }
+  try {
+    const cached = localStorage.getItem(`elite_company_settings_${companyEntity}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && typeof parsed === 'object') {
+        return { ...baseForm, ...parsed };
       }
-    } catch (e) {}
-    return baseForm;
-  });
+    }
+  } catch (e) {}
+  return baseForm;
+};
+
+export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', currentUser: propUser }) {
+  const accentColor = getCompanyAccentColor(companyEntity);
+  const currentUser = propUser || api.getCurrentUser();
+  const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(() => getInitialFormForCompany(companyEntity));
 
   const [newTagInput, setNewTagInput] = useState({
     categories: '',
@@ -150,6 +155,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
   };
 
   useEffect(() => {
+    setForm(getInitialFormForCompany(companyEntity));
     loadSettings();
   }, [companyEntity]);
 
@@ -611,6 +617,15 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
         >
           <Palette size={16} /> 🎨 Document & Invoice Design Studio
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('approvals')}
+          className={activeTab === 'approvals' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
+        >
+          <ShieldCheck size={16} /> 🛡️ Company Approvals & Policies
         </button>
       </div>
 
@@ -1724,6 +1739,13 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
               saving={saving}
             />
           )}
+        </div>
+      )}
+
+      {/* TAB 5: COMPANY APPROVALS & POLICIES */}
+      {activeTab === 'approvals' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <AdminChangeApprovalQueue companyEntity={companyEntity} currentUser={currentUser} />
         </div>
       )}
     </div>

@@ -32,6 +32,7 @@ export const AVAILABLE_SCREENS = [
 
   // Elite Edition (Company)
   { id: 'ee_dashboard', label: 'Elite Edition: Dashboard Overview', category: 'Elite Edition' },
+  { id: 'ee_rfd', label: 'Elite Edition: Fabric Process', category: 'Elite Edition' },
   { id: 'ee_invoices', label: 'Elite Edition: Invoices & GST Billing', category: 'Elite Edition' },
   { id: 'ee_expenses', label: 'Elite Edition: Expense Ledger', category: 'Elite Edition' },
   { id: 'ee_raw_materials', label: 'Elite Edition: Raw Materials', category: 'Elite Edition' },
@@ -49,6 +50,7 @@ export const AVAILABLE_SCREENS = [
 
   // Sobise (Company)
   { id: 'so_dashboard', label: 'Sobise: Dashboard Overview', category: 'Sobise' },
+  { id: 'so_rfd', label: 'Sobise: Fabric Process', category: 'Sobise' },
   { id: 'so_invoices', label: 'Sobise: Finance & GST Billing', category: 'Sobise' },
   { id: 'so_expenses', label: 'Sobise: Expense Ledger', category: 'Sobise' },
   { id: 'so_raw_materials', label: 'Sobise: Raw Materials', category: 'Sobise' },
@@ -57,6 +59,7 @@ export const AVAILABLE_SCREENS = [
 
   // Ethno wear (Company)
   { id: 'ew_dashboard', label: 'Ethno wear: Dashboard Overview', category: 'Ethno wear' },
+  { id: 'ew_rfd', label: 'Ethno wear: Fabric Process', category: 'Ethno wear' },
   { id: 'ew_invoices', label: 'Ethno wear: Invoices & GST Billing', category: 'Ethno wear' },
   { id: 'ew_expenses', label: 'Ethno wear: Expense Ledger', category: 'Ethno wear' },
   { id: 'ew_raw_materials', label: 'Ethno wear: Raw Materials', category: 'Ethno wear' },
