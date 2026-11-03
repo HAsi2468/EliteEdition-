@@ -2199,6 +2199,31 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // ✏️ Edit & Delete Handlers: Mill Challans
   // ==========================================
   const handleOpenEditMillChallan = (ch) => {
+    // 1. Resolve TPs from ch.tps if available
+    let challanTps = [];
+    if (Array.isArray(ch.tps) && ch.tps.length > 0) {
+      challanTps = ch.tps.map((t, idx) => ({
+        srNo: t.srNo || idx + 1,
+        lotNumber: t.lotNumber || ch.lotNumber || '',
+        tpNo: t.tpNo || String(idx + 1),
+        tpMtr: t.tpMtr !== undefined && t.tpMtr !== null ? t.tpMtr : ''
+      }));
+    } else {
+      // Fallback: search across grayLots for TPs assigned to this mill challan
+      (grayLots || []).forEach(lot => {
+        (lot.tps || []).forEach(tp => {
+          if (tp.millChallanNo === ch.challanNo) {
+            challanTps.push({
+              srNo: challanTps.length + 1,
+              lotNumber: lot.lotNumber,
+              tpNo: tp.tpNo,
+              tpMtr: tp.tpMtr !== undefined && tp.tpMtr !== null ? tp.tpMtr : ''
+            });
+          }
+        });
+      });
+    }
+
     setEditingMillChallan(ch);
     setEditChallanForm({
       challanNo: ch.challanNo || '',
@@ -2209,7 +2234,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       vehicleNo: ch.vehicleNo || '',
       driverName: ch.driverName || '',
       status: ch.status || 'In Processing at Mill',
-      notes: ch.notes || ''
+      notes: ch.notes || '',
+      tps: challanTps
     });
   };
 
@@ -2221,12 +2247,35 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const oldChallanNo = editingMillChallan.challanNo;
     const newChallanNo = editChallanForm.challanNo.trim();
 
+    // Clean & validate all TPs
+    const validTps = (editChallanForm.tps || []).map((t, idx) => ({
+      ...t,
+      srNo: idx + 1,
+      lotNumber: (t.lotNumber || editingMillChallan.lotNumber || '').trim(),
+      tpNo: String(t.tpNo || idx + 1).trim(),
+      tpMtr: parseFloat(t.tpMtr) || 0
+    }));
+
+    const newTotalMeters = parseFloat(validTps.reduce((sum, t) => sum + t.tpMtr, 0).toFixed(2));
+    const newTotalTps = validTps.length;
+
+    // Lookup maps for remaining TPs: key = lotNumber + '__' + tpNo, and fallback by tpNo
+    const tpMapByLotAndNo = new Map();
+    const tpMapByNo = new Map();
+    validTps.forEach(t => {
+      tpMapByLotAndNo.set(`${(t.lotNumber || '').trim()}__${t.tpNo}`, t.tpMtr);
+      tpMapByNo.set(t.tpNo, t.tpMtr);
+    });
+
     const updatedMillChallans = millChallans.map(ch => {
       if (ch.id === editingMillChallan.id) {
         return {
           ...ch,
           ...editChallanForm,
           challanNo: newChallanNo,
+          tps: validTps,
+          totalTps: newTotalTps,
+          totalMeters: newTotalMeters,
           millGst: selectedMill?.gstin || ch.millGst,
           millAddress: selectedMill?.address || ch.millAddress,
           millPhone: selectedMill?.phone || ch.millPhone,
@@ -2236,23 +2285,63 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       return ch;
     });
 
-    let updatedGrayLots = grayLots;
-    // If Challan # was updated, synchronize TPs in grayLots
-    if (oldChallanNo && newChallanNo && oldChallanNo !== newChallanNo) {
-      updatedGrayLots = grayLots.map(lot => ({
-        ...lot,
-        tps: (lot.tps || []).map(tp => {
-          if (tp.millChallanNo === oldChallanNo) {
-            return { ...tp, millChallanNo: newChallanNo };
+    // Synchronize with grayLots:
+    // Update meters, update challanNo if changed, and restore removed TPs to 'In Stock'
+    const updatedGrayLots = grayLots.map(lot => {
+      let lotChanged = false;
+      const updatedTps = (lot.tps || []).map(tp => {
+        const belongsToChallan = (tp.millChallanNo === oldChallanNo) || (oldChallanNo && tp.millChallanNo === newChallanNo);
+        if (belongsToChallan) {
+          const keyWithLot = `${(lot.lotNumber || '').trim()}__${tp.tpNo}`;
+          if (tpMapByLotAndNo.has(keyWithLot) || tpMapByNo.has(tp.tpNo)) {
+            const newMtr = tpMapByLotAndNo.has(keyWithLot) ? tpMapByLotAndNo.get(keyWithLot) : tpMapByNo.get(tp.tpNo);
+            if (newMtr !== Number(tp.tpMtr) || tp.millChallanNo !== newChallanNo) {
+              lotChanged = true;
+              return {
+                ...tp,
+                tpMtr: newMtr,
+                millChallanNo: newChallanNo,
+                status: 'Sent to Mill'
+              };
+            }
+          } else {
+            // TP was removed from this challan: restore back to 'In Stock'
+            lotChanged = true;
+            return {
+              ...tp,
+              millChallanNo: null,
+              status: 'In Stock'
+            };
           }
-          return tp;
-        })
-      }));
-      setGrayLots(updatedGrayLots);
-      try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
-    }
+        }
+        return tp;
+      });
 
+      if (lotChanged) {
+        const newTotalMtrs = parseFloat(updatedTps.reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0).toFixed(2));
+        const newSentMtrs = parseFloat(updatedTps.filter(t => t.status === 'Sent to Mill').reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0).toFixed(2));
+        const hasSent = newSentMtrs > 0;
+        const hasRemainingInStock = updatedTps.some(t => t.status === 'In Stock');
+
+        let newStatus = lot.status;
+        if (hasSent && hasRemainingInStock) newStatus = 'Partially at Mill';
+        else if (hasSent && !hasRemainingInStock) newStatus = 'Fully at Mill';
+        else if (!hasSent) newStatus = 'In Stock';
+
+        return {
+          ...lot,
+          totalMeters: newTotalMtrs,
+          sentToMillMeters: newSentMtrs,
+          status: newStatus,
+          tps: updatedTps
+        };
+      }
+      return lot;
+    });
+
+    setGrayLots(updatedGrayLots);
     setMillChallans(updatedMillChallans);
+    try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(updatedGrayLots)); } catch (e) {}
     try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(updatedMillChallans)); } catch (e) {}
 
     // STRICT PERSISTENCE: Save directly to MongoDB Atlas immediately!
@@ -2262,7 +2351,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       grayLots: updatedGrayLots
     }).catch(err => console.error('Failed to update Mill Challan in MongoDB Atlas:', err));
 
-    triggerEliteAlert(`Challan ${newChallanNo} updated successfully!`, 'Challan Updated');
+    triggerEliteAlert(`Challan ${newChallanNo} updated (${newTotalTps} TPs, ${newTotalMeters.toFixed(1)} Mtr)!`, 'Challan Updated');
     setEditingMillChallan(null);
     setEditChallanForm(null);
   };
@@ -7161,8 +7250,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           <div
             style={{
               width: '100%',
-              maxWidth: '620px',
-              maxHeight: '90vh',
+              maxWidth: '720px',
+              maxHeight: '92vh',
               overflowY: 'auto',
               background: '#ffffff',
               borderRadius: 12,
@@ -7323,6 +7412,166 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
               </div>
 
+              {/* 🧵 CHALLAN TP BREAKDOWN & EDITABLE METERS */}
+              {(() => {
+                const currentTps = editChallanForm.tps || [];
+                const liveTotalMtrs = currentTps.reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0);
+                const origMtrs = Number(editingMillChallan.totalMeters) || 0;
+                const diffMtrs = liveTotalMtrs - origMtrs;
+
+                return (
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.75rem', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                          Challan TP Breakdown & Meters ({currentTps.length} TPs)
+                        </span>
+                        <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
+                          Live: {liveTotalMtrs.toFixed(1)} Mtr
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditChallanForm(prev => {
+                            const cur = prev.tps || [];
+                            const nextSr = cur.length + 1;
+                            const newTp = {
+                              srNo: nextSr,
+                              lotNumber: cur[0]?.lotNumber || editingMillChallan.lotNumber || '',
+                              tpNo: String(nextSr),
+                              tpMtr: ''
+                            };
+                            return { ...prev, tps: [...cur, newTp] };
+                          });
+                        }}
+                        className="btn-secondary"
+                        style={{
+                          padding: '3px 9px',
+                          fontSize: '0.74rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: '#ffffff',
+                          color: '#0284c7',
+                          borderColor: '#bae6fd',
+                          fontWeight: 700
+                        }}
+                      >
+                        <Plus size={13} /> Add TP
+                      </button>
+                    </div>
+
+                    <div style={{ maxHeight: '210px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, background: '#ffffff' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                          <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontSize: '0.7rem', textAlign: 'left' }}>
+                            <th style={{ padding: '6px 8px', width: 45 }}>Sr</th>
+                            <th style={{ padding: '6px 8px', width: 130 }}>Lot No.</th>
+                            <th style={{ padding: '6px 8px', width: 130 }}>TP No.</th>
+                            <th style={{ padding: '6px 8px' }}>TP Meter (Mtr)</th>
+                            <th style={{ padding: '6px 8px', width: 45, textAlign: 'center' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentTps.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
+                                No TPs currently attached to this challan. Click "+ Add TP" above to add rolls.
+                              </td>
+                            </tr>
+                          ) : (
+                            currentTps.map((tp, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '4px 8px', color: '#64748b', fontWeight: 700 }}>
+                                  {tp.srNo || idx + 1}
+                                </td>
+                                <td style={{ padding: '4px 8px' }}>
+                                  <input
+                                    type="text"
+                                    value={tp.lotNumber || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditChallanForm(prev => {
+                                        const next = [...(prev.tps || [])];
+                                        next[idx] = { ...next[idx], lotNumber: val };
+                                        return { ...prev, tps: next };
+                                      });
+                                    }}
+                                    className="input-field"
+                                    style={{ height: '26px', fontSize: '0.76rem', padding: '2px 6px', width: '100%', background: '#f8fafc' }}
+                                    placeholder="Lot No"
+                                  />
+                                </td>
+                                <td style={{ padding: '4px 8px' }}>
+                                  <input
+                                    type="text"
+                                    value={tp.tpNo}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditChallanForm(prev => {
+                                        const next = [...(prev.tps || [])];
+                                        next[idx] = { ...next[idx], tpNo: val };
+                                        return { ...prev, tps: next };
+                                      });
+                                    }}
+                                    className="input-field"
+                                    style={{ height: '26px', fontSize: '0.78rem', padding: '2px 6px', width: '100%', fontWeight: 700 }}
+                                  />
+                                </td>
+                                <td style={{ padding: '4px 8px' }}>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={tp.tpMtr}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditChallanForm(prev => {
+                                        const next = [...(prev.tps || [])];
+                                        next[idx] = { ...next[idx], tpMtr: val };
+                                        return { ...prev, tps: next };
+                                      });
+                                    }}
+                                    className="input-field"
+                                    style={{ height: '26px', fontSize: '0.8rem', padding: '2px 6px', width: '100%', fontWeight: 800, color: '#0284c7' }}
+                                    placeholder="0.0"
+                                  />
+                                </td>
+                                <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditChallanForm(prev => {
+                                        const next = (prev.tps || []).filter((_, i) => i !== idx);
+                                        return { ...prev, tps: next };
+                                      });
+                                    }}
+                                    style={{
+                                      background: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      color: '#dc2626',
+                                      borderRadius: 4,
+                                      cursor: 'pointer',
+                                      padding: '3px 6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    title="Remove TP from this Challan"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
                   Notes / Instructions
@@ -7336,10 +7585,27 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 />
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-                <span><strong>Total TPs:</strong> {editingMillChallan.totalTps} TPs</span>
-                <span><strong>Total Meters:</strong> {editingMillChallan.totalMeters.toFixed(1)} Mtr</span>
-              </div>
+              {(() => {
+                const currentTps = editChallanForm.tps || [];
+                const liveTotalMtrs = currentTps.reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0);
+                const origMtrs = Number(editingMillChallan.totalMeters) || 0;
+                const diffMtrs = liveTotalMtrs - origMtrs;
+                const isModified = Math.abs(diffMtrs) > 0.05 || currentTps.length !== (editingMillChallan.totalTps || 0);
+
+                return (
+                  <div style={{ background: '#f8fafc', padding: '0.6rem 0.85rem', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.76rem', color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span><strong>Total TPs:</strong> {currentTps.length} TPs</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isModified && (
+                        <span style={{ fontSize: '0.70rem', color: '#b45309', background: '#fef3c7', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>
+                          Was: {origMtrs.toFixed(1)} Mtr ({diffMtrs > 0 ? `+${diffMtrs.toFixed(1)}` : diffMtrs.toFixed(1)} Mtr)
+                        </span>
+                      )}
+                      <span><strong>Total Meters:</strong> <span style={{ color: '#0284c7', fontWeight: 900 }}>{liveTotalMtrs.toFixed(1)} Mtr</span></span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
                 <button
