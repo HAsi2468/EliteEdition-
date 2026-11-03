@@ -608,13 +608,21 @@ const enrichImages = async (items) => {
   const baseSkus = [...new Set(needImageSkus.map(s => extractBaseSku(s)))];
   const regexes = baseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
 
-  const productDocs = await db.InventoryProduct.find({
-    skuCode: { $in: regexes },
-    imageUrl: { $exists: true, $nin: [null, ''] }
-  }).lean();
+  const [productDocs, masterProducts] = await Promise.all([
+    db.InventoryProduct.find({
+      skuCode: { $in: regexes },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean(),
+    db.Product.find({
+      skuCode: { $in: regexes },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean()
+  ]);
+
+  const allProductDocs = [...productDocs, ...masterProducts];
 
   const imageMap = {};
-  productDocs.forEach(p => {
+  allProductDocs.forEach(p => {
     const base = p.skuCode ? extractBaseSku(p.skuCode) : null;
     if (base && p.imageUrl) {
       if (!imageMap[base]) imageMap[base] = p.imageUrl;

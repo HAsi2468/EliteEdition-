@@ -82,6 +82,18 @@ export default function InventoryGrid({
 }) {
   const safeItems = Array.isArray(items) ? items : [];
 
+  // Helper to resolve product image from item or catalogItems fallback
+  const resolveItemImage = (item) => {
+    if (!item) return '';
+    if (item.imageUrl) return item.imageUrl;
+    const cleanSku = (item.skuCode || item.sku || '').trim().toLowerCase();
+    if (!cleanSku) return '';
+    const inCat = (catalogItems || []).find(c => (c.skuCode || '').trim().toLowerCase() === cleanSku);
+    if (inCat?.imageUrl) return inCat.imageUrl;
+    const inInv = (safeItems || []).find(it => (it.skuCode || '').trim().toLowerCase() === cleanSku);
+    return inInv?.imageUrl || '';
+  };
+
   // 4 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock), 'catalog' (Product Catalog)
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
 
@@ -673,8 +685,8 @@ export default function InventoryGrid({
           curGroup.skuCodes.add(item.skuCode || item.sku || `ITEM-${idx}`);
           curGroup.latestTimeMs = Math.max(curGroup.latestTimeMs, timeMs);
           curGroup.earliestTimeMs = Math.min(curGroup.earliestTimeMs, timeMs);
-          if (!curGroup.sampleImage && item.imageUrl) {
-            curGroup.sampleImage = item.imageUrl;
+          if (!curGroup.sampleImage) {
+            curGroup.sampleImage = resolveItemImage(item);
           }
           return;
         }
@@ -694,7 +706,7 @@ export default function InventoryGrid({
         totalQty: itemQty,
         totalAmount: Number(item.totalPurchaseAmount || (itemQty * itemPrice)),
         skuCodes: new Set([item.skuCode || item.sku || `ITEM-${idx}`]),
-        sampleImage: item.imageUrl || ''
+        sampleImage: resolveItemImage(item)
       };
       groups.push(curGroup);
     });
@@ -1118,8 +1130,8 @@ export default function InventoryGrid({
           curGroup.skuCodes.add(skuCode);
           curGroup.latestTimeMs = Math.max(curGroup.latestTimeMs, timeMs);
           curGroup.earliestTimeMs = Math.min(curGroup.earliestTimeMs, timeMs);
-          if (!curGroup.sampleImage && item.imageUrl) {
-            curGroup.sampleImage = item.imageUrl;
+          if (!curGroup.sampleImage) {
+            curGroup.sampleImage = resolveItemImage(item);
           }
           return;
         }
@@ -1138,7 +1150,7 @@ export default function InventoryGrid({
         totalSellAmount: totalSell,
         totalProfit: profit,
         skuCodes: new Set([skuCode]),
-        sampleImage: item.imageUrl || ''
+        sampleImage: resolveItemImage(item)
       };
       groups.push(curGroup);
     });
@@ -2510,8 +2522,9 @@ export default function InventoryGrid({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   {ch.sampleImage && (
                                     <img
-                                      src={ch.sampleImage}
+                                      src={convertDriveUrl(ch.sampleImage, visibleSkus[0] || ch.items?.[0]?.skuCode)}
                                       alt="preview"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                       style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
                                     />
                                   )}
@@ -3411,8 +3424,9 @@ export default function InventoryGrid({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   {ch.sampleImage && (
                                     <img
-                                      src={ch.sampleImage}
+                                      src={convertDriveUrl(ch.sampleImage, visibleSkus[0] || ch.items?.[0]?.skuCode)}
                                       alt="preview"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                       style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
                                     />
                                   )}

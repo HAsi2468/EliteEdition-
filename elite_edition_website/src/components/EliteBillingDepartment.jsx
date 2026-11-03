@@ -3416,12 +3416,13 @@ export default function EliteBillingDepartment({
   }, [search]);
 
   // ── Fetch Master Data (Customers, Items, Vendors) ──────────────────────────
-  const fetchMasterData = async () => {
+  const fetchMasterData = async (targetCompany = (invoiceForm?.issuingCompany || companyEntity)) => {
     try {
+      const target = normalizeCompanyEntity(targetCompany || companyEntity);
       const [cRes, itemRes, vRes] = await Promise.all([
-        api.getBillingCustomers(companyEntity),
-        api.getBillingItems(companyEntity),
-        api.getBillingVendors(companyEntity).catch(err => {
+        api.getBillingCustomers(target),
+        api.getBillingItems(target),
+        api.getBillingVendors(target).catch(err => {
           console.warn('Billing vendors load warning:', err);
           return { data: [] };
         })
@@ -3479,6 +3480,13 @@ export default function EliteBillingDepartment({
   useEffect(() => {
     fetchMasterData();
   }, [companyEntity]);
+
+  // When activeTab switches to 'create', ensure master data matches the selected issuing company
+  useEffect(() => {
+    if (activeTab === 'create' && invoiceForm.issuingCompany) {
+      fetchMasterData(invoiceForm.issuingCompany);
+    }
+  }, [activeTab]);
 
   // Invoices & Stats fetch on debouncedSearch, statusFilter, or companyEntity
   useEffect(() => {
@@ -4223,7 +4231,7 @@ export default function EliteBillingDepartment({
         setCustomers(prev => prev.map(c => c._id === editingCustomerId ? res.data : c));
         triggerPushNotification('✏️ Customer Updated', `Customer "${custForm.name}" updated.`, 'success');
       } else {
-        const res = await api.createBillingCustomer({ ...custForm, companyEntity });
+        const res = await api.createBillingCustomer({ ...custForm, companyEntity: invoiceForm.issuingCompany || companyEntity });
         setCustomers(prev => [...prev, res.data]);
         triggerPushNotification('👥 Customer Created', `Customer "${custForm.name}" registered.`, 'success');
       }
@@ -4302,7 +4310,7 @@ export default function EliteBillingDepartment({
         setItemsList(prev => prev.map(i => i._id === editingItemId ? res.data : i));
         triggerPushNotification('✏️ Product Updated', `Product "${itemForm.itemName}" updated.`, 'success');
       } else {
-        const res = await api.createBillingItem({ ...itemForm, companyEntity });
+        const res = await api.createBillingItem({ ...itemForm, companyEntity: invoiceForm.issuingCompany || companyEntity });
         const savedItem = res.data;
         setItemsList(prev => [...prev, savedItem]);
         triggerPushNotification('📦 Product Created', `Product "${itemForm.itemName}" cataloged.`, 'success');
@@ -5114,7 +5122,7 @@ export default function EliteBillingDepartment({
                   Official B2B Tax Invoice with automated GST & TDS deductions
                 </div>
               </div>
-              <EntityBrandBadge entityId={companyEntity} />
+              <EntityBrandBadge entityId={invoiceForm.issuingCompany || companyEntity} />
             </div>
             <div style={{ display: 'flex', gap: '0.65rem' }}>
               <button
@@ -5155,18 +5163,37 @@ export default function EliteBillingDepartment({
               <label style={{ ...labelStyle, color: '#7c3aed', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
               <select
                 value={invoiceForm.issuingCompany || companyEntity}
-                onChange={e => {
+                onChange={async e => {
                   const selected = normalizeCompanyEntity(e.target.value);
+                  const isCorp = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear', 'Yamunaji', 'EXEDP'].includes(selected);
                   setInvoiceForm(f => ({
                     ...f,
                     issuingCompany: selected,
-                    notes: `Thank you for doing business with ${selected}!`
+                    notes: `Thank you for doing business with ${selected}!`,
+                    customer: editingInvoiceId ? f.customer : {
+                      customerId: '',
+                      name: '',
+                      businessName: '',
+                      phone: '',
+                      email: '',
+                      gstin: '',
+                      billingAddress: '',
+                      shippingAddress: '',
+                      state: 'Gujarat',
+                      stateCode: '24'
+                    },
+                    items: editingInvoiceId ? f.items : (isCorp ? [
+                      { itemName: '', hsnCode: '', qty: 1, unit: 'Pcs', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
+                    ] : [
+                      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', ourChallanNo: '', imageUrl: '', totalAmount: 4500 }
+                    ])
                   }));
                   api.getNextInvoiceNo(selected).then(nextRes => {
                     if (nextRes?.invoiceNo) {
                       setInvoiceForm(f => ({ ...f, invoiceNo: nextRes.invoiceNo, invoiceSeq: nextRes.nextSeq }));
                     }
                   }).catch(() => { });
+                  fetchMasterData(selected);
                 }}
                 style={{
                   ...inputStyle,
