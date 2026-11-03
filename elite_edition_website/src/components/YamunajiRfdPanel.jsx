@@ -140,6 +140,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const STORAGE_RFD_KEY = getRfdStorageKey(companyEntity, 'rfd_lots_data');
   const STORAGE_CONFIGS_KEY = getRfdStorageKey(companyEntity, 'master_configurations');
 
+  const companyCode = useMemo(() => {
+    const c = (companyEntity || 'Yamunaji').toLowerCase();
+    if (c.includes('fabtex') || c === 'ef') return 'EF';
+    if (c.includes('sobise') || c === 'so') return 'SO';
+    if (c.includes('ethno') || c === 'ew') return 'EW';
+    if (c.includes('edition') || c === 'ee') return 'EE';
+    return 'YJ';
+  }, [companyEntity]);
+
   // Master Screen Mode: 'gray' (Gray Fabric) or 'rfd' (RFD Fabric)
   const [screenMode, setScreenMode] = useState('gray');
 
@@ -355,7 +364,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 paymentTerms: p.terms || '30 Days',
                 purchaseType: p.purchaseType === 'inventory' ? 'Inventory Purchase' : (p.purchaseType || 'Inventory Purchase'),
                 postToPurchase: true,
-                purchaseNo: p.purchaseNo || 'YJP-01',
+                purchaseNo: p.purchaseNo || `${companyCode}P-01`,
                 purchaseId: p._id || '',
                 tps: [{ srNo: 1, tpNo: '1', tpMtr: String(qty), status: 'In Stock', millChallanNo: null }]
               };
@@ -633,7 +642,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return `LOTGRAY-${String(nextVal).padStart(2, '0')}`;
   }, [grayLots]);
 
-  // Auto-generate sequential Inward Challan No (e.g. YJMC-01)
+  // Auto-generate sequential Inward Challan No (e.g. YJMC-01 for Yamunaji, EFMC-01 for Elite Fabtex)
   const getNextOurChallanNo = useCallback(() => {
     let maxSeq = 0;
     (grayLots || []).forEach(l => {
@@ -645,14 +654,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
     });
     const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
-    const c = (companyEntity || 'Yamunaji').toLowerCase();
-    let prefix = 'YJ';
-    if (c.includes('fabtex') || c === 'ef') prefix = 'EF';
-    else if (c.includes('sobise') || c === 'so') prefix = 'SO';
-    else if (c.includes('ethno') || c === 'ew') prefix = 'EW';
-    else if (c.includes('edition') || c === 'ee') prefix = 'EE';
-    return `${prefix}MC-${String(nextVal).padStart(2, '0')}`;
-  }, [grayLots, companyEntity]);
+    return `${companyCode}MC-${String(nextVal).padStart(2, '0')}`;
+  }, [grayLots, companyCode]);
 
   // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
@@ -2661,7 +2664,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       const currentAtMill = Math.max(0, parseFloat((sentMtr - (prevReceived + prevShortage)).toFixed(1)));
 
       const cleanChallanNo = (challan.challanNo || '').replace(/[^a-zA-Z0-9]/g, '');
-      const suggestedLot = `YJ-RFD-${cleanChallanNo || String(rfdLots.length + 1).padStart(3, '0')}`;
+      const suggestedLot = `${companyCode}-RFD-${cleanChallanNo || String(rfdLots.length + 1).padStart(3, '0')}`;
 
       setInwardRfdForm({
         lotNumber: suggestedLot,
@@ -2681,7 +2684,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       });
     } else {
       setInwardRfdForm({
-        lotNumber: `YJ-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`,
+        lotNumber: `${companyCode}-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`,
         inwardDate: new Date().toISOString().split('T')[0],
         sourceChallanId: '',
         millParty: '',
@@ -2728,7 +2731,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const currentAtMill = Math.max(0, parseFloat((sentMtr - (prevReceived + prevShortage)).toFixed(1)));
 
     const cleanChallanNo = (ch.challanNo || '').replace(/[^a-zA-Z0-9]/g, '');
-    const suggestedLot = `YJ-RFD-${cleanChallanNo || String(rfdLots.length + 1).padStart(3, '0')}`;
+    const suggestedLot = `${companyCode}-RFD-${cleanChallanNo || String(rfdLots.length + 1).padStart(3, '0')}`;
 
     setInwardRfdForm(prev => ({
       ...prev,
@@ -2788,7 +2791,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       ? 0
       : Math.max(0, parseFloat((graySent - (receivedRfd + shortageMtr)).toFixed(1)));
 
-    const lotNumber = inwardRfdForm.lotNumber.trim() || `YJ-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`;
+    const lotNumber = inwardRfdForm.lotNumber.trim() || `${companyCode}-RFD-${String(rfdLots.length + 1).padStart(3, '0')}`;
 
     let createdPurchaseNo = '';
     let createdPurchaseId = '';
@@ -5677,7 +5680,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         <input
                           type="text"
                           readOnly
-                          placeholder="e.g. YJMC-01"
+                          placeholder={`e.g. ${companyCode}MC-01`}
                           value={weaverForm.ourChallanNo}
                           title="System Auto-Generated (Not Editable)"
                           className="input-field"
@@ -7824,7 +7827,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     readOnly
                     className="input-field"
                     value={editGrayLotForm.ourChallanNo || ''}
-                    placeholder="e.g. YJMC-01"
+                    placeholder={`e.g. ${companyCode}MC-01`}
                     title="Challan Number is system auto-assigned and locked"
                     style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#059669', cursor: 'not-allowed' }}
                   />
@@ -8526,7 +8529,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       value={inwardRfdForm.lotNumber}
                       onChange={e => setInwardRfdForm({ ...inwardRfdForm, lotNumber: e.target.value })}
                       required
-                      placeholder="e.g. YJ-RFD-001"
+                      placeholder={`e.g. ${companyCode}-RFD-001`}
                       style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
                     />
                   </div>
