@@ -619,7 +619,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     postToPurchase: true
   });
 
-  // Auto-generate sequential Lot Number based on highest number in existing gray lots
+  // Auto-generate sequential Lot Number based on highest number in existing gray lots (e.g. LOTGRAY-01)
   const getNextLotNumber = useCallback(() => {
     let maxSeq = 0;
     (grayLots || []).forEach(l => {
@@ -630,14 +630,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
     });
     const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
-    return `LOT-${String(nextVal).padStart(3, '0')}`;
+    return `LOTGRAY-${String(nextVal).padStart(2, '0')}`;
   }, [grayLots]);
 
-  // Auto-generate sequential Our Inward Challan No
+  // Auto-generate sequential Inward Challan No (e.g. YJMC-01)
   const getNextOurChallanNo = useCallback(() => {
     let maxSeq = 0;
     (grayLots || []).forEach(l => {
-      const valStr = l.ourChallanNo || l.inwardChallanNo || '';
+      const valStr = l.ourChallanNo || l.challanNo || l.inwardChallanNo || '';
       const m = String(valStr).match(/(\d+)(?!.*\d)/);
       if (m) {
         const val = parseInt(m[1], 10);
@@ -645,8 +645,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
     });
     const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
-    return `CH-${String(nextVal).padStart(3, '0')}`;
-  }, [grayLots]);
+    const c = (companyEntity || 'Yamunaji').toLowerCase();
+    let prefix = 'YJ';
+    if (c.includes('fabtex') || c === 'ef') prefix = 'EF';
+    else if (c.includes('sobise') || c === 'so') prefix = 'SO';
+    else if (c.includes('ethno') || c === 'ew') prefix = 'EW';
+    else if (c.includes('edition') || c === 'ee') prefix = 'EE';
+    return `${prefix}MC-${String(nextVal).padStart(2, '0')}`;
+  }, [grayLots, companyEntity]);
 
   // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
@@ -3637,7 +3643,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <th style={{ padding: '10px 12px' }}>Lot Number</th>
                       <th style={{ padding: '10px 12px' }}>Inward Date</th>
                       <th style={{ padding: '10px 12px' }}>Weaver / Loom Owner</th>
-                      <th style={{ padding: '10px 12px' }}>Our / Weaver Challan</th>
+                      <th style={{ padding: '10px 12px' }}>Challan No / Weaver Challan</th>
                       <th style={{ padding: '10px 12px' }}>Quality</th>
                       <th style={{ padding: '10px 12px' }}>Total TPs</th>
                       <th style={{ padding: '10px 12px' }}>Total Gray Mtr</th>
@@ -3688,8 +3694,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           </td>
                           <td style={{ padding: '10px 12px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ fontSize: '0.76rem', color: '#0284c7', fontWeight: 800 }}>
-                                Our: {lot.ourChallanNo || '—'}
+                              <div style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 800 }}>
+                                Challan: {lot.ourChallanNo || lot.challanNo || '—'}
                               </div>
                               <div style={{ color: '#0f172a', fontWeight: 600, fontSize: '0.74rem' }}>
                                 Weaver: {lot.weaverChallanNo || 'N/A'}
@@ -5653,7 +5659,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         <input
                           type="text"
                           readOnly
-                          placeholder="e.g. LOT-001"
+                          placeholder="e.g. LOTGRAY-01"
                           value={weaverForm.lotNumber}
                           title="System Auto-Generated (Not Editable)"
                           className="input-field"
@@ -5664,14 +5670,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
                           <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
-                            Our Challan No (Auto) *
+                            Challan No (Auto) *
                           </label>
                           <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>Auto Locked</span>
                         </div>
                         <input
                           type="text"
                           readOnly
-                          placeholder="e.g. CH-001"
+                          placeholder="e.g. YJMC-01"
                           value={weaverForm.ourChallanNo}
                           title="System Auto-Generated (Not Editable)"
                           className="input-field"
@@ -7204,7 +7210,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </div>
 
                         <div style={{ textAlign: 'right', fontSize: '0.66rem', lineHeight: 1.35 }}>
-                          <div><strong>Challan No:</strong> <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
+                          <div><strong>Mill Challan No:</strong> <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
                           <div><strong>Date:</strong> {showPrintChallanModal.challanDate}</div>
                           <div><strong>Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
                           {(() => {
@@ -7215,7 +7221,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             return (
                               <>
                                 {lotNos && <div><strong>Lot No:</strong> <span style={{ fontWeight: 800 }}>{lotNos}</span></div>}
-                                {ourChallans && <div><strong>Our Challan No:</strong> <span style={{ fontWeight: 800, color: '#0284c7' }}>{ourChallans}</span></div>}
+                                {ourChallans && <div><strong>Challan No:</strong> <span style={{ fontWeight: 800, color: '#0284c7' }}>{ourChallans}</span></div>}
                                 {weaverChallans && <div><strong>Weaver Gray Challan:</strong> <span style={{ fontWeight: 800, color: '#475569' }}>{weaverChallans}</span></div>}
                               </>
                             );
@@ -7809,7 +7815,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                     <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
-                      Our Inward Challan #
+                      Challan No
                     </label>
                     <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>Locked</span>
                   </div>
@@ -7818,8 +7824,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     readOnly
                     className="input-field"
                     value={editGrayLotForm.ourChallanNo || ''}
-                    placeholder="e.g. CH-001"
-                    title="Our Inward Challan Number is system auto-assigned and locked"
+                    placeholder="e.g. YJMC-01"
+                    title="Challan Number is system auto-assigned and locked"
                     style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#059669', cursor: 'not-allowed' }}
                   />
                 </div>
