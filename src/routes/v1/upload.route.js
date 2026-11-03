@@ -225,7 +225,7 @@ function isSafeImageUrl(targetUrl) {
     return false;
   }
 
-  // Allowlist of trusted image hosts only (Cloudflare R2, AWS S3, Elite Edition ERP domains, Google CDN)
+  // Allowlist of trusted image hosts only (Cloudflare R2, AWS S3, Elite Edition ERP domains, Google CDN, Giphy, Tenor)
   const isAllowedDomain =
     hostname.endsWith('.r2.dev') ||
     hostname.endsWith('.r2.cloudflarestorage.com') ||
@@ -235,7 +235,12 @@ function isSafeImageUrl(targetUrl) {
     hostname.endsWith('.s3.amazonaws.com') ||
     hostname.endsWith('.s3.ap-south-1.amazonaws.com') ||
     hostname === 'lh3.googleusercontent.com' ||
-    hostname === 'drive.google.com';
+    hostname === 'drive.google.com' ||
+    hostname.endsWith('.giphy.com') ||
+    hostname === 'giphy.com' ||
+    hostname.endsWith('.gph.is') ||
+    hostname.endsWith('.tenor.com') ||
+    hostname === 'tenor.com';
 
   return isAllowedDomain;
 }

@@ -7326,6 +7326,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                           src={gifUrl}
                                           alt={fileNameDisplay || 'GIF'}
                                           loading="lazy"
+                                          onError={(e) => {
+                                            // Fallback to backend download proxy if direct third-party CDN fails
+                                            if (!e.currentTarget.dataset.retried) {
+                                              e.currentTarget.dataset.retried = 'true';
+                                              e.currentTarget.src = `/v1/upload/download?url=${encodeURIComponent(gifUrl)}&filename=${encodeURIComponent(fileNameDisplay || 'animation.gif')}`;
+                                            }
+                                          }}
                                           style={{
                                             width: '100%',
                                             maxWidth: '300px',
@@ -8158,169 +8165,114 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 ) : (
                   <>
-                    {/* Left Actions (WhatsApp-Style Icon Cluster) */}
-                    <div className="phoenix-chat-toolbar-left" style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                      {/* 1. Actions / More Tools (+) Button */}
-                      <div style={{ position: 'relative' }}>
+                    {/* WhatsApp-Style Unified Ergonomic Input Capsule (Elite ERP Theme) */}
+                    <div className="phoenix-chat-input-pill">
+                      {/* 1. Emoji / Stickers / GIF Picker (Smile icon) */}
+                      <button
+                        type="button"
+                        className={`phoenix-pill-btn ${showEmojiPicker ? 'is-active' : ''}`}
+                        title="Emojis, Stickers & GIFs"
+                        onClick={() => {
+                          setShowEmojiPicker(!showEmojiPicker);
+                        }}
+                      >
+                        <Smile size={20} />
+                      </button>
+
+                      <EmojiPickerPopover
+                        isOpen={showEmojiPicker}
+                        initialTab={mediaPickerTab}
+                        onClose={() => setShowEmojiPicker(false)}
+                        onSelectEmoji={(emo) => {
+                          setInputMessage((prev) => prev + emo);
+                          if (chatTextareaRef.current) chatTextareaRef.current.focus();
+                        }}
+                        onSelectSticker={(sticker) => {
+                          setShowEmojiPicker(false);
+                          handleSendStickerOrGif(sticker, 'sticker');
+                        }}
+                        onSelectGif={(gif) => {
+                          setShowEmojiPicker(false);
+                          handleSendStickerOrGif(gif, 'gif');
+                        }}
+                      />
+
+                      {isUrgent && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '1px 5px', borderRadius: '4px', marginRight: '4px', flexShrink: 0 }}>
+                          SOS
+                        </span>
+                      )}
+
+                      {/* 2. Textarea: Expands to fill the entire remaining horizontal width */}
+                      <textarea
+                        ref={chatTextareaRef}
+                        rows={1}
+                        placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Type a message..."}
+                        value={inputMessage}
+                        onPaste={handlePasteClipboard}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            if (showEmojiPicker) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowEmojiPicker(false);
+                              return;
+                            }
+                            if (mentionQuery !== null) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setMentionQuery(null);
+                              return;
+                            }
+                          }
+                          if (mentionQuery !== null) {
+                            if (mentionCandidates.length > 0) {
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+                                return;
+                              }
+                              if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                                return;
+                              }
+                              if (e.key === 'Enter' || e.key === 'Tab') {
+                                e.preventDefault();
+                                if (mentionCandidates[mentionIndex]) {
+                                  handleSelectMention(mentionCandidates[mentionIndex]);
+                                  return;
+                                }
+                              }
+                            }
+                          }
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            if (mentionQuery !== null) setMentionQuery(null);
+                            handleSendMessage(e);
+                          }
+                        }}
+                        onFocus={() => {
+                          setTimeout(() => {
+                            if (chatScrollRef.current) {
+                              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+                            }
+                          }, 100);
+                        }}
+                        onChange={handleInputChange}
+                        className="phoenix-chat-textarea"
+                      />
+
+                      {/* 3. Paperclip / Attachment Menu Button (Right inside the capsule) */}
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <button
                           type="button"
-                          className={`phoenix-toolbar-icon ${showMobileActionMenu ? 'is-active' : ''}`}
-                          onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
-                          title="Actions & Tools"
-                        >
-                          <Plus size={20} />
-                        </button>
-
-                        {showMobileActionMenu && (
-                          <>
-                            <div
-                              onClick={() => setShowMobileActionMenu(false)}
-                              style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
-                            />
-                            <div style={{
-                              position: 'absolute',
-                              bottom: 'calc(100% + 10px)',
-                              left: 0,
-                              background: '#ffffff',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '16px',
-                              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.16)',
-                              zIndex: 9999,
-                              padding: '8px',
-                              minWidth: '230px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '3px',
-                              animation: 'fadeIn 0.15s ease'
-                            }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowMobileActionMenu(false);
-                                  openFileDialog('image/*');
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <ImageIcon size={16} color="#2563eb" />
-                                </div>
-                                <span>Upload Photo</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowMobileActionMenu(false);
-                                  openFileDialog('.pdf,application/pdf');
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <FileText size={16} color="#dc2626" />
-                                </div>
-                                <span>Attach PDF Document</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowMobileActionMenu(false);
-                                  openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*');
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Paperclip size={16} color="#2563eb" />
-                                </div>
-                                <span>Attach Any Document</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => { setShowMobileActionMenu(false); handleOpenShareModal('jobcard'); }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Share2 size={16} color="#8b5cf6" />
-                                </div>
-                                <span>Quick Share Record</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => { setShowMobileActionMenu(false); setShowPollModal(true); }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <BarChart2 size={16} color="#059669" />
-                                </div>
-                                <span>Create Poll</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => { setShowMobileActionMenu(false); handleOpenTaskModalFromChat(); }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <CheckSquare size={16} color="#10b981" />
-                                </div>
-                                <span>Create Task</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => { setShowMobileActionMenu(false); setIsUrgent(!isUrgent); }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: isUrgent ? '#fee2e2' : 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: isUrgent ? '#dc2626' : '#0f172a', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <AlertTriangle size={16} color="#dc2626" />
-                                </div>
-                                <span>{isUrgent ? 'Disable Urgent Alert' : 'Mark as Urgent (SOS)'}</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* 2. Direct Paperclip Attachment Button */}
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          type="button"
-                          className={`phoenix-toolbar-icon ${showDesktopAttachMenu ? 'is-active' : ''}`}
+                          className={`phoenix-pill-btn ${showDesktopAttachMenu ? 'is-active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             setShowDesktopAttachMenu(!showDesktopAttachMenu);
                           }}
-                          title="Attach Files or Records"
+                          title="Attach Photos, Documents or Records"
                         >
                           <Paperclip size={19} />
                         </button>
@@ -8334,8 +8286,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <div
                               style={{
                                 position: 'absolute',
-                                bottom: 'calc(100% + 10px)',
-                                left: 0,
+                                bottom: 'calc(100% + 12px)',
+                                right: 0,
                                 background: '#ffffff',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '16px',
@@ -8438,50 +8390,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 </div>
                                 <span>Quick Share Record</span>
                               </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  setIsUrgent(!isUrgent);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: isUrgent ? '#fee2e2' : 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: isUrgent ? '#dc2626' : '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <AlertTriangle size={16} color="#dc2626" />
+                                </div>
+                                <span>{isUrgent ? 'Disable Urgent Alert' : 'Mark as Urgent (SOS)'}</span>
+                              </button>
                             </div>
                           </>
                         )}
                       </div>
 
-                      {/* 3. Emoji Picker (Smile) */}
+                      {/* 4. GIF Shortcut Button inside pill (Desktop/Tablet) */}
                       <button
                         type="button"
-                        className={`phoenix-toolbar-icon ${showEmojiPicker && mediaPickerTab === 'emoji' ? 'is-active' : ''}`}
-                        title="Emojis"
-                        onClick={() => {
-                          if (showEmojiPicker && mediaPickerTab === 'emoji') {
-                            setShowEmojiPicker(false);
-                          } else {
-                            setMediaPickerTab('emoji');
-                            setShowEmojiPicker(true);
-                          }
-                        }}
-                      >
-                        <Smile size={20} />
-                      </button>
-
-                      {/* 4. Stickers / AI Sparkle */}
-                      <button
-                        type="button"
-                        className={`phoenix-toolbar-icon ${showEmojiPicker && mediaPickerTab === 'sticker' ? 'is-active' : ''}`}
-                        title="Stickers"
-                        onClick={() => {
-                          if (showEmojiPicker && mediaPickerTab === 'sticker') {
-                            setShowEmojiPicker(false);
-                          } else {
-                            setMediaPickerTab('sticker');
-                            setShowEmojiPicker(true);
-                          }
-                        }}
-                      >
-                        <Sparkles size={18} color={showEmojiPicker && mediaPickerTab === 'sticker' ? '#2563eb' : '#8b5cf6'} />
-                      </button>
-
-                      {/* 5. GIF Button */}
-                      <button
-                        type="button"
-                        className={`phoenix-toolbar-icon ${showEmojiPicker && mediaPickerTab === 'gif' ? 'is-active' : ''}`}
-                        title="Send GIF"
+                        className={`hidden md:inline-flex phoenix-pill-btn ${showEmojiPicker && mediaPickerTab === 'gif' ? 'is-active' : ''}`}
+                        title="Send Animated GIF"
                         onClick={() => {
                           if (showEmojiPicker && mediaPickerTab === 'gif') {
                             setShowEmojiPicker(false);
@@ -8492,8 +8428,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         }}
                         style={{
                           borderRadius: '12px',
-                          width: '34px',
-                          height: '28px',
+                          width: '32px',
+                          height: '26px',
                           border: '1.5px solid #cbd5e1',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -8501,102 +8437,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           padding: '0 2px'
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: '0.64rem',
-                            fontWeight: 900,
-                            color: showEmojiPicker && mediaPickerTab === 'gif' ? '#2563eb' : '#64748b',
-                            letterSpacing: '0.04em'
-                          }}
-                        >
+                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: showEmojiPicker && mediaPickerTab === 'gif' ? '#2563eb' : '#64748b' }}>
                           GIF
                         </span>
                       </button>
-
-                      <EmojiPickerPopover
-                        isOpen={showEmojiPicker}
-                        initialTab={mediaPickerTab}
-                        onClose={() => setShowEmojiPicker(false)}
-                        onSelectEmoji={(emo) => {
-                          setInputMessage((prev) => prev + emo);
-                          if (chatTextareaRef.current) chatTextareaRef.current.focus();
-                        }}
-                        onSelectSticker={(sticker) => {
-                          setShowEmojiPicker(false);
-                          handleSendStickerOrGif(sticker, 'sticker');
-                        }}
-                        onSelectGif={(gif) => {
-                          setShowEmojiPicker(false);
-                          handleSendStickerOrGif(gif, 'gif');
-                        }}
-                      />
-                    </div>
-
-                    {/* Center: WhatsApp Rounded Text Input Capsule */}
-                    <div className="phoenix-chat-input-pill">
-                      {isUrgent && (
-                        <span style={{ fontSize: '0.65rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '1px 5px', borderRadius: '4px', marginRight: '6px', flexShrink: 0 }}>
-                          SOS
-                        </span>
-                      )}
-                      <textarea
-                        ref={chatTextareaRef}
-                        rows={1}
-                        placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Type a message..."}
-                        value={inputMessage}
-                        onPaste={handlePasteClipboard}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            if (showEmojiPicker) {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setShowEmojiPicker(false);
-                              return;
-                            }
-                            if (mentionQuery !== null) {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setMentionQuery(null);
-                              return;
-                            }
-                          }
-                          if (mentionQuery !== null) {
-                            if (mentionCandidates.length > 0) {
-                              if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
-                                return;
-                              }
-                              if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
-                                return;
-                              }
-                              if (e.key === 'Enter' || e.key === 'Tab') {
-                                e.preventDefault();
-                                if (mentionCandidates[mentionIndex]) {
-                                  handleSelectMention(mentionCandidates[mentionIndex]);
-                                  return;
-                                }
-                              }
-                            }
-                          }
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            if (mentionQuery !== null) setMentionQuery(null);
-                            handleSendMessage(e);
-                          }
-                        }}
-                        onFocus={() => {
-                          setTimeout(() => {
-                            if (chatScrollRef.current) {
-                              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-                            }
-                          }, 100);
-                        }}
-                        onChange={handleInputChange}
-                        className="phoenix-chat-textarea"
-                      />
                     </div>
 
                     {/* Right: WhatsApp Dynamic Action Button (Voice Note ➔ Send) */}

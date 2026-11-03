@@ -371,19 +371,19 @@
   letter-spacing: 0.01em !important;
 }
 
-/* ─── WHATSAPP-STYLE MODERN CHAT INPUT BAR ─── */
+/* ─── WHATSAPP-STYLE MODERN CHAT INPUT BAR (ELITE ERP THEME) ─── */
 .phoenix-chat-input-bar {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  padding: 8px 14px !important;
+  gap: 8px !important;
+  padding: 8px 12px !important;
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
-  background: #f0f2f5 !important; /* Authentic WhatsApp Web bottom bar background */
-  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: var(--bg-main, #f8fafc) !important; /* Elite ERP clean light background */
+  border-top: 1px solid var(--border-light, #e2e8f0) !important;
   flex-shrink: 0 !important;
   position: relative !important;
   box-sizing: border-box !important;
-  min-height: 58px !important;
+  min-height: 56px !important;
 }
 
 .phoenix-chat-input-pill {
@@ -391,21 +391,47 @@
   min-width: 0 !important;
   display: flex !important;
   align-items: center !important;
+  gap: 6px !important;
   background: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border: 1.5px solid var(--border-light, #cbd5e1) !important;
   border-radius: 24px !important;
-  padding: 4px 16px !important;
-  box-shadow: 0 1px 2px rgba(11, 20, 26, 0.08) !important;
+  padding: 4px 10px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
   transition: all 0.15s ease-in-out !important;
   box-sizing: border-box !important;
   position: relative !important;
-  min-height: 42px !important;
+  min-height: 44px !important;
 }
 
 .phoenix-chat-input-pill:focus-within {
   background: #ffffff !important;
-  border-color: rgba(37, 99, 235, 0.35) !important;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
+}
+
+.phoenix-pill-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px !important;
+  border-radius: 50% !important;
+  transition: all 0.15s ease !important;
+  flex-shrink: 0 !important;
+  outline: none !important;
+}
+
+.phoenix-pill-btn:hover {
+  color: #2563eb !important;
+  background: rgba(37, 99, 235, 0.08) !important;
+}
+
+.phoenix-pill-btn.is-active {
+  color: #2563eb !important;
+  background: rgba(37, 99, 235, 0.12) !important;
 }
 
 .phoenix-chat-textarea,
@@ -415,24 +441,24 @@
   width: 100% !important;
   height: 24px !important;
   min-height: 24px !important;
-  max-height: 110px !important;
-  padding: 2px 0 !important;
+  max-height: 120px !important;
+  padding: 2px 4px !important;
   border: none !important;
   outline: none !important;
   outline-style: none !important;
   box-shadow: none !important;
   background: transparent !important;
   font-size: 0.94rem !important;
-  color: #111b21 !important;
+  color: #0f172a !important; /* Elite ERP dark text */
   resize: none !important;
   box-sizing: border-box !important;
   font-family: inherit !important;
-  line-height: 1.4 !important;
+  line-height: 1.42 !important;
 }
 
 .phoenix-chat-textarea::placeholder {
-  color: #8696a0 !important;
-  font-size: 0.93rem !important;
+  color: #94a3b8 !important;
+  font-size: 0.92rem !important;
 }
 
 /* Eliminate any nested/inner extension focus rings inside chat pill */
@@ -460,18 +486,19 @@
   align-items: center !important;
   justify-content: center !important;
   border: none !important;
-  background: transparent !important;
-  color: #54656f !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
   cursor: pointer !important;
-  transition: all 0.15s ease !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35) !important;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
   flex-shrink: 0 !important;
   padding: 0 !important;
 }
 
 .phoenix-whatsapp-mic-btn:hover {
-  background: rgba(0, 0, 0, 0.06) !important;
-  color: #2563eb !important;
+  background: #1d4ed8 !important;
   transform: scale(1.06);
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.45) !important;
 }
 
 .phoenix-whatsapp-send-btn {
