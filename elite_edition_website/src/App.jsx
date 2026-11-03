@@ -3988,7 +3988,7 @@ export default function App() {
           ) : activeTab === 'ee_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ee_rfd' ? (
-            <YamunajiRfdPanel companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
+            <YamunajiRfdPanel key="Elite Edition" companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ee_settings' ? (
             <CompanySettingsPanel companyEntity="Elite Edition" currentUser={currentUser} />
           ) : activeTab === 'ee_complaints' ? (
@@ -4002,7 +4002,7 @@ export default function App() {
           ) : activeTab === 'ef_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ef_rfd' ? (
-            <YamunajiRfdPanel companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
+            <YamunajiRfdPanel key="Elite Fabtex" companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ef_settings' ? (
             <CompanySettingsPanel companyEntity="Elite Fabtex" currentUser={currentUser} />
           ) : activeTab === 'ef_complaints' ? (
@@ -4016,7 +4016,7 @@ export default function App() {
           ) : activeTab === 'so_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'so_rfd' ? (
-            <YamunajiRfdPanel companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
+            <YamunajiRfdPanel key="Sobise" companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'so_settings' ? (
             <CompanySettingsPanel companyEntity="Sobise" currentUser={currentUser} />
           ) : activeTab === 'so_complaints' ? (
@@ -4030,7 +4030,7 @@ export default function App() {
           ) : activeTab === 'ew_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ew_rfd' ? (
-            <YamunajiRfdPanel companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
+            <YamunajiRfdPanel key="Ethno wear" companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ew_settings' ? (
             <CompanySettingsPanel companyEntity="Ethno wear" currentUser={currentUser} />
           ) : activeTab === 'ew_complaints' ? (
@@ -4044,7 +4044,7 @@ export default function App() {
           ) : activeTab === 'yj_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'yj_rfd' ? (
-            <YamunajiRfdPanel companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
+            <YamunajiRfdPanel key="Yamunaji" companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'yj_settings' ? (
             <CompanySettingsPanel companyEntity="Yamunaji" currentUser={currentUser} />
           ) : activeTab === 'yj_complaints' ? (
