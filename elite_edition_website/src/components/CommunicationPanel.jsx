@@ -5137,16 +5137,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
-                  background: isSocketConnected ? '#25b865' : '#f59e0b',
+                  background: isSocketConnected ? '#25b865' : '#94a3b8',
                   display: 'inline-block'
                 }}
-                title={isSocketConnected ? "Live Presence Active" : "Reconnecting to server..."}
+                title={isSocketConnected ? "Live Presence Active" : "Connecting..."}
               />
-              {!isSocketConnected && (
-                <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 700 }}>
-                  Reconnecting...
-                </span>
-              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

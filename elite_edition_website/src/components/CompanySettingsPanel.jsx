@@ -16,72 +16,94 @@ const getCompanyAccentColor = (entity) => {
 
 export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }) {
   const accentColor = getCompanyAccentColor(companyEntity);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    companyName: companyEntity.toUpperCase(),
-    companyGstin: companyEntity === 'Elite Edition' ? '24BSWPA7682P1ZS' : '',
-    companyAddress: companyEntity === 'Elite Edition' ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' : '',
-    companyPhone: companyEntity === 'Elite Edition' ? '+91 76006 65058' : '',
-    companyEmail: companyEntity === 'Elite Edition' ? 'INFO.ELITEEDITION@GMAIL.COM' : '',
-    companyLogo: '',
-    companyState: 'Gujarat',
-    companyStateCode: '24',
-    companyBankName: companyEntity === 'Elite Edition' ? 'KOTAK MAHINDRA BANK' : '',
-    companyAccountNo: companyEntity === 'Elite Edition' ? '9909866667' : '',
-    companyIfscCode: companyEntity === 'Elite Edition' ? 'KKBK0000883' : '',
-    companyBanks: companyEntity === 'Elite Edition' ? [
-      {
-        bankName: 'KOTAK MAHINDRA BANK',
-        accountNo: '9909866667',
-        ifscCode: 'KKBK0000883',
-        branch: 'Surat',
-        accountType: 'Current',
-        isDefault: true
-      }
-    ] : [],
-    invoicePrefix: companyEntity === 'Sobise' ? 'SO-2627-' : companyEntity === 'Elite Fabtex' ? 'EF-2627-' : companyEntity === 'Elite Edition' ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : companyEntity === 'Ethno wear' ? 'EW-2627-' : companyEntity === 'Yamunaji' ? 'YJ-2627-' : 'EDP/26-27/',
-    startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
-    companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
-    challanDesign: {
-      title: 'DELIVERY CHALLAN',
-      prefix: companyEntity === 'Sobise' ? 'SO-' : companyEntity === 'Elite Fabtex' ? 'EF-' : companyEntity === 'Elite Stitching' ? 'ES/SC/' : companyEntity === 'Elite Edition' ? 'EE-' : companyEntity === 'Ethno wear' ? 'EWC-' : companyEntity === 'Yamunaji' ? 'YJ-' : 'EDP/DC/',
-      startingNo: 1,
-      paperSize: 'A4',
-      orientation: 'portrait',
-      copies: ['Original for Consignee', 'Duplicate for Transporter', 'Triplicate for Supplier'],
-      showLogo: true,
-      showGstin: true,
-      showPhoneEmail: true,
-      showBankDetails: false,
-      showDesignImage: true,
-      showHsnCode: true,
-      showRateAndAmount: true,
-      showRemarks: true,
-      signatureLeft: "Receiver's Signature",
-      signatureCenter: "Prepared / Checked By",
-      signatureRight: "Authorized Signatory",
-      termsAndConditions: '1. Goods received in good condition and as per specification.\n2. Dispute if any subject to Surat jurisdiction only.\n3. Goods once dispatched/delivered will not be taken back.',
-      footerNote: 'This is a computer generated delivery challan.'
-    },
-    reportDesign: {
-      themeColor: '#0284c7',
-      paperSize: 'A4',
-      orientation: 'landscape',
-      density: 'compact',
-      showLogo: true,
-      showKpiSummary: true,
-      showGeneratedBy: true,
-      showTimestamp: true,
+  const [form, setForm] = useState(() => {
+    const isEE = companyEntity === 'Elite Edition';
+    const isYJ = companyEntity === 'Yamunaji';
+    const isEF = companyEntity === 'Elite Fabtex';
+    const isSO = companyEntity === 'Sobise';
+    const isEW = companyEntity === 'Ethno wear';
+
+    const baseForm = {
+      companyName: isYJ ? 'YAMUNAJI CREATION' : companyEntity.toUpperCase(),
+      companyGstin: isEE ? '24BSWPA7682P1ZS' : (isYJ ? '24AAEFY0361N1ZZ' : ''),
+      companyAddress: isEE 
+        ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' 
+        : (isYJ ? 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat' : ''),
+      companyPhone: isEE ? '+91 76006 65058' : (isYJ ? '9979112777' : ''),
+      companyEmail: isEE ? 'INFO.ELITEEDITION@GMAIL.COM' : '',
+      companyLogo: '',
+      companyState: 'Gujarat',
+      companyStateCode: '24',
+      companyBankName: isEE ? 'KOTAK MAHINDRA BANK' : '',
+      companyAccountNo: isEE ? '9909866667' : '',
+      companyIfscCode: isEE ? 'KKBK0000883' : '',
+      companyBanks: isEE ? [
+        {
+          bankName: 'KOTAK MAHINDRA BANK',
+          accountNo: '9909866667',
+          ifscCode: 'KKBK0000883',
+          branch: 'Surat',
+          accountType: 'Current',
+          isDefault: true
+        }
+      ] : [],
+      invoicePrefix: isSO ? 'SO-2627-' : isEF ? 'EF-2627-' : isEE ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : isEW ? 'EW-2627-' : isYJ ? 'YJ-2627-' : 'EDP/26-27/',
+      startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
+      companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+      challanDesign: {
+        title: 'DELIVERY CHALLAN',
+        prefix: isSO ? 'SO-' : isEF ? 'EF-' : companyEntity === 'Elite Stitching' ? 'ES/SC/' : isEE ? 'EE-' : isEW ? 'EWC-' : isYJ ? 'YJ-' : 'EDP/DC/',
+        startingNo: 1,
+        paperSize: 'A4',
+        orientation: 'portrait',
+        copies: ['Original for Consignee', 'Duplicate for Transporter', 'Triplicate for Supplier'],
+        showLogo: true,
+        showGstin: true,
+        showPhoneEmail: true,
+        showBankDetails: false,
+        showDesignImage: true,
+        showHsnCode: true,
+        showRateAndAmount: true,
+        showRemarks: true,
+        signatureLeft: "Receiver's Signature",
+        signatureCenter: "Prepared / Checked By",
+        signatureRight: "Authorized Signatory",
+        termsAndConditions: '1. Goods received in good condition and as per specification.\n2. Dispute if any subject to Surat jurisdiction only.\n3. Goods once dispatched/delivered will not be taken back.',
+        footerNote: 'This is a computer generated delivery challan.'
+      },
+      reportDesign: {
+        themeColor: '#0284c7',
+        paperSize: 'A4',
+        orientation: 'landscape',
+        density: 'compact',
+        showLogo: true,
+        showKpiSummary: true,
+        showGeneratedBy: true,
+        showTimestamp: true,
       watermarkText: '',
       footerDisclaimer: 'Confidential ERP Report - For Internal Operations Only.'
     },
-    categories: [],
-    paperTypes: [],
-    fabrics: [],
+    categories: ['Rayon', 'Cotton', 'Silk', 'Polyester', 'Georgette', 'Modal', 'Cambric'],
+    paperTypes: ['Sublimation 45 GSM', 'Sublimation 70 GSM', 'Plotter Paper 80 GSM'],
+    fabrics: ['Rayon 14KG', 'Cotton 60x60', 'Modal Satin', 'Georgette 60GM', 'Chanderi', 'Viscose Twill'],
     widths: ['36"', '44"', '58"', '64"'],
-    passes: [],
+    passes: ['2 Pass (High Speed)', '3 Pass (Standard)', '4 Pass (High Density)', '6 Pass (Super HD)'],
     purchaseTypes: ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
+    };
+
+    try {
+      const cached = localStorage.getItem(`elite_company_settings_${companyEntity}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          return { ...baseForm, ...parsed };
+        }
+      }
+    } catch (e) {}
+    return baseForm;
   });
 
   const [newTagInput, setNewTagInput] = useState({
@@ -227,9 +249,12 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
   };
 
   const loadSettings = async () => {
-    setLoading(true);
+    setIsRefreshing(true);
     try {
-      const res = await api.getCompanySettings(companyEntity);
+      const res = await Promise.race([
+        api.getCompanySettings(companyEntity),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+      ]);
       if (res && res.data) {
         setForm(f => {
           const loadedBanks = Array.isArray(res.data.companyBanks) && res.data.companyBanks.length > 0
@@ -245,7 +270,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                 }]
               : [];
 
-          return {
+          const updated = {
             ...f,
             ...res.data,
             companyBanks: loadedBanks,
@@ -257,20 +282,25 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
               ...f.reportDesign,
               ...(res.data.reportDesign || {})
             },
-            categories: Array.isArray(res.data.categories) ? res.data.categories : [],
-            paperTypes: Array.isArray(res.data.paperTypes) ? res.data.paperTypes : [],
-            fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
-            widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : ['36"', '44"', '58"', '64"'],
-            passes: Array.isArray(res.data.passes) ? res.data.passes : [],
+            categories: (Array.isArray(res.data.categories) && res.data.categories.length > 0) ? res.data.categories : f.categories,
+            paperTypes: (Array.isArray(res.data.paperTypes) && res.data.paperTypes.length > 0) ? res.data.paperTypes : f.paperTypes,
+            fabrics: (Array.isArray(res.data.fabrics) && res.data.fabrics.length > 0) ? res.data.fabrics : f.fabrics,
+            widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : f.widths,
+            passes: (Array.isArray(res.data.passes) && res.data.passes.length > 0) ? res.data.passes : f.passes,
             purchaseTypes: Array.isArray(res.data.purchaseTypes)
               ? res.data.purchaseTypes
-              : ['Inventory Purchase', 'Expense Purchase', 'Asset Purchase']
+              : f.purchaseTypes
           };
+          try {
+            localStorage.setItem(`elite_company_settings_${companyEntity}`, JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
         });
       }
     } catch (err) {
-      console.warn('Failed to load company settings:', err);
+      console.warn('Background load company settings:', err);
     } finally {
+      setIsRefreshing(false);
       setLoading(false);
     }
   };
@@ -501,15 +531,6 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     setForm(f => ({ ...f, [name]: value }));
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <RefreshCw className="spin" size={28} style={{ color: accentColor, marginBottom: '0.5rem' }} />
-        <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Loading Official Settings for {companyEntity}...</div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1040px', margin: '0 auto' }}>
       {/* Header Banner */}
@@ -520,7 +541,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           marginBottom: '1.5rem',
           display: 'flex',
           alignItems: 'center',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           borderLeft: `5px solid ${accentColor}`,
           boxShadow: `0 8px 32px rgba(0,0,0,0.25)`
         }}
@@ -549,8 +570,8 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           </p>
         </div>
 
-        <button onClick={loadSettings} className="btn-secondary" style={{ padding: '0.55rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <RefreshCw size={14} /> Refresh
+        <button onClick={loadSettings} disabled={isRefreshing} className="btn-secondary" style={{ padding: '0.55rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} /> {isRefreshing ? 'Syncing...' : 'Refresh'}
         </button>
       </div>
 

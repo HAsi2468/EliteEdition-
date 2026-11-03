@@ -24,16 +24,22 @@ import JobCardStatusDashboard from './JobCardStatusDashboard';
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Edition', onNavigate }) {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    invoiceCount: 0,
-    paidAmount: 0,
-    balanceDue: 0,
-    paidCount: 0,
-    unpaidCount: 0,
-    partiallyPaidCount: 0,
-    recentInvoices: []
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`elite_dashboard_stats_${companyEntity}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      totalRevenue: 0,
+      invoiceCount: 0,
+      paidAmount: 0,
+      balanceDue: 0,
+      paidCount: 0,
+      unpaidCount: 0,
+      partiallyPaidCount: 0,
+      recentInvoices: []
+    };
   });
   const [complaintStats, setComplaintStats] = useState({ total: 0, open: 0, resolved: 0 });
   const [expenseStats, setExpenseStats] = useState({ totalIn: 0, totalOut: 0 });
@@ -68,7 +74,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
       }
 
       if (billingRes && billingRes.success) {
-        setStats({
+        const nextStats = {
           totalRevenue: billingRes.data?.totalRevenue || 0,
           invoiceCount: billingRes.data?.invoiceCount || 0,
           paidAmount: billingRes.data?.paidAmount || 0,
@@ -79,7 +85,11 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
           recentInvoices: (billingRes.data?.recentInvoices && billingRes.data.recentInvoices.length > 0)
             ? billingRes.data.recentInvoices
             : recent
-        });
+        };
+        setStats(nextStats);
+        try {
+          localStorage.setItem(`elite_dashboard_stats_${companyEntity}`, JSON.stringify(nextStats));
+        } catch (e) {}
       }
 
       // 2. Fetch Complaints Stats
@@ -120,16 +130,6 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
   };
 
   const accentColor = getAccentColor();
-
-  if (loading) {
-    return (
-      <div className="glass-panel" style={{ padding: '4rem 2rem', textAlign: 'center', margin: '1rem' }}>
-        <RefreshCw size={32} className="spin-loader" style={{ color: accentColor, marginBottom: '0.75rem' }} />
-        <h3 style={{ color: 'var(--text-primary)', margin: 0 }}>Loading {companyEntity} Dashboard Intelligence...</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 4 }}>Aggregating real-time financial, invoicing, and complaint analytics.</p>
-      </div>
-    );
-  }
 
   const netProfitOrMargin = (stats.totalRevenue || 0) - (expenseStats.totalOut || 0);
 
