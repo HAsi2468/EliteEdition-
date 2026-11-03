@@ -619,9 +619,39 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     postToPurchase: true
   });
 
+  // Auto-generate sequential Lot Number based on highest number in existing gray lots
+  const getNextLotNumber = useCallback(() => {
+    let maxSeq = 0;
+    (grayLots || []).forEach(l => {
+      const m = String(l.lotNumber || '').match(/(\d+)(?!.*\d)/);
+      if (m) {
+        const val = parseInt(m[1], 10);
+        if (val > maxSeq) maxSeq = val;
+      }
+    });
+    const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
+    return `LOT-${String(nextVal).padStart(3, '0')}`;
+  }, [grayLots]);
+
+  // Auto-generate sequential Our Inward Challan No
+  const getNextOurChallanNo = useCallback(() => {
+    let maxSeq = 0;
+    (grayLots || []).forEach(l => {
+      const valStr = l.ourChallanNo || l.inwardChallanNo || '';
+      const m = String(valStr).match(/(\d+)(?!.*\d)/);
+      if (m) {
+        const val = parseInt(m[1], 10);
+        if (val > maxSeq) maxSeq = val;
+      }
+    });
+    const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
+    return `CH-${String(nextVal).padStart(3, '0')}`;
+  }, [grayLots]);
+
   // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
     lotNumber: '',
+    ourChallanNo: '',
     inwardDate: new Date().toISOString().split('T')[0],
     weaverParty: '',
     weaverChallanNo: '',
@@ -642,6 +672,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       { srNo: 1, tpNo: '', tpMtr: '' }
     ]
   });
+
+  const handleOpenWeaverInwardModal = () => {
+    const autoLot = getNextLotNumber();
+    const autoChallan = getNextOurChallanNo();
+    setWeaverForm(prev => ({
+      ...prev,
+      lotNumber: autoLot,
+      ourChallanNo: autoChallan,
+      inwardDate: new Date().toISOString().split('T')[0]
+    }));
+    setShowWeaverInwardModal(true);
+  };
 
   // Direct numeric row count input state for auto-adding TP rows instantly
   const [tpCountInput, setTpCountInput] = useState('');
@@ -1186,8 +1228,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       return;
     }
 
-    const nextId = `GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`;
-    const lotNumber = weaverForm.lotNumber.trim() || nextId;
+    const nextLot = getNextLotNumber();
+    const nextChallan = getNextOurChallanNo();
+    const lotNumber = (weaverForm.lotNumber || '').trim() || nextLot;
+    const ourChallanNo = (weaverForm.ourChallanNo || '').trim() || nextChallan;
+    const weaverChallanNo = (weaverForm.weaverChallanNo || '').trim();
+
     const totalMeters = validTps.reduce((sum, t) => sum + parseFloat(t.tpMtr), 0);
     const roundMtrs = parseFloat(totalMeters.toFixed(2));
     const ratePerMtr = parseFloat(weaverForm.ratePerMeter) || 0;
@@ -1230,9 +1276,10 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         const purchasePayload = {
           companyEntity,
           purchaseNo: nextPurNo,
-          billNo: (weaverForm.invoiceNo || weaverForm.weaverChallanNo || lotNumber).trim(),
+          billNo: (weaverForm.invoiceNo || weaverChallanNo || ourChallanNo || lotNumber).trim(),
           purchaseType: weaverForm.purchaseType || 'Inventory Purchase',
-          ourChallanNo: lotNumber,
+          ourChallanNo: ourChallanNo,
+          partyChallan: weaverChallanNo,
           date: weaverForm.invoiceDate || weaverForm.inwardDate,
           dueDate: dueDateObj.toISOString().split('T')[0],
           vendorName: weaverForm.weaverParty.trim(),
@@ -1248,12 +1295,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           },
           items: [{
             itemName: `${weaverForm.fabricQuality} (Gray Fabric)`,
-            description: `${companyEntity || 'Yamunaji'} Gray Lot ${lotNumber} from ${weaverForm.weaverParty.trim()} (${validTps.length} TPs)`,
+            description: `${companyEntity || 'Yamunaji'} Gray Lot ${lotNumber} from ${weaverForm.weaverParty.trim()} (${validTps.length} TPs) | Our Challan: ${ourChallanNo} | Weaver Challan: ${weaverChallanNo || 'N/A'}`,
             fabric: weaverForm.fabricQuality,
             fabricName: weaverForm.fabricQuality,
             lotNo: lotNumber,
-            partyChallan: weaverForm.weaverChallanNo || '',
-            ourChallanNo: lotNumber,
+            partyChallan: weaverChallanNo || '',
+            ourChallanNo: ourChallanNo,
             hsnCode: weaverForm.hsnCode || '5208',
             quantity: roundMtrs,
             qty: roundMtrs,
@@ -1318,11 +1365,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     }
 
     const newGrayLot = {
-      id: nextId,
+      id: lotNumber,
       lotNumber,
+      ourChallanNo,
+      weaverChallanNo: weaverChallanNo || 'Direct Inward',
       inwardDate: weaverForm.inwardDate,
       weaverParty: weaverForm.weaverParty.trim(),
-      weaverChallanNo: weaverForm.weaverChallanNo.trim() || 'Direct Inward',
       fabricQuality: weaverForm.fabricQuality,
       totalTps: validTps.length,
       totalMeters: roundMtrs,
@@ -1397,6 +1445,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     // Reset Form to clean slate
     setWeaverForm({
       lotNumber: '',
+      ourChallanNo: '',
       inwardDate: new Date().toISOString().split('T')[0],
       weaverParty: '',
       weaverChallanNo: '',
@@ -1669,6 +1718,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         list.push({
           lotId: lot.id,
           lotNumber: lot.lotNumber,
+          ourChallanNo: lot.ourChallanNo || '',
           weaverParty: lot.weaverParty,
           weaverChallanNo: lot.weaverChallanNo || lot.lotNumber,
           fabricQuality: lot.fabricQuality,
@@ -2102,12 +2152,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       processRequired: millChallanForm.processRequired,
       fabricQuality: primaryQuality,
       lotNumber: Array.from(new Set(selectedMillTps.map(t => t.lotNumber).filter(Boolean))).join(', ') || 'GRAY-LOT-MIX',
+      ourChallanNo: Array.from(new Set(selectedMillTps.map(t => t.ourChallanNo).filter(Boolean))).join(', '),
+      weaverChallanNo: Array.from(new Set(selectedMillTps.map(t => t.weaverChallanNo).filter(Boolean))).join(', '),
       totalTps: selectedMillTps.length,
       totalMeters: totalMtrs,
       status: 'At Mill',
       tps: selectedMillTps.map((t, idx) => ({
         srNo: idx + 1,
         lotNumber: t.lotNumber,
+        ourChallanNo: t.ourChallanNo || '',
+        weaverChallanNo: t.weaverChallanNo || '',
         tpNo: t.tpNo,
         tpMtr: t.tpMtr
       })),
@@ -2425,6 +2479,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
     setEditGrayLotForm({
       lotNumber: lot.lotNumber || '',
+      ourChallanNo: lot.ourChallanNo || '',
       inwardDate: lot.inwardDate || '',
       weaverParty: lot.weaverParty || '',
       weaverChallanNo: lot.weaverChallanNo || '',
@@ -2516,6 +2571,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         return {
           ...l,
           lotNumber: editGrayLotForm.lotNumber.trim(),
+          ourChallanNo: (editGrayLotForm.ourChallanNo || '').trim(),
           inwardDate: editGrayLotForm.inwardDate,
           weaverParty: editGrayLotForm.weaverParty,
           weaverChallanNo: editGrayLotForm.weaverChallanNo,
@@ -3428,7 +3484,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
               <button
-                onClick={() => setShowWeaverInwardModal(true)}
+                onClick={handleOpenWeaverInwardModal}
                 className="btn-primary"
                 style={{
                   padding: '0.45rem 1rem',
@@ -3581,7 +3637,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <th style={{ padding: '10px 12px' }}>Lot Number</th>
                       <th style={{ padding: '10px 12px' }}>Inward Date</th>
                       <th style={{ padding: '10px 12px' }}>Weaver / Loom Owner</th>
-                      <th style={{ padding: '10px 12px' }}>Weaver Challan #</th>
+                      <th style={{ padding: '10px 12px' }}>Our / Weaver Challan</th>
                       <th style={{ padding: '10px 12px' }}>Quality</th>
                       <th style={{ padding: '10px 12px' }}>Total TPs</th>
                       <th style={{ padding: '10px 12px' }}>Total Gray Mtr</th>
@@ -3601,7 +3657,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               title="Clean Slate — Ready for First Inward"
                               description="All test data has been cleared. Click '+ New Weaver Gray Inward' to record incoming fabric lots with individual roll meterages."
                               actionLabel="+ New Weaver Gray Inward"
-                              onAction={() => setShowWeaverInwardModal(true)}
+                              onAction={handleOpenWeaverInwardModal}
                             />
                           ) : (
                             <EnterpriseEmptyState
@@ -3631,7 +3687,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             {lot.weaverParty}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
-                            <div style={{ color: '#0f172a', fontWeight: 600 }}>{lot.weaverChallanNo || 'N/A'}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ fontSize: '0.76rem', color: '#0284c7', fontWeight: 800 }}>
+                                Our: {lot.ourChallanNo || '—'}
+                              </div>
+                              <div style={{ color: '#0f172a', fontWeight: 600, fontSize: '0.74rem' }}>
+                                Weaver: {lot.weaverChallanNo || 'N/A'}
+                              </div>
+                            </div>
                             {lot.invoiceNo ? (
                               <div style={{ fontSize: '0.71rem', color: '#0284c7', fontWeight: 700, marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                                 <FileText size={11} color="#0284c7" /> Inv: {lot.invoiceNo}
@@ -5550,25 +5613,69 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', height: '100%', minHeight: 0, overflowY: 'auto', paddingRight: '6px' }}>
                   {/* Card 1: Lot & Weaver Details */}
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.2rem' }}>
-                      <Boxes size={15} color="#0284c7" />
-                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                        Lot Identification & Weaver
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.3rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Boxes size={15} color="#0284c7" />
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                          Lot Identification & Weaver
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setSettingsActiveTab('weavers'); setShowSettingsModal(true); }}
+                        className="btn-secondary"
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #bae6fd',
+                          color: '#0284c7',
+                          fontSize: '0.70rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: '2px 8px',
+                          borderRadius: 5,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Settings size={12} /> Manage Weavers
+                      </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.65rem' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          Lot Number (Optional)
-                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                            Lot Number (Auto) *
+                          </label>
+                          <span style={{ fontSize: '0.60rem', color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '1px 5px', borderRadius: 3 }}>Auto</span>
+                        </div>
                         <input
                           type="text"
-                          placeholder={`GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`}
+                          required
+                          placeholder="e.g. LOT-001"
                           value={weaverForm.lotNumber}
                           onChange={(e) => setWeaverForm(prev => ({ ...prev, lotNumber: e.target.value }))}
                           className="input-field"
-                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#0284c7' }}
+                        />
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                            Our Challan No (Auto) *
+                          </label>
+                          <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>Auto</span>
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. CH-001"
+                          value={weaverForm.ourChallanNo}
+                          onChange={(e) => setWeaverForm(prev => ({ ...prev, ourChallanNo: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#059669' }}
                         />
                       </div>
 
@@ -5589,18 +5696,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.65rem' }}>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
-                            Weaver / Loom Owner Name *
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => { setSettingsActiveTab('weavers'); setShowSettingsModal(true); }}
-                            style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            ⚙️ Manage
-                          </button>
-                        </div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Weaver / Loom Owner Name *
+                        </label>
                         <input
                           type="text"
                           required
@@ -5640,16 +5738,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
-                          Weaver Gray Challan No
-                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                            Weaver Gray Challan No *
+                          </label>
+                          <span style={{ fontSize: '0.60rem', color: '#b45309', fontWeight: 700, background: '#fef3c7', padding: '1px 5px', borderRadius: 3 }}>Party Challan</span>
+                        </div>
                         <input
                           type="text"
+                          required
                           placeholder="e.g. CH-8901"
                           value={weaverForm.weaverChallanNo}
                           onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverChallanNo: e.target.value }))}
                           className="input-field"
-                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 700 }}
                         />
                       </div>
                     </div>
@@ -7114,6 +7216,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           <div><strong>Challan No:</strong> <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
                           <div><strong>Date:</strong> {showPrintChallanModal.challanDate}</div>
                           <div><strong>Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
+                          {(() => {
+                            const lotNos = showPrintChallanModal.lotNumber || Array.from(new Set((showPrintChallanModal.tps || []).map(t => t.lotNumber).filter(Boolean))).join(', ');
+                            const matchedLots = grayLots.filter(l => (showPrintChallanModal.tps || []).some(t => t.lotNumber === l.lotNumber) || l.lotNumber === showPrintChallanModal.lotNumber);
+                            const ourChallans = showPrintChallanModal.ourChallanNo || Array.from(new Set(matchedLots.map(l => l.ourChallanNo).filter(Boolean))).join(', ');
+                            const weaverChallans = showPrintChallanModal.weaverChallanNo || Array.from(new Set(matchedLots.map(l => l.weaverChallanNo).filter(Boolean))).join(', ');
+                            return (
+                              <>
+                                {lotNos && <div><strong>Lot No:</strong> <span style={{ fontWeight: 800 }}>{lotNos}</span></div>}
+                                {ourChallans && <div><strong>Our Challan No:</strong> <span style={{ fontWeight: 800, color: '#0284c7' }}>{ourChallans}</span></div>}
+                                {weaverChallans && <div><strong>Weaver Gray Challan:</strong> <span style={{ fontWeight: 800, color: '#475569' }}>{weaverChallans}</span></div>}
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -7679,7 +7794,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             </div>
 
             <form onSubmit={handleSaveEditGrayLot} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
                     Lot Number
@@ -7690,7 +7805,21 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     value={editGrayLotForm.lotNumber}
                     onChange={e => setEditGrayLotForm({ ...editGrayLotForm, lotNumber: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 700 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
+                    Our Inward Challan #
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={editGrayLotForm.ourChallanNo || ''}
+                    onChange={e => setEditGrayLotForm({ ...editGrayLotForm, ourChallanNo: e.target.value })}
+                    placeholder="e.g. CH-001"
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 700, color: '#0284c7' }}
                   />
                 </div>
 
