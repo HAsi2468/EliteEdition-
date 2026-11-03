@@ -30,11 +30,12 @@ function createCspMiddleware(options = {}) {
       `script-src 'self' 'nonce-${nonce}'`,
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
-      `img-src 'self' data: blob: https://*.r2.dev https://pub-${r2Subdomain}.r2.dev https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev https://*.googleusercontent.com https://drive.google.com https://${customDomain}`,
-      `connect-src 'self' https://${r2AccountId}.r2.cloudflarestorage.com https://*.r2.cloudflarestorage.com https://*.r2.dev https://${customDomain} wss://${customDomain}`,
-      "object-src 'none'",
+      `img-src 'self' data: blob: https://*.r2.dev https://pub-${r2Subdomain}.r2.dev https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev https://*.googleusercontent.com https://drive.google.com https://${customDomain} https://*.giphy.com https://media*.giphy.com https://*.tenor.com https://media.tenor.com https://*.tenor.co`,
+      `connect-src 'self' https://${r2AccountId}.r2.cloudflarestorage.com https://*.r2.cloudflarestorage.com https://*.r2.dev https://${customDomain} wss://${customDomain} https://api.giphy.com https://tenor.googleapis.com`,
+      "object-src 'self' blob: data:",
+      "frame-src 'self' blob: data:",
       "base-uri 'self'",
-      "frame-ancestors 'none'",
+      "frame-ancestors 'self'",
       "form-action 'self'",
     ];
 
@@ -43,7 +44,7 @@ function createCspMiddleware(options = {}) {
 
     res.setHeader(headerName, cspHeader);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
 
     next();
   };

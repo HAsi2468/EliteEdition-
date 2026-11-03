@@ -110,7 +110,11 @@ function chunkInvoiceItems(items, maxFirst = 7, maxOther = 12) {
 /**
  * Builds and renders the Tally GST Tax Invoice into an existing or new PDFDocument instance
  */
-function renderTallyInvoice(doc, invoice, companyConfig = {}, options = {}) {
+function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {}) {
+  companyConfig = companyConfig || {};
+  invoice = invoice || {};
+  options = options || {};
+
   const isColor = options.isColor !== false;
   const isDuplicate = options.isDuplicate === true || !isColor;
   const defaultLabel = isDuplicate ? '(DUPLICATE FOR TRANSPORTER)' : '(ORIGINAL FOR RECIPIENT)';

@@ -2449,7 +2449,9 @@ const downloadInvoicePdf = async (req, res) => {
 
   } catch (error) {
     console.error('Download Invoice PDF Error:', error);
-    res.status(500).send('Error generating PDF invoice');
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error generating PDF invoice', message: error?.message || 'Error generating PDF invoice' });
+    }
   }
 };
 
