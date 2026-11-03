@@ -80,23 +80,6 @@ export const isLotBelongingToCompany = (lot, currentCompany, currentCode) => {
     }
   }
 
-  // 3. Check ourChallanNo prefix (e.g. YJMC-, EFMC-, EEMC-, SOMC-, EWMC-)
-  const cNo = String(lot.ourChallanNo || '').toUpperCase();
-  if (cNo) {
-    const challanPrefixes = [
-      { code: 'YJ', pfx: 'YJMC-' },
-      { code: 'EF', pfx: 'EFMC-' },
-      { code: 'EE', pfx: 'EEMC-' },
-      { code: 'SO', pfx: 'SOMC-' },
-      { code: 'EW', pfx: 'EWMC-' }
-    ];
-    for (const item of challanPrefixes) {
-      if (item.code !== currentCode && cNo.startsWith(item.pfx)) {
-        return false;
-      }
-    }
-  }
-
   return true;
 };
 
@@ -106,6 +89,15 @@ export const isChallanBelongingToCompany = (challan, currentCompany, currentCode
   if (challan.companyEntity) {
     const chComp = String(challan.companyEntity).toLowerCase().replace(/[\s_-]+/g, '');
     if (chComp !== curComp) return false;
+  }
+  const cNo = String(challan.challanNo || challan.id || '').toUpperCase();
+  if (cNo) {
+    const prefixes = ['YJMC-', 'EFMC-', 'EEMC-', 'SOMC-', 'EWMC-'];
+    for (const pfx of prefixes) {
+      if (pfx !== `${currentCode}MC-` && cNo.startsWith(pfx)) {
+        return false;
+      }
+    }
   }
   return true;
 };
@@ -700,39 +692,50 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     postToPurchase: true
   });
 
-  // Auto-generate sequential Lot Number based on highest number in existing gray lots (e.g. LOTGRAY-01)
+  // Auto-generate sequential Lot Number based on LOTGRAY- prefix (e.g. LOTGRAY-01)
   const getNextLotNumber = useCallback(() => {
     let maxSeq = 0;
     (grayLots || []).forEach(l => {
-      const m = String(l.lotNumber || '').match(/(\d+)(?!.*\d)/);
-      if (m) {
-        const val = parseInt(m[1], 10);
+      const valStr = String(l.lotNumber || l.id || '').trim();
+      const match = valStr.match(/LOTGRAY-(\d+)/i);
+      if (match) {
+        const val = parseInt(match[1], 10);
         if (val > maxSeq) maxSeq = val;
       }
     });
-    const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
+    const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length > 0 ? grayLots.length + 1 : 1);
     return `LOTGRAY-${String(nextVal).padStart(2, '0')}`;
   }, [grayLots]);
 
-  // Auto-generate sequential Inward Challan No (e.g. YJMC-01 for Yamunaji, EFMC-01 for Elite Fabtex)
-  const getNextOurChallanNo = useCallback(() => {
+  // Auto-generate sequential Mill Delivery Challan No (e.g. YJMC-01 for Yamunaji, EFMC-01 for Elite Fabtex)
+  const getNextMillChallanNo = useCallback(() => {
     let maxSeq = 0;
-    (grayLots || []).forEach(l => {
-      const valStr = l.ourChallanNo || l.challanNo || l.inwardChallanNo || '';
-      const m = String(valStr).match(/(\d+)(?!.*\d)/);
-      if (m) {
-        const val = parseInt(m[1], 10);
+    const prefixRegex = new RegExp(`^${companyCode}MC-(\\d+)`, 'i');
+    (millChallans || []).forEach(c => {
+      const valStr = String(c.challanNo || c.id || '').trim();
+      const match = valStr.match(prefixRegex);
+      if (match) {
+        const val = parseInt(match[1], 10);
         if (val > maxSeq) maxSeq = val;
       }
     });
-    const nextVal = maxSeq > 0 ? maxSeq + 1 : (grayLots.length + 1);
+    if (maxSeq === 0) {
+      (millChallans || []).forEach(c => {
+        const valStr = String(c.challanNo || c.id || '').trim();
+        const match = valStr.match(/MC-(\d+)/i);
+        if (match) {
+          const val = parseInt(match[1], 10);
+          if (val > maxSeq) maxSeq = val;
+        }
+      });
+    }
+    const nextVal = maxSeq > 0 ? maxSeq + 1 : 1;
     return `${companyCode}MC-${String(nextVal).padStart(2, '0')}`;
-  }, [grayLots, companyCode]);
+  }, [millChallans, companyCode]);
 
   // Form State for Weaver Inward with TP details (Clean, no dummy/default values)
   const [weaverForm, setWeaverForm] = useState({
     lotNumber: '',
-    ourChallanNo: '',
     inwardDate: new Date().toISOString().split('T')[0],
     weaverParty: '',
     weaverChallanNo: '',
@@ -756,11 +759,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const handleOpenWeaverInwardModal = () => {
     const autoLot = getNextLotNumber();
-    const autoChallan = getNextOurChallanNo();
     setWeaverForm(prev => ({
       ...prev,
       lotNumber: autoLot,
-      ourChallanNo: autoChallan,
       inwardDate: new Date().toISOString().split('T')[0]
     }));
     setShowWeaverInwardModal(true);
@@ -1310,9 +1311,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     }
 
     const nextLot = getNextLotNumber();
-    const nextChallan = getNextOurChallanNo();
     const lotNumber = (weaverForm.lotNumber || '').trim() || nextLot;
-    const ourChallanNo = (weaverForm.ourChallanNo || '').trim() || nextChallan;
     const weaverChallanNo = (weaverForm.weaverChallanNo || '').trim();
 
     const totalMeters = validTps.reduce((sum, t) => sum + parseFloat(t.tpMtr), 0);
@@ -1357,9 +1356,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         const purchasePayload = {
           companyEntity,
           purchaseNo: nextPurNo,
-          billNo: (weaverForm.invoiceNo || weaverChallanNo || ourChallanNo || lotNumber).trim(),
+          billNo: (weaverForm.invoiceNo || weaverChallanNo || lotNumber).trim(),
           purchaseType: weaverForm.purchaseType || 'Inventory Purchase',
-          ourChallanNo: ourChallanNo,
           partyChallan: weaverChallanNo,
           date: weaverForm.invoiceDate || weaverForm.inwardDate,
           dueDate: dueDateObj.toISOString().split('T')[0],
@@ -1376,12 +1374,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           },
           items: [{
             itemName: `${weaverForm.fabricQuality} (Gray Fabric)`,
-            description: `${companyEntity || 'Yamunaji'} Gray Lot ${lotNumber} from ${weaverForm.weaverParty.trim()} (${validTps.length} TPs) | Our Challan: ${ourChallanNo} | Weaver Challan: ${weaverChallanNo || 'N/A'}`,
+            description: `${companyEntity || 'Yamunaji'} Gray Lot ${lotNumber} from ${weaverForm.weaverParty.trim()} (${validTps.length} TPs) | Weaver Challan: ${weaverChallanNo || 'N/A'}`,
             fabric: weaverForm.fabricQuality,
             fabricName: weaverForm.fabricQuality,
             lotNo: lotNumber,
             partyChallan: weaverChallanNo || '',
-            ourChallanNo: ourChallanNo,
             hsnCode: weaverForm.hsnCode || '5208',
             quantity: roundMtrs,
             qty: roundMtrs,
@@ -1449,7 +1446,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       id: lotNumber,
       lotNumber,
       companyEntity: companyEntity || 'Yamunaji',
-      ourChallanNo,
       weaverChallanNo: weaverChallanNo || 'Direct Inward',
       inwardDate: weaverForm.inwardDate,
       weaverParty: weaverForm.weaverParty.trim(),
@@ -1886,8 +1882,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
       if (!qual) qual = configs.qualities[0] || 'Pure Viscose Rayon 14kg';
     }
+    const autoChallan = getNextMillChallanNo();
     setMillChallanForm(prev => ({
       ...prev,
+      challanNo: autoChallan,
+      challanDate: new Date().toISOString().split('T')[0],
       fabricQuality: qual,
       selectedLotId: 'all',
       selectedTpKeys: {}
@@ -2214,10 +2213,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       return;
     }
 
-    const challanNo = millChallanForm.challanNo.trim() || `MILL-CH-${String(millChallans.length + 101)}`;
+    const autoChallan = getNextMillChallanNo();
+    const challanNo = (millChallanForm.challanNo || '').trim() || autoChallan;
     const totalMtrs = parseFloat(millSelectedTotalMtrs.toFixed(2));
     const primaryQuality = millChallanForm.fabricQuality || selectedMillTps[0]?.fabricQuality || 'Gray Fabric';
     const matchedMill = selectedMillDetails;
+
+    const matchedLots = grayLots.filter(l => selectedMillTps.some(t => t.lotNumber === l.lotNumber || t.lotId === l.id) || l.lotNumber === millChallanForm.selectedLotId);
+    const weaverChallans = Array.from(new Set([
+      ...selectedMillTps.map(t => t.weaverChallanNo),
+      ...matchedLots.map(l => l.weaverChallanNo)
+    ].filter(Boolean))).join(', ');
+    const weaverParties = Array.from(new Set([
+      ...selectedMillTps.map(t => t.weaverParty),
+      ...matchedLots.map(l => l.weaverParty)
+    ].filter(Boolean))).join(', ');
+    const lotNumbers = Array.from(new Set(selectedMillTps.map(t => t.lotNumber).filter(Boolean))).join(', ') || 'GRAY-LOT-MIX';
 
     const newChallan = {
       id: challanNo,
@@ -2234,16 +2245,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       driverName: millChallanForm.driverName.trim() || 'Driver',
       processRequired: millChallanForm.processRequired,
       fabricQuality: primaryQuality,
-      lotNumber: Array.from(new Set(selectedMillTps.map(t => t.lotNumber).filter(Boolean))).join(', ') || 'GRAY-LOT-MIX',
-      ourChallanNo: Array.from(new Set(selectedMillTps.map(t => t.ourChallanNo).filter(Boolean))).join(', '),
-      weaverChallanNo: Array.from(new Set(selectedMillTps.map(t => t.weaverChallanNo).filter(Boolean))).join(', '),
+      lotNumber: lotNumbers,
+      weaverParty: weaverParties,
+      weaverChallanNo: weaverChallans,
       totalTps: selectedMillTps.length,
       totalMeters: totalMtrs,
       status: 'At Mill',
       tps: selectedMillTps.map((t, idx) => ({
         srNo: idx + 1,
         lotNumber: t.lotNumber,
-        ourChallanNo: t.ourChallanNo || '',
+        weaverParty: t.weaverParty || '',
         weaverChallanNo: t.weaverChallanNo || '',
         tpNo: t.tpNo,
         tpMtr: t.tpMtr
@@ -5725,7 +5736,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.65rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
                           <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
@@ -5741,24 +5752,6 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           title="System Auto-Generated (Not Editable)"
                           className="input-field"
                           style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#0284c7', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
-                        />
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
-                            Challan No (Auto) *
-                          </label>
-                          <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>Auto Locked</span>
-                        </div>
-                        <input
-                          type="text"
-                          readOnly
-                          placeholder={`e.g. ${companyCode}MC-01`}
-                          value={weaverForm.ourChallanNo}
-                          title="System Auto-Generated (Not Editable)"
-                          className="input-field"
-                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#059669', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
                         />
                       </div>
 
@@ -6452,16 +6445,22 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             <form onSubmit={handleCreateMillChallan} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Challan No (Auto if blank)
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                      Challan No (Auto) *
+                    </label>
+                    <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>
+                      Auto Locked
+                    </span>
+                  </div>
                   <input
                     type="text"
-                    placeholder={`MILL-CH-${String(millChallans.length + 101)}`}
+                    readOnly
+                    placeholder={`e.g. ${companyCode}MC-01`}
                     value={millChallanForm.challanNo}
-                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, challanNo: e.target.value }))}
+                    title="Mill Delivery Challan No is auto-generated and locked"
                     className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.85rem', width: '100%', fontWeight: 800, color: '#059669', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
                   />
                 </div>
 
@@ -7286,20 +7285,36 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           <div style={{ marginTop: 2, fontSize: '0.64rem' }}><strong>Process Required:</strong> {showPrintChallanModal.processRequired}</div>
                         </div>
 
-                        <div style={{ textAlign: 'right', fontSize: '0.66rem', lineHeight: 1.35 }}>
-                          <div><strong>Mill Challan No:</strong> <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
-                          <div><strong>Date:</strong> {showPrintChallanModal.challanDate}</div>
-                          <div><strong>Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
+                        <div style={{ textAlign: 'right', fontSize: '0.66rem', lineHeight: 1.4 }}>
+                          <div><strong>Mill Challan No:</strong> <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#059669' }}>{showPrintChallanModal.challanNo}</span></div>
+                          <div><strong>Challan Date:</strong> {showPrintChallanModal.challanDate}</div>
+                          <div><strong>Fabric Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
                           {(() => {
                             const lotNos = showPrintChallanModal.lotNumber || Array.from(new Set((showPrintChallanModal.tps || []).map(t => t.lotNumber).filter(Boolean))).join(', ');
                             const matchedLots = grayLots.filter(l => (showPrintChallanModal.tps || []).some(t => t.lotNumber === l.lotNumber) || l.lotNumber === showPrintChallanModal.lotNumber);
-                            const ourChallans = showPrintChallanModal.ourChallanNo || Array.from(new Set(matchedLots.map(l => l.ourChallanNo).filter(Boolean))).join(', ');
-                            const weaverChallans = showPrintChallanModal.weaverChallanNo || Array.from(new Set(matchedLots.map(l => l.weaverChallanNo).filter(Boolean))).join(', ');
+                            const weaverChallans = showPrintChallanModal.weaverChallanNo || Array.from(new Set([
+                              ...(showPrintChallanModal.tps || []).map(t => t.weaverChallanNo),
+                              ...matchedLots.map(l => l.weaverChallanNo)
+                            ].filter(Boolean))).join(', ');
+                            const weaverParties = showPrintChallanModal.weaverParty || Array.from(new Set([
+                              ...(showPrintChallanModal.tps || []).map(t => t.weaverParty),
+                              ...matchedLots.map(l => l.weaverParty)
+                            ].filter(Boolean))).join(', ');
+
                             return (
                               <>
-                                {lotNos && <div><strong>Lot No:</strong> <span style={{ fontWeight: 800 }}>{lotNos}</span></div>}
-                                {ourChallans && <div><strong>Challan No:</strong> <span style={{ fontWeight: 800, color: '#0284c7' }}>{ourChallans}</span></div>}
-                                {weaverChallans && <div><strong>Weaver Gray Challan:</strong> <span style={{ fontWeight: 800, color: '#475569' }}>{weaverChallans}</span></div>}
+                                <div>
+                                  <strong>Weaver Challan No:</strong>{' '}
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a', background: '#f8fafc', padding: '1px 5px', borderRadius: 3, border: '1px solid #94a3b8' }}>
+                                    {weaverChallans || 'Direct Inward'}
+                                  </span>
+                                </div>
+                                {weaverParties && (
+                                  <div><strong>Weaver / Loom:</strong> <span style={{ fontWeight: 800, color: '#334155' }}>{weaverParties}</span></div>
+                                )}
+                                {lotNos && (
+                                  <div><strong>Gray Lot No:</strong> <span style={{ fontWeight: 800, color: '#0284c7' }}>{lotNos}</span></div>
+                                )}
                               </>
                             );
                           })()}
