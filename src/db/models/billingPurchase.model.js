@@ -48,8 +48,11 @@ const billingPurchaseSchema = new mongoose.Schema(
       gstin: { type: String, default: '' },
       billingAddress: { type: String, default: '' },
       shippingAddress: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+      city: { type: String, default: '' },
       state: { type: String, default: 'Gujarat' },
-      stateCode: { type: String, default: '24' }
+      stateCode: { type: String, default: '24' },
+      country: { type: String, default: 'India' }
     },
     vendorName: { type: String, required: true, trim: true, index: true },
 

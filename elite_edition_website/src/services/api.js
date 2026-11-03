@@ -2523,6 +2523,10 @@ export const api = {
     });
   },
 
+  async lookupPincode(pincode) {
+    return request(`/billing/lookup-pincode/${encodeURIComponent(pincode)}`);
+  },
+
   // Purchases CRUD
   async getNextPurchaseNo(companyEntity = 'Elite Digital Prints') {
     return request(`/billing/purchases/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);

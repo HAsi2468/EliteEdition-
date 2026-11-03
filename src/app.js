@@ -117,6 +117,7 @@ app.use(
 					'https://api.giphy.com',
 					'https://*.giphy.com',
 					'https://tenor.googleapis.com',
+					'https://api.postalpincode.in',
 				],
 				mediaSrc: ["'self'", 'blob:', 'data:', 'https://*.r2.dev'],
 				objectSrc: ["'self'", 'blob:', 'data:', 'https://*.r2.dev'],

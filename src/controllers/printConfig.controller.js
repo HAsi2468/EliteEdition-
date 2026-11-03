@@ -168,6 +168,7 @@ const updatePrintConfig = async (req, res) => {
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
       'deliveryOptions', 'lotPartyMap', 'companyName', 'companyGstin', 'companyAddress',
       'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms',
+      'companyState', 'companyStateCode', 'companyCity', 'companyPincode', 'companyCountry',
       'paymentDueDays', 'startingInvoiceNo', 'invoicePrefix', 'invoiceSuffix',
       'stitchingCategories', 'stitchingLabels', 'finishingOptions', 'stitchingParties', 'stitchingBillTo', 'stitchingShipTo', 'stitchingDeliveryBy',
       'expenseInCategories', 'expenseOutCategories', 'expensePaymentModes'

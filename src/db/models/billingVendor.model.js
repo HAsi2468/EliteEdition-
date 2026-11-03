@@ -10,8 +10,11 @@ const billingVendorSchema = new mongoose.Schema(
     gstin: { type: String, default: '', trim: true },
     billingAddress: { type: String, default: '', trim: true },
     shippingAddress: { type: String, default: '', trim: true },
+    pincode: { type: String, default: '', trim: true },
+    city: { type: String, default: '', trim: true },
     state: { type: String, default: 'Gujarat', trim: true },
     stateCode: { type: String, default: '24', trim: true },
+    country: { type: String, default: 'India', trim: true },
     openingBalance: { type: Number, default: 0 },
     vendorType: { type: String, default: 'Fabric', trim: true }
   },

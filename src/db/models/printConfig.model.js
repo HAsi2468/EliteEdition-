@@ -216,6 +216,18 @@ const printConfigSchema = new mongoose.Schema(
       type: String,
       default: '24',
     },
+    companyCity: {
+      type: String,
+      default: 'Surat',
+    },
+    companyPincode: {
+      type: String,
+      default: '',
+    },
+    companyCountry: {
+      type: String,
+      default: 'India',
+    },
     companyEmail: {
       type: String,
       default: 'info@company.com',

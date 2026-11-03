@@ -22,6 +22,7 @@ import QuickActionMenu from './common/QuickActionMenu';
 import { SmartActionGroup } from './common/SmartActionGroup';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import * as XLSX from 'xlsx';
+import { lookupPincode, getStateCode, inferStateFromGstin } from '../utils/postalCodeHelper';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -421,8 +422,11 @@ export default function EliteBillingDepartment({
       gstin: '',
       billingAddress: '',
       shippingAddress: '',
+      pincode: '',
+      city: '',
       state: 'Gujarat',
-      stateCode: '24'
+      stateCode: '24',
+      country: 'India'
     },
     vendorName: '',
     items: [createEmptyPurchaseItem()],
@@ -625,8 +629,11 @@ export default function EliteBillingDepartment({
           gstin: '',
           billingAddress: '',
           shippingAddress: '',
+          pincode: '',
+          city: '',
           state: 'Gujarat',
-          stateCode: '24'
+          stateCode: '24',
+          country: 'India'
         }
       }));
       return;
@@ -655,8 +662,11 @@ export default function EliteBillingDepartment({
           gstin: matchedBilling.gstin || '',
           billingAddress: matchedBilling.billingAddress || matchedBilling.address || '',
           shippingAddress: matchedBilling.shippingAddress || matchedBilling.billingAddress || matchedBilling.address || '',
+          pincode: matchedBilling.pincode || '',
+          city: matchedBilling.city || '',
           state: matchedBilling.state || 'Gujarat',
-          stateCode: matchedBilling.stateCode || '24'
+          stateCode: matchedBilling.stateCode || '24',
+          country: matchedBilling.country || 'India'
         }
       }));
       return;
@@ -682,8 +692,11 @@ export default function EliteBillingDepartment({
           gstin: pv.gstin || '',
           billingAddress: pv.billingAddress || '',
           shippingAddress: pv.shippingAddress || pv.billingAddress || '',
+          pincode: pv.pincode || '',
+          city: pv.city || '',
           state: pv.state || 'Gujarat',
-          stateCode: pv.stateCode || '24'
+          stateCode: pv.stateCode || '24',
+          country: pv.country || 'India'
         }
       }));
       return;
@@ -862,8 +875,11 @@ export default function EliteBillingDepartment({
         gstin: p.vendor?.gstin || '',
         billingAddress: p.vendor?.billingAddress || '',
         shippingAddress: p.vendor?.shippingAddress || '',
+        pincode: p.vendor?.pincode || '',
+        city: p.vendor?.city || '',
         state: p.vendor?.state || 'Gujarat',
-        stateCode: p.vendor?.stateCode || '24'
+        stateCode: p.vendor?.stateCode || '24',
+        country: p.vendor?.country || 'India'
       },
       vendorName: p.vendorName || p.vendor?.businessName || p.vendor?.name || '',
       items: pItems,
@@ -1274,8 +1290,11 @@ export default function EliteBillingDepartment({
         gstin: purchaseForm.vendor?.gstin || '',
         billingAddress: purchaseForm.vendor?.billingAddress || '',
         shippingAddress: purchaseForm.vendor?.shippingAddress || '',
+        pincode: purchaseForm.vendor?.pincode || '',
+        city: purchaseForm.vendor?.city || '',
         state: purchaseForm.vendor?.state || 'Gujarat',
-        stateCode: purchaseForm.vendor?.stateCode || '24'
+        stateCode: purchaseForm.vendor?.stateCode || '24',
+        country: purchaseForm.vendor?.country || 'India'
       },
       vendorName: vendorFinalName.trim(),
       companyEntity: companyEntity || 'Elite Digital Prints',
@@ -3287,18 +3306,24 @@ export default function EliteBillingDepartment({
   const [payNotes, setPayNotes] = useState('');
   const [submittingPay, setSubmittingPay] = useState(false);
 
+  // Pincode lookup loading states
+  const [pincodeLoadingCust, setPincodeLoadingCust] = useState(false);
+  const [pincodeLoadingVendor, setPincodeLoadingVendor] = useState(false);
+  const [pincodeLoadingInvoice, setPincodeLoadingInvoice] = useState(false);
+  const [pincodeLoadingPurchase, setPincodeLoadingPurchase] = useState(false);
+
   // New Customer Modal State
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [custForm, setCustForm] = useState({
-    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
+    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', pincode: '', city: '', state: 'Gujarat', stateCode: '24', country: 'India'
   });
 
   // New Vendor Modal State
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [editingVendorId, setEditingVendorId] = useState(null);
   const [vendorForm, setVendorForm] = useState({
-    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier'
+    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', pincode: '', city: '', state: 'Gujarat', stateCode: '24', country: 'India', vendorType: 'General Supplier'
   });
 
   // New Item Modal State
@@ -3359,8 +3384,11 @@ export default function EliteBillingDepartment({
       gstin: '',
       billingAddress: '',
       shippingAddress: '',
+      pincode: '',
+      city: '',
       state: 'Gujarat',
-      stateCode: '24'
+      stateCode: '24',
+      country: 'India'
     },
     items: isCorporateEntity ? [
       { itemName: '', hsnCode: '', qty: 1, unit: 'Pcs', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
@@ -3639,7 +3667,7 @@ export default function EliteBillingDepartment({
           invoiceDate: new Date().toISOString().split('T')[0],
           dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
           customer: customers[0] ? { ...customers[0] } : {
-            customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
+            customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', pincode: '', city: '', state: 'Gujarat', stateCode: '24', country: 'India'
           },
           items: isCorporateEntity ? [
             { itemName: '', hsnCode: '', qty: 1, unit: 'Pcs', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
@@ -4019,8 +4047,11 @@ export default function EliteBillingDepartment({
           gstin: matched.gstin || '',
           billingAddress: matched.billingAddress || '',
           shippingAddress: matched.shippingAddress || matched.billingAddress || '',
+          pincode: matched.pincode || '',
+          city: matched.city || '',
           state: matched.state || 'Gujarat',
-          stateCode: matched.stateCode || '24'
+          stateCode: matched.stateCode || '24',
+          country: matched.country || 'India'
         },
         taxType: matched.stateCode && matched.stateCode !== '24' ? 'IGST' : 'CGST_SGST'
       }));
@@ -4209,6 +4240,172 @@ export default function EliteBillingDepartment({
     }
   };
 
+  // Pincode and Geo Handlers for Customer Modal
+  const handleCustPincodeChange = async (e) => {
+    const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setCustForm(f => ({ ...f, pincode: pin }));
+    if (pin.length === 6) {
+      setPincodeLoadingCust(true);
+      try {
+        const geo = await lookupPincode(pin);
+        if (geo) {
+          setCustForm(f => ({
+            ...f,
+            pincode: pin,
+            city: geo.city || f.city,
+            state: geo.state || f.state,
+            stateCode: geo.stateCode || f.stateCode,
+            country: geo.country || 'India'
+          }));
+        }
+      } catch (err) {
+        console.warn('Cust pincode lookup failed:', err);
+      } finally {
+        setPincodeLoadingCust(false);
+      }
+    }
+  };
+
+  const handleCustStateChange = (e) => {
+    const st = e.target.value;
+    setCustForm(f => ({
+      ...f,
+      state: st,
+      stateCode: getStateCode(st)
+    }));
+  };
+
+  // Pincode and Geo Handlers for Vendor Modal
+  const handleVendorPincodeChange = async (e) => {
+    const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setVendorForm(f => ({ ...f, pincode: pin }));
+    if (pin.length === 6) {
+      setPincodeLoadingVendor(true);
+      try {
+        const geo = await lookupPincode(pin);
+        if (geo) {
+          setVendorForm(f => ({
+            ...f,
+            pincode: pin,
+            city: geo.city || f.city,
+            state: geo.state || f.state,
+            stateCode: geo.stateCode || f.stateCode,
+            country: geo.country || 'India'
+          }));
+        }
+      } catch (err) {
+        console.warn('Vendor pincode lookup failed:', err);
+      } finally {
+        setPincodeLoadingVendor(false);
+      }
+    }
+  };
+
+  const handleVendorStateChange = (e) => {
+    const st = e.target.value;
+    setVendorForm(f => ({
+      ...f,
+      state: st,
+      stateCode: getStateCode(st)
+    }));
+  };
+
+  // Pincode and Geo Handlers for Invoice Customer Section
+  const handleInvoiceCustPincodeChange = async (e) => {
+    const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setInvoiceForm(f => ({
+      ...f,
+      customer: { ...f.customer, pincode: pin }
+    }));
+    if (pin.length === 6) {
+      setPincodeLoadingInvoice(true);
+      try {
+        const geo = await lookupPincode(pin);
+        if (geo) {
+          const newStateCode = geo.stateCode || '24';
+          setInvoiceForm(f => ({
+            ...f,
+            customer: {
+              ...f.customer,
+              pincode: pin,
+              city: geo.city || f.customer.city,
+              state: geo.state || f.customer.state,
+              stateCode: newStateCode,
+              country: geo.country || 'India'
+            },
+            taxType: newStateCode !== '24' ? 'IGST' : 'CGST_SGST'
+          }));
+        }
+      } catch (err) {
+        console.warn('Invoice pincode lookup failed:', err);
+      } finally {
+        setPincodeLoadingInvoice(false);
+      }
+    }
+  };
+
+  const handleInvoiceCustStateChange = (e) => {
+    const st = e.target.value;
+    const code = getStateCode(st);
+    setInvoiceForm(f => ({
+      ...f,
+      customer: {
+        ...f.customer,
+        state: st,
+        stateCode: code
+      },
+      taxType: code !== '24' ? 'IGST' : 'CGST_SGST'
+    }));
+  };
+
+  // Pincode and Geo Handlers for Purchase Vendor Section
+  const handlePurchaseVendorPincodeChange = async (e) => {
+    const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setPurchaseForm(f => ({
+      ...f,
+      vendor: { ...f.vendor, pincode: pin }
+    }));
+    if (pin.length === 6) {
+      setPincodeLoadingPurchase(true);
+      try {
+        const geo = await lookupPincode(pin);
+        if (geo) {
+          const newStateCode = geo.stateCode || '24';
+          setPurchaseForm(f => ({
+            ...f,
+            vendor: {
+              ...f.vendor,
+              pincode: pin,
+              city: geo.city || f.vendor.city,
+              state: geo.state || f.vendor.state,
+              stateCode: newStateCode,
+              country: geo.country || 'India'
+            },
+            taxType: newStateCode !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
+          }));
+        }
+      } catch (err) {
+        console.warn('Purchase pincode lookup failed:', err);
+      } finally {
+        setPincodeLoadingPurchase(false);
+      }
+    }
+  };
+
+  const handlePurchaseVendorStateChange = (e) => {
+    const st = e.target.value;
+    const code = getStateCode(st);
+    setPurchaseForm(f => ({
+      ...f,
+      vendor: {
+        ...f.vendor,
+        state: st,
+        stateCode: code
+      },
+      taxType: code !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
+    }));
+  };
+
   // Create / Update Customer Handler
   const handleSaveCustomer = async () => {
     if (!custForm.name || !custForm.name.trim()) {
@@ -4237,7 +4434,7 @@ export default function EliteBillingDepartment({
       }
       setShowCustomerModal(false);
       setEditingCustomerId(null);
-      setCustForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24' });
+      setCustForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', pincode: '', city: '', state: 'Gujarat', stateCode: '24', country: 'India' });
     } catch (err) {
       alert(err.message || 'Failed to save customer');
     }
@@ -4252,8 +4449,11 @@ export default function EliteBillingDepartment({
       email: c.email || '',
       gstin: c.gstin || '',
       billingAddress: c.billingAddress || '',
+      pincode: c.pincode || '',
+      city: c.city || '',
       state: c.state || 'Gujarat',
-      stateCode: c.stateCode || '24'
+      stateCode: c.stateCode || '24',
+      country: c.country || 'India'
     });
     setShowCustomerModal(true);
   };
@@ -4276,7 +4476,7 @@ export default function EliteBillingDepartment({
       }
       setShowVendorModal(false);
       setEditingVendorId(null);
-      setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier' });
+      setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', pincode: '', city: '', state: 'Gujarat', stateCode: '24', country: 'India', vendorType: 'General Supplier' });
     } catch (err) {
       alert(err.message || 'Failed to save vendor');
     }
@@ -4291,8 +4491,11 @@ export default function EliteBillingDepartment({
       email: v.email || '',
       gstin: v.gstin || '',
       billingAddress: v.billingAddress || v.address || '',
+      pincode: v.pincode || '',
+      city: v.city || '',
       state: v.state || 'Gujarat',
       stateCode: v.stateCode || '24',
+      country: v.country || 'India',
       vendorType: v.vendorType || 'Fabric'
     });
     setShowVendorModal(true);
@@ -5322,10 +5525,74 @@ export default function EliteBillingDepartment({
                 <label style={labelStyle}>Billing Address</label>
                 <input
                   type="text"
-                  value={invoiceForm.customer.billingAddress}
+                  value={invoiceForm.customer.billingAddress || ''}
                   onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, billingAddress: e.target.value } }))}
                   style={inputStyle}
-                  placeholder="Street / Area / City"
+                  placeholder="Street / Area / Complex"
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>
+                  PIN Code {pincodeLoadingInvoice && <RefreshCw size={11} className="spin" color="#a78bfa" style={{ display: 'inline', marginLeft: 4 }} />}
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={invoiceForm.customer.pincode || ''}
+                  onChange={handleInvoiceCustPincodeChange}
+                  style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
+                  placeholder="e.g. 395006"
+                />
+                <span style={{ fontSize: '0.65rem', color: '#a78bfa', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City, State & GST</span>
+              </div>
+
+              <div>
+                <label style={labelStyle}>City / District</label>
+                <input
+                  type="text"
+                  value={invoiceForm.customer.city || ''}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, city: e.target.value } }))}
+                  style={inputStyle}
+                  placeholder="e.g. Surat"
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>State & Code</label>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <input
+                    type="text"
+                    value={invoiceForm.customer.state || ''}
+                    onChange={handleInvoiceCustStateChange}
+                    style={{ ...inputStyle, flex: 1 }}
+                    placeholder="e.g. Gujarat"
+                  />
+                  <input
+                    type="text"
+                    value={invoiceForm.customer.stateCode || ''}
+                    onChange={e => {
+                      const code = e.target.value;
+                      setInvoiceForm(f => ({
+                        ...f,
+                        customer: { ...f.customer, stateCode: code },
+                        taxType: code && code !== '24' ? 'IGST' : 'CGST_SGST'
+                      }));
+                    }}
+                    style={{ ...inputStyle, width: '48px', textAlign: 'center', fontWeight: 700 }}
+                    placeholder="24"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Country</label>
+                <input
+                  type="text"
+                  value={invoiceForm.customer.country || 'India'}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, country: e.target.value } }))}
+                  style={inputStyle}
+                  placeholder="India"
                 />
               </div>
             </div>
@@ -7320,7 +7587,7 @@ export default function EliteBillingDepartment({
                     <label style={labelStyle}>Billing / Supplier Address</label>
                     <input
                       type="text"
-                      value={purchaseForm.vendor.billingAddress}
+                      value={purchaseForm.vendor?.billingAddress || ''}
                       onChange={e => setPurchaseForm(f => ({
                         ...f,
                         vendor: { ...f.vendor, billingAddress: e.target.value }
@@ -7331,16 +7598,66 @@ export default function EliteBillingDepartment({
                   </div>
 
                   <div>
-                    <label style={labelStyle}>State</label>
+                    <label style={labelStyle}>
+                      PIN Code {pincodeLoadingPurchase && <RefreshCw size={11} className="spin" color="#4f46e5" style={{ display: 'inline', marginLeft: 4 }} />}
+                    </label>
                     <input
                       type="text"
-                      value={purchaseForm.vendor.state}
-                      onChange={e => setPurchaseForm(f => ({
-                        ...f,
-                        vendor: { ...f.vendor, state: e.target.value }
-                      }))}
+                      maxLength={6}
+                      value={purchaseForm.vendor?.pincode || ''}
+                      onChange={handlePurchaseVendorPincodeChange}
+                      style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
+                      placeholder="e.g. 395006"
+                    />
+                    <span style={{ fontSize: '0.65rem', color: '#4f46e5', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City, State & GST</span>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>City / District</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor?.city || ''}
+                      onChange={e => setPurchaseForm(f => ({ ...f, vendor: { ...f.vendor, city: e.target.value } }))}
                       style={inputStyle}
-                      placeholder="e.g. Gujarat"
+                      placeholder="e.g. Surat"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>State & Code</label>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <input
+                        type="text"
+                        value={purchaseForm.vendor?.state || ''}
+                        onChange={handlePurchaseVendorStateChange}
+                        style={{ ...inputStyle, flex: 1 }}
+                        placeholder="e.g. Gujarat"
+                      />
+                      <input
+                        type="text"
+                        value={purchaseForm.vendor?.stateCode || ''}
+                        onChange={e => {
+                          const code = e.target.value;
+                          setPurchaseForm(f => ({
+                            ...f,
+                            vendor: { ...f.vendor, stateCode: code },
+                            taxType: code && code !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
+                          }));
+                        }}
+                        style={{ ...inputStyle, width: '48px', textAlign: 'center', fontWeight: 700 }}
+                        placeholder="24"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Country</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor?.country || 'India'}
+                      onChange={e => setPurchaseForm(f => ({ ...f, vendor: { ...f.vendor, country: e.target.value } }))}
+                      style={inputStyle}
+                      placeholder="India"
                     />
                   </div>
                 </div>
@@ -8511,6 +8828,66 @@ export default function EliteBillingDepartment({
               <textarea rows={2} value={custForm.billingAddress} onChange={e => setCustForm(f => ({ ...f, billingAddress: e.target.value }))} style={inputStyle} />
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>
+                  PIN Code {pincodeLoadingCust && <RefreshCw size={11} className="spin" color="#6366f1" style={{ display: 'inline', marginLeft: 4 }} />}
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={custForm.pincode || ''}
+                  onChange={handleCustPincodeChange}
+                  style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
+                  placeholder="e.g. 395006"
+                />
+                <span style={{ fontSize: '0.65rem', color: '#6366f1', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City & State</span>
+              </div>
+              <div>
+                <label style={labelStyle}>City / District</label>
+                <input
+                  type="text"
+                  value={custForm.city || ''}
+                  onChange={e => setCustForm(f => ({ ...f, city: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="e.g. Surat"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>State</label>
+                <input
+                  type="text"
+                  value={custForm.state || ''}
+                  onChange={handleCustStateChange}
+                  style={inputStyle}
+                  placeholder="e.g. Gujarat"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>State Code</label>
+                <input
+                  type="text"
+                  value={custForm.stateCode || ''}
+                  onChange={e => setCustForm(f => ({ ...f, stateCode: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="24"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Country</label>
+                <input
+                  type="text"
+                  value={custForm.country || 'India'}
+                  onChange={e => setCustForm(f => ({ ...f, country: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="India"
+                />
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowCustomerModal(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleSaveCustomer}>
@@ -8617,21 +8994,60 @@ export default function EliteBillingDepartment({
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
               <div>
+                <label style={labelStyle}>
+                  PIN Code {pincodeLoadingVendor && <RefreshCw size={11} className="spin" color="#6366f1" style={{ display: 'inline', marginLeft: 4 }} />}
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={vendorForm.pincode || ''}
+                  onChange={handleVendorPincodeChange}
+                  style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
+                  placeholder="e.g. 395006"
+                />
+                <span style={{ fontSize: '0.65rem', color: '#6366f1', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City & State</span>
+              </div>
+              <div>
+                <label style={labelStyle}>City / District</label>
+                <input
+                  type="text"
+                  value={vendorForm.city || ''}
+                  onChange={e => setVendorForm(f => ({ ...f, city: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="e.g. Surat"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr', gap: '0.6rem' }}>
+              <div>
                 <label style={labelStyle}>State</label>
                 <input
                   type="text"
-                  value={vendorForm.state}
-                  onChange={e => setVendorForm(f => ({ ...f, state: e.target.value }))}
+                  value={vendorForm.state || ''}
+                  onChange={handleVendorStateChange}
                   style={inputStyle}
+                  placeholder="e.g. Gujarat"
                 />
               </div>
               <div>
                 <label style={labelStyle}>State Code</label>
                 <input
                   type="text"
-                  value={vendorForm.stateCode}
+                  value={vendorForm.stateCode || ''}
                   onChange={e => setVendorForm(f => ({ ...f, stateCode: e.target.value }))}
                   style={inputStyle}
+                  placeholder="24"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Country</label>
+                <input
+                  type="text"
+                  value={vendorForm.country || 'India'}
+                  onChange={e => setVendorForm(f => ({ ...f, country: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="India"
                 />
               </div>
             </div>

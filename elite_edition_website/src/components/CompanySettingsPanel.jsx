@@ -11,6 +11,7 @@ import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import CompanyDesignStudio from './CompanyDesignStudio';
 import DocumentDesignStudio from './DesignStudio/DocumentDesignStudio';
 import AdminChangeApprovalQueue from './AdminChangeApprovalQueue';
+import { lookupPincode, getStateCode } from '../utils/postalCodeHelper';
 
 const getCompanyAccentColor = (entity) => {
   return 'var(--primary)';
@@ -32,8 +33,11 @@ export const getInitialFormForCompany = (companyEntity) => {
     companyPhone: isEE ? '+91 76006 65058' : (isYJ ? '9979112777' : ''),
     companyEmail: isEE ? 'INFO.ELITEEDITION@GMAIL.COM' : '',
     companyLogo: '',
+    companyCity: isEE || isYJ ? 'Surat' : '',
+    companyPincode: isEE ? '395010' : '',
     companyState: 'Gujarat',
     companyStateCode: '24',
+    companyCountry: 'India',
     companyBankName: isEE ? 'KOTAK MAHINDRA BANK' : '',
     companyAccountNo: isEE ? '9909866667' : '',
     companyIfscCode: isEE ? 'KKBK0000883' : '',
@@ -538,6 +542,39 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
     setForm(f => ({ ...f, [name]: value }));
   };
 
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+
+  const handleCompanyPincodeChange = async (e) => {
+    const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setForm(f => ({ ...f, companyPincode: pin }));
+    if (pin.length === 6) {
+      setPincodeLoading(true);
+      try {
+        const geo = await lookupPincode(pin);
+        if (geo) {
+          setForm(f => ({
+            ...f,
+            companyPincode: pin,
+            companyCity: geo.city || f.companyCity,
+            companyState: geo.state || f.companyState,
+            companyStateCode: geo.stateCode || f.companyStateCode,
+            companyCountry: geo.country || 'India'
+          }));
+        }
+      } catch (err) {
+        console.warn('Pincode lookup error:', err);
+      } finally {
+        setPincodeLoading(false);
+      }
+    }
+  };
+
+  const handleCompanyStateChange = (e) => {
+    const stateVal = e.target.value;
+    const code = getStateCode(stateVal);
+    setForm(f => ({ ...f, companyState: stateVal, companyStateCode: code }));
+  };
+
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1040px', margin: '0 auto' }}>
       {/* Header Banner */}
@@ -1018,41 +1055,90 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
                 className="form-control"
               />
             </div>
-
-            <div>
-              <label className="form-label">State Name</label>
-              <input
-                type="text"
-                name="companyState"
-                value={form.companyState}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">State GST Code</label>
-              <input
-                type="text"
-                name="companyStateCode"
-                value={form.companyStateCode}
-                onChange={handleChange}
-                placeholder="24"
-                className="form-control"
-              />
-            </div>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label className="form-label">Registered Office & Factory Address</label>
+          <div style={{ marginTop: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
+            <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+              Registered Office & Factory Address (Street / Building)
+            </label>
             <textarea
               name="companyAddress"
               value={form.companyAddress}
               onChange={handleChange}
-              rows={3}
+              rows={2}
               className="form-control"
-              placeholder="Full address printed on Tax Invoices"
+              placeholder="e.g. Plot No-B/37, Siddheshwar Soc., Punagam Road"
             />
+          </div>
+
+          {/* Geo-Location 4-Column Address Grid with Free Pincode Auto-Fill */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', marginTop: '0.85rem' }}>
+            <div>
+              <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                PIN Code {pincodeLoading && <RefreshCw size={12} className="spin" color="#2563eb" />}
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={form.companyPincode || ''}
+                onChange={handleCompanyPincodeChange}
+                placeholder="e.g. 395006"
+                className="form-control"
+                style={{ fontWeight: 700, letterSpacing: '1px' }}
+              />
+              <span style={{ fontSize: '0.68rem', color: '#2563eb', display: 'block', marginTop: '2px' }}>
+                ⚡ Auto-fetches City & State
+              </span>
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 700 }}>City / District</label>
+              <input
+                type="text"
+                name="companyCity"
+                value={form.companyCity || ''}
+                onChange={handleChange}
+                placeholder="e.g. Surat"
+                className="form-control"
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 700 }}>State</label>
+              <input
+                type="text"
+                name="companyState"
+                value={form.companyState || ''}
+                onChange={handleCompanyStateChange}
+                placeholder="e.g. Gujarat"
+                className="form-control"
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 700 }}>State GST Code</label>
+              <input
+                type="text"
+                name="companyStateCode"
+                value={form.companyStateCode || ''}
+                onChange={handleChange}
+                placeholder="24"
+                className="form-control"
+                style={{ fontWeight: 700, textAlign: 'center' }}
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 700 }}>Country</label>
+              <input
+                type="text"
+                name="companyCountry"
+                value={form.companyCountry || 'India'}
+                onChange={handleChange}
+                placeholder="India"
+                className="form-control"
+              />
+            </div>
           </div>
         </div>
 
