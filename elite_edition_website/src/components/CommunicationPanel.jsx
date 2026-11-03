@@ -361,6 +361,155 @@ function TextFileViewer({ fileUrl, fileName }) {
   );
 }
 
+function PdfViewer({ fileUrl, fileName, onDownload }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [blobUrl, setBlobUrl] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    let createdUrl = null;
+    setLoading(true);
+    setError(null);
+
+    const loadPdf = async () => {
+      let pdfBlob = null;
+
+      // 1. Try direct fetch first
+      try {
+        const res = await fetch(fileUrl);
+        if (res.ok) {
+          pdfBlob = await res.blob();
+        }
+      } catch (e) {
+        // Direct fetch blocked by CORS or network, proceed to fallback proxy
+      }
+
+      // 2. Fallback to authenticated download proxy
+      if (!pdfBlob) {
+        try {
+          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'document.pdf')}`;
+          const res = await authFetch(proxyUrl);
+          if (res.ok) {
+            pdfBlob = await res.blob();
+          } else {
+            throw new Error(`Server returned HTTP ${res.status}`);
+          }
+        } catch (err) {
+          if (!active) return;
+          setError(err.message || 'Unable to load PDF stream');
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!active) return;
+
+      if (pdfBlob) {
+        const typedBlob = pdfBlob.type === 'application/pdf' ? pdfBlob : new Blob([pdfBlob], { type: 'application/pdf' });
+        createdUrl = window.URL.createObjectURL(typedBlob);
+        setBlobUrl(createdUrl);
+      } else {
+        setError('Empty PDF response received');
+      }
+      setLoading(false);
+    };
+
+    loadPdf();
+
+    return () => {
+      active = false;
+      if (createdUrl) {
+        window.URL.revokeObjectURL(createdUrl);
+      }
+    };
+  }, [fileUrl, fileName]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: '14px', background: '#1e293b' }}>
+        <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#3874ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#e2e8f0' }}>Preparing PDF document preview...</span>
+      </div>
+    );
+  }
+
+  if (error || !blobUrl) {
+    return (
+      <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#f87171', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#0f172a' }}>
+        <FileText size={48} style={{ opacity: 0.7, marginBottom: '12px' }} />
+        <p style={{ margin: 0, fontWeight: 700, fontSize: '1.05rem', color: '#ffffff' }}>Could not display PDF inline.</p>
+        <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '6px', maxWidth: '400px' }}>
+          This document could not be loaded into the browser frame ({error || 'Unknown error'}). You can open or download it directly.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '18px' }}>
+          {onDownload && (
+            <button
+              type="button"
+              onClick={onDownload}
+              style={{
+                background: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 18px',
+                borderRadius: '6px',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Download size={15} /> Download PDF
+            </button>
+          )}
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: '#334155',
+              color: '#ffffff',
+              padding: '8px 18px',
+              borderRadius: '6px',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <ExternalLink size={15} /> Open in New Tab
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#525659' }}>
+      <object
+        data={`${blobUrl}#toolbar=1&navpanes=0`}
+        type="application/pdf"
+        style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+      >
+        <embed
+          src={`${blobUrl}#toolbar=1&navpanes=0`}
+          type="application/pdf"
+          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+        />
+        <iframe
+          src={`${blobUrl}#toolbar=1&navpanes=0`}
+          title={fileName}
+          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+        />
+      </object>
+    </div>
+  );
+}
+
 // Unified Message Deduplication & Monotonic Ordering Helper
 const mergeMessages = (prev = [], incoming = []) => {
   const map = new Map();
@@ -9218,11 +9367,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   />
                 </div>
               ) : isPdf ? (
-                <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                  <iframe
-                    src={fileUrl}
-                    title={fileName}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
+                <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#525659', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                  <PdfViewer
+                    fileUrl={fileUrl}
+                    fileName={fileName}
+                    onDownload={() => handleDownloadAttachment(fileUrl, fileName)}
                   />
                 </div>
               ) : isText ? (
