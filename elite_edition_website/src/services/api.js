@@ -29,16 +29,39 @@ export const getAccessToken = () => inMemoryAccessToken;
 export const isAuthenticated = () => Boolean(inMemoryAccessToken || (typeof localStorage !== 'undefined' && localStorage.getItem('elite_user')));
 
 export const authFetch = async (url, options = {}) => {
-  const token = inMemoryAccessToken;
+  let token = inMemoryAccessToken;
   const headers = {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
-  return fetch(url, {
+  let res = await fetch(url, {
     ...options,
     headers,
     credentials: 'include', // Guarantees HttpOnly authentication cookies are included
   });
+
+  if (res.status === 401 && !options._authRetried) {
+    try {
+      const freshToken = await silentAuth.getFreshAccessToken();
+      if (freshToken) {
+        setInMemoryToken(freshToken);
+        const retryHeaders = {
+          ...options.headers,
+          'Authorization': `Bearer ${freshToken}`,
+        };
+        res = await fetch(url, {
+          ...options,
+          _authRetried: true,
+          headers: retryHeaders,
+          credentials: 'include',
+        });
+      }
+    } catch (e) {
+      console.warn('[authFetch] Auto-refresh on 401 failed:', e?.message || e);
+    }
+  }
+
+  return res;
 };
 
 // CSRF Token Resolver & Injector for State-Changing Requests (Phase 3)
@@ -2423,7 +2446,21 @@ export const api = {
     const baseUrl = getBaseUrl();
     const url = `${baseUrl}/billing/invoices/${id}/pdf?t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
     const response = await authFetch(url);
-    if (!response.ok) throw new Error('Failed to generate Invoice PDF');
+    if (!response.ok) {
+      let errMsg = 'Failed to generate Invoice PDF';
+      try {
+        const text = await response.text();
+        if (text) {
+          try {
+            const j = JSON.parse(text);
+            errMsg = j.message || j.error || text;
+          } catch (_) {
+            if (text.length < 150) errMsg = text;
+          }
+        }
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
     const blob = await response.blob();
     const pdfName = `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`;
     downloadOrPreviewPdf(blob, pdfName, { title: `Tax Invoice #${invoiceNo || 'Draft'}` });
@@ -2436,7 +2473,21 @@ export const api = {
     const baseUrl = getBaseUrl();
     const url = `${baseUrl}/billing/invoices-bulk-pdf?ids=${ids.join(',')}`;
     const response = await authFetch(url);
-    if (!response.ok) throw new Error('Failed to generate combined Invoices PDF');
+    if (!response.ok) {
+      let errMsg = 'Failed to generate combined Invoices PDF';
+      try {
+        const text = await response.text();
+        if (text) {
+          try {
+            const j = JSON.parse(text);
+            errMsg = j.message || j.error || text;
+          } catch (_) {
+            if (text.length < 150) errMsg = text;
+          }
+        }
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Combined Invoices' });
     console.log(`[Bulk PDF Download] Generated & downloaded combined PDF in ${(performance.now() - t0).toFixed(0)}ms`);
