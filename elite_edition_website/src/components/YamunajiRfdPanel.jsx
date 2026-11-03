@@ -5644,7 +5644,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           gap: '4px'
                         }}
                       >
-                        <Settings size={12} /> Manage Weavers
+                        <Settings size={12} /> Manage
                       </button>
                     </div>
 
