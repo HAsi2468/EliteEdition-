@@ -56,10 +56,10 @@ export const isLotBelongingToCompany = (lot, currentCompany, currentCode) => {
   if (!lot) return false;
   const curComp = (currentCompany || 'Yamunaji').toLowerCase().replace(/[\s_-]+/g, '');
 
-  // 1. If lot has companyEntity explicitly set, it MUST match
+  // 1. If lot has companyEntity explicitly set, it MUST match strictly
   if (lot.companyEntity) {
     const lotComp = String(lot.companyEntity).toLowerCase().replace(/[\s_-]+/g, '');
-    if (lotComp !== curComp) return false;
+    return lotComp === curComp;
   }
 
   // 2. Check purchaseNo prefix (e.g. YJP-, EFP-, EEP-, SOP-, EWP-)
@@ -74,32 +74,61 @@ export const isLotBelongingToCompany = (lot, currentCompany, currentCode) => {
       { code: 'ES', pfx: 'ESP-' }
     ];
     for (const item of prefixes) {
-      if (item.code !== currentCode && pNo.startsWith(item.pfx)) {
-        return false;
+      if (pNo.startsWith(item.pfx)) {
+        return item.code === currentCode;
       }
     }
   }
 
-  return true;
+  // 3. Check lot number prefix (e.g., EF-LOT, YJ-LOT)
+  const lotNum = String(lot.lotNumber || lot.id || '').toUpperCase();
+  if (lotNum) {
+    const prefixes = ['YJ', 'EF', 'EE', 'SO', 'EW', 'ES'];
+    for (const pfx of prefixes) {
+      if (lotNum.startsWith(`${pfx}-`) || lotNum.startsWith(`${pfx}_`)) {
+        return pfx === currentCode;
+      }
+    }
+  }
+
+  // 4. Check ourChallanNo or challanNo prefix (e.g. EFMC-, YJMC-)
+  const cNo = String(lot.ourChallanNo || lot.challanNo || '').toUpperCase();
+  if (cNo) {
+    const prefixes = ['YJMC-', 'EFMC-', 'EEMC-', 'SOMC-', 'EWMC-'];
+    for (const pfx of prefixes) {
+      if (cNo.startsWith(pfx)) {
+        return pfx === `${currentCode}MC-`;
+      }
+    }
+  }
+
+  // 5. Fallback for unassigned / legacy lots (e.g. GRAY-2026-xxx):
+  // All historical / unassigned lots belong to Yamunaji ONLY.
+  // For any other company (e.g. Elite Fabtex 'EF'), they MUST NOT show!
+  return curComp === 'yamunaji';
 };
 
 export const isChallanBelongingToCompany = (challan, currentCompany, currentCode) => {
   if (!challan) return false;
   const curComp = (currentCompany || 'Yamunaji').toLowerCase().replace(/[\s_-]+/g, '');
+
   if (challan.companyEntity) {
     const chComp = String(challan.companyEntity).toLowerCase().replace(/[\s_-]+/g, '');
-    if (chComp !== curComp) return false;
+    return chComp === curComp;
   }
+
   const cNo = String(challan.challanNo || challan.id || '').toUpperCase();
   if (cNo) {
     const prefixes = ['YJMC-', 'EFMC-', 'EEMC-', 'SOMC-', 'EWMC-'];
     for (const pfx of prefixes) {
-      if (pfx !== `${currentCode}MC-` && cNo.startsWith(pfx)) {
-        return false;
+      if (cNo.startsWith(pfx)) {
+        return pfx === `${currentCode}MC-`;
       }
     }
   }
-  return true;
+
+  // Fallback for unassigned / legacy challans: Yamunaji ONLY
+  return curComp === 'yamunaji';
 };
 
 // ==========================================
@@ -372,6 +401,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           const pComp = (p.companyEntity || '').toLowerCase().replace(/[\s_-]+/g, '');
           const curComp = (companyEntity || 'Yamunaji').toLowerCase().replace(/[\s_-]+/g, '');
           if (pComp && curComp && pComp !== curComp) return;
+          if (!pComp && curComp !== 'yamunaji') {
+            // Historical unassigned purchases belong to Yamunaji only
+            const pNo = (p.purchaseNo || '').toUpperCase();
+            if (!pNo.startsWith(companyCode + 'P-')) return;
+          }
 
           const pNo = (p.purchaseNo || '').toUpperCase();
           if (pNo) {
@@ -2953,6 +2987,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const newRfdLot = {
       id: `RFD-LOT-${Date.now()}`,
       lotNumber,
+      companyEntity: companyEntity || 'Yamunaji',
       inwardDate: inwardRfdForm.inwardDate,
       millParty: inwardRfdForm.millParty.trim(),
       millChallanNo: inwardRfdForm.millChallanNo.trim() || 'Direct Mill Inward',
