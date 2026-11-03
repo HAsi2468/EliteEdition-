@@ -5648,16 +5648,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
                             Lot Number (Auto) *
                           </label>
-                          <span style={{ fontSize: '0.60rem', color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '1px 5px', borderRadius: 3 }}>Auto</span>
+                          <span style={{ fontSize: '0.60rem', color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '1px 5px', borderRadius: 3 }}>Auto Locked</span>
                         </div>
                         <input
                           type="text"
-                          required
+                          readOnly
                           placeholder="e.g. LOT-001"
                           value={weaverForm.lotNumber}
-                          onChange={(e) => setWeaverForm(prev => ({ ...prev, lotNumber: e.target.value }))}
+                          title="System Auto-Generated (Not Editable)"
                           className="input-field"
-                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#0284c7' }}
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#0284c7', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
                         />
                       </div>
 
@@ -5666,16 +5666,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
                             Our Challan No (Auto) *
                           </label>
-                          <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>Auto</span>
+                          <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>Auto Locked</span>
                         </div>
                         <input
                           type="text"
-                          required
+                          readOnly
                           placeholder="e.g. CH-001"
                           value={weaverForm.ourChallanNo}
-                          onChange={(e) => setWeaverForm(prev => ({ ...prev, ourChallanNo: e.target.value }))}
+                          title="System Auto-Generated (Not Editable)"
                           className="input-field"
-                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#059669' }}
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#059669', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
                         />
                       </div>
 
@@ -5758,18 +5758,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.65rem' }}>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
-                            Fabric Quality *
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => { setSettingsActiveTab('qualities'); setShowSettingsModal(true); }}
-                            style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            ⚙️ Manage
-                          </button>
-                        </div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Fabric Quality *
+                        </label>
                         <select
                           value={weaverForm.fabricQuality}
                           onChange={(e) => setWeaverForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
@@ -7397,16 +7388,19 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             <form onSubmit={handleSaveEditMillChallan} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Challan Number
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                      Challan Number
+                    </label>
+                    <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>Locked</span>
+                  </div>
                   <input
                     type="text"
+                    readOnly
                     className="input-field"
                     value={editChallanForm.challanNo}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, challanNo: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                    title="Challan Number is system auto-assigned and locked"
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#0f172a', cursor: 'not-allowed' }}
                   />
                 </div>
 
@@ -7796,30 +7790,37 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             <form onSubmit={handleSaveEditGrayLot} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Lot Number
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                      Lot Number
+                    </label>
+                    <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>Locked</span>
+                  </div>
                   <input
                     type="text"
+                    readOnly
                     className="input-field"
                     value={editGrayLotForm.lotNumber}
-                    onChange={e => setEditGrayLotForm({ ...editGrayLotForm, lotNumber: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 700 }}
+                    title="Lot Number is system auto-assigned and locked"
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#0284c7', cursor: 'not-allowed' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Our Inward Challan #
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                      Our Inward Challan #
+                    </label>
+                    <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>Locked</span>
+                  </div>
                   <input
                     type="text"
+                    readOnly
                     className="input-field"
                     value={editGrayLotForm.ourChallanNo || ''}
-                    onChange={e => setEditGrayLotForm({ ...editGrayLotForm, ourChallanNo: e.target.value })}
                     placeholder="e.g. CH-001"
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 700, color: '#0284c7' }}
+                    title="Our Inward Challan Number is system auto-assigned and locked"
+                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#059669', cursor: 'not-allowed' }}
                   />
                 </div>
 
