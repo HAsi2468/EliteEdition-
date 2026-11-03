@@ -3102,7 +3102,7 @@ export default function EliteBillingDepartment({
   const [previewImageModal, setPreviewImageModal] = useState(null);
 
   const openPdfDialog = (inv) => {
-    setPdfDuplicateChecked(false);
+    setPdfDuplicateChecked(true);
     setPdfDuplicateModal(inv);
   };
 
@@ -5378,7 +5378,7 @@ export default function EliteBillingDepartment({
                                       onClick: async () => {
                                         try {
                                           triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${inv.invoiceNo}...`, 'info');
-                                          await api.downloadInvoicePdf(inv._id, inv.invoiceNo, false);
+                                          await api.downloadInvoicePdf(inv._id, inv.invoiceNo, true);
                                         } catch (err) {
                                           alert('Failed to prepare invoice for printing: ' + err.message);
                                         }
@@ -8895,7 +8895,7 @@ export default function EliteBillingDepartment({
                   setPrintingInvoiceId(viewInvoiceModal._id);
                   try {
                     triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${viewInvoiceModal.invoiceNo}...`, 'info');
-                    await api.downloadInvoicePdf(viewInvoiceModal._id, viewInvoiceModal.invoiceNo, false);
+                    await api.downloadInvoicePdf(viewInvoiceModal._id, viewInvoiceModal.invoiceNo, true);
                   } catch (err) {
                     alert('Failed to load invoice for printing: ' + err.message);
                   } finally {
@@ -9415,8 +9415,8 @@ export default function EliteBillingDepartment({
             {/* Info note */}
             <div style={{ fontSize: '0.73rem', color: 'var(--text-muted, #94a3b8)', margin: '0.8rem 0 1.4rem', paddingLeft: '0.3rem' }}>
               {pdfDuplicateChecked
-                ? '📄 You will get a 2-page PDF: Page 1 (Original — Colourful) + Page 2 (Duplicate — Black & White)'
-                : '📄 You will get a 1-page PDF: Original colourful copy only'}
+                ? '📄 You will get a 2-page PDF: Page 1 (Original — Company Brand Colour) + Page 2 (Duplicate — Black & White)'
+                : '📄 You will get a 1-page PDF: Original company brand colour copy only'}
             </div>
 
             {/* Actions */}
