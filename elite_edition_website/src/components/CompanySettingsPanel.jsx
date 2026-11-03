@@ -11,7 +11,7 @@ import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import CompanyDesignStudio from './CompanyDesignStudio';
 import DocumentDesignStudio from './DesignStudio/DocumentDesignStudio';
 import AdminChangeApprovalQueue from './AdminChangeApprovalQueue';
-import { lookupPincode, getStateCode } from '../utils/postalCodeHelper';
+import { lookupPincode, lookupLocation, getStateCode, inferStateFromGstin } from '../utils/postalCodeHelper';
 
 const getCompanyAccentColor = (entity) => {
   return 'var(--primary)';
@@ -544,27 +544,50 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
 
   const [pincodeLoading, setPincodeLoading] = useState(false);
 
+  const resolvePincode = async (rawPin) => {
+    if (!rawPin || rawPin.length < 5) return;
+    setPincodeLoading(true);
+    try {
+      const geo = await lookupPincode(rawPin);
+      if (geo) {
+        setForm(f => ({
+          ...f,
+          companyPincode: geo.pincode || rawPin,
+          companyCity: geo.city || f.companyCity,
+          companyState: geo.state || f.companyState,
+          companyStateCode: geo.stateCode || f.companyStateCode,
+          companyCountry: geo.country || 'India'
+        }));
+      }
+    } catch (err) {
+      console.warn('Pincode lookup error:', err);
+    } finally {
+      setPincodeLoading(false);
+    }
+  };
+
   const handleCompanyPincodeChange = async (e) => {
     const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
     setForm(f => ({ ...f, companyPincode: pin }));
-    if (pin.length === 6) {
-      setPincodeLoading(true);
-      try {
-        const geo = await lookupPincode(pin);
-        if (geo) {
-          setForm(f => ({
-            ...f,
-            companyPincode: pin,
-            companyCity: geo.city || f.companyCity,
-            companyState: geo.state || f.companyState,
-            companyStateCode: geo.stateCode || f.companyStateCode,
-            companyCountry: geo.country || 'India'
-          }));
-        }
-      } catch (err) {
-        console.warn('Pincode lookup error:', err);
-      } finally {
-        setPincodeLoading(false);
+    if (pin.length >= 5) {
+      resolvePincode(pin);
+    }
+  };
+
+  const handleCompanyCityChange = async (e) => {
+    const cityVal = e.target.value;
+    setForm(f => ({ ...f, companyCity: cityVal }));
+    if (cityVal && cityVal.trim().length >= 3) {
+      const geo = await lookupLocation(cityVal.trim());
+      if (geo) {
+        setForm(f => ({
+          ...f,
+          companyCity: geo.city || cityVal,
+          companyState: geo.state || f.companyState,
+          companyStateCode: geo.stateCode || f.companyStateCode,
+          companyCountry: geo.country || 'India',
+          companyPincode: (!f.companyPincode || f.companyPincode.length < 5) ? (geo.pincode || f.companyPincode) : f.companyPincode
+        }));
       }
     }
   };
@@ -572,7 +595,22 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
   const handleCompanyStateChange = (e) => {
     const stateVal = e.target.value;
     const code = getStateCode(stateVal);
-    setForm(f => ({ ...f, companyState: stateVal, companyStateCode: code }));
+    setForm(f => ({ ...f, companyState: stateVal, companyStateCode: code, companyCountry: f.companyCountry || 'India' }));
+  };
+
+  const handleCompanyGstinChange = (e) => {
+    const gVal = e.target.value;
+    const inferred = inferStateFromGstin(gVal);
+    if (inferred) {
+      setForm(f => ({
+        ...f,
+        companyGstin: gVal,
+        companyState: inferred.state || f.companyState,
+        companyStateCode: inferred.stateCode || f.companyStateCode
+      }));
+    } else {
+      setForm(f => ({ ...f, companyGstin: gVal }));
+    }
   };
 
   return (
@@ -1025,7 +1063,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
                 type="text"
                 name="companyGstin"
                 value={form.companyGstin}
-                onChange={handleChange}
+                onChange={handleCompanyGstinChange}
                 placeholder="24AAAAA0000A1Z5"
                 className="form-control"
                 style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}
@@ -1082,12 +1120,13 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
                 maxLength={6}
                 value={form.companyPincode || ''}
                 onChange={handleCompanyPincodeChange}
-                placeholder="e.g. 395006"
+                onBlur={() => resolvePincode(form.companyPincode)}
+                placeholder="e.g. 395006 or 110024"
                 className="form-control"
                 style={{ fontWeight: 700, letterSpacing: '1px' }}
               />
               <span style={{ fontSize: '0.68rem', color: '#2563eb', display: 'block', marginTop: '2px' }}>
-                ⚡ Auto-fetches City & State
+                ⚡ Auto-fetches City, State & GST
               </span>
             </div>
 
@@ -1097,10 +1136,14 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
                 type="text"
                 name="companyCity"
                 value={form.companyCity || ''}
-                onChange={handleChange}
-                placeholder="e.g. Surat"
+                onChange={handleCompanyCityChange}
+                onBlur={() => handleCompanyCityChange({ target: { value: form.companyCity } })}
+                placeholder="e.g. Surat, Delhi, Mumbai"
                 className="form-control"
               />
+              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                ⚡ Auto-sets State & Pincode
+              </span>
             </div>
 
             <div>

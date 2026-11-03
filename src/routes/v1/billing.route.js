@@ -44,8 +44,10 @@ router.delete('/items/:id', billingController.deleteItem);
 router.get('/company-settings', billingController.getCompanySettings);
 router.put('/company-settings', billingController.updateCompanySettings);
 
-// Free Indian Postal PIN Code Lookup (City, State, Country, GST Code)
+// Free Indian Postal PIN Code & Location Lookup (City, State, Country, GST Code)
+router.get('/lookup-pincode', billingController.lookupPincode);
 router.get('/lookup-pincode/:pincode', billingController.lookupPincode);
+router.get('/lookup-location', billingController.lookupLocation);
 
 // Purchases CRUD
 router.get('/purchases', billingController.getPurchases);

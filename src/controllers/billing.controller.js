@@ -5053,96 +5053,75 @@ const getGstr1Table12Summary = async (req, res) => {
   }
 };
 
-// ── 15. PINCODE LOOKUP (FREE INDIAN POSTAL API WITH CACHE & OFFLINE HUB BACKUP) ─
+// ── 15. PINCODE & LOCATION LOOKUP (OFFLINE DATASET + CANDIDATE RECOVERY) ─
+const postalGeoService = require('../services/postalGeoService');
 const pincodeCache = new Map();
-const OFFLINE_PINCODE_MAP = {
-  '395001': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395002': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395003': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395004': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395005': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395006': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395007': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395008': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395009': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '395010': { city: 'Surat', state: 'Gujarat', stateCode: '24' },
-  '380001': { city: 'Ahmedabad', state: 'Gujarat', stateCode: '24' },
-  '380002': { city: 'Ahmedabad', state: 'Gujarat', stateCode: '24' },
-  '360001': { city: 'Rajkot', state: 'Gujarat', stateCode: '24' },
-  '390001': { city: 'Vadodara', state: 'Gujarat', stateCode: '24' },
-  '400001': { city: 'Mumbai', state: 'Maharashtra', stateCode: '27' },
-  '400002': { city: 'Mumbai', state: 'Maharashtra', stateCode: '27' },
-  '411001': { city: 'Pune', state: 'Maharashtra', stateCode: '27' },
-  '421501': { city: 'Bhiwandi', state: 'Maharashtra', stateCode: '27' },
-  '110001': { city: 'New Delhi', state: 'Delhi', stateCode: '07' },
-  '110006': { city: 'Delhi', state: 'Delhi', stateCode: '07' },
-  '302001': { city: 'Jaipur', state: 'Rajasthan', stateCode: '08' },
-  '342001': { city: 'Jodhpur', state: 'Rajasthan', stateCode: '08' },
-  '560001': { city: 'Bengaluru', state: 'Karnataka', stateCode: '29' },
-  '600001': { city: 'Chennai', state: 'Tamil Nadu', stateCode: '33' },
-  '641601': { city: 'Tirupur', state: 'Tamil Nadu', stateCode: '33' },
-  '500001': { city: 'Hyderabad', state: 'Telangana', stateCode: '36' },
-  '700001': { city: 'Kolkata', state: 'West Bengal', stateCode: '19' },
-  '141001': { city: 'Ludhiana', state: 'Punjab', stateCode: '03' },
-  '452001': { city: 'Indore', state: 'Madhya Pradesh', stateCode: '23' }
-};
 
 const lookupPincode = async (req, res) => {
   try {
-    const rawPin = String(req.params.pincode || req.query.pincode || '').trim();
-    if (!/^\d{6}$/.test(rawPin)) {
-      return res.status(400).json({ success: false, error: 'Pincode must be exactly 6 numeric digits.' });
+    const rawPin = String(req.params.pincode || req.query.pincode || req.query.query || '').trim();
+    if (!rawPin) {
+      return res.status(400).json({ success: false, error: 'Pincode or location query is required.' });
     }
 
     if (pincodeCache.has(rawPin)) {
       return res.json({ success: true, data: pincodeCache.get(rawPin) });
     }
 
-    let result = null;
-    try {
-      const axios = require('axios');
-      const response = await axios.get(`https://api.postalpincode.in/pincode/${rawPin}`, { timeout: 4000 });
-      if (Array.isArray(response.data) && response.data[0] && response.data[0].Status === 'Success') {
-        const poList = response.data[0].PostOffice || [];
-        const primary = poList[0] || {};
-        const stateName = primary.State || 'Gujarat';
-        const districtName = primary.District || primary.Division || primary.Block || '';
-        const stateCode = resolveStateCode(stateName);
+    // 1. Instant ultra-fast lookup via offline postalGeoService (154,823 PINs + 5-digit recovery)
+    let result = postalGeoService.lookupLocation(rawPin);
 
-        result = {
-          pincode: rawPin,
-          city: districtName || OFFLINE_PINCODE_MAP[rawPin]?.city || 'Surat',
-          district: districtName,
-          state: stateName,
-          stateCode,
-          country: primary.Country || 'India',
-          postOffices: poList.map(p => p.Name).filter(Boolean)
-        };
-      }
-    } catch (apiErr) {
-      if (logger && logger.warn) logger.warn(`External postal pincode API request failed for ${rawPin}: ${apiErr.message}`);
-    }
+    // 2. If not found, try fallback
+    if (!result && /^\d{6}$/.test(rawPin)) {
+      try {
+        const axios = require('axios');
+        const response = await axios.get(`https://api.postalpincode.in/pincode/${rawPin}`, { timeout: 3000 });
+        if (Array.isArray(response.data) && response.data[0] && response.data[0].Status === 'Success') {
+          const poList = response.data[0].PostOffice || [];
+          const primary = poList[0] || {};
+          const stateName = primary.State || 'Gujarat';
+          const districtName = primary.District || primary.Division || primary.Block || '';
+          const stateCode = postalGeoService.resolveStateCode(stateName);
 
-    if (!result && OFFLINE_PINCODE_MAP[rawPin]) {
-      const off = OFFLINE_PINCODE_MAP[rawPin];
-      result = {
-        pincode: rawPin,
-        city: off.city,
-        district: off.city,
-        state: off.state,
-        stateCode: off.stateCode,
-        country: 'India',
-        postOffices: [off.city]
-      };
+          result = {
+            pincode: rawPin,
+            city: districtName || 'Surat',
+            district: districtName,
+            state: stateName,
+            stateCode,
+            country: primary.Country || 'India',
+            postOffices: poList.map(p => p.Name).filter(Boolean)
+          };
+        }
+      } catch (e) {}
     }
 
     if (!result) {
-      return res.status(404).json({ success: false, error: `No postal records found for PIN code ${rawPin}.` });
+      return res.status(404).json({ success: false, error: `No postal records found for ${rawPin}.` });
     }
 
     pincodeCache.set(rawPin, result);
     return res.json({ success: true, data: result });
   } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const lookupLocation = async (req, res) => {
+  try {
+    const q = String(req.query.q || req.query.query || req.params.query || '').trim();
+    if (!q) {
+      return res.status(400).json({ success: false, error: 'Search query is required.' });
+    }
+    const result = postalGeoService.lookupLocation(q);
+    if (!result) {
+      return res.status(404).json({ success: false, error: `No location found for "${q}".` });
+    }
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
     if (logger && logger.error) logger.error('Error looking up postal pincode: %s', err.stack || err.message);
     res.status(500).json({ success: false, error: err.message });
   }
@@ -5181,5 +5160,6 @@ module.exports = {
   deletePurchase,
   bulkSyncPurchases,
   getGstr1Table12Summary,
-  lookupPincode
+  lookupPincode,
+  lookupLocation
 };

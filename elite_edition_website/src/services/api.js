@@ -2527,6 +2527,10 @@ export const api = {
     return request(`/billing/lookup-pincode/${encodeURIComponent(pincode)}`);
   },
 
+  async lookupLocation(query) {
+    return request(`/billing/lookup-location?query=${encodeURIComponent(query)}`);
+  },
+
   // Purchases CRUD
   async getNextPurchaseNo(companyEntity = 'Elite Digital Prints') {
     return request(`/billing/purchases/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);

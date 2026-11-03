@@ -22,7 +22,7 @@ import QuickActionMenu from './common/QuickActionMenu';
 import { SmartActionGroup } from './common/SmartActionGroup';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import * as XLSX from 'xlsx';
-import { lookupPincode, getStateCode, inferStateFromGstin } from '../utils/postalCodeHelper';
+import { lookupPincode, lookupLocation, getStateCode, inferStateFromGstin } from '../utils/postalCodeHelper';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -4240,29 +4240,67 @@ export default function EliteBillingDepartment({
     }
   };
 
-  // Pincode and Geo Handlers for Customer Modal
-  const handleCustPincodeChange = async (e) => {
+  // ── Customer Modal Geo Handlers ──
+  const resolveCustPincode = async (rawPin) => {
+    if (!rawPin || rawPin.length < 5) return;
+    setPincodeLoadingCust(true);
+    try {
+      const geo = await lookupPincode(rawPin);
+      if (geo) {
+        setCustForm(f => ({
+          ...f,
+          pincode: geo.pincode || rawPin,
+          city: geo.city || f.city,
+          state: geo.state || f.state,
+          stateCode: geo.stateCode || f.stateCode,
+          country: geo.country || 'India'
+        }));
+      }
+    } catch (err) {
+      console.warn('Cust pincode lookup failed:', err);
+    } finally {
+      setPincodeLoadingCust(false);
+    }
+  };
+
+  const handleCustPincodeChange = (e) => {
     const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
     setCustForm(f => ({ ...f, pincode: pin }));
-    if (pin.length === 6) {
-      setPincodeLoadingCust(true);
-      try {
-        const geo = await lookupPincode(pin);
-        if (geo) {
-          setCustForm(f => ({
-            ...f,
-            pincode: pin,
-            city: geo.city || f.city,
-            state: geo.state || f.state,
-            stateCode: geo.stateCode || f.stateCode,
-            country: geo.country || 'India'
-          }));
-        }
-      } catch (err) {
-        console.warn('Cust pincode lookup failed:', err);
-      } finally {
-        setPincodeLoadingCust(false);
+    if (pin.length >= 5) {
+      resolveCustPincode(pin);
+    }
+  };
+
+  const handleCustCityChange = async (e) => {
+    const cityVal = e.target.value;
+    setCustForm(f => ({ ...f, city: cityVal }));
+    if (cityVal && cityVal.trim().length >= 3) {
+      const geo = await lookupLocation(cityVal.trim());
+      if (geo) {
+        setCustForm(f => ({
+          ...f,
+          city: geo.city || cityVal,
+          state: geo.state || f.state,
+          stateCode: geo.stateCode || f.stateCode,
+          country: geo.country || 'India',
+          pincode: (!f.pincode || f.pincode.length < 5) ? (geo.pincode || f.pincode) : f.pincode
+        }));
       }
+    }
+  };
+
+  const handleCustGstinChange = (e) => {
+    const gVal = e.target.value;
+    const inferred = inferStateFromGstin(gVal);
+    if (inferred) {
+      setCustForm(f => ({
+        ...f,
+        gstin: gVal,
+        state: inferred.state || f.state,
+        stateCode: inferred.stateCode || f.stateCode
+      }));
+    } else {
+      setCustForm(f => ({ ...f, gstin: gVal }));
     }
   };
 
@@ -4271,33 +4309,72 @@ export default function EliteBillingDepartment({
     setCustForm(f => ({
       ...f,
       state: st,
-      stateCode: getStateCode(st)
+      stateCode: getStateCode(st),
+      country: f.country || 'India'
     }));
   };
 
-  // Pincode and Geo Handlers for Vendor Modal
-  const handleVendorPincodeChange = async (e) => {
+  // ── Vendor Modal Geo Handlers ──
+  const resolveVendorPincode = async (rawPin) => {
+    if (!rawPin || rawPin.length < 5) return;
+    setPincodeLoadingVendor(true);
+    try {
+      const geo = await lookupPincode(rawPin);
+      if (geo) {
+        setVendorForm(f => ({
+          ...f,
+          pincode: geo.pincode || rawPin,
+          city: geo.city || f.city,
+          state: geo.state || f.state,
+          stateCode: geo.stateCode || f.stateCode,
+          country: geo.country || 'India'
+        }));
+      }
+    } catch (err) {
+      console.warn('Vendor pincode lookup failed:', err);
+    } finally {
+      setPincodeLoadingVendor(false);
+    }
+  };
+
+  const handleVendorPincodeChange = (e) => {
     const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
     setVendorForm(f => ({ ...f, pincode: pin }));
-    if (pin.length === 6) {
-      setPincodeLoadingVendor(true);
-      try {
-        const geo = await lookupPincode(pin);
-        if (geo) {
-          setVendorForm(f => ({
-            ...f,
-            pincode: pin,
-            city: geo.city || f.city,
-            state: geo.state || f.state,
-            stateCode: geo.stateCode || f.stateCode,
-            country: geo.country || 'India'
-          }));
-        }
-      } catch (err) {
-        console.warn('Vendor pincode lookup failed:', err);
-      } finally {
-        setPincodeLoadingVendor(false);
+    if (pin.length >= 5) {
+      resolveVendorPincode(pin);
+    }
+  };
+
+  const handleVendorCityChange = async (e) => {
+    const cityVal = e.target.value;
+    setVendorForm(f => ({ ...f, city: cityVal }));
+    if (cityVal && cityVal.trim().length >= 3) {
+      const geo = await lookupLocation(cityVal.trim());
+      if (geo) {
+        setVendorForm(f => ({
+          ...f,
+          city: geo.city || cityVal,
+          state: geo.state || f.state,
+          stateCode: geo.stateCode || f.stateCode,
+          country: geo.country || 'India',
+          pincode: (!f.pincode || f.pincode.length < 5) ? (geo.pincode || f.pincode) : f.pincode
+        }));
       }
+    }
+  };
+
+  const handleVendorGstinChange = (e) => {
+    const gVal = e.target.value;
+    const inferred = inferStateFromGstin(gVal);
+    if (inferred) {
+      setVendorForm(f => ({
+        ...f,
+        gstin: gVal,
+        state: inferred.state || f.state,
+        stateCode: inferred.stateCode || f.stateCode
+      }));
+    } else {
+      setVendorForm(f => ({ ...f, gstin: gVal }));
     }
   };
 
@@ -4306,41 +4383,95 @@ export default function EliteBillingDepartment({
     setVendorForm(f => ({
       ...f,
       state: st,
-      stateCode: getStateCode(st)
+      stateCode: getStateCode(st),
+      country: f.country || 'India'
     }));
   };
 
-  // Pincode and Geo Handlers for Invoice Customer Section
-  const handleInvoiceCustPincodeChange = async (e) => {
+  // ── Invoice Customer Geo Handlers ──
+  const resolveInvoiceCustPincode = async (rawPin) => {
+    if (!rawPin || rawPin.length < 5) return;
+    setPincodeLoadingInvoice(true);
+    try {
+      const geo = await lookupPincode(rawPin);
+      if (geo) {
+        const newStateCode = geo.stateCode || '24';
+        setInvoiceForm(f => ({
+          ...f,
+          customer: {
+            ...f.customer,
+            pincode: geo.pincode || rawPin,
+            city: geo.city || f.customer.city,
+            state: geo.state || f.customer.state,
+            stateCode: newStateCode,
+            country: geo.country || 'India'
+          },
+          taxType: newStateCode !== '24' ? 'IGST' : 'CGST_SGST'
+        }));
+      }
+    } catch (err) {
+      console.warn('Invoice pincode lookup failed:', err);
+    } finally {
+      setPincodeLoadingInvoice(false);
+    }
+  };
+
+  const handleInvoiceCustPincodeChange = (e) => {
     const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
     setInvoiceForm(f => ({
       ...f,
       customer: { ...f.customer, pincode: pin }
     }));
-    if (pin.length === 6) {
-      setPincodeLoadingInvoice(true);
-      try {
-        const geo = await lookupPincode(pin);
-        if (geo) {
-          const newStateCode = geo.stateCode || '24';
-          setInvoiceForm(f => ({
-            ...f,
-            customer: {
-              ...f.customer,
-              pincode: pin,
-              city: geo.city || f.customer.city,
-              state: geo.state || f.customer.state,
-              stateCode: newStateCode,
-              country: geo.country || 'India'
-            },
-            taxType: newStateCode !== '24' ? 'IGST' : 'CGST_SGST'
-          }));
-        }
-      } catch (err) {
-        console.warn('Invoice pincode lookup failed:', err);
-      } finally {
-        setPincodeLoadingInvoice(false);
+    if (pin.length >= 5) {
+      resolveInvoiceCustPincode(pin);
+    }
+  };
+
+  const handleInvoiceCustCityChange = async (e) => {
+    const cityVal = e.target.value;
+    setInvoiceForm(f => ({
+      ...f,
+      customer: { ...f.customer, city: cityVal }
+    }));
+    if (cityVal && cityVal.trim().length >= 3) {
+      const geo = await lookupLocation(cityVal.trim());
+      if (geo) {
+        const newStateCode = geo.stateCode || '24';
+        setInvoiceForm(f => ({
+          ...f,
+          customer: {
+            ...f.customer,
+            city: geo.city || cityVal,
+            state: geo.state || f.customer.state,
+            stateCode: newStateCode,
+            country: geo.country || 'India',
+            pincode: (!f.customer.pincode || f.customer.pincode.length < 5) ? (geo.pincode || f.customer.pincode) : f.customer.pincode
+          },
+          taxType: newStateCode !== '24' ? 'IGST' : 'CGST_SGST'
+        }));
       }
+    }
+  };
+
+  const handleInvoiceCustGstinChange = (e) => {
+    const gVal = e.target.value;
+    const inferred = inferStateFromGstin(gVal);
+    if (inferred) {
+      setInvoiceForm(f => ({
+        ...f,
+        customer: {
+          ...f.customer,
+          gstin: gVal,
+          state: inferred.state || f.customer.state,
+          stateCode: inferred.stateCode || f.customer.stateCode
+        },
+        taxType: inferred.stateCode !== '24' ? 'IGST' : 'CGST_SGST'
+      }));
+    } else {
+      setInvoiceForm(f => ({
+        ...f,
+        customer: { ...f.customer, gstin: gVal }
+      }));
     }
   };
 
@@ -4352,43 +4483,97 @@ export default function EliteBillingDepartment({
       customer: {
         ...f.customer,
         state: st,
-        stateCode: code
+        stateCode: code,
+        country: f.customer.country || 'India'
       },
       taxType: code !== '24' ? 'IGST' : 'CGST_SGST'
     }));
   };
 
-  // Pincode and Geo Handlers for Purchase Vendor Section
-  const handlePurchaseVendorPincodeChange = async (e) => {
+  // ── Purchase Vendor Geo Handlers ──
+  const resolvePurchaseVendorPincode = async (rawPin) => {
+    if (!rawPin || rawPin.length < 5) return;
+    setPincodeLoadingPurchase(true);
+    try {
+      const geo = await lookupPincode(rawPin);
+      if (geo) {
+        const newStateCode = geo.stateCode || '24';
+        setPurchaseForm(f => ({
+          ...f,
+          vendor: {
+            ...f.vendor,
+            pincode: geo.pincode || rawPin,
+            city: geo.city || f.vendor.city,
+            state: geo.state || f.vendor.state,
+            stateCode: newStateCode,
+            country: geo.country || 'India'
+          },
+          taxType: newStateCode !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
+        }));
+      }
+    } catch (err) {
+      console.warn('Purchase pincode lookup failed:', err);
+    } finally {
+      setPincodeLoadingPurchase(false);
+    }
+  };
+
+  const handlePurchaseVendorPincodeChange = (e) => {
     const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
     setPurchaseForm(f => ({
       ...f,
       vendor: { ...f.vendor, pincode: pin }
     }));
-    if (pin.length === 6) {
-      setPincodeLoadingPurchase(true);
-      try {
-        const geo = await lookupPincode(pin);
-        if (geo) {
-          const newStateCode = geo.stateCode || '24';
-          setPurchaseForm(f => ({
-            ...f,
-            vendor: {
-              ...f.vendor,
-              pincode: pin,
-              city: geo.city || f.vendor.city,
-              state: geo.state || f.vendor.state,
-              stateCode: newStateCode,
-              country: geo.country || 'India'
-            },
-            taxType: newStateCode !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
-          }));
-        }
-      } catch (err) {
-        console.warn('Purchase pincode lookup failed:', err);
-      } finally {
-        setPincodeLoadingPurchase(false);
+    if (pin.length >= 5) {
+      resolvePurchaseVendorPincode(pin);
+    }
+  };
+
+  const handlePurchaseVendorCityChange = async (e) => {
+    const cityVal = e.target.value;
+    setPurchaseForm(f => ({
+      ...f,
+      vendor: { ...f.vendor, city: cityVal }
+    }));
+    if (cityVal && cityVal.trim().length >= 3) {
+      const geo = await lookupLocation(cityVal.trim());
+      if (geo) {
+        const newStateCode = geo.stateCode || '24';
+        setPurchaseForm(f => ({
+          ...f,
+          vendor: {
+            ...f.vendor,
+            city: geo.city || cityVal,
+            state: geo.state || f.vendor.state,
+            stateCode: newStateCode,
+            country: geo.country || 'India',
+            pincode: (!f.vendor.pincode || f.vendor.pincode.length < 5) ? (geo.pincode || f.vendor.pincode) : f.vendor.pincode
+          },
+          taxType: newStateCode !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
+        }));
       }
+    }
+  };
+
+  const handlePurchaseVendorGstinChange = (e) => {
+    const gVal = e.target.value;
+    const inferred = inferStateFromGstin(gVal);
+    if (inferred) {
+      setPurchaseForm(f => ({
+        ...f,
+        vendor: {
+          ...f.vendor,
+          gstin: gVal,
+          state: inferred.state || f.vendor.state,
+          stateCode: inferred.stateCode || f.vendor.stateCode
+        },
+        taxType: inferred.stateCode !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
+      }));
+    } else {
+      setPurchaseForm(f => ({
+        ...f,
+        vendor: { ...f.vendor, gstin: gVal }
+      }));
     }
   };
 
@@ -4400,7 +4585,8 @@ export default function EliteBillingDepartment({
       vendor: {
         ...f.vendor,
         state: st,
-        stateCode: code
+        stateCode: code,
+        country: f.vendor.country || 'India'
       },
       taxType: code !== '24' ? 'IGST' : (f.taxType || 'CGST_SGST')
     }));
@@ -5514,8 +5700,8 @@ export default function EliteBillingDepartment({
                 <label style={labelStyle}>GSTIN Number</label>
                 <input
                   type="text"
-                  value={invoiceForm.customer.gstin}
-                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, gstin: e.target.value } }))}
+                  value={invoiceForm.customer.gstin || ''}
+                  onChange={handleInvoiceCustGstinChange}
                   style={inputStyle}
                   placeholder="e.g. 24AAAFE1234F1Z5"
                 />
@@ -5541,8 +5727,9 @@ export default function EliteBillingDepartment({
                   maxLength={6}
                   value={invoiceForm.customer.pincode || ''}
                   onChange={handleInvoiceCustPincodeChange}
+                  onBlur={() => resolveInvoiceCustPincode(invoiceForm.customer.pincode)}
                   style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
-                  placeholder="e.g. 395006"
+                  placeholder="e.g. 395006 or 110024"
                 />
                 <span style={{ fontSize: '0.65rem', color: '#a78bfa', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City, State & GST</span>
               </div>
@@ -5552,10 +5739,12 @@ export default function EliteBillingDepartment({
                 <input
                   type="text"
                   value={invoiceForm.customer.city || ''}
-                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, city: e.target.value } }))}
+                  onChange={handleInvoiceCustCityChange}
+                  onBlur={() => handleInvoiceCustCityChange({ target: { value: invoiceForm.customer.city } })}
                   style={inputStyle}
-                  placeholder="e.g. Surat"
+                  placeholder="e.g. Surat, Delhi, Mumbai"
                 />
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>⚡ Auto-sets State & Pincode</span>
               </div>
 
               <div>
@@ -7545,11 +7734,8 @@ export default function EliteBillingDepartment({
                     <label style={labelStyle}>GSTIN Number</label>
                     <input
                       type="text"
-                      value={purchaseForm.vendor.gstin}
-                      onChange={e => setPurchaseForm(f => ({
-                        ...f,
-                        vendor: { ...f.vendor, gstin: e.target.value }
-                      }))}
+                      value={purchaseForm.vendor?.gstin || ''}
+                      onChange={handlePurchaseVendorGstinChange}
                       style={inputStyle}
                       placeholder="e.g. 24AAAFE1234F1Z5"
                     />
@@ -7606,8 +7792,9 @@ export default function EliteBillingDepartment({
                       maxLength={6}
                       value={purchaseForm.vendor?.pincode || ''}
                       onChange={handlePurchaseVendorPincodeChange}
+                      onBlur={() => resolvePurchaseVendorPincode(purchaseForm.vendor?.pincode)}
                       style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
-                      placeholder="e.g. 395006"
+                      placeholder="e.g. 395006 or 110024"
                     />
                     <span style={{ fontSize: '0.65rem', color: '#4f46e5', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City, State & GST</span>
                   </div>
@@ -7617,10 +7804,12 @@ export default function EliteBillingDepartment({
                     <input
                       type="text"
                       value={purchaseForm.vendor?.city || ''}
-                      onChange={e => setPurchaseForm(f => ({ ...f, vendor: { ...f.vendor, city: e.target.value } }))}
+                      onChange={handlePurchaseVendorCityChange}
+                      onBlur={() => handlePurchaseVendorCityChange({ target: { value: purchaseForm.vendor?.city } })}
                       style={inputStyle}
-                      placeholder="e.g. Surat"
+                      placeholder="e.g. Surat, Delhi, Mumbai"
                     />
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>⚡ Auto-sets State & Pincode</span>
                   </div>
 
                   <div>
@@ -8819,7 +9008,7 @@ export default function EliteBillingDepartment({
               </div>
               <div>
                 <label style={labelStyle}>GSTIN Number</label>
-                <input type="text" value={custForm.gstin} onChange={e => setCustForm(f => ({ ...f, gstin: e.target.value }))} style={inputStyle} />
+                <input type="text" value={custForm.gstin} onChange={handleCustGstinChange} style={inputStyle} placeholder="e.g. 24AAAAA0000A1Z5" />
               </div>
             </div>
 
@@ -8838,8 +9027,9 @@ export default function EliteBillingDepartment({
                   maxLength={6}
                   value={custForm.pincode || ''}
                   onChange={handleCustPincodeChange}
+                  onBlur={() => resolveCustPincode(custForm.pincode)}
                   style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
-                  placeholder="e.g. 395006"
+                  placeholder="e.g. 395006 or 110024"
                 />
                 <span style={{ fontSize: '0.65rem', color: '#6366f1', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City & State</span>
               </div>
@@ -8848,10 +9038,12 @@ export default function EliteBillingDepartment({
                 <input
                   type="text"
                   value={custForm.city || ''}
-                  onChange={e => setCustForm(f => ({ ...f, city: e.target.value }))}
+                  onChange={handleCustCityChange}
+                  onBlur={() => handleCustCityChange({ target: { value: custForm.city } })}
                   style={inputStyle}
-                  placeholder="e.g. Surat"
+                  placeholder="e.g. Surat, Delhi, Mumbai"
                 />
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>⚡ Auto-sets State & Pincode</span>
               </div>
             </div>
 
@@ -8947,7 +9139,7 @@ export default function EliteBillingDepartment({
                 <input
                   type="text"
                   value={vendorForm.gstin}
-                  onChange={e => setVendorForm(f => ({ ...f, gstin: e.target.value }))}
+                  onChange={handleVendorGstinChange}
                   style={inputStyle}
                   placeholder="e.g. 24AAAAA0000A1Z5"
                 />
@@ -9002,8 +9194,9 @@ export default function EliteBillingDepartment({
                   maxLength={6}
                   value={vendorForm.pincode || ''}
                   onChange={handleVendorPincodeChange}
+                  onBlur={() => resolveVendorPincode(vendorForm.pincode)}
                   style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
-                  placeholder="e.g. 395006"
+                  placeholder="e.g. 395006 or 110024"
                 />
                 <span style={{ fontSize: '0.65rem', color: '#6366f1', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City & State</span>
               </div>
@@ -9012,10 +9205,12 @@ export default function EliteBillingDepartment({
                 <input
                   type="text"
                   value={vendorForm.city || ''}
-                  onChange={e => setVendorForm(f => ({ ...f, city: e.target.value }))}
+                  onChange={handleVendorCityChange}
+                  onBlur={() => handleVendorCityChange({ target: { value: vendorForm.city } })}
                   style={inputStyle}
-                  placeholder="e.g. Surat"
+                  placeholder="e.g. Surat, Delhi, Mumbai"
                 />
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>⚡ Auto-sets State & Pincode</span>
               </div>
             </div>
 
