@@ -6406,29 +6406,29 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 780,
+              maxWidth: 1200,
               maxHeight: '92vh',
-              overflowY: 'auto',
+              overflow: 'hidden',
               background: '#ffffff',
               borderRadius: 14,
               boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              padding: '1.5rem',
+              padding: '1.25rem 1.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem'
+              gap: '0.75rem'
             }}
           >
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <div style={{ width: 38, height: 38, borderRadius: 10, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Truck size={22} color="#15803d" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
                     + Create Delivery Challan for Mill
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                     Select Gray Fabric TPs from stock to dispatch to the processing mill for RFD.
                   </span>
                 </div>
@@ -6464,374 +6464,411 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </div>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleCreateMillChallan} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
-                      Challan No (Auto) *
-                    </label>
-                    <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>
-                      Auto Locked
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    readOnly
-                    placeholder={`e.g. ${companyCode}MC-01`}
-                    value={millChallanForm.challanNo}
-                    title="Mill Delivery Challan No is auto-generated and locked"
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.85rem', width: '100%', fontWeight: 800, color: '#059669', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
-                  />
-                </div>
+            {/* Form - 2 Split Parts (1. Basic Details, 2. Manage TP Details) */}
+            <form onSubmit={handleCreateMillChallan} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(380px, 1fr) minmax(480px, 1.25fr)',
+                  gap: '1rem',
+                  flex: 1,
+                  minHeight: 0
+                }}
+              >
+                {/* ⬅️ PART 1: BASIC DETAILS & MILL INFO */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', height: '100%', minHeight: 0, overflowY: 'auto', paddingRight: '4px' }}>
+                  {/* Card 1: Challan & Mill Details */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.15rem' }}>
+                      <FileText size={15} color="#059669" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                        1. Basic Details & Mill Information
+                      </span>
+                    </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Challan Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={millChallanForm.challanDate}
-                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, challanDate: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-              </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                            Challan No (Auto) *
+                          </label>
+                          <span style={{ fontSize: '0.60rem', color: '#059669', fontWeight: 800, background: '#dcfce7', padding: '1px 5px', borderRadius: 3 }}>
+                            Auto Locked
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          readOnly
+                          placeholder={`e.g. ${companyCode}MC-01`}
+                          value={millChallanForm.challanNo}
+                          title="Mill Delivery Challan No is auto-generated and locked"
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 800, color: '#059669', background: '#f8fafc', cursor: 'not-allowed', border: '1px solid #cbd5e1' }}
+                        />
+                      </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Processing / Dyeing Mill Name *
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <input
-                      type="text"
-                      required
-                      list="mills-master-datalist"
-                      placeholder="Select or enter processing mill name..."
-                      value={millChallanForm.millParty}
-                      onChange={(e) => setMillChallanForm(prev => ({ ...prev, millParty: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                    />
-                    <datalist id="mills-master-datalist">
-                      {(configs.mills || []).map((m, idx) => {
-                        const party = normalizeParty(m);
-                        return (
-                          <option
-                            key={idx}
-                            value={party.name}
-                            label={party.gst ? `GST: ${party.gst} | ${party.address || party.city}` : ''}
-                          />
-                        );
-                      })}
-                    </datalist>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Challan Date *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={millChallanForm.challanDate}
+                          onChange={(e) => setMillChallanForm(prev => ({ ...prev, challanDate: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                      </div>
+                    </div>
 
-                    {selectedMillDetails && (
-                      <div style={{ fontSize: '0.72rem', background: '#f0fdf4', padding: '4px 8px', borderRadius: 6, border: '1px solid #bbf7d0', color: '#166534', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {selectedMillDetails.gst && (
-                          <span style={{ fontWeight: 800 }}>
-                            GSTIN: {selectedMillDetails.gst}
-                          </span>
-                        )}
-                        {selectedMillDetails.address && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <MapPin size={11} color="#16a34a" /> {selectedMillDetails.address}, {selectedMillDetails.city}
-                          </span>
-                        )}
-                        {selectedMillDetails.phone && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <Phone size={11} color="#16a34a" /> {selectedMillDetails.phone}
-                          </span>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                        Processing / Dyeing Mill Name *
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <input
+                          type="text"
+                          required
+                          list="mills-master-datalist"
+                          placeholder="Select or enter processing mill name..."
+                          value={millChallanForm.millParty}
+                          onChange={(e) => setMillChallanForm(prev => ({ ...prev, millParty: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                        <datalist id="mills-master-datalist">
+                          {(configs.mills || []).map((m, idx) => {
+                            const party = normalizeParty(m);
+                            return (
+                              <option
+                                key={idx}
+                                value={party.name}
+                                label={party.gst ? `GST: ${party.gst} | ${party.address || party.city}` : ''}
+                              />
+                            );
+                          })}
+                        </datalist>
+
+                        {selectedMillDetails && (
+                          <div style={{ fontSize: '0.72rem', background: '#f0fdf4', padding: '4px 8px', borderRadius: 6, border: '1px solid #bbf7d0', color: '#166534', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {selectedMillDetails.gst && (
+                              <span style={{ fontWeight: 800 }}>
+                                GSTIN: {selectedMillDetails.gst}
+                              </span>
+                            )}
+                            {selectedMillDetails.address && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                <MapPin size={11} color="#16a34a" /> {selectedMillDetails.address}, {selectedMillDetails.city}
+                              </span>
+                            )}
+                            {selectedMillDetails.phone && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                <Phone size={11} color="#16a34a" /> {selectedMillDetails.phone}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                    Vehicle / Tempo No
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. GJ-05-XX-1234"
-                    value={millChallanForm.vehicleNo}
-                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, vehicleNo: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                  Process Instructions for Mill
-                </label>
-                <input
-                  type="text"
-                  list="processes-master-datalist"
-                  placeholder="e.g. RFD Bleaching, Scouring, Mercerizing & Heat Setting"
-                  value={millChallanForm.processRequired}
-                  onChange={(e) => setMillChallanForm(prev => ({ ...prev, processRequired: e.target.value }))}
-                  className="input-field"
-                  style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                />
-                <datalist id="processes-master-datalist">
-                  {(configs.processes || []).map(p => <option key={p} value={p} />)}
-                </datalist>
-              </div>
-
-              {/* 🧵 1. SELECT FABRIC QUALITY & INWARD CHALLAN */}
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <Layers size={15} color="#0284c7" />
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
-                    1. Select Fabric Quality & Inward Challan
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: 'auto' }}>
-                    (Only inward challans & TPs of selected quality are shown)
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
-                  {/* Fabric Quality Selector */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                      Fabric Quality *
-                    </label>
-                    <select
-                      value={millChallanForm.fabricQuality}
-                      onChange={(e) => handleQualityChangeForOutward(e.target.value)}
-                      className="input-field"
-                      style={{ height: '34px', fontSize: '0.8rem', width: '100%', fontWeight: 700 }}
-                    >
-                      <option value="">-- Select Fabric Quality * --</option>
-                      {grayStockQualities.map(item => (
-                        <option key={item.quality} value={item.quality}>
-                          {item.quality} {item.inStockTps > 0 ? `(${item.inStockTps} In Stock, ${item.inStockMtr.toFixed(0)} Mtr)` : `(0 In Stock)`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Inward Challan / Lot Selector */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
-                      Filter by Weaver Challan / Lot
-                    </label>
-                    <select
-                      value={millChallanForm.selectedLotId}
-                      onChange={(e) => setMillChallanForm(prev => ({ ...prev, selectedLotId: e.target.value }))}
-                      className="input-field"
-                      style={{ height: '34px', fontSize: '0.8rem', width: '100%' }}
-                    >
-                      <option value="all">
-                        All Inward Challans ({lotsMatchingQuality.length} Lots Available)
-                      </option>
-                      {lotsMatchingQuality.map(lot => {
-                        const inStockCount = (lot.tps || []).filter(t => t.status === 'In Stock').length;
-                        return (
-                          <option key={lot.id} value={lot.id}>
-                            Lot #{lot.lotNumber} | Weaver: {lot.weaverParty} | Ch: {lot.weaverChallanNo || lot.lotNumber} ({inStockCount} in stock)
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* 📦 2. SELECT TP PIECES TO SEND TO MILL */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ background: '#f8fafc', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                      2. Select TP Pieces for Outward Challan
-                    </span>
-                    <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b' }}>
-                      Quality: <strong style={{ color: '#0284c7' }}>{millChallanForm.fabricQuality}</strong> • Available to Send: <strong style={{ color: '#16a34a' }}>{availableInStockTpsCount} TPs</strong>
-                      {outwardedTpsCount > 0 && ` • Already Outwarded: ${outwardedTpsCount} TPs (Locked)`}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      type="button"
-                      disabled={availableInStockTpsCount === 0}
-                      onClick={handleSelectAllInStock}
-                      style={{
-                        padding: '3px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        borderRadius: 4,
-                        border: '1px solid #bbf7d0',
-                        background: '#f0fdf4',
-                        color: '#166534',
-                        cursor: availableInStockTpsCount > 0 ? 'pointer' : 'not-allowed',
-                        opacity: availableInStockTpsCount > 0 ? 1 : 0.6
-                      }}
-                    >
-                      Select All Available ({availableInStockTpsCount})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeselectAllInStock}
-                      style={{
-                        padding: '3px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        borderRadius: 4,
-                        border: '1px solid #e2e8f0',
-                        background: '#ffffff',
-                        color: '#64748b',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Deselect All
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ maxHeight: '240px', overflowY: 'auto', padding: '4px' }}>
-                  {displayedTpsForOutward.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
-                      No gray fabric pieces found for <strong>{millChallanForm.fabricQuality}</strong>. Please inward gray fabric from weaver first or select another quality.
                     </div>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                      <thead>
-                        <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
-                          <th style={{ padding: '6px 8px', width: 40, textAlign: 'center' }}>Select</th>
-                          <th style={{ padding: '6px 8px' }}>Lot #</th>
-                          <th style={{ padding: '6px 8px' }}>Weaver Challan / Party</th>
-                          <th style={{ padding: '6px 8px' }}>Quality</th>
-                          <th style={{ padding: '6px 8px' }}>TP No</th>
-                          <th style={{ padding: '6px 8px' }}>TP Meter</th>
-                          <th style={{ padding: '6px 8px' }}>Status / Outward Info</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {displayedTpsForOutward.map((tp, idx) => {
-                          const key = `${tp.lotId}__${tp.tpIndex}`;
-                          const isSelected = Boolean(millChallanForm.selectedTpKeys[key]);
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Vehicle / Tempo No
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. GJ-05-XX-1234"
+                          value={millChallanForm.vehicleNo}
+                          onChange={(e) => setMillChallanForm(prev => ({ ...prev, vehicleNo: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                          Driver / Contact Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Driver / Carrier name"
+                          value={millChallanForm.driverName || ''}
+                          onChange={(e) => setMillChallanForm(prev => ({ ...prev, driverName: e.target.value }))}
+                          className="input-field"
+                          style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                        Process Instructions for Mill
+                      </label>
+                      <input
+                        type="text"
+                        list="processes-master-datalist"
+                        placeholder="e.g. RFD Bleaching, Scouring, Mercerizing & Heat Setting"
+                        value={millChallanForm.processRequired}
+                        onChange={(e) => setMillChallanForm(prev => ({ ...prev, processRequired: e.target.value }))}
+                        className="input-field"
+                        style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                      />
+                      <datalist id="processes-master-datalist">
+                        {(configs.processes || []).map(p => <option key={p} value={p} />)}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Fabric Quality & Source Filter */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.15rem' }}>
+                      <Layers size={15} color="#0284c7" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                        Fabric Quality & Source Filter
+                      </span>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                        Fabric Quality *
+                      </label>
+                      <select
+                        value={millChallanForm.fabricQuality}
+                        onChange={(e) => handleQualityChangeForOutward(e.target.value)}
+                        className="input-field"
+                        style={{ height: '32px', fontSize: '0.82rem', width: '100%', fontWeight: 700 }}
+                      >
+                        <option value="">-- Select Fabric Quality * --</option>
+                        {grayStockQualities.map(item => (
+                          <option key={item.quality} value={item.quality}>
+                            {item.quality} {item.inStockTps > 0 ? `(${item.inStockTps} In Stock, ${item.inStockMtr.toFixed(0)} Mtr)` : `(0 In Stock)`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>
+                        Filter by Weaver Challan / Lot
+                      </label>
+                      <select
+                        value={millChallanForm.selectedLotId}
+                        onChange={(e) => setMillChallanForm(prev => ({ ...prev, selectedLotId: e.target.value }))}
+                        className="input-field"
+                        style={{ height: '32px', fontSize: '0.82rem', width: '100%' }}
+                      >
+                        <option value="all">
+                          All Inward Challans ({lotsMatchingQuality.length} Lots Available)
+                        </option>
+                        {lotsMatchingQuality.map(lot => {
+                          const inStockCount = (lot.tps || []).filter(t => t.status === 'In Stock').length;
                           return (
-                            <tr
-                              key={idx}
-                              onClick={() => {
-                                if (tp.isInStock) {
-                                  handleToggleTpSelection(tp.lotId, tp.tpIndex, true);
-                                }
-                              }}
-                              style={{
-                                cursor: tp.isInStock ? 'pointer' : 'not-allowed',
-                                background: tp.isOutwarded
-                                  ? '#f8fafc'
-                                  : isSelected
-                                    ? '#ecfdf5'
-                                    : '#ffffff',
-                                borderBottom: '1px solid #f1f5f9',
-                                opacity: tp.isOutwarded ? 0.72 : 1,
-                                transition: 'background 0.15s ease'
-                              }}
-                            >
-                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                                {tp.isOutwarded ? (
-                                  <input
-                                    type="checkbox"
-                                    disabled
-                                    checked={false}
-                                    title="Already outwarded to mill"
-                                    style={{ cursor: 'not-allowed' }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                ) : (
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleToggleTpSelection(tp.lotId, tp.tpIndex, true)}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                )}
-                              </td>
-                              <td style={{ padding: '6px 8px', fontWeight: 700, color: tp.isOutwarded ? '#64748b' : '#0284c7' }}>
-                                {tp.lotNumber}
-                              </td>
-                              <td style={{ padding: '6px 8px', color: tp.isOutwarded ? '#94a3b8' : '#334155' }}>
-                                <div style={{ fontWeight: 600 }}>{tp.weaverParty}</div>
-                                <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Ch: {tp.weaverChallanNo}</div>
-                              </td>
-                              <td style={{ padding: '6px 8px', color: tp.isOutwarded ? '#94a3b8' : '#334155' }}>
-                                {tp.fabricQuality}
-                              </td>
-                              <td style={{ padding: '6px 8px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#0f172a' }}>
-                                {tp.tpNo}
-                              </td>
-                              <td style={{ padding: '6px 8px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#059669' }}>
-                                {tp.tpMtr} Mtr
-                              </td>
-                              <td style={{ padding: '6px 8px' }}>
-                                {tp.isOutwarded ? (
-                                  <span
-                                    style={{
-                                      fontSize: '0.68rem',
-                                      fontWeight: 800,
-                                      padding: '2px 8px',
-                                      borderRadius: 4,
-                                      background: '#f1f5f9',
-                                      color: '#64748b',
-                                      border: '1px solid #cbd5e1',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 3
-                                    }}
-                                  >
-                                    <Lock size={10} color="#64748b" /> Already Outwarded ({tp.millChallanNo || 'At Mill'})
-                                  </span>
-                                ) : (
-                                  <span
-                                    style={{
-                                      fontSize: '0.68rem',
-                                      fontWeight: 800,
-                                      padding: '2px 8px',
-                                      borderRadius: 4,
-                                      background: '#dcfce7',
-                                      color: '#15803d',
-                                      border: '1px solid #bbf7d0',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 3
-                                    }}
-                                  >
-                                    <CheckCircle2 size={10} color="#16a34a" /> In Stock (Available)
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
+                            <option key={lot.id} value={lot.id}>
+                              Lot #{lot.lotNumber} | Weaver: {lot.weaverParty} | Ch: {lot.weaverChallanNo || lot.lotNumber} ({inStockCount} in stock)
+                            </option>
                           );
                         })}
-                      </tbody>
-                    </table>
-                  )}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Selection Footer */}
-                <div style={{ background: '#f0fdf4', padding: '8px 12px', borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 700 }}>
-                    Selected for Mill: <strong>{selectedMillTps.length} TPs</strong>
+                {/* ➡️ PART 2: MANAGE TP DETAILS */}
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, border: '1px solid #e2e8f0', borderRadius: 10, background: '#ffffff', overflow: 'hidden' }}>
+                  {/* TP Header */}
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Boxes size={15} color="#059669" />
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                          2. Manage TP Details
+                        </span>
+                        <span style={{ fontSize: '0.68rem', background: '#dcfce7', color: '#15803d', padding: '1px 7px', borderRadius: 10, fontWeight: 800 }}>
+                          {selectedMillTps.length} Selected
+                        </span>
+                      </div>
+                      <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
+                        Quality: <strong style={{ color: '#0284c7' }}>{millChallanForm.fabricQuality || 'None selected'}</strong> • Available: <strong style={{ color: '#16a34a' }}>{availableInStockTpsCount} TPs</strong>
+                        {outwardedTpsCount > 0 && ` • Outwarded: ${outwardedTpsCount} TPs`}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        disabled={availableInStockTpsCount === 0}
+                        onClick={handleSelectAllInStock}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          borderRadius: 6,
+                          border: '1px solid #bbf7d0',
+                          background: '#f0fdf4',
+                          color: '#166534',
+                          cursor: availableInStockTpsCount > 0 ? 'pointer' : 'not-allowed',
+                          opacity: availableInStockTpsCount > 0 ? 1 : 0.6
+                        }}
+                      >
+                        Select All Available ({availableInStockTpsCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeselectAllInStock}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          borderRadius: 6,
+                          border: '1px solid #e2e8f0',
+                          background: '#ffffff',
+                          color: '#64748b',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Deselect All
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#15803d' }}>
-                    Challan Total: {millSelectedTotalMtrs.toFixed(1)} Mtr
+
+                  {/* Scrollable TP table */}
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                    {displayedTpsForOutward.length === 0 ? (
+                      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                        No gray fabric pieces found for <strong>{millChallanForm.fabricQuality || 'the selected quality'}</strong>. Please select a fabric quality or inward gray fabric first.
+                      </div>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>
+                          <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+                            <th style={{ padding: '7px 10px', width: 40, textAlign: 'center' }}>Select</th>
+                            <th style={{ padding: '7px 10px' }}>Lot #</th>
+                            <th style={{ padding: '7px 10px' }}>Weaver Challan / Party</th>
+                            <th style={{ padding: '7px 10px' }}>Quality</th>
+                            <th style={{ padding: '7px 10px' }}>TP No</th>
+                            <th style={{ padding: '7px 10px' }}>TP Meter</th>
+                            <th style={{ padding: '7px 10px' }}>Status / Outward Info</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayedTpsForOutward.map((tp, idx) => {
+                            const key = `${tp.lotId}__${tp.tpIndex}`;
+                            const isSelected = Boolean(millChallanForm.selectedTpKeys[key]);
+                            return (
+                              <tr
+                                key={idx}
+                                onClick={() => {
+                                  if (tp.isInStock) {
+                                    handleToggleTpSelection(tp.lotId, tp.tpIndex, true);
+                                  }
+                                }}
+                                style={{
+                                  cursor: tp.isInStock ? 'pointer' : 'not-allowed',
+                                  background: tp.isOutwarded
+                                    ? '#f8fafc'
+                                    : isSelected
+                                      ? '#ecfdf5'
+                                      : '#ffffff',
+                                  borderBottom: '1px solid #f1f5f9',
+                                  opacity: tp.isOutwarded ? 0.72 : 1,
+                                  transition: 'background 0.15s ease'
+                                }}
+                              >
+                                <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                                  {tp.isOutwarded ? (
+                                    <input
+                                      type="checkbox"
+                                      disabled
+                                      checked={false}
+                                      title="Already outwarded to mill"
+                                      style={{ cursor: 'not-allowed' }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  ) : (
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleToggleTpSelection(tp.lotId, tp.tpIndex, true)}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  )}
+                                </td>
+                                <td style={{ padding: '6px 10px', fontWeight: 700, color: tp.isOutwarded ? '#64748b' : '#0284c7' }}>
+                                  {tp.lotNumber}
+                                </td>
+                                <td style={{ padding: '6px 10px', color: tp.isOutwarded ? '#94a3b8' : '#334155' }}>
+                                  <div style={{ fontWeight: 600 }}>{tp.weaverParty}</div>
+                                  <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Ch: {tp.weaverChallanNo}</div>
+                                </td>
+                                <td style={{ padding: '6px 10px', color: tp.isOutwarded ? '#94a3b8' : '#334155' }}>
+                                  {tp.fabricQuality}
+                                </td>
+                                <td style={{ padding: '6px 10px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#0f172a' }}>
+                                  {tp.tpNo}
+                                </td>
+                                <td style={{ padding: '6px 10px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#059669' }}>
+                                  {tp.tpMtr} Mtr
+                                </td>
+                                <td style={{ padding: '6px 10px' }}>
+                                  {tp.isOutwarded ? (
+                                    <span
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: 4,
+                                        background: '#f1f5f9',
+                                        color: '#64748b',
+                                        border: '1px solid #cbd5e1',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 3
+                                      }}
+                                    >
+                                      <Lock size={10} color="#64748b" /> Already Outwarded ({tp.millChallanNo || 'At Mill'})
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: 4,
+                                        background: '#dcfce7',
+                                        color: '#15803d',
+                                        border: '1px solid #bbf7d0',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 3
+                                      }}
+                                    >
+                                      <CheckCircle2 size={10} color="#16a34a" /> In Stock (Available)
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {/* Selection Footer */}
+                  <div style={{ background: '#f0fdf4', padding: '9px 14px', borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 700 }}>
+                      Selected for Mill: <strong style={{ fontSize: '0.9rem' }}>{selectedMillTps.length} TPs</strong>
+                    </div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#15803d' }}>
+                      Challan Total: {millSelectedTotalMtrs.toFixed(1)} Mtr
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+              {/* Bottom Action Bar */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.65rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowMillChallanModal(false)}
@@ -6845,16 +6882,17 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   disabled={selectedMillTps.length === 0}
                   className="btn-primary"
                   style={{
-                    padding: '0.45rem 1.25rem',
+                    padding: '0.45rem 1.35rem',
                     fontSize: '0.82rem',
                     background: selectedMillTps.length > 0 ? 'linear-gradient(135deg, #059669, #10b981)' : '#94a3b8',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '6px',
+                    fontWeight: 800
                   }}
                 >
-                  <Check size={16} /> Confirm & Generate Mill Challan
+                  <Check size={16} /> Confirm & Generate Mill Challan ({selectedMillTps.length} TPs • {millSelectedTotalMtrs.toFixed(1)} Mtr)
                 </button>
               </div>
             </form>
@@ -7457,26 +7495,27 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           }}
         >
           <div
+            className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: '720px',
+              maxWidth: '1180px',
               maxHeight: '92vh',
-              overflowY: 'auto',
+              overflow: 'hidden',
               background: '#ffffff',
-              borderRadius: 12,
+              borderRadius: 14,
               boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              padding: '1.5rem',
+              padding: '1.25rem 1.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem'
+              gap: '0.75rem'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-              <div>
-                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
                   Edit Mill Outward Challan
                 </span>
-                <span style={{ marginLeft: 8, fontSize: '0.74rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
+                <span style={{ fontSize: '0.76rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
                   {editingMillChallan.challanNo}
                 </span>
               </div>
@@ -7488,338 +7527,353 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditMillChallan} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
-                      Challan Number
-                    </label>
-                    <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>Locked</span>
-                  </div>
-                  <input
-                    type="text"
-                    readOnly
-                    className="input-field"
-                    value={editChallanForm.challanNo}
-                    title="Challan Number is system auto-assigned and locked"
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#0f172a', cursor: 'not-allowed' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Challan Date
-                  </label>
-                  <input
-                    type="date"
-                    className="input-field"
-                    value={editChallanForm.challanDate}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, challanDate: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Processing Mill
-                  </label>
-                  <select
-                    className="input-field"
-                    value={editChallanForm.millParty}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, millParty: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  >
-                    {configs.mills.map((m, idx) => (
-                      <option key={idx} value={getPartyName(m)}>
-                        {getPartyName(m)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Fabric Quality
-                  </label>
-                  <select
-                    className="input-field"
-                    value={editChallanForm.fabricQuality}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, fabricQuality: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  >
-                    {configs.qualities.map((q, idx) => (
-                      <option key={idx} value={q}>{q}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Process Required
-                  </label>
-                  <select
-                    className="input-field"
-                    value={editChallanForm.processRequired}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, processRequired: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  >
-                    {configs.processes.map((p, idx) => (
-                      <option key={idx} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Status
-                  </label>
-                  <select
-                    className="input-field"
-                    value={editChallanForm.status}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, status: e.target.value })}
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  >
-                    <option value="In Processing at Mill">In Processing at Mill</option>
-                    <option value="Ready for Pickup">Ready for Pickup</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Vehicle / Transport No.
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={editChallanForm.vehicleNo}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, vehicleNo: e.target.value })}
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                    Driver / Contact Name
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={editChallanForm.driverName}
-                    onChange={e => setEditChallanForm({ ...editChallanForm, driverName: e.target.value })}
-                    style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                  />
-                </div>
-              </div>
-
-              {/* 🧵 CHALLAN TP BREAKDOWN & EDITABLE METERS */}
-              {(() => {
-                const currentTps = editChallanForm.tps || [];
-                const liveTotalMtrs = currentTps.reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0);
-                const origMtrs = Number(editingMillChallan.totalMeters) || 0;
-                const diffMtrs = liveTotalMtrs - origMtrs;
-
-                return (
-                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.75rem', background: '#f8fafc' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
-                          Challan TP Breakdown & Meters ({currentTps.length} TPs)
-                        </span>
-                        <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
-                          Live: {liveTotalMtrs.toFixed(1)} Mtr
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditChallanForm(prev => {
-                            const cur = prev.tps || [];
-                            const nextSr = cur.length + 1;
-                            const newTp = {
-                              srNo: nextSr,
-                              lotNumber: cur[0]?.lotNumber || editingMillChallan.lotNumber || '',
-                              tpNo: String(nextSr),
-                              tpMtr: ''
-                            };
-                            return { ...prev, tps: [...cur, newTp] };
-                          });
-                        }}
-                        className="btn-secondary"
-                        style={{
-                          padding: '3px 9px',
-                          fontSize: '0.74rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          background: '#ffffff',
-                          color: '#0284c7',
-                          borderColor: '#bae6fd',
-                          fontWeight: 700
-                        }}
-                      >
-                        <Plus size={13} /> Add TP
-                      </button>
+            <form onSubmit={handleSaveEditMillChallan} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(360px, 1fr) minmax(460px, 1.25fr)',
+                  gap: '1rem',
+                  flex: 1,
+                  minHeight: 0
+                }}
+              >
+                {/* ⬅️ PART 1: BASIC DETAILS */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', height: '100%', minHeight: 0, overflowY: 'auto', paddingRight: '4px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.15rem' }}>
+                      <FileText size={15} color="#0284c7" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                        1. Basic Details
+                      </span>
                     </div>
 
-                    <div style={{ maxHeight: '210px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, background: '#ffffff' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                          <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontSize: '0.7rem', textAlign: 'left' }}>
-                            <th style={{ padding: '6px 8px', width: 45 }}>Sr</th>
-                            <th style={{ padding: '6px 8px', width: 130 }}>Lot No.</th>
-                            <th style={{ padding: '6px 8px', width: 130 }}>TP No.</th>
-                            <th style={{ padding: '6px 8px' }}>TP Meter (Mtr)</th>
-                            <th style={{ padding: '6px 8px', width: 45, textAlign: 'center' }}></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {currentTps.length === 0 ? (
-                            <tr>
-                              <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
-                                No TPs currently attached to this challan. Click "+ Add TP" above to add rolls.
-                              </td>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
+                            Challan Number
+                          </label>
+                          <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>Locked</span>
+                        </div>
+                        <input
+                          type="text"
+                          readOnly
+                          className="input-field"
+                          value={editChallanForm.challanNo}
+                          title="Challan Number is system auto-assigned and locked"
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6, fontWeight: 800, background: '#f8fafc', color: '#0f172a', cursor: 'not-allowed' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Challan Date
+                        </label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          value={editChallanForm.challanDate}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, challanDate: e.target.value })}
+                          required
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Processing Mill
+                        </label>
+                        <select
+                          className="input-field"
+                          value={editChallanForm.millParty}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, millParty: e.target.value })}
+                          required
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        >
+                          {configs.mills.map((m, idx) => (
+                            <option key={idx} value={getPartyName(m)}>
+                              {getPartyName(m)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Fabric Quality
+                        </label>
+                        <select
+                          className="input-field"
+                          value={editChallanForm.fabricQuality}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, fabricQuality: e.target.value })}
+                          required
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        >
+                          {configs.qualities.map((q, idx) => (
+                            <option key={idx} value={q}>{q}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Process Required
+                        </label>
+                        <select
+                          className="input-field"
+                          value={editChallanForm.processRequired}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, processRequired: e.target.value })}
+                          required
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        >
+                          {configs.processes.map((p, idx) => (
+                            <option key={idx} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Status
+                        </label>
+                        <select
+                          className="input-field"
+                          value={editChallanForm.status}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, status: e.target.value })}
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        >
+                          <option value="In Processing at Mill">In Processing at Mill</option>
+                          <option value="Ready for Pickup">Ready for Pickup</option>
+                          <option value="Completed">Completed</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Vehicle / Transport No.
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          value={editChallanForm.vehicleNo}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, vehicleNo: e.target.value })}
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                          Driver / Contact Name
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          value={editChallanForm.driverName}
+                          onChange={e => setEditChallanForm({ ...editChallanForm, driverName: e.target.value })}
+                          style={{ width: '100%', height: '32px', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                        Notes / Instructions
+                      </label>
+                      <textarea
+                        className="input-field"
+                        value={editChallanForm.notes}
+                        onChange={e => setEditChallanForm({ ...editChallanForm, notes: e.target.value })}
+                        rows={3}
+                        style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ➡️ PART 2: MANAGE TP DETAILS */}
+                {(() => {
+                  const currentTps = editChallanForm.tps || [];
+                  const liveTotalMtrs = currentTps.reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0);
+                  const origMtrs = Number(editingMillChallan.totalMeters) || 0;
+                  const diffMtrs = liveTotalMtrs - origMtrs;
+                  const isModified = Math.abs(diffMtrs) > 0.05 || currentTps.length !== (editingMillChallan.totalTps || 0);
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, border: '1px solid #e2e8f0', borderRadius: 10, background: '#ffffff', overflow: 'hidden' }}>
+                      <div style={{ background: '#f8fafc', padding: '10px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <Boxes size={15} color="#0284c7" />
+                          <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                            2. Manage TP Details ({currentTps.length} TPs)
+                          </span>
+                          <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, fontWeight: 800 }}>
+                            Live: {liveTotalMtrs.toFixed(1)} Mtr
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditChallanForm(prev => {
+                              const cur = prev.tps || [];
+                              const nextSr = cur.length + 1;
+                              const newTp = {
+                                srNo: nextSr,
+                                lotNumber: cur[0]?.lotNumber || editingMillChallan.lotNumber || '',
+                                tpNo: String(nextSr),
+                                tpMtr: ''
+                              };
+                              return { ...prev, tps: [...cur, newTp] };
+                            });
+                          }}
+                          className="btn-secondary"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.74rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: '#ffffff',
+                            color: '#0284c7',
+                            borderColor: '#bae6fd',
+                            fontWeight: 700,
+                            borderRadius: 6
+                          }}
+                        >
+                          <Plus size={13} /> Add TP
+                        </button>
+                      </div>
+
+                      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: '#f8fafc' }}>
+                            <tr style={{ borderBottom: '1px solid #cbd5e1', color: '#475569', fontSize: '0.7rem', textAlign: 'left' }}>
+                              <th style={{ padding: '7px 10px', width: 45 }}>Sr</th>
+                              <th style={{ padding: '7px 10px', width: 130 }}>Lot No.</th>
+                              <th style={{ padding: '7px 10px', width: 130 }}>TP No.</th>
+                              <th style={{ padding: '7px 10px' }}>TP Meter (Mtr)</th>
+                              <th style={{ padding: '7px 10px', width: 45, textAlign: 'center' }}></th>
                             </tr>
-                          ) : (
-                            currentTps.map((tp, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                <td style={{ padding: '4px 8px', color: '#64748b', fontWeight: 700 }}>
-                                  {tp.srNo || idx + 1}
-                                </td>
-                                <td style={{ padding: '4px 8px' }}>
-                                  <input
-                                    type="text"
-                                    value={tp.lotNumber || ''}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      setEditChallanForm(prev => {
-                                        const next = [...(prev.tps || [])];
-                                        next[idx] = { ...next[idx], lotNumber: val };
-                                        return { ...prev, tps: next };
-                                      });
-                                    }}
-                                    className="input-field"
-                                    style={{ height: '26px', fontSize: '0.76rem', padding: '2px 6px', width: '100%', background: '#f8fafc' }}
-                                    placeholder="Lot No"
-                                  />
-                                </td>
-                                <td style={{ padding: '4px 8px' }}>
-                                  <input
-                                    type="text"
-                                    value={tp.tpNo}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      setEditChallanForm(prev => {
-                                        const next = [...(prev.tps || [])];
-                                        next[idx] = { ...next[idx], tpNo: val };
-                                        return { ...prev, tps: next };
-                                      });
-                                    }}
-                                    className="input-field"
-                                    style={{ height: '26px', fontSize: '0.78rem', padding: '2px 6px', width: '100%', fontWeight: 700 }}
-                                  />
-                                </td>
-                                <td style={{ padding: '4px 8px' }}>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    value={tp.tpMtr}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      setEditChallanForm(prev => {
-                                        const next = [...(prev.tps || [])];
-                                        next[idx] = { ...next[idx], tpMtr: val };
-                                        return { ...prev, tps: next };
-                                      });
-                                    }}
-                                    className="input-field"
-                                    style={{ height: '26px', fontSize: '0.8rem', padding: '2px 6px', width: '100%', fontWeight: 800, color: '#0284c7' }}
-                                    placeholder="0.0"
-                                  />
-                                </td>
-                                <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditChallanForm(prev => {
-                                        const next = (prev.tps || []).filter((_, i) => i !== idx);
-                                        return { ...prev, tps: next };
-                                      });
-                                    }}
-                                    style={{
-                                      background: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      color: '#dc2626',
-                                      borderRadius: 4,
-                                      cursor: 'pointer',
-                                      padding: '3px 6px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}
-                                    title="Remove TP from this Challan"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
+                          </thead>
+                          <tbody>
+                            {currentTps.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  No TPs currently attached to this challan. Click "+ Add TP" above to add rolls.
                                 </td>
                               </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })()}
+                            ) : (
+                              currentTps.map((tp, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '5px 10px', color: '#64748b', fontWeight: 700 }}>
+                                    {tp.srNo || idx + 1}
+                                  </td>
+                                  <td style={{ padding: '5px 10px' }}>
+                                    <input
+                                      type="text"
+                                      value={tp.lotNumber || ''}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setEditChallanForm(prev => {
+                                          const next = [...(prev.tps || [])];
+                                          next[idx] = { ...next[idx], lotNumber: val };
+                                          return { ...prev, tps: next };
+                                        });
+                                      }}
+                                      className="input-field"
+                                      style={{ height: '28px', fontSize: '0.76rem', padding: '2px 6px', width: '100%', background: '#f8fafc' }}
+                                      placeholder="Lot No"
+                                    />
+                                  </td>
+                                  <td style={{ padding: '5px 10px' }}>
+                                    <input
+                                      type="text"
+                                      value={tp.tpNo}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setEditChallanForm(prev => {
+                                          const next = [...(prev.tps || [])];
+                                          next[idx] = { ...next[idx], tpNo: val };
+                                          return { ...prev, tps: next };
+                                        });
+                                      }}
+                                      className="input-field"
+                                      style={{ height: '28px', fontSize: '0.78rem', padding: '2px 6px', width: '100%', fontWeight: 700 }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: '5px 10px' }}>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={tp.tpMtr}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setEditChallanForm(prev => {
+                                          const next = [...(prev.tps || [])];
+                                          next[idx] = { ...next[idx], tpMtr: val };
+                                          return { ...prev, tps: next };
+                                        });
+                                      }}
+                                      className="input-field"
+                                      style={{ height: '28px', fontSize: '0.8rem', padding: '2px 6px', width: '100%', fontWeight: 800, color: '#0284c7' }}
+                                      placeholder="0.0"
+                                    />
+                                  </td>
+                                  <td style={{ padding: '5px 10px', textAlign: 'center' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditChallanForm(prev => {
+                                          const next = (prev.tps || []).filter((_, i) => i !== idx);
+                                          return { ...prev, tps: next };
+                                        });
+                                      }}
+                                      style={{
+                                        background: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        color: '#dc2626',
+                                        borderRadius: 4,
+                                        cursor: 'pointer',
+                                        padding: '3px 6px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}
+                                      title="Remove TP from this Challan"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#475569', marginBottom: 3 }}>
-                  Notes / Instructions
-                </label>
-                <textarea
-                  className="input-field"
-                  value={editChallanForm.notes}
-                  onChange={e => setEditChallanForm({ ...editChallanForm, notes: e.target.value })}
-                  rows={2}
-                  style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
-                />
+                      <div style={{ background: '#f8fafc', padding: '9px 14px', borderTop: '1px solid #e2e8f0', fontSize: '0.76rem', color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span><strong>Total TPs:</strong> {currentTps.length} TPs</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {isModified && (
+                            <span style={{ fontSize: '0.70rem', color: '#b45309', background: '#fef3c7', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>
+                              Was: {origMtrs.toFixed(1)} Mtr ({diffMtrs > 0 ? `+${diffMtrs.toFixed(1)}` : diffMtrs.toFixed(1)} Mtr)
+                            </span>
+                          )}
+                          <span><strong>Total Meters:</strong> <span style={{ color: '#0284c7', fontWeight: 900 }}>{liveTotalMtrs.toFixed(1)} Mtr</span></span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {(() => {
-                const currentTps = editChallanForm.tps || [];
-                const liveTotalMtrs = currentTps.reduce((sum, t) => sum + (parseFloat(t.tpMtr) || 0), 0);
-                const origMtrs = Number(editingMillChallan.totalMeters) || 0;
-                const diffMtrs = liveTotalMtrs - origMtrs;
-                const isModified = Math.abs(diffMtrs) > 0.05 || currentTps.length !== (editingMillChallan.totalTps || 0);
-
-                return (
-                  <div style={{ background: '#f8fafc', padding: '0.6rem 0.85rem', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.76rem', color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span><strong>Total TPs:</strong> {currentTps.length} TPs</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {isModified && (
-                        <span style={{ fontSize: '0.70rem', color: '#b45309', background: '#fef3c7', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>
-                          Was: {origMtrs.toFixed(1)} Mtr ({diffMtrs > 0 ? `+${diffMtrs.toFixed(1)}` : diffMtrs.toFixed(1)} Mtr)
-                        </span>
-                      )}
-                      <span><strong>Total Meters:</strong> <span style={{ color: '#0284c7', fontWeight: 900 }}>{liveTotalMtrs.toFixed(1)} Mtr</span></span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.65rem' }}>
                 <button
                   type="button"
                   onClick={() => { setEditingMillChallan(null); setEditChallanForm(null); }}
@@ -7831,7 +7885,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 <button
                   type="submit"
                   className="btn-primary"
-                  style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem', background: '#0284c7' }}
+                  style={{ padding: '0.45rem 1.35rem', fontSize: '0.82rem', background: '#0284c7', fontWeight: 800 }}
                 >
                   Save Changes
                 </button>
