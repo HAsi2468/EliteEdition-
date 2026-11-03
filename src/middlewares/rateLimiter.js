@@ -114,18 +114,34 @@ const tokenRefreshLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 3000, // 3,000 requests per 15 min ceiling for ERP operations
+	max: 60000, // 60,000 requests per 15 min ceiling for ERP operations across shared office LAN
 	standardHeaders: true,
 	legacyHeaders: false,
 	skip: (req) => {
-		if (req.path === '/' || req.path === '/health' || req.path === '/api/health' || req.path === '/v1/health') {
+		const path = req.path || req.originalUrl || '';
+		// 1. Skip lightweight health checks
+		if (path === '/' || path === '/health' || path === '/api/health' || path === '/v1/health') {
+			return true;
+		}
+		// 2. Never rate limit static design images, thumbnails, uploads, or preflight CORS
+		if (
+			req.method === 'OPTIONS' ||
+			path.includes('/designs') ||
+			path.includes('/uploads') ||
+			path.includes('/download-zip')
+		) {
+			return true;
+		}
+		// 3. Authenticated ERP users: ERP staff on shared office LAN router are already authenticated
+		// and governed by RBAC gates; do not throttle them by shared office IP
+		if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
 			return true;
 		}
 		return false;
 	},
 	message: {
 		code: 429,
-		error: 'Too many requests from this IP, please try again later.',
+		error: 'Too many requests from this network, please try again later.',
 	},
 });
 
