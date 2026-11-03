@@ -1804,7 +1804,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   <option value="Elite Stitching">✂️ Elite Stitching ({users.filter(u => u.allowedCompanies?.includes('Elite Stitching')).length})</option>
                   <option value="Elite Digital Print">🖨️ Elite Digital Print ({users.filter(u => u.allowedCompanies?.includes('Elite Digital Print')).length})</option>
                   <option value="Sobise">✨ Sobise ({users.filter(u => u.allowedCompanies?.includes('Sobise')).length})</option>
-                  <option value="Ethno wear">🌸 Ethno wear ({users.filter(u => u.allowedCompanies?.includes('Ethno wear')).length})</option>
+                  <option value="Ethno wear">🥻 Ethno wear ({users.filter(u => u.allowedCompanies?.includes('Ethno wear')).length})</option>
                   <option value="Yamunaji">🏢 Yamunaji ({users.filter(u => u.allowedCompanies?.includes('Yamunaji')).length})</option>
                 </select>
               </div>

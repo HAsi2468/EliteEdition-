@@ -99,7 +99,7 @@ export default function CorporateDeliveryChallanPanel({
 
   const getThemeColor = () => {
     const norm = String(companyEntity || '').toLowerCase();
-    if (norm.includes('ethno') || norm === 'ew') return '#ec4899'; // Ethno wear Pink
+    if (norm.includes('ethno') || norm === 'ew') return '#8b5a2b'; // Ethno wear Brown
     if (norm.includes('sobise')) return '#e11d48'; // Sobise Rose
     if (norm.includes('fabtex')) return '#f59e0b'; // Fabtex Amber
     if (norm.includes('edition')) return '#8b5cf6'; // Edition Purple

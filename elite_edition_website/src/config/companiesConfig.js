@@ -131,9 +131,9 @@ export const COMPANIES = [
     settingsTab: 'ew_settings',
     invoicePrefix: 'EW-2627-',
     invoiceSuffix: '',
-    badgeColor: '#ec4899',
-    iconColor: '#ec4899',
-    gradient: 'linear-gradient(135deg, #ec4899, #be185d)',
+    badgeColor: '#8b5a2b',
+    iconColor: '#8b5a2b',
+    gradient: 'linear-gradient(135deg, #8b5a2b, #6b4423)',
     description: 'Company workspace for Ethno wear finance, invoices & billing.',
     aliases: ['ethno_wear', 'ew', 'ethno wear', 'ethnowear', 'ethno']
   },
