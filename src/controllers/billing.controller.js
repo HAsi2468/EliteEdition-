@@ -2959,9 +2959,10 @@ const getPurchaseRegex = (prefix) => {
 
 const getNextPurchaseNo = async (req, res) => {
   try {
-    const { companyEntity = 'Elite Digital Prints' } = req.query;
-    const prefix = getPurchasePrefix(companyEntity);
-    const regex = getPurchaseRegex(prefix);
+    const { companyEntity = 'Elite Digital Prints', entryType = 'general' } = req.query;
+    const isContra = entryType === 'contra';
+    const prefix = isContra ? 'CNTR-' : getPurchasePrefix(companyEntity);
+    const regex = isContra ? /^CNTR[-_]?(\d+)/i : getPurchaseRegex(prefix);
 
     const purchases = await BillingPurchase.find({
       $or: [
@@ -2993,9 +2994,11 @@ const getNextPurchaseNo = async (req, res) => {
 const createPurchase = async (req, res) => {
   try {
     const purchaseData = { ...req.body };
+    const isContra = purchaseData.entryType === 'contra';
+
     if (!purchaseData.purchaseNo || !purchaseData.purchaseNo.trim()) {
-      const prefix = getPurchasePrefix(purchaseData.companyEntity);
-      const regex = getPurchaseRegex(prefix);
+      const prefix = isContra ? 'CNTR-' : getPurchasePrefix(purchaseData.companyEntity);
+      const regex = isContra ? /^CNTR[-_]?(\d+)/i : getPurchaseRegex(prefix);
 
       const purchases = await BillingPurchase.find({
         $or: [
@@ -3024,6 +3027,9 @@ const createPurchase = async (req, res) => {
     if (!purchaseData.vendorName && purchaseData.vendor) {
       purchaseData.vendorName = purchaseData.vendor.businessName || purchaseData.vendor.name || '';
     }
+    if (isContra && (!purchaseData.vendorName || !purchaseData.vendorName.trim())) {
+      purchaseData.vendorName = purchaseData.contraDetails?.debitParty || purchaseData.contraDetails?.creditParty || 'Contra Settlement';
+    }
     if (purchaseData.vendor) {
       if (!purchaseData.vendor.vendorId || !mongoose.Types.ObjectId.isValid(purchaseData.vendor.vendorId)) {
         delete purchaseData.vendor.vendorId;
@@ -3033,7 +3039,34 @@ const createPurchase = async (req, res) => {
       delete purchaseData._id;
     }
 
-    // ── Duplicate Purchase Bill Guard (Vendor + Bill No, or complete details) ──
+    // Contra Entry Specific Normalization
+    if (isContra) {
+      const contraAmt = Number(purchaseData.contraDetails?.amount || purchaseData.grandTotal || purchaseData.totalAmount || 0);
+      purchaseData.grandTotal = contraAmt;
+      purchaseData.totalAmount = contraAmt;
+      purchaseData.subtotal = contraAmt;
+      purchaseData.subtotalAmount = contraAmt;
+      purchaseData.taxableAmount = contraAmt;
+      purchaseData.paidAmount = contraAmt;
+      purchaseData.balanceDue = 0;
+      purchaseData.paymentStatus = 'PAID';
+      purchaseData.purchaseType = 'contra';
+      if (!purchaseData.items || purchaseData.items.length === 0) {
+        purchaseData.items = [{
+          itemName: `Contra: ${purchaseData.contraDetails?.debitParty || 'Dr'} ⇄ ${purchaseData.contraDetails?.creditParty || 'Cr'}`,
+          description: purchaseData.contraDetails?.narration || 'Contra / Party Offset Entry',
+          quantity: 1,
+          qty: 1,
+          unit: 'Entry',
+          unitPrice: contraAmt,
+          rate: contraAmt,
+          totalAmount: contraAmt,
+          amount: contraAmt
+        }];
+      }
+    }
+
+    // ── Duplicate Purchase Bill Guard (Skipped for Contra Vouchers) ──
     const vName = (purchaseData.vendorName || purchaseData.vendor?.businessName || purchaseData.vendor?.name || '').trim();
     const bNo = (purchaseData.billNo || '').trim();
     const chNo = (purchaseData.ourChallanNo || '').trim();
@@ -3041,52 +3074,54 @@ const createPurchase = async (req, res) => {
     const gTotal = Number(purchaseData.grandTotal || purchaseData.totalAmount || 0);
     const pDate = purchaseData.date ? new Date(purchaseData.date) : new Date();
 
-    if (vName && bNo && bNo !== '-' && bNo.toLowerCase() !== 'na' && bNo.toLowerCase() !== 'n/a') {
-      const dupQuery = {
-        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-        billNo: { $regex: new RegExp(`^${bNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-      };
-      if (cEntity) {
-        dupQuery.companyEntity = { $regex: new RegExp(`^${cEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
-      }
-      const existing = await BillingPurchase.findOne(dupQuery);
-      if (existing) {
-        const dupDate = existing.date ? new Date(existing.date).toLocaleDateString('en-GB') : 'N/A';
-        return res.status(409).json({
-          success: false,
-          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Bill #${existing.billNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} (dated ${dupDate}). Duplicate purchase bills are not permitted.`
-        });
-      }
-    } else if (vName && chNo && chNo !== '-' && chNo.toLowerCase() !== 'na' && chNo.toLowerCase() !== 'n/a') {
-      const dupQuery = {
-        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-        ourChallanNo: { $regex: new RegExp(`^${chNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-      };
-      const existing = await BillingPurchase.findOne(dupQuery);
-      if (existing) {
-        return res.status(409).json({
-          success: false,
-          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Challan #${existing.ourChallanNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)}.`
-        });
-      }
-    } else if (vName && gTotal > 0) {
-      const startOfDay = new Date(pDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(pDate);
-      endOfDay.setHours(23, 59, 59, 999);
+    if (!isContra) {
+      if (vName && bNo && bNo !== '-' && bNo.toLowerCase() !== 'na' && bNo.toLowerCase() !== 'n/a') {
+        const dupQuery = {
+          vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          billNo: { $regex: new RegExp(`^${bNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        };
+        if (cEntity) {
+          dupQuery.companyEntity = { $regex: new RegExp(`^${cEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+        }
+        const existing = await BillingPurchase.findOne(dupQuery);
+        if (existing) {
+          const dupDate = existing.date ? new Date(existing.date).toLocaleDateString('en-GB') : 'N/A';
+          return res.status(409).json({
+            success: false,
+            error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Bill #${existing.billNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} (dated ${dupDate}). Duplicate purchase bills are not permitted.`
+          });
+        }
+      } else if (vName && chNo && chNo !== '-' && chNo.toLowerCase() !== 'na' && chNo.toLowerCase() !== 'n/a') {
+        const dupQuery = {
+          vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          ourChallanNo: { $regex: new RegExp(`^${chNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        };
+        const existing = await BillingPurchase.findOne(dupQuery);
+        if (existing) {
+          return res.status(409).json({
+            success: false,
+            error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Challan #${existing.ourChallanNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)}.`
+          });
+        }
+      } else if (vName && gTotal > 0) {
+        const startOfDay = new Date(pDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(pDate);
+        endOfDay.setHours(23, 59, 59, 999);
 
-      const dupQuery = {
-        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-        billNo: { $in: [null, '', '-', 'NA', 'N/A', 'na', 'n/a'] },
-        grandTotal: { $gte: gTotal - 1, $lte: gTotal + 1 },
-        date: { $gte: startOfDay, $lte: endOfDay }
-      };
-      const existing = await BillingPurchase.findOne(dupQuery);
-      if (existing) {
-        return res.status(409).json({
-          success: false,
-          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} with identical Vendor "${existing.vendorName}" and Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} already exists for this date.`
-        });
+        const dupQuery = {
+          vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          billNo: { $in: [null, '', '-', 'NA', 'N/A', 'na', 'n/a'] },
+          grandTotal: { $gte: gTotal - 1, $lte: gTotal + 1 },
+          date: { $gte: startOfDay, $lte: endOfDay }
+        };
+        const existing = await BillingPurchase.findOne(dupQuery);
+        if (existing) {
+          return res.status(409).json({
+            success: false,
+            error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} with identical Vendor "${existing.vendorName}" and Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} already exists for this date.`
+          });
+        }
       }
     }
 

@@ -29,6 +29,16 @@ const billingPurchaseSchema = new mongoose.Schema(
     purchaseNo: { type: String, required: true, trim: true, index: true },
     billNo: { type: String, default: '', trim: true, index: true }, // Vendor Bill / Invoice No (e.g. 2092/26-27)
     purchaseType: { type: String, default: 'inventory', index: true }, // 'inventory' (Inventory Purchase), 'expense' (Expense Purchase), or 'asset' (Asset Purchase)
+    entryType: { type: String, enum: ['general', 'contra'], default: 'general', index: true },
+    contraDetails: {
+      contraMode: { type: String, default: 'party_offset' }, // 'party_offset' (Vendor ↔ Customer Havala) | 'bank_cash' (Bank ↔ Cash)
+      debitPartyType: { type: String, default: 'vendor' },
+      debitParty: { type: String, default: '' },
+      creditPartyType: { type: String, default: 'customer' },
+      creditParty: { type: String, default: '' },
+      referenceNo: { type: String, default: '' },
+      narration: { type: String, default: '' }
+    },
     ourChallanNo: { type: String, default: '' },
     date: { type: Date, default: Date.now },
     dueDate: { type: Date },
