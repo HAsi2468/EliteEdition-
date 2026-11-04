@@ -314,7 +314,7 @@
 /* Desktop Grid for TP Row */
 .challan-tp-grid-header {
   display: grid;
-  grid-template-columns: 55px 130px 1fr 1fr 1.1fr 34px;
+  grid-template-columns: 55px 125px 1.4fr 1.1fr 34px;
   gap: 0.45rem;
   font-size: 0.72rem;
   color: #64748b;
@@ -326,8 +326,8 @@
 
 .challan-tp-row {
   display: grid;
-  grid-template-columns: 55px 130px 1fr 1fr 1.1fr 34px;
-  grid-template-areas: "badge lot fresh west meter remove";
+  grid-template-columns: 55px 125px 1.4fr 1.1fr 34px;
+  grid-template-areas: "badge lot job meter remove";
   gap: 0.45rem;
   align-items: center;
 }
@@ -338,6 +338,10 @@
 
 .challan-tp-lot-container {
   grid-area: lot;
+}
+
+.challan-tp-job-wrapper {
+  grid-area: job;
 }
 
 .challan-tp-fresh-wrapper {
@@ -459,7 +463,7 @@
     grid-template-columns: 50px 1fr 34px !important;
     grid-template-areas:
       "badge lot remove"
-      "fresh west meter" !important;
+      "job job meter" !important;
     gap: 0.45rem !important;
     background: #f8fafc !important;
     border: 1.5px solid #e2e8f0 !important;

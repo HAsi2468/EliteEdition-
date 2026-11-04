@@ -1849,19 +1849,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     setChallanForm(prev => {
       const tpDetails = [...prev.tpDetails];
       const currentRow = { ...tpDetails[index] };
-
-      if (field === 'freshMtr' || field === 'westMtr') {
-        currentRow[field] = value;
-        const fresh = field === 'freshMtr' ? (parseFloat(value) || 0) : (parseFloat(currentRow.freshMtr) || 0);
-        const west = field === 'westMtr' ? (parseFloat(value) || 0) : (parseFloat(currentRow.westMtr) || 0);
-        const sum = fresh + west;
-        if (value !== '' || (currentRow.freshMtr !== '' && currentRow.freshMtr != null) || (currentRow.westMtr !== '' && currentRow.westMtr != null)) {
-          currentRow.tpMeter = sum > 0 ? (sum % 1 === 0 ? String(sum) : sum.toFixed(2)) : '';
-        }
-      } else {
-        currentRow[field] = value;
-      }
-
+      currentRow[field] = value;
       tpDetails[index] = currentRow;
       return { ...prev, tpDetails };
     });
@@ -1877,7 +1865,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         .map(s => s.trim())
         .filter(s => s.length > 0);
       const defaultLot = lots[0] || '';
-      return { ...prev, tpDetails: [...prevTp, { tpNo: nextNo, tpMeter: '', freshMtr: '', westMtr: '', lotNo: defaultLot }] };
+      const rawTokens = String(prev.jobNo || '')
+        .split(/[,\s&]+/)
+        .map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, ''))
+        .filter(Boolean);
+      const defaultJob = rawTokens[0] ? (findMatchingJobCard(rawTokens[0])?.jobNo || rawTokens[0]) : '';
+      return { ...prev, tpDetails: [...prevTp, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot, jobNo: defaultJob }] };
     });
     setChallanMobileTab('tp');
   };
@@ -2869,6 +2862,34 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       jobsCount: matched.length,
       jobLabels: matched.map(j => `#${j.jobNo}`).join(', ')
     };
+  }, [challanForm.jobNo, inProgressJobCards]);
+
+  // Specific list of Job Cards attached to current challan
+  const challanSelectedJobs = React.useMemo(() => {
+    if (!challanForm.jobNo) return [];
+    const rawTokens = String(challanForm.jobNo || '')
+      .split(/[,\s&]+/)
+      .map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, ''))
+      .filter(Boolean);
+    const seen = new Set();
+    const result = [];
+    for (const tok of rawTokens) {
+      const matched = findMatchingJobCard(tok);
+      const jNo = matched ? String(matched.jobNo) : tok;
+      if (!seen.has(jNo.toUpperCase())) {
+        seen.add(jNo.toUpperCase());
+        const dNo = matched ? (matched.designNo || matched.designName || '') : '';
+        const color = matched ? (matched.colors || matched.colourMatching || '') : '';
+        result.push({
+          jobNo: jNo,
+          designNo: dNo,
+          color,
+          label: dNo ? `Job #${jNo} (${dNo})` : `Job #${jNo}`,
+          matched
+        });
+      }
+    }
+    return result;
   }, [challanForm.jobNo, inProgressJobCards]);
 
   // Proportional lot stock fulfillment calculation (including fusing waste & shortage)
@@ -6385,8 +6406,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <div className="challan-tp-grid-header">
                     <span>TP No</span>
                     <span>Assigned Lot</span>
-                    <span>Fresh Mtr</span>
-                    <span>West Mtr</span>
+                    <span>Job Card #</span>
                     <span>Total Mtr</span>
                     <span></span>
                   </div>
@@ -6513,52 +6533,73 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             )}
                           </div>
 
-                          <div className="challan-tp-fresh-wrapper" style={{ position: 'relative', width: '100%' }}>
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              value={row.freshMtr ?? ''}
-                              onChange={e => updateTpRow(idx, 'freshMtr', e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem 0.45rem',
-                                fontSize: '0.88rem',
-                                fontWeight: 700,
-                                color: '#0f172a',
-                                background: '#f0fdf4',
-                                border: '1.5px solid #86efac',
-                                borderRadius: '6px',
-                                boxSizing: 'border-box',
-                                textAlign: 'right'
-                              }}
-                              placeholder="Fresh (m)"
-                              title="Fresh roll meters"
-                            />
-                          </div>
-
-                          <div className="challan-tp-west-wrapper" style={{ position: 'relative', width: '100%' }}>
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              value={row.westMtr ?? ''}
-                              onChange={e => updateTpRow(idx, 'westMtr', e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem 0.45rem',
-                                fontSize: '0.88rem',
-                                fontWeight: 700,
-                                color: '#0f172a',
-                                background: '#fff7ed',
-                                border: '1.5px solid #fed7aa',
-                                borderRadius: '6px',
-                                boxSizing: 'border-box',
-                                textAlign: 'right'
-                              }}
-                              placeholder="West (m)"
-                              title="Westage / Short meters"
-                            />
+                          <div className="challan-tp-job-wrapper" style={{ position: 'relative', width: '100%' }}>
+                            {challanSelectedJobs.length > 1 ? (
+                              <select
+                                value={row.jobNo || challanSelectedJobs[0]?.jobNo || ''}
+                                onChange={e => updateTpRow(idx, 'jobNo', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.35rem',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 800,
+                                  color: '#0f172a',
+                                  background: '#ffffff',
+                                  border: '1.5px solid #6366f1',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  boxSizing: 'border-box'
+                                }}
+                                title="Select specific Job Card for this roll"
+                              >
+                                {challanSelectedJobs.map((j, jIdx) => (
+                                  <option key={jIdx} value={j.jobNo}>
+                                    {j.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : challanSelectedJobs.length === 1 ? (
+                              <div
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.35rem',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 800,
+                                  color: '#4338ca',
+                                  background: '#e0e7ff',
+                                  border: '1.5px solid #c7d2fe',
+                                  borderRadius: '6px',
+                                  textAlign: 'center',
+                                  boxSizing: 'border-box',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                                title={challanSelectedJobs[0].label}
+                              >
+                                {challanSelectedJobs[0].label}
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={row.jobNo || ''}
+                                onChange={e => updateTpRow(idx, 'jobNo', e.target.value)}
+                                placeholder="Job #"
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.4rem',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 700,
+                                  color: '#0f172a',
+                                  background: '#ffffff',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '6px',
+                                  boxSizing: 'border-box',
+                                  textAlign: 'center'
+                                }}
+                                title="Job Card No for this roll"
+                              />
+                            )}
                           </div>
 
                           <div className="challan-tp-meter-wrapper" style={{ position: 'relative', width: '100%' }}>
@@ -6581,8 +6622,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 boxSizing: 'border-box',
                                 textAlign: 'right'
                               }}
-                              placeholder="Total (m)"
-                              title="Total roll meters (Fresh + West)"
+                              placeholder="Roll (m)"
+                              title="Total roll meters"
                             />
                           </div>
 
