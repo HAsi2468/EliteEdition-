@@ -123,12 +123,13 @@ const apiLimiter = rateLimit({
 		if (path === '/' || path === '/health' || path === '/api/health' || path === '/v1/health') {
 			return true;
 		}
-		// 2. Never rate limit static design images, thumbnails, uploads, or preflight CORS
+		// 2. Never rate limit static design images, thumbnails, uploads, or preflight CORS, or real-time communication
 		if (
 			req.method === 'OPTIONS' ||
 			path.includes('/designs') ||
 			path.includes('/uploads') ||
-			path.includes('/download-zip')
+			path.includes('/download-zip') ||
+			path.includes('/communication')
 		) {
 			return true;
 		}
