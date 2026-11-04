@@ -181,22 +181,38 @@ const clientPincodeCache = new Map();
 /**
  * 5-digit candidate recovery helper (e.g. 11024 -> 110024, 39506 -> 395006)
  */
+function getFiveDigitCandidates(pin5) {
+  if (!pin5 || pin5.length !== 5) return [];
+  const candidates = [];
+  for (let i = 1; i <= 4; i++) {
+    candidates.push(pin5.slice(0, i) + '0' + pin5.slice(i));
+  }
+  candidates.push('0' + pin5);
+  return Array.from(new Set(candidates));
+}
+
 function recoverFiveDigitPin(pin5) {
   if (pin5.length !== 5) return null;
-  for (let i = 1; i <= 4; i++) {
-    const candidate = pin5.slice(0, i) + '0' + pin5.slice(i);
+  const candidates = getFiveDigitCandidates(pin5);
+  for (const candidate of candidates) {
     if (OFFLINE_PINCODE_MAP[candidate]) {
       return { candidate, data: OFFLINE_PINCODE_MAP[candidate] };
     }
   }
-  if (pin5 === '11024') return { candidate: '110024', data: OFFLINE_PINCODE_MAP['110024'] };
-  if (pin5 === '39506') return { candidate: '395006', data: OFFLINE_PINCODE_MAP['395006'] };
-  if (pin5 === '38001') return { candidate: '380001', data: OFFLINE_PINCODE_MAP['380001'] };
+  if (pin5 === '11024' && OFFLINE_PINCODE_MAP['110024']) {
+    return { candidate: '110024', data: OFFLINE_PINCODE_MAP['110024'] };
+  }
+  if (pin5 === '39506' && OFFLINE_PINCODE_MAP['395006']) {
+    return { candidate: '395006', data: OFFLINE_PINCODE_MAP['395006'] };
+  }
+  if (pin5 === '38001' && OFFLINE_PINCODE_MAP['380001']) {
+    return { candidate: '380001', data: OFFLINE_PINCODE_MAP['380001'] };
+  }
   return null;
 }
 
 /**
- * Free Instant Pincode Lookup (Offline dataset + Backend Proxy + Candidate Recovery)
+ * Free Instant Pincode Lookup (Offline dataset + Backend Proxy + Public API + Candidate Recovery)
  */
 export async function lookupPincode(pincode) {
   if (!pincode) return null;
@@ -223,7 +239,7 @@ export async function lookupPincode(pincode) {
     return res;
   }
 
-  // 3. 5-digit candidate recovery
+  // 3. 5-digit candidate recovery from offline map
   if (cleanPin.length === 5) {
     const rec = recoverFiveDigitPin(cleanPin);
     if (rec && rec.data) {
@@ -238,6 +254,7 @@ export async function lookupPincode(pincode) {
         country: 'India'
       };
       clientPincodeCache.set(cleanPin, res);
+      clientPincodeCache.set(rec.candidate, res);
       return res;
     }
   }
@@ -247,10 +264,67 @@ export async function lookupPincode(pincode) {
     const res = await api.lookupPincode(cleanPin);
     if (res && res.success && res.data) {
       clientPincodeCache.set(cleanPin, res.data);
+      if (res.data.pincode) clientPincodeCache.set(res.data.pincode, res.data);
       return res.data;
     }
   } catch (err) {
     // Backend fallback
+  }
+
+  // If 5 digits, query backend with candidates
+  if (cleanPin.length === 5) {
+    const candidates = getFiveDigitCandidates(cleanPin);
+    for (const cand of candidates) {
+      try {
+        const res = await api.lookupPincode(cand);
+        if (res && res.success && res.data) {
+          const finalRes = { ...res.data, originalQuery: cleanPin, autoCorrected: true };
+          clientPincodeCache.set(cleanPin, finalRes);
+          clientPincodeCache.set(cand, finalRes);
+          return finalRes;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 5. Direct Free Public Indian Postal API fallback (CORS enabled, 100% free)
+  try {
+    const pinsToTry = [cleanPin];
+    if (cleanPin.length === 5) {
+      pinsToTry.push(...getFiveDigitCandidates(cleanPin));
+    }
+    for (const testPin of pinsToTry) {
+      if (testPin.length === 6) {
+        const resp = await fetch(`https://api.postalpincode.in/pincode/${testPin}`);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (Array.isArray(json) && json[0] && json[0].Status === 'Success') {
+            const poList = json[0].PostOffice || [];
+            const primary = poList[0] || {};
+            const stateName = primary.State || 'Gujarat';
+            const district = primary.District || primary.Division || primary.Block || '';
+            const city = district || primary.Name || 'Surat';
+            const stateCode = getStateCode(stateName);
+            const res = {
+              pincode: testPin,
+              originalQuery: cleanPin,
+              autoCorrected: testPin !== cleanPin,
+              city,
+              district,
+              state: stateName,
+              stateCode,
+              country: primary.Country || 'India',
+              postOffices: poList.map(p => p.Name).filter(Boolean)
+            };
+            clientPincodeCache.set(cleanPin, res);
+            clientPincodeCache.set(testPin, res);
+            return res;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // Network fallback
   }
 
   return null;

@@ -2042,48 +2042,60 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             needsOverride = true;
             overrideReasons.push(`• Job #${j.jobNo}: Fusing has not started (0m fused).`);
           }
-        } else if (freshMtr > 0 && challanTotalMtr > (availableFresh + 2.0)) {
-          if (!isAdmin) {
-            setLoading(false);
-            const sendForApproval = await triggerEliteConfirm({
-              title: '🛡️ Submit for Admin Approval?',
-              message: `Requested Challan quantity (${challanTotalMtr.toFixed(1)}m) exceeds available fresh fused fabric (${availableFresh.toFixed(1)}m available: ${freshMtr.toFixed(1)}m fresh fused - ${deliveredMtr.toFixed(1)}m already delivered) for Job #${j.jobNo}.\n\nWould you like to submit this Delivery Challan to the Admin Review & Approvals Queue for authorization?`,
-              confirmText: 'Yes, Submit for Approval',
-              cancelText: 'Cancel & Adjust Meters'
-            });
-            if (sendForApproval) {
-              setLoading(true);
-              try {
-                const effectiveTotalMtr = challanTotalMtr > 0
-                  ? challanTotalMtr
-                  : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
-                const creatorName = challanForm.createdBy || currentUser.fullName || currentUser.name || currentUser.username || 'HASI';
-                const payload = {
-                  ...challanForm,
-                  totalMtr: effectiveTotalMtr,
-                  createdBy: creatorName,
-                  submitForApproval: true
-                };
-                await api.createFabricChallan(payload);
-                setLoading(false);
-                setIsCombinedModalOpen(false);
-                triggerPushNotification(
-                  '🛡️ Submitted to Admin Approval Queue',
-                  `Delivery Challan for Job #${j.jobNo} (${effectiveTotalMtr}m) submitted to Admin Review & Approvals Queue.`,
-                  'info'
-                );
-                return;
-              } catch (subErr) {
-                setLoading(false);
-                triggerEliteAlert('Submission Failed', subErr.message, 'error');
-                return;
-              }
+        }
+      }
+
+      // Check available fresh fused quantity across all matched jobs combined
+      const totalFreshMtr = matchedJobs.reduce((sum, j) => sum + parseFloat(j.freshMtr || 0), 0);
+      const totalDeliveredMtr = matchedJobs.reduce((sum, j) => sum + parseFloat(j.deliveredMtr || 0), 0);
+      const totalAvailableFresh = Math.max(0, totalFreshMtr - totalDeliveredMtr);
+
+      if (totalFreshMtr > 0 && challanTotalMtr > (totalAvailableFresh + 2.0)) {
+        const isMulti = matchedJobs.length > 1;
+        const jobDisplay = isMulti
+          ? `Combined Jobs (${matchedJobs.map(j => j.jobNo).join(', ')})`
+          : `Job #${matchedJobs[0].jobNo}`;
+
+        if (!isAdmin) {
+          setLoading(false);
+          const sendForApproval = await triggerEliteConfirm({
+            title: '🛡️ Submit for Admin Approval?',
+            message: `Requested Challan quantity (${challanTotalMtr.toFixed(1)}m) exceeds available fresh fused fabric (${totalAvailableFresh.toFixed(1)}m available: ${totalFreshMtr.toFixed(1)}m fresh fused - ${totalDeliveredMtr.toFixed(1)}m already delivered) for ${jobDisplay}.\n\nWould you like to submit this Delivery Challan to the Admin Review & Approvals Queue for authorization?`,
+            confirmText: 'Yes, Submit for Approval',
+            cancelText: 'Cancel & Adjust Meters'
+          });
+          if (sendForApproval) {
+            setLoading(true);
+            try {
+              const effectiveTotalMtr = challanTotalMtr > 0
+                ? challanTotalMtr
+                : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
+              const creatorName = challanForm.createdBy || currentUser.fullName || currentUser.name || currentUser.username || 'HASI';
+              const payload = {
+                ...challanForm,
+                totalMtr: effectiveTotalMtr,
+                createdBy: creatorName,
+                submitForApproval: true
+              };
+              await api.createFabricChallan(payload);
+              setLoading(false);
+              setIsCombinedModalOpen(false);
+              triggerPushNotification(
+                '🛡️ Submitted to Admin Approval Queue',
+                `Delivery Challan for ${jobDisplay} (${effectiveTotalMtr}m) submitted to Admin Review & Approvals Queue.`,
+                'info'
+              );
+              return;
+            } catch (subErr) {
+              setLoading(false);
+              triggerEliteAlert('Submission Failed', subErr.message, 'error');
+              return;
             }
-            return;
-          } else {
-            needsOverride = true;
-            overrideReasons.push(`• Job #${j.jobNo}: Requested ${challanTotalMtr.toFixed(1)}m exceeds available fresh fused quantity (${availableFresh.toFixed(1)}m).`);
           }
+          return;
+        } else {
+          needsOverride = true;
+          overrideReasons.push(`• ${jobDisplay}: Requested ${challanTotalMtr.toFixed(1)}m exceeds available fresh fused quantity (${totalAvailableFresh.toFixed(1)}m).`);
         }
       }
 
