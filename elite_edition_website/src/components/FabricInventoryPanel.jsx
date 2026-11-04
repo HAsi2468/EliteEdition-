@@ -794,7 +794,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const fetchActiveJobCards = async () => {
     try {
       const jRes = await api.getJobCards({
-        status: 'In Progress',
         skipStats: 'true',
         limit: 300
       });

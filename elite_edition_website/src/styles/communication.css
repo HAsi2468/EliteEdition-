@@ -386,6 +386,10 @@
   min-height: 56px !important;
 }
 
+.phoenix-chat-input-bar.is-keyboard-open {
+  padding-bottom: 8px !important;
+}
+
 .phoenix-chat-input-pill {
   flex: 1 1 0% !important;
   min-width: 0 !important;

@@ -42,7 +42,28 @@ async function syncJobCardDeliveryTotals(jobNo) {
           ]
         });
 
-        const totalDeliveredMtr = challans.reduce((sum, ch) => sum + (Number(ch.totalMtr) || 0), 0);
+        let totalDeliveredMtr = 0;
+        for (const ch of challans) {
+          const chTokens = String(ch.jobNo || '').split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
+          const isMulti = chTokens.length > 1;
+          if (isMulti && Array.isArray(ch.tpDetails) && ch.tpDetails.length > 0) {
+            const matchedTps = ch.tpDetails.filter(tp => {
+              if (!tp.jobNo) return false;
+              const tpClean = String(tp.jobNo).replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+              const tpDigits = tpClean.match(/\d+/)?.[0];
+              return tpClean.toUpperCase() === jClean.toUpperCase() || (jDigits && tpDigits === jDigits);
+            });
+            if (matchedTps.length > 0) {
+              const tpSum = matchedTps.reduce((s, tp) => s + (parseFloat(tp.tpMeter) || ((parseFloat(tp.freshMtr) || 0) + (parseFloat(tp.westMtr) || 0))), 0);
+              totalDeliveredMtr += tpSum;
+            } else {
+              // If not tagged per-TP, divide evenly among the linked jobs
+              totalDeliveredMtr += ((Number(ch.totalMtr) || 0) / chTokens.length);
+            }
+          } else {
+            totalDeliveredMtr += (Number(ch.totalMtr) || 0);
+          }
+        }
         jCard.deliveredMtr = Math.round(totalDeliveredMtr * 100) / 100;
 
         const freshMtr = parseFloat(String(jCard.freshMtr || 0).replace(/[^\d.]/g, '')) || 0;

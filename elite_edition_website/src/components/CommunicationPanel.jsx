@@ -845,6 +845,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewportHeight, setViewportHeight] = useState(null);
+  const isKeyboardOpen = Boolean(
+    isMobileScreen &&
+    viewportHeight !== null &&
+    typeof window !== 'undefined' &&
+    viewportHeight < (window.innerHeight - 60)
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -5234,8 +5240,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         width: '100%',
         flex: 1,
         minHeight: 0,
-        height: '100%',
-        maxHeight: '100%',
+        height: (isMobileScreen && isKeyboardOpen && viewportHeight) ? `${viewportHeight}px` : '100%',
+        maxHeight: (isMobileScreen && isKeyboardOpen && viewportHeight) ? `${viewportHeight}px` : '100%',
         padding: isMobileScreen ? 0 : '0.85rem',
         boxSizing: 'border-box',
         overflow: 'hidden',
@@ -8031,7 +8037,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               {/* Chat Input Form (Compact Modern Single-Row SaaS Bar) */}
               <form
                 onSubmit={handleSendMessage}
-                className="phoenix-chat-input-bar"
+                className={`phoenix-chat-input-bar ${isKeyboardOpen ? 'is-keyboard-open' : ''}`}
                 style={{ position: 'relative' }}
                 onDragEnter={handleChatDragEnter}
                 onDragOver={handleChatDragOver}
