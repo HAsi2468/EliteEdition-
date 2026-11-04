@@ -216,6 +216,61 @@ const executeApprovedAction = async (approval, adminUser) => {
       }
     }
 
+    const isCreateAction = approval.action === 'CREATE' || (approval.httpMethod === 'POST' && !approval.targetId);
+
+    // 2A. Direct Controller or Model Creation for CREATE actions
+    if (isCreateAction && targetModel) {
+      if (approval.module === 'FabricChallan') {
+        const fabricChallanController = require('./fabricChallan.controller');
+        const mockReq = {
+          body: {
+            ...approval.requestBody,
+            adminOverride: true,
+            submitForApproval: false,
+            allowOverrun: true,
+            allowNegativeStock: true
+          },
+          user: {
+            ...(adminUser || {}),
+            role: 'admin',
+            isAdmin: true,
+            isMainAdmin: true
+          },
+          headers: {
+            'x-approval-execution': 'true',
+            'x-operator-override': 'true',
+            'x-is-admin': 'true',
+            'x-admin-override': 'true'
+          }
+        };
+        let createdResult = null;
+        let createError = null;
+        const mockRes = {
+          status(c) { this._status = c; return this; },
+          json(d) {
+            if (this._status && this._status >= 400) {
+              createError = new Error(d.error || d.message || 'Challan creation failed');
+            } else {
+              createdResult = d.data || d;
+            }
+            return this;
+          },
+          send(s) { createdResult = s; return this; }
+        };
+        await fabricChallanController.createChallan(mockReq, mockRes);
+        if (createError) throw createError;
+        return { success: true, method: 'DIRECT_CONTROLLER_CREATE', data: createdResult };
+      } else {
+        const payload = { ...approval.requestBody };
+        delete payload._id;
+        delete payload.__v;
+        delete payload.createdAt;
+        const created = await targetModel.create(payload);
+        return { success: true, method: 'DIRECT_MODEL_CREATE', data: created };
+      }
+    }
+
+    // 2B. Direct Model update / delete for existing records
     const targetKey = approval.targetId || approval.requestBody?.jobNo || approval.requestBody?.id || approval.requestBody?._id;
     if (targetModel && (targetKey || approval.targetIdentifier)) {
       let idQuery;
@@ -226,13 +281,18 @@ const executeApprovedAction = async (approval, adminUser) => {
           { id: targetKey },
           { jobNo: targetKey },
           { invoiceNo: targetKey },
-          { challanNo: targetKey },
           { lotNo: targetKey },
           { code: targetKey },
         ];
+        if (targetKey && !isNaN(Number(targetKey)) && String(Number(targetKey)) === String(targetKey).trim()) {
+          queryOr.push({ challanNo: Number(targetKey) });
+        }
         if (approval.targetIdentifier) {
           const cleanIdent = String(approval.targetIdentifier).replace(/^Job #|^Lot #|^Invoice #|^Challan #/i, '').trim();
           queryOr.push({ jobNo: cleanIdent }, { lotNo: cleanIdent });
+          if (!isNaN(Number(cleanIdent)) && String(Number(cleanIdent)) === cleanIdent) {
+            queryOr.push({ challanNo: Number(cleanIdent) });
+          }
         }
         idQuery = { $or: queryOr };
       }

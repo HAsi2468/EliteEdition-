@@ -669,6 +669,12 @@ const createChallan = async (req, res) => {
       }
     }
 
+    // ── Workflow Pipeline & Admin Roles ──
+    const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
+    const isUserAdmin = userRole === 'admin' || Boolean(req.user?.isAdmin) || Boolean(req.user?.isMainAdmin);
+    const isApprovalReplay = req.headers['x-approval-execution'] === 'true' || req.headers['x-operator-override'] === 'true' || req.headers['x-is-admin'] === 'true' || req.headers['x-admin-override'] === 'true';
+    const hasAdminOverride = (isUserAdmin && req.body.adminOverride === true) || isApprovalReplay || req.body.allowNegativeStock === true;
+
     // ── Stock Sufficiency Validation: Selected lot(s) must have enough fabric with wastage & shortage ──
     const stockCheck = await validateLotStockSufficiency({
       lotGroups,
@@ -679,22 +685,17 @@ const createChallan = async (req, res) => {
       shortageMode: sMode,
     });
 
-    if (!stockCheck.valid) {
+    if (!stockCheck.valid && !hasAdminOverride) {
       return res.status(400).json({
         success: false,
         error: stockCheck.error,
+        canAdminOverride: isUserAdmin,
         lotNo: stockCheck.lotNo,
         availableStock: stockCheck.availableStock,
         requiredStock: stockCheck.requiredStock,
         deficit: stockCheck.deficit
       });
     }
-
-    // ── Workflow Pipeline Validation: Job Card -> Printing -> Fusing -> Delivery Challan ──
-    const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
-    const isUserAdmin = userRole === 'admin' || Boolean(req.user?.isAdmin) || Boolean(req.user?.isMainAdmin);
-    const isApprovalReplay = req.headers['x-approval-execution'] === 'true' || req.headers['x-operator-override'] === 'true' || req.headers['x-is-admin'] === 'true';
-    const hasAdminOverride = (isUserAdmin && req.body.adminOverride === true) || isApprovalReplay;
 
     // Support non-admin submission to Admin Approval Queue if requested
     if (req.body.submitForApproval === true && !isUserAdmin) {
@@ -1649,13 +1650,28 @@ const downloadChallanPdf = async (req, res) => {
       });
     }
 
-    const jobTokens = String(challan.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    const rawJobTokens = [
+      ...String(challan.jobNo || '').split(/[,\s&]+/).map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')),
+      ...(Array.isArray(challan.tpDetails) ? challan.tpDetails.map(tp => String(tp.jobNo || '').trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')) : [])
+    ].filter(Boolean);
+
+    const seenJobNos = new Set();
     const foundJobCards = [];
-    for (const jNo of jobTokens) {
+    for (const jNo of rawJobTokens) {
       try {
         const cleanNo = jNo.replace(/\D/g, '');
+        if (!cleanNo && !jNo) continue;
+        if (cleanNo && seenJobNos.has(cleanNo)) continue;
+        if (cleanNo) seenJobNos.add(cleanNo);
+
         const job = await JobCard.findOne({
-          $or: [{ jobNo: jNo }, { jobNo: `JOB-${cleanNo}` }, { jobNo: `JOB NO.- ${cleanNo}` }]
+          $or: [
+            { jobNo: jNo },
+            { jobNo: `JOB-${cleanNo}` },
+            { jobNo: `JOB NO.- ${cleanNo}` },
+            { jobNo: cleanNo },
+            { jobNo: Number(cleanNo) }
+          ]
         }).lean();
         if (job) {
           foundJobCards.push(job);
@@ -1998,12 +2014,17 @@ const downloadChallanPdf = async (req, res) => {
 
           doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
 
-          const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
+          const cleanJobNo = tp.jobNo ? String(tp.jobNo).replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '') : '';
+          const hasMultiJobs = foundJobCards.length > 1;
+          const val = (hasMultiJobs && cleanJobNo)
+            ? `${parseFloat(tp.tpMeter).toFixed(2)}m (J#${cleanJobNo})`
+            : `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
+          const meterFontSize = (hasMultiJobs && cleanJobNo) ? 10.5 : 13;
 
           doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
             .text(String(tp.tpNo || (i + 1)), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
           
-          doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica')
+          doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(meterFontSize).font('Helvetica')
             .text(val, x + tpColWidth * 0.35, y + 7, { width: tpColWidth * 0.65, align: 'center' });
         }
       }

@@ -81,7 +81,7 @@ const jobCardSchema = new mongoose.Schema(
     shift:            { type: String, default: '', trim: true },
     deliveryStatus:   { type: String, default: 'Delivery Pending', enum: ['Delivery Pending', 'Delivery In Progress', 'Partial Complete', 'Delivery Done'] },
     deliveryDate:     { type: String, default: '' },
-    status:           { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Done'] },
+    status:           { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Done', 'Pending QA'] },
 
     // ── QA & Quality Checking Fields ──
     qaStatus:           { type: String, default: 'QA Pending', enum: ['QA Pending', 'QA Passed', 'QA Rejected'] },

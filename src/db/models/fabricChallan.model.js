@@ -7,6 +7,9 @@ const tpDetailSchema = new mongoose.Schema(
     freshMtr: { type: Number, default: 0 },
     westMtr: { type: Number, default: 0 },
     lotNo: { type: String, default: '' },
+    jobNo: { type: String, default: '' },
+    designNo: { type: String, default: '' },
+    imageUrl: { type: String, default: '' },
   },
   { _id: false }
 );
