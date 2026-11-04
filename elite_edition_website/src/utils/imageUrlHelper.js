@@ -229,7 +229,24 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   }
 
   const rawFilename = extractCleanFilename(raw);
-  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
+  const cleanDesign = (dName || '').replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
+
+  // Collect all valid text identifiers (sku, brand codes, designName, etc.)
+  const nameSet = new Set();
+  const addNameCandidate = (val) => {
+    if (!val || typeof val !== 'string') return;
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    const upper = trimmed.toUpperCase();
+    if (upper === 'UNNAMED PRODUCT' || upper === 'PRODUCT' || upper === 'ITEM' || upper === 'DEFAULT' || upper === 'N/A') return;
+    nameSet.add(trimmed);
+  };
+
+  addNameCandidate(cleanDesign);
+  if (options.sku) addNameCandidate(options.sku);
+  if (Array.isArray(options.identifiers)) {
+    options.identifiers.forEach(addNameCandidate);
+  }
 
   // 4. Direct absolute HTTP/HTTPS URL (Cloudflare R2 / CDN link / user-provided URL)
   // When an explicit URL is provided, it is the actual designated image and MUST be prioritized.
@@ -246,7 +263,7 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     }
   }
 
-  // 5. Direct Cloudflare R2 links (and master fallbacks)
+  // 5. Direct Cloudflare R2 links from rawFilename
   if (rawFilename) {
     if (isTiffFile(rawFilename)) {
       add(`/v1/upload/preview?url=${encodeURIComponent(rawFilename)}`);
@@ -257,8 +274,8 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
       add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(rawFilename)}`);
       add(`${R2_PUBLIC_BASE}/sample_reference/${encodeURIComponent(rawFilename)}`);
       add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(rawFilename)}`);
+      add(`/uploads/${encodeURIComponent(rawFilename)}`);
     }
-    add(`/v1/designs/${encodeURIComponent(rawFilename)}`);
 
     if (!rawFilename.startsWith('image-') && !rawFilename.startsWith('blob-')) {
       const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
@@ -267,54 +284,59 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpeg`);
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.png`);
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.webp`);
-        add(`/v1/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
+        add(`/uploads/${encodeURIComponent(baseWithoutExt)}.jpg`);
       }
     }
   }
 
-  // 5. For thumbnails, also include the backend endpoint if not already loaded
-  if (isThumb && !raw.startsWith('http://') && !raw.startsWith('https://')) {
-    if (rawFilename) {
-      add(`/v1/designs/${encodeURIComponent(rawFilename)}${thumbQuery}`);
-      const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
-      if (baseWithoutExt) {
-        add(`/v1/designs/${encodeURIComponent(baseWithoutExt)}.jpg${thumbQuery}`);
-      }
-    }
-    if (cleanDesign) {
-      add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg${thumbQuery}`);
-    }
-  }
+  // 6. Candidates built from identifiers (SKU, brand codes, designName)
+  for (const ident of nameSet) {
+    const cleanIdent = ident.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '').trim();
+    if (!cleanIdent) continue;
 
-  // 5. Candidates built from designName
-  if (cleanDesign) {
-    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.jpg`);
-    add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg`);
-    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.jpeg`);
-    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.png`);
-    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.webp`);
+    // Direct match with common image extensions
+    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanIdent)}.jpg`);
+    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanIdent)}.jpeg`);
+    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanIdent)}.png`);
+    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanIdent)}.webp`);
+    add(`/uploads/${encodeURIComponent(cleanIdent)}.jpg`);
+
+    // Numeric SKU prefixes (e.g. SKU '273' -> 'ED-273', 'S-273', 'ED-0273')
+    if (/^\d+$/.test(cleanIdent)) {
+      add(`${R2_PUBLIC_BASE}/designs/ED-${cleanIdent}.jpg`);
+      add(`${R2_PUBLIC_BASE}/designs/ED-${cleanIdent}.jpeg`);
+      add(`${R2_PUBLIC_BASE}/designs/ED-${cleanIdent}.png`);
+      add(`${R2_PUBLIC_BASE}/designs/S-${cleanIdent}.jpg`);
+      add(`${R2_PUBLIC_BASE}/designs/ED-0${cleanIdent}.jpg`);
+      add(`/uploads/ED-${cleanIdent}.jpg`);
+    }
+
+    // Prefixed SKU without prefix (e.g. 'ED-273' -> '273', 'S-469' -> '469')
+    const unprefix = cleanIdent.replace(/^(ED|S|SKU)[-_]/i, '').trim();
+    if (unprefix && unprefix !== cleanIdent) {
+      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(unprefix)}.jpg`);
+      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(unprefix)}.jpeg`);
+      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(unprefix)}.png`);
+      add(`/uploads/${encodeURIComponent(unprefix)}.jpg`);
+    }
 
     // Stripped suffix variations (e.g. 'ED-456 D' -> 'ED-456', 'ED-476(1)' -> 'ED-476', 'ED-81jpg' -> 'ED-81')
-    const stripped1 = cleanDesign.replace(/\s+[A-Za-z0-9]$/, '').trim();
-    const stripped2 = cleanDesign.replace(/\([0-9]+\)$/, '').trim();
-    const stripped3 = cleanDesign.replace(/jpe?g$/i, '').trim();
+    const stripped1 = cleanIdent.replace(/\s+[A-Za-z0-9]$/, '').trim();
+    const stripped2 = cleanIdent.replace(/\([0-9]+\)$/, '').trim();
+    const stripped3 = cleanIdent.replace(/jpe?g$/i, '').trim();
 
     for (const s of [stripped1, stripped2, stripped3]) {
-      if (s && s !== cleanDesign) {
-        if (isThumb) {
-          add(`/v1/designs/${encodeURIComponent(s)}.jpg${thumbQuery}`);
-        }
+      if (s && s !== cleanIdent) {
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(s)}.jpg`);
-        add(`/v1/designs/${encodeURIComponent(s)}.jpg`);
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(s)}.jpeg`);
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(s)}.png`);
       }
     }
-  }
 
-  // 6. Backend smart fallback route (guaranteed to return valid image or decorative SVG badge)
-  const fallback = cleanDesign || rawFilename || 'DESIGN';
-  add(`/v1/designs/${encodeURIComponent(fallback)}.jpg?fallback=1`);
+    // Sample reference & design samples folders on R2
+    add(`${R2_PUBLIC_BASE}/sample_reference/${encodeURIComponent(cleanIdent)}.jpg`);
+    add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(cleanIdent)}.jpg`);
+  }
 
   return candidates;
 }
@@ -360,18 +382,14 @@ export function getOptimizedThumbnailUrl(src, options = {}) {
     return `/v1/upload/preview?url=${encodeURIComponent(clean)}&w=${width}&q=${quality}`;
   }
 
-  // 3. Cloudflare R2 files -> Route through backend Sharp thumbnail pipeline
+  // 3. Cloudflare R2 files -> Load directly from Cloudflare R2 CDN!
   if (clean.includes('r2.dev') || clean.startsWith(R2_PUBLIC_BASE)) {
-    const rawFilename = extractCleanFilename(clean);
-    if (rawFilename) {
-      return `/v1/designs/${encodeURIComponent(rawFilename)}?thumb=1&w=${width}&q=${quality}`;
-    }
+    return clean;
   }
 
-  // 4. Relative backend designs
-  if (clean.startsWith('/v1/designs/') || clean.startsWith('/designs/')) {
-    const sep = clean.includes('?') ? '&' : '?';
-    return `${clean}${sep}thumb=1&w=${width}&q=${quality}`;
+  // 4. Relative uploads
+  if (clean.startsWith('/uploads/') || clean.startsWith('uploads/')) {
+    return clean.startsWith('/') ? clean : `/${clean}`;
   }
 
   // 5. Default return

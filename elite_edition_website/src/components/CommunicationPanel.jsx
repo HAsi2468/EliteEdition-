@@ -845,6 +845,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewportHeight, setViewportHeight] = useState(null);
+  const [viewportTop, setViewportTop] = useState(0);
   const isKeyboardOpen = Boolean(
     isMobileScreen &&
     viewportHeight !== null &&
@@ -866,6 +867,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         if (isMob) {
           const vv = window.visualViewport;
           const newH = vv ? Math.round(vv.height) : window.innerHeight;
+          const newTop = vv ? Math.round(vv.offsetTop) : 0;
+          setViewportTop(newTop);
           // Only trigger state re-render if height change is substantial (> 30px, e.g. software keyboard)
           if (lastHeight === null || Math.abs(newH - lastHeight) > 30) {
             lastHeight = newH;
@@ -875,6 +878,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           if (lastHeight !== null) {
             lastHeight = null;
             setViewportHeight(null);
+            setViewportTop(0);
           }
         }
       });
@@ -884,13 +888,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     window.addEventListener('resize', handleResize);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleResize);
-      // NOTE: Do NOT attach to visualViewport 'scroll' to prevent rapid re-render loops while scrolling on mobile
+      window.visualViewport.addEventListener('scroll', handleResize);
     }
     return () => {
       if (rAFId) cancelAnimationFrame(rAFId);
       window.removeEventListener('resize', handleResize);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
       }
     };
   }, []);
@@ -5242,6 +5247,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         minHeight: 0,
         height: (isMobileScreen && isKeyboardOpen && viewportHeight) ? `${viewportHeight}px` : '100%',
         maxHeight: (isMobileScreen && isKeyboardOpen && viewportHeight) ? `${viewportHeight}px` : '100%',
+        ...(isMobileScreen && isKeyboardOpen && viewportHeight ? {
+          position: 'fixed',
+          top: `${viewportTop || 0}px`,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+        } : {}),
         padding: isMobileScreen ? 0 : '0.85rem',
         boxSizing: 'border-box',
         overflow: 'hidden',
@@ -8259,6 +8271,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           }
                         }}
                         onFocus={() => {
+                          if (isMobileScreen && typeof window !== 'undefined') {
+                            window.scrollTo(0, 0);
+                          }
                           setTimeout(() => {
                             if (chatScrollRef.current) {
                               chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;

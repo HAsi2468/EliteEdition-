@@ -1594,10 +1594,18 @@ export default function App() {
   // Load initial global data only when navigating to inventory/catalog/dashboard screens
   useEffect(() => {
     const isHeavyDataTab = ['inventory', 'catalog', 'dashboard', 'elite_online'].includes(activeTab);
-    if (isAuthenticated && isHeavyDataTab && items.length === 0 && !api.isClientUser()) {
-      fetchData();
+    if (isAuthenticated && isHeavyDataTab && !api.isClientUser()) {
+      if (items.length === 0) {
+        fetchData();
+      } else if ((activeTab === 'inventory' || activeTab === 'catalog') && catalogItems.length === 0) {
+        api.getProductsCatalog({ limit: 10000 }).then((cat) => {
+          if (Array.isArray(cat) && cat.length > 0) {
+            setCatalogItems(cat);
+          }
+        }).catch((err) => console.warn('[App] Auto-fetch catalog error:', err));
+      }
     }
-  }, [activeTab, isAuthenticated, items.length]);
+  }, [activeTab, isAuthenticated, items.length, catalogItems.length]);
 
   // Global Socket.io Real-Time Push Notification & Multi-Department Listener
   useEffect(() => {
@@ -1858,13 +1866,13 @@ export default function App() {
     setLoading(true);
     setError('');
     try {
-      // Only load product catalog if currently navigating to inventory/catalog screens
-      const isCatalogNeeded = activeTabRef.current === 'inventory' || activeTabRef.current === 'catalog';
+      // Load product catalog if navigating to inventory/catalog screens or if catalog is not yet loaded
+      const isCatalogNeeded = activeTabRef.current === 'inventory' || activeTabRef.current === 'catalog' || catalogItems.length === 0;
 
       // Run requests in parallel with pagination limits to prevent 504 timeouts
       const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
-        isCatalogNeeded ? api.getProductsCatalog({ limit: 500 }) : Promise.resolve([]),
+        isCatalogNeeded ? api.getProductsCatalog({ limit: 10000 }) : Promise.resolve([]),
         api.getSales({ limit: 50 }),
         api.getParties({ limit: 50 }),
         api.refreshCurrentUser(),

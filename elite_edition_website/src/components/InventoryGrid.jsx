@@ -15,6 +15,7 @@ import VendorPartyManagerModal from './VendorPartyManagerModal';
 import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
+import { generateCode128Svg, resolveItemSize, resolveBarcodeTitle } from '../utils/barcodeHelper';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -1379,8 +1380,9 @@ export default function InventoryGrid({
   // Thermal Barcode Printing
   const printBarcode = (item) => {
     const sku = item.skuCode || 'NO-SKU';
-    const size = item.size || 'N/A';
-    const companyTitle = (item.brand && item.brand.toUpperCase() !== 'ELITE ONLINE' && item.brand.toUpperCase() !== 'ALL') ? item.brand.toUpperCase() : 'EON';
+    const size = resolveItemSize(item, sku);
+    const companyTitle = resolveBarcodeTitle(item);
+    const barcodeSvg = generateCode128Svg(sku, 40);
 
     const countStr = window.prompt(`How many barcode stickers to print for SKU "${sku}"?`, "1");
     if (countStr === null) return;
@@ -1396,14 +1398,13 @@ export default function InventoryGrid({
     let sheetsHtml = '';
     
     for (let i = 0; i < totalSheets; i++) {
-      const idx1 = i * 2;
       const idx2 = i * 2 + 1;
       
       const sticker1Html = `
         <div class="sticker">
           <div class="title">${companyTitle}</div>
           <div class="barcode-container">
-            <svg class="barcode-img" id="barcode_${idx1}"></svg>
+            ${barcodeSvg}
           </div>
           <div class="footer-row">
             <span class="sku-text">${sku}</span>
@@ -1417,7 +1418,7 @@ export default function InventoryGrid({
           <div class="sticker">
             <div class="title">${companyTitle}</div>
             <div class="barcode-container">
-              <svg class="barcode-img" id="barcode_${idx2}"></svg>
+              ${barcodeSvg}
             </div>
             <div class="footer-row">
               <span class="sku-text">${sku}</span>
@@ -1435,48 +1436,31 @@ export default function InventoryGrid({
       `;
     }
 
-    let barcodeScripts = '';
-    for (let j = 0; j < count; j++) {
-      barcodeScripts += `
-        JsBarcode("#barcode_${j}", "${sku}", {
-          format: "CODE128",
-          displayValue: false,
-          margin: 0,
-          background: "transparent",
-          lineColor: "#000",
-          width: 2,
-          height: 40
-        });
-      `;
-    }
-
     const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <title>Print Barcodes - ${sku}</title>
-        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
           @page { size: 100mm 25mm; margin: 0; }
-          body { margin: 0; padding: 0; font-family: sans-serif; background: white; color: black; }
+          body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: white; color: black; }
           .sheet { display: flex; width: 100mm; height: 25mm; box-sizing: border-box; overflow: hidden; page-break-after: always; }
           .sheet:last-child { page-break-after: avoid; }
-          .sticker { flex: 1; width: 50mm; height: 25mm; box-sizing: border-box; padding: 2.2mm 3.5mm 1.5mm 3.5mm; display: flex; flex-direction: column; align-items: center; justify-content: space-between; overflow: hidden; }
-          .title { font-size: 8.5pt; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
-          .barcode-container { display: flex; align-items: center; justify-content: center; height: 12.5mm; width: 100%; }
-          .barcode-img { max-width: 44mm; height: 11mm; }
-          .footer-row { display: flex; justify-content: space-between; width: 100%; font-size: 7.5pt; font-weight: 500; }
-          .sku-text { font-family: monospace; font-weight: bold; }
-          .size-text { font-weight: bold; }
+          .sticker { flex: 1; width: 50mm; height: 25mm; box-sizing: border-box; padding: 2mm 3.5mm 1.5mm 3.5mm; display: flex; flex-direction: column; align-items: center; justify-content: space-between; overflow: hidden; }
+          .title { font-size: 8.5pt; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; letter-spacing: 0.5px; }
+          .barcode-container { display: flex; align-items: center; justify-content: center; height: 12.5mm; width: 100%; max-width: 44mm; overflow: hidden; }
+          .barcode-container svg { width: 100%; height: 100%; display: block; }
+          .footer-row { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 7.5pt; font-weight: 600; padding: 0 1mm; box-sizing: border-box; }
+          .sku-text { font-family: monospace; font-weight: bold; font-size: 8pt; }
+          .size-text { font-weight: bold; font-size: 7.5pt; }
         </style>
       </head>
       <body>
         ${sheetsHtml}
         <script>
-          try { ${barcodeScripts} } catch(e) { console.error(e); }
           window.onload = function() {
-            setTimeout(function() { window.print(); window.close(); }, 300);
-          }
+            setTimeout(function() { window.print(); window.close(); }, 200);
+          };
         </script>
       </body>
       </html>

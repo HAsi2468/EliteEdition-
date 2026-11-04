@@ -91,13 +91,50 @@ const getOrders = async (
     const parsedLimit = Number(limit) || 10000;
     const parsedOffset = Number(offset) || 0;
 
-    const products = await collection.find(whereClause)
+    let products = await collection.find(whereClause)
       .sort(finalSort)
       .skip(parsedOffset)
       .limit(parsedLimit)
       .lean();
 
-    return products.map((p) => ({ ...p, id: p._id.toString() }));
+    // Fallback 1: If useInventoryTable was true but no items found, query db.Product
+    if ((!products || products.length === 0) && useInventoryTable && db.Product) {
+      products = await db.Product.find(whereClause)
+        .sort(finalSort)
+        .skip(parsedOffset)
+        .limit(parsedLimit)
+        .lean();
+    }
+
+    // Fallback 2: If both collections are empty, synthesize catalog from existing Inventory stock items
+    if ((!products || products.length === 0) && db.Inventory) {
+      const invItems = await db.Inventory.find({}).limit(parsedLimit).lean();
+      if (invItems && invItems.length > 0) {
+        const seenSkus = new Set();
+        products = [];
+        for (const it of invItems) {
+          const sku = (it.skuCode || it.sku || '').trim();
+          if (sku && !seenSkus.has(sku.toLowerCase())) {
+            seenSkus.add(sku.toLowerCase());
+            products.push({
+              _id: it._id,
+              skuCode: sku,
+              description: it.productName || it.description || sku,
+              brand: it.brand || 'Elite Edition',
+              categoryName: it.category || 'General',
+              color: it.color || '',
+              size: Array.isArray(it.size) ? it.size : [it.size || 'Free Size'],
+              imageUrl: it.imageUrl || '',
+              basePrice: it.purchasePrice || it.sellingPrice || 0,
+              costPrice: it.purchasePrice || 0,
+              mrp: it.mrp || it.sellingPrice || 0
+            });
+          }
+        }
+      }
+    }
+
+    return (products || []).map((p) => ({ ...p, id: p._id ? p._id.toString() : p.id }));
   } catch (error) {
     logger.error('Error fetching orders: %o', error);
     throw error;
@@ -129,7 +166,7 @@ const getAllProductsList = async (req, res) => {
   } = req.query;
 
   const isDefaultQuery = !search && !dateStart && !dateEnd && (!page || Number(page) === 1);
-  const cappedLimit = Math.min(parseInt(limit, 10) || 50, 5000);
+  const cappedLimit = Math.min(parseInt(limit, 10) || 50, 20000);
   const cacheKey = `default_prod_${cappedLimit}_${sortField || ''}_${sortOrder || ''}`;
 
   if (isDefaultQuery && productsListCache.has(cacheKey)) {

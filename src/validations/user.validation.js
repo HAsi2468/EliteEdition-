@@ -50,7 +50,12 @@ const getUsers = {
 		email: Joi.string().email(),
 		limit: Joi.number().min(1),
 		page: Joi.number().min(1),
-	}),
+		companyEntity: Joi.string().allow('', null).optional(),
+		role: Joi.string().allow('', null).optional(),
+		status: Joi.string().allow('', null).optional(),
+		department: Joi.string().allow('', null).optional(),
+		search: Joi.string().allow('', null).optional(),
+	}).unknown(true),
 };
 
 const getUser = {

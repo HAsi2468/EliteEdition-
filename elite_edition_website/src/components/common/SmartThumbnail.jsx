@@ -45,6 +45,8 @@ export function SmartThumbnail({
   rawUrl,
   name = '',
   title = '',
+  sku = '',
+  identifiers = [],
   category = 'design', // 'design' | 'fabric' | 'invoice' | 'job' | 'general'
   size = 'md', // 'sm' (32px) | 'md' (36px) | 'lg' (40px) | number
   aspectRatio = '1:1', // '1:1' | '3:4'
@@ -63,7 +65,7 @@ export function SmartThumbnail({
 
   // Normalize image source and name
   const sourceUrl = src || rawUrl || '';
-  const itemTitle = title || name || 'Item';
+  const itemTitle = title || name || '';
 
   // Dimensional constraints: 32px, 36px, or 40px
   const widthPx = useMemo(() => {
@@ -78,21 +80,30 @@ export function SmartThumbnail({
     return widthPx; // '1:1' square
   }, [widthPx, aspectRatio]);
 
-  // Server request optimizer: request bounded 100px WebP/JPEG thumbnail
-  const optimizedThumbSrc = useMemo(() => {
-    if (!sourceUrl) return '';
-    return getOptimizedThumbnailUrl(sourceUrl, { width: 100, quality: 75 });
-  }, [sourceUrl]);
-
   // Ordered candidate URLs for self-healing resolution
   const candidates = useMemo(() => {
-    if (!sourceUrl && !itemTitle) return [];
-    return getImageCandidates(sourceUrl, itemTitle, { thumbnail: true, width: 120 });
-  }, [sourceUrl, itemTitle]);
+    const list = [];
+    if (sourceUrl) {
+      const opt = getOptimizedThumbnailUrl(sourceUrl, { width: 100, quality: 75 });
+      if (opt) list.push(opt);
+    }
+    const resolved = getImageCandidates(sourceUrl, itemTitle, {
+      thumbnail: true,
+      width: 120,
+      sku,
+      identifiers
+    });
+    for (const u of resolved) {
+      if (u && !list.includes(u)) {
+        list.push(u);
+      }
+    }
+    return list;
+  }, [sourceUrl, itemTitle, sku, identifiers]);
 
   const [candidateIdx, setCandidateIdx] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [hasError, setHasError] = useState(!sourceUrl);
+  const [hasError, setHasError] = useState(false);
 
   // Quick-Peek Popover State (Desktop / Tablet)
   const [isQuickPeekOpen, setIsQuickPeekOpen] = useState(false);
@@ -107,10 +118,10 @@ export function SmartThumbnail({
   useEffect(() => {
     setCandidateIdx(0);
     setHasLoaded(false);
-    setHasError(!sourceUrl);
-  }, [sourceUrl, candidates]);
+    setHasError(candidates.length === 0);
+  }, [candidates]);
 
-  const activeSrc = optimizedThumbSrc || candidates[candidateIdx] || '';
+  const activeSrc = candidates[candidateIdx] || '';
 
   const handleImageError = () => {
     if (activeSrc) {
@@ -170,7 +181,11 @@ export function SmartThumbnail({
       calculatePeekCoordinates();
       setIsQuickPeekOpen(true);
       // Pre-fetch HD full resolution
-      const hdCandidates = getImageCandidates(sourceUrl, itemTitle, { thumbnail: false });
+      const hdCandidates = getImageCandidates(sourceUrl, itemTitle, {
+        thumbnail: false,
+        sku,
+        identifiers
+      });
       if (hdCandidates[0]) prefetchImage(hdCandidates[0]);
     }, 160);
   };
@@ -213,9 +228,13 @@ export function SmartThumbnail({
 
   // High-Res Image for Peek & Lightbox
   const hdImageUrl = useMemo(() => {
-    const hdCandidates = getImageCandidates(sourceUrl, itemTitle, { thumbnail: false });
+    const hdCandidates = getImageCandidates(sourceUrl, itemTitle, {
+      thumbnail: false,
+      sku,
+      identifiers
+    });
     return hdCandidates[0] || activeSrc;
-  }, [sourceUrl, itemTitle, activeSrc]);
+  }, [sourceUrl, itemTitle, sku, identifiers, activeSrc]);
 
   // Initials and silhouette fallback category
   const itemInitials = useMemo(() => {

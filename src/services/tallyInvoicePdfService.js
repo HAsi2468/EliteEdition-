@@ -149,7 +149,7 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
   // Determine issuing company - invoice.companyEntity is the authoritative source
   const rawCompany = String(invoice.companyEntity || companyConfig.companyEntity || companyConfig.companyName || 'Elite Digital Print').trim();
   const resolvedCompany = rawCompany;
-  const isDirectConfig = companyConfig.companyEntity === resolvedCompany;
+  const isDirectConfig = (companyConfig.companyEntity === resolvedCompany) && !companyConfig.isFallbackConfig;
   const baseBrandColor = getCompanyBrandColor(resolvedCompany, companyConfig.brandColor || companyConfig.badgeColor);
 
   // 1. BRAND IDENTITY & COLOR PALETTE
@@ -170,20 +170,20 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
   const midX = PAD + halfCW; // 297 pt
 
   // Seller details resolution honoring the issuing company
-  let companyDisplayName = (isDirectConfig && companyConfig.companyName) ? companyConfig.companyName : resolvedCompany.toUpperCase();
+  let companyDisplayName = (isDirectConfig && companyConfig.companyName) ? companyConfig.companyName : (resolvedCompany === 'Elite Online' ? 'ELITE ONLINE' : resolvedCompany.toUpperCase());
   companyDisplayName = companyDisplayName.replace(/\s*\([^)]*\)/g, '').trim();
 
   const companyAddress = ((isDirectConfig && companyConfig.companyAddress)
     ? companyConfig.companyAddress
-    : (resolvedCompany === 'Elite Online' ? 'Plot No. 12, Surat, Gujarat' : (companyConfig.companyAddress || 'G.F., PLOT NO-B/37, SIDDHESHWAR SOC., PUNAGAM MAIN ROAD, NR. KALAPUL, SURAT-395010'))).toUpperCase();
+    : (resolvedCompany === 'Elite Online' ? 'Plot No. 12, Surat, Gujarat - 395010' : (companyConfig.companyAddress || 'G.F., PLOT NO-B/37, SIDDHESHWAR SOC., PUNAGAM MAIN ROAD, NR. KALAPUL, SURAT-395010'))).toUpperCase();
   const companyGstin = (isDirectConfig && companyConfig.companyGstin)
     ? companyConfig.companyGstin
-    : (resolvedCompany === 'Yamunaji' ? '24AAEFY0361N1ZZ' : (companyConfig.companyGstin || '24AANFE0044M1ZG'));
+    : (resolvedCompany === 'Yamunaji' ? '24AAEFY0361N1ZZ' : resolvedCompany === 'Elite Edition' ? '24BSWPA7682P1ZS' : resolvedCompany === 'Elite Online' ? (companyConfig.companyGstin && companyConfig.companyEntity === 'Elite Online' ? companyConfig.companyGstin : '') : (resolvedCompany === 'Elite Digital Print' ? (companyConfig.companyGstin || '24AANFE0044M1ZG') : ''));
   const companyState = (isDirectConfig && companyConfig.companyState) ? companyConfig.companyState : 'Gujarat';
   const companyStateCode = (isDirectConfig && companyConfig.companyStateCode) ? companyConfig.companyStateCode : '24';
   const companyEmail = (isDirectConfig && (companyConfig.companyEmail || companyConfig.companyPhone))
     ? (companyConfig.companyEmail || companyConfig.companyPhone)
-    : (resolvedCompany === 'Elite Digital Print' ? 'elitedigitalprint@gmail.com' : 'info@company.com');
+    : (resolvedCompany === 'Elite Online' ? 'info.eliteonline@gmail.com' : (resolvedCompany === 'Elite Digital Print' ? 'elitedigitalprint@gmail.com' : 'info@company.com'));
   const companyCity = (isDirectConfig && companyConfig.companyCity) ? companyConfig.companyCity : 'Surat';
 
   // Consignee (Ship To)
@@ -252,9 +252,23 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
   const tdsAmount = hasTds ? (invoice.tdsAmount != null && Number(invoice.tdsAmount) > 0 ? Number(invoice.tdsAmount) : Math.round((totalTaxable * (tdsRate / 100)) * 100) / 100) : 0;
   const netReceivable = grandTotal - tdsAmount;
 
-  // 2. MAIN ITEM TABLE COLUMNS (7 Standard Columns)
-  // Total Width = 28 + 215.28 + 50 + 72 + 52 + 38 + 100 = 555.28 pt
-  const tableCols = [
+  // 2. MAIN ITEM TABLE COLUMNS (Dynamic 7 or 8 Columns depending on discounts)
+  const hasDiscount = items.some(it => {
+    const dPct = parseFloat(it.discountPercent || it.discountPct || it.discountRate || it.discount || 0);
+    const dAmt = parseFloat(it.discountAmount || it.discountAmt || 0);
+    return dPct > 0 || dAmt > 0;
+  });
+
+  const tableCols = hasDiscount ? [
+    { id: 'sr', title: 'Sl\nNo.', w: 26, align: 'center' },
+    { id: 'desc', title: 'Description of Goods', w: 181.28, align: 'left' },
+    { id: 'hsn', title: 'HSN/SAC', w: 48, align: 'center' },
+    { id: 'qty', title: 'Quantity', w: 68, align: 'right' },
+    { id: 'rate', title: 'Rate (₹)', w: 48, align: 'right' },
+    { id: 'per', title: 'per', w: 34, align: 'center' },
+    { id: 'disc', title: 'Disc\n%', w: 50, align: 'right' },
+    { id: 'amount', title: 'Amount (₹)', w: 100, align: 'right' }
+  ] : [
     { id: 'sr', title: 'Sl\nNo.', w: 28, align: 'center' },
     { id: 'desc', title: 'Description of Goods', w: 215.28, align: 'left' },
     { id: 'hsn', title: 'HSN/SAC', w: 50, align: 'center' },
@@ -263,6 +277,9 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
     { id: 'per', title: 'per', w: 38, align: 'center' },
     { id: 'amount', title: 'Amount (₹)', w: 100, align: 'right' }
   ];
+
+  const amountColIdx = tableCols.length - 1;
+  const discColIdx = hasDiscount ? 6 : -1;
 
   const colX = [];
   let accX = PAD;
@@ -527,8 +544,16 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
       doc.font('Helvetica').fontSize(7.2)
          .text(overallQtyUnit, colX[5] + 2, itemRowY, { width: tableCols[5].w - 4, align: 'center' });
 
-      doc.font('Helvetica-Bold').fontSize(8.2)
-         .text(amtVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+      if (hasDiscount) {
+        const dPct = parseFloat(it.discountPercent || it.discountPct || it.discountRate || it.discount || 0);
+        const dAmt = parseFloat(it.discountAmount || it.discountAmt || 0);
+        const discStr = dPct > 0 ? `${dPct}%` : (dAmt > 0 ? `₹${dAmt.toFixed(2)}` : '—');
+        doc.font('Helvetica').fontSize(7.5).fillColor(dPct > 0 || dAmt > 0 ? BRAND : TEXT_MUTED)
+           .text(discStr, colX[discColIdx] + 2, itemRowY, { width: tableCols[discColIdx].w - 4, align: 'right' });
+      }
+
+      doc.font('Helvetica-Bold').fontSize(8.2).fillColor(TEXT_MAIN)
+         .text(amtVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
 
       const rowH = descStr ? 22 : 16;
       itemRowY += rowH;
@@ -541,51 +566,51 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
       // Subtotal (Taxable Value) Row if multiple items exist
       if (chunk.length > 1) {
         doc.fillColor(TEXT_MUTED).fontSize(7.5).font('Helvetica-Bold')
-           .text('Subtotal (Taxable Value)', colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
+           .text('Subtotal (Taxable Value)', colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
         doc.fillColor(TEXT_MAIN).fontSize(7.8).font('Helvetica-Bold')
-           .text(totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text(totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 12;
       }
 
       // CGST & SGST (or IGST) Rows
       if (isIgst) {
         doc.fillColor(TEXT_MAIN).fontSize(7.8).font('Helvetica-Bold')
-           .text('IGST @ 5.0%', colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
-        doc.text(totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text('IGST @ 5.0%', colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
+        doc.text(totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 12;
       } else {
         doc.fillColor(TEXT_MAIN).fontSize(7.8).font('Helvetica-Bold')
-           .text('CGST @ 2.5%', colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
-        doc.text(totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text('CGST @ 2.5%', colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
+        doc.text(totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 12;
 
         doc.fillColor(TEXT_MAIN).fontSize(7.8).font('Helvetica-Bold')
-           .text('SGST @ 2.5%', colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
-        doc.text(totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text('SGST @ 2.5%', colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
+        doc.text(totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 12;
       }
 
       // Round-off Row (if non-zero)
       if (roundOffVal !== 0) {
         doc.fillColor(TEXT_MUTED).fontSize(7.5).font('Helvetica')
-           .text('Round Off', colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
+           .text('Round Off', colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
         doc.fillColor(TEXT_MAIN).fontSize(7.8).font('Helvetica')
-           .text((roundOffVal > 0 ? `+${roundOffVal.toFixed(2)}` : roundOffVal.toFixed(2)), colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text((roundOffVal > 0 ? `+${roundOffVal.toFixed(2)}` : roundOffVal.toFixed(2)), colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 12;
       }
 
       // Job-work / ERP Specific Deductions: Less TDS (194C) @ 2% & Net Receivable
       if (hasTds) {
         doc.fillColor('#dc2626').fontSize(7.5).font('Helvetica-Bold')
-           .text(`Less: TDS (${tdsSection}) @ ${tdsRate}%`, colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
+           .text(`Less: TDS (${tdsSection}) @ ${tdsRate}%`, colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
         doc.fillColor('#dc2626').fontSize(7.8).font('Helvetica-Bold')
-           .text(`-${tdsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text(`-${tdsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 12;
 
         doc.fillColor(BRAND).fontSize(8).font('Helvetica-Bold')
-           .text('Net Receivable', colX[1] + 6, itemRowY, { width: colX[6] - colX[1] - 12, align: 'right' });
+           .text('Net Receivable', colX[1] + 6, itemRowY, { width: colX[amountColIdx] - colX[1] - 12, align: 'right' });
         doc.fillColor(BRAND).fontSize(8.5).font('Helvetica-Bold')
-           .text(`₹ ${netReceivable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX[6] + 2, itemRowY, { width: tableCols[6].w - 4, align: 'right' });
+           .text(`₹ ${netReceivable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX[amountColIdx] + 2, itemRowY, { width: tableCols[amountColIdx].w - 4, align: 'right' });
         itemRowY += 13;
       }
     }
@@ -618,7 +643,7 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
          .text(`${grandTotalQty.toFixed(2)} ${overallQtyUnit}`, colX[3] + 2, totalRowY + 5, { width: tableCols[3].w - 4, align: 'right' });
 
       doc.fillColor(BRAND).fontSize(9.5).font('Helvetica-Bold')
-         .text(`₹ ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX[6] + 2, totalRowY + 5, { width: tableCols[6].w - 4, align: 'right' });
+         .text(`₹ ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX[amountColIdx] + 2, totalRowY + 5, { width: tableCols[amountColIdx].w - 4, align: 'right' });
     } else {
       doc.fillColor(BRAND).fontSize(8).font('Helvetica-Bold')
          .text('Page Subtotal (Continued on Next Page...):', colX[1] + 6, totalRowY + 5, { width: colX[3] - colX[1] - 8, align: 'right' });
@@ -627,7 +652,7 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
          .text(`${pageQty.toFixed(2)} ${overallQtyUnit}`, colX[3] + 2, totalRowY + 5, { width: tableCols[3].w - 4, align: 'right' });
 
       doc.fillColor(BRAND).fontSize(8.5).font('Helvetica-Bold')
-         .text(pageAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[6] + 2, totalRowY + 5, { width: tableCols[6].w - 4, align: 'right' });
+         .text(pageAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), colX[amountColIdx] + 2, totalRowY + 5, { width: tableCols[amountColIdx].w - 4, align: 'right' });
     }
 
     currentY = tableBottomY;

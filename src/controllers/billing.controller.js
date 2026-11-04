@@ -2282,12 +2282,22 @@ const downloadInvoicePdf = async (req, res) => {
     if (!config) {
       config = await PrintConfig.findOne({ companyEntity: { $regex: new RegExp(`^${companyEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }).lean();
     }
+    const isDirectConfigFound = Boolean(config);
     if (!config) {
       config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
     }
     // Strict assignment of issuing company entity
     config.companyEntity = companyEntity;
-    if (!config.companyName || config.companyEntity !== companyEntity) {
+    if (!isDirectConfigFound && companyEntity !== 'Elite Digital Print') {
+      config.isFallbackConfig = true;
+      config.companyName = companyEntity === 'Elite Online' ? 'ELITE ONLINE' : companyEntity.toUpperCase();
+      if (companyEntity === 'Elite Online') {
+        config.companyAddress = 'PLOT NO. 12, SURAT, GUJARAT - 395010';
+        config.companyPhone = '+91 76006 65058';
+        config.companyEmail = 'info.eliteonline@gmail.com';
+        config.companyGstin = '';
+      }
+    } else if (!config.companyName) {
       config.companyName = companyEntity.toUpperCase();
     }
 

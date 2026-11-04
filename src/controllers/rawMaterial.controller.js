@@ -827,7 +827,7 @@ const downloadLedgerPdf = async (req, res) => {
     const activeLogo = fs.existsSync(digitalLogoPath) ? digitalLogoPath : (fs.existsSync(logoPath) ? logoPath : null);
 
     const titleType = type && type !== 'All' ? `${type.toUpperCase()} ` : '';
-    const compName = companyEntity || 'Elite Digital Print';
+    const compName = resolveRawCompany(req) || req.query.companyEntity || 'Elite Digital Print';
 
     // Header drawing
     if (activeLogo) {

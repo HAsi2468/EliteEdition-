@@ -68,10 +68,11 @@ const getAll = async (req, res) => {
       filter.$and.push({ $or: deptOr });
     }
 
-    if (search && String(search).trim()) {
-      const tokens = String(search).trim().split(/\s+/).filter(Boolean);
+    if (search && typeof search === 'string' && search.trim()) {
+      const cleanSearch = search.trim().slice(0, 100);
+      const tokens = cleanSearch.split(/\s+/).filter(Boolean);
       tokens.forEach(tok => {
-        const safeTok = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const safeTok = tok.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
         const searchOr = [
           { designName:     { $regex: safeTok, $options: 'i' } },
           { designerName:   { $regex: safeTok, $options: 'i' } },

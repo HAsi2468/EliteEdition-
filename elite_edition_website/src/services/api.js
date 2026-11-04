@@ -728,7 +728,7 @@ export const api = {
   _productsCatalogCacheTime: 0,
 
   async getProductsCatalog(params = {}) {
-    const { limit = 2000, search, forceRefresh = false } = (typeof params === 'object' && params !== null) ? params : {};
+    const { limit = 10000, search, forceRefresh = false } = (typeof params === 'object' && params !== null) ? params : {};
     const now = Date.now();
     if (!forceRefresh && !search && this._productsCatalogCache && (now - this._productsCatalogCacheTime < 60000)) {
       return this._productsCatalogCache;
