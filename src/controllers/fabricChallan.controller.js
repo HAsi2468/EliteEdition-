@@ -749,6 +749,7 @@ const createChallan = async (req, res) => {
 
     if (jobNo && !hasAdminOverride) {
       const rawJobTokens = String(jobNo).split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
+      const matchedJobs = [];
       for (const tok of rawJobTokens) {
         const cleanNo = tok.replace(/\D/g, '');
         const jCard = await JobCard.findOne({
@@ -758,9 +759,12 @@ const createChallan = async (req, res) => {
             ...(cleanNo ? [{ jobNo: new RegExp(cleanNo + '$', 'i') }] : [])
           ]
         });
+        if (jCard) matchedJobs.push(jCard);
+      }
 
-        if (jCard) {
-          // 1. Must pass Printing Stage
+      if (matchedJobs.length > 0) {
+        // 1. Stage checks per job: Every job in the combined challan must have completed printing and fusing
+        for (const jCard of matchedJobs) {
           const pStatus = (jCard.printStatus || '').toLowerCase();
           const pMtr = parseFloat(jCard.printMtr || 0);
           const isPrintDone = pStatus.includes('done') || pMtr > 0;
@@ -774,11 +778,7 @@ const createChallan = async (req, res) => {
             });
           }
 
-          // 2. Must have Fresh Fused fabric available: Available = sum(Fresh Mtr) - sum(Delivered Challans)
           const freshMtr = parseFloat(jCard.freshMtr || 0);
-          const deliveredMtr = parseFloat(jCard.deliveredMtr || 0);
-          const availableFreshMtr = Math.max(0, freshMtr - deliveredMtr);
-
           if (freshMtr <= 0) {
             return res.status(400).json({
               success: false,
@@ -787,42 +787,50 @@ const createChallan = async (req, res) => {
               canAdminOverride: isUserAdmin,
               availableFreshMtr: 0,
               freshMtr: 0,
-              deliveredMtr,
+              deliveredMtr: parseFloat(jCard.deliveredMtr || 0),
               jobNo: jCard.jobNo
             });
           }
+        }
 
-          // 3. Partial Quantities check: Cannot exceed available fresh fused fabric
-          if (freshMtr > 0 && totalMtr > (availableFreshMtr + 2.0)) {
+        // 2. Sum available fresh fused fabric across all matched jobs combined
+        const totalFreshMtr = matchedJobs.reduce((sum, j) => sum + parseFloat(j.freshMtr || 0), 0);
+        const totalDeliveredMtr = matchedJobs.reduce((sum, j) => sum + parseFloat(j.deliveredMtr || 0), 0);
+        const availableFreshMtr = Math.max(0, totalFreshMtr - totalDeliveredMtr);
+
+        if (totalFreshMtr > 0 && totalMtr > (availableFreshMtr + 2.0)) {
+          const isMulti = matchedJobs.length > 1;
+          const jobLabel = isMulti ? `Combined Jobs (${matchedJobs.map(j => j.jobNo).join(', ')})` : `Job #${matchedJobs[0].jobNo}`;
+          return res.status(400).json({
+            success: false,
+            error: `Workflow Validation: Requested Challan quantity (${totalMtr.toFixed(1)}m) exceeds available fresh fused fabric (${availableFreshMtr.toFixed(1)}m available: ${totalFreshMtr.toFixed(1)}m fresh fused - ${totalDeliveredMtr.toFixed(1)}m already delivered) for ${jobLabel}.`,
+            stageError: 'EXCEEDS_FRESH_MTR',
+            canAdminOverride: isUserAdmin,
+            availableFreshMtr,
+            freshMtr: totalFreshMtr,
+            deliveredMtr: totalDeliveredMtr,
+            jobNo: matchedJobs.map(j => j.jobNo).join(', ')
+          });
+        }
+
+        // 3. Combined target overrun check across all matched jobs
+        const totalTargetMtr = matchedJobs.reduce((sum, j) => sum + (parseFloat(String(j.totalMtr || j.consumption || 0).replace(/[^\d.]/g, '')) || 0), 0);
+        if (totalTargetMtr > 0) {
+          const projectedTotal = totalDeliveredMtr + totalMtr;
+          const maxAllowable = totalTargetMtr * 1.15;
+          if (projectedTotal > maxAllowable && !req.body.allowOverrun && !hasAdminOverride) {
+            const isMulti = matchedJobs.length > 1;
+            const jobLabel = isMulti ? `Combined Jobs (${matchedJobs.map(j => j.jobNo).join(', ')})` : `Job #${matchedJobs[0].jobNo}`;
             return res.status(400).json({
               success: false,
-              error: `Workflow Validation: Requested Challan quantity (${totalMtr.toFixed(1)}m) exceeds available fresh fused fabric (${availableFreshMtr.toFixed(1)}m available: ${freshMtr.toFixed(1)}m fresh fused - ${deliveredMtr.toFixed(1)}m already delivered) for Job #${jCard.jobNo}.`,
-              stageError: 'EXCEEDS_FRESH_MTR',
+              error: `Job Card Overrun Alert: ${jobLabel} target is ${totalTargetMtr}m (max allowed with 15% buffer: ${maxAllowable.toFixed(1)}m). Projected delivery reaches ${projectedTotal.toFixed(1)}m (${totalDeliveredMtr.toFixed(1)}m previous + ${totalMtr.toFixed(1)}m this challan). Overrun exceeds limit. Manager approval (allowOverrun) required.`,
+              stageError: 'JOB_CARD_OVERRUN',
+              targetMtr: totalTargetMtr,
+              projectedTotal,
+              maxAllowable,
               canAdminOverride: isUserAdmin,
-              availableFreshMtr,
-              freshMtr,
-              deliveredMtr,
-              jobNo: jCard.jobNo
+              jobNo: matchedJobs.map(j => j.jobNo).join(', ')
             });
-          }
-
-          // 4. Job Card Target Overrun Check: Total delivered cannot exceed 15% overrun limit
-          const targetMtr = parseFloat(String(jCard.totalMtr || jCard.consumption || 0).replace(/[^\d.]/g, '')) || 0;
-          if (targetMtr > 0) {
-            const projectedTotal = deliveredMtr + totalMtr;
-            const maxAllowable = targetMtr * 1.15;
-            if (projectedTotal > maxAllowable && !req.body.allowOverrun && !hasAdminOverride) {
-              return res.status(400).json({
-                success: false,
-                error: `Job Card Overrun Alert: Job Card #${jCard.jobNo} target is ${targetMtr}m (max allowed with 15% buffer: ${maxAllowable.toFixed(1)}m). Projected delivery reaches ${projectedTotal.toFixed(1)}m (${deliveredMtr.toFixed(1)}m previous + ${totalMtr.toFixed(1)}m this challan). Overrun exceeds limit. Manager approval (allowOverrun) required.`,
-                stageError: 'JOB_CARD_OVERRUN',
-                targetMtr,
-                projectedTotal,
-                maxAllowable,
-                canAdminOverride: isUserAdmin,
-                jobNo: jCard.jobNo
-              });
-            }
           }
         }
       }

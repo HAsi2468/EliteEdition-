@@ -181,7 +181,9 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
     const rate = Number(it.taxRate !== undefined && it.taxRate !== null ? it.taxRate : 5);
     const key = `${hsn}_${rate}`;
     if (!hsnMap[key]) hsnMap[key] = { hsn, rate, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
-    const taxable = Number(it.totalAmount || 0);
+    const itQty = parseFloat(it.qty !== undefined ? it.qty : (it.quantity !== undefined ? it.quantity : 0)) || 0;
+    const itPrice = parseFloat(it.unitPrice !== undefined ? it.unitPrice : (it.rate !== undefined ? it.rate : 0)) || 0;
+    const taxable = Number(it.totalAmount !== undefined && it.totalAmount !== null ? it.totalAmount : (it.amount !== undefined && it.amount !== null ? it.amount : (itQty * itPrice)));
     hsnMap[key].taxable += taxable;
     if (isIgst) {
       hsnMap[key].igst += Math.round((taxable * (rate / 100)) * 100) / 100;
@@ -201,7 +203,7 @@ function renderTallyInvoice(doc, invoice = {}, companyConfig = {}, options = {})
   let grandTotalQty = 0;
   let overallQtyUnit = 'MTR';
   items.forEach(it => {
-    grandTotalQty += parseFloat(it.qty) || 0;
+    grandTotalQty += parseFloat(it.qty !== undefined ? it.qty : (it.quantity !== undefined ? it.quantity : 0)) || 0;
     if (it.unit || it.qtyUnit) overallQtyUnit = it.unit || it.qtyUnit;
   });
 

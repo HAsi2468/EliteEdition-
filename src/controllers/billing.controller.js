@@ -2291,16 +2291,8 @@ const downloadInvoicePdf = async (req, res) => {
       config.companyName = companyEntity.toUpperCase();
     }
 
-    // Set anti-cache and direct download headers
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo || 'Draft'}.pdf"`);
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
     const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true, bufferPages: true, autoPageBreak: false });
     doc.options.autoPageBreak = false;
-    doc.pipe(res);
 
     const { renderTallyInvoice } = require('../services/tallyInvoicePdfService');
 
@@ -2313,7 +2305,26 @@ const downloadInvoicePdf = async (req, res) => {
       renderTallyInvoice(doc, invoice, config, { isColor: false, isDuplicate: true, copyLabel: '(DUPLICATE FOR TRANSPORTER)' });
     }
 
-    console.log(`[PDF Performance] Invoice ${invoice.invoiceNo} PDF generated in ${Date.now() - startTime}ms (${(invoice.items || []).length} items)`);
+    const buffers = [];
+    doc.on('data', chunk => buffers.push(chunk));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Length', pdfData.length);
+      res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo || 'Draft'}.pdf"`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.send(pdfData);
+      console.log(`[PDF Performance] Invoice ${invoice.invoiceNo} PDF generated & delivered in ${Date.now() - startTime}ms (${(invoice.items || []).length} items, ${pdfData.length} bytes)`);
+    });
+    doc.on('error', docErr => {
+      console.error('PDFKit Document Error:', docErr);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Error generating PDF invoice', message: docErr.message });
+      }
+    });
+
     doc.end();
 
   } catch (error) {
@@ -2348,12 +2359,6 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 
     const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true, bufferPages: true, autoPageBreak: false });
     doc.options.autoPageBreak = false;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Combined_Tax_Invoices_${invoices.length}_Items.pdf"`);
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    doc.pipe(res);
 
     const { renderTallyInvoice } = require('../services/tallyInvoicePdfService');
     for (let invIdx = 0; invIdx < invoices.length; invIdx++) {
@@ -2377,12 +2382,33 @@ const downloadBulkInvoicesPdf = async (req, res) => {
       renderTallyInvoice(doc, invoice, companyConfig, { isColor: true, isDuplicate: false, copyLabel: '(ORIGINAL FOR RECIPIENT)' });
     }
 
-    console.log(`[Bulk PDF Performance] ${invoices.length} Invoices generated into single combined PDF in ${Date.now() - startTime}ms`);
+    const buffers = [];
+    doc.on('data', chunk => buffers.push(chunk));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Length', pdfData.length);
+      res.setHeader('Content-Disposition', `attachment; filename="Combined_Tax_Invoices_${invoices.length}_Items.pdf"`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.send(pdfData);
+      console.log(`[Bulk PDF Performance] ${invoices.length} Invoices generated into single combined PDF in ${Date.now() - startTime}ms (${pdfData.length} bytes)`);
+    });
+    doc.on('error', docErr => {
+      console.error('PDFKit Document Error in Bulk PDF:', docErr);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Error generating bulk combined PDF invoice', message: docErr.message });
+      }
+    });
+
     doc.end();
 
   } catch (error) {
     console.error('Download Bulk Invoice PDF Error:', error);
-    res.status(500).send('Error generating bulk combined PDF invoice');
+    if (!res.headersSent) {
+      res.status(500).send('Error generating bulk combined PDF invoice');
+    }
   }
 };
 
