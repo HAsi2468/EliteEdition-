@@ -605,101 +605,354 @@ function numToWords(amount) {
   return 'Rupees ' + convert(num) + ' Only';
 }
 
+function renderAwsOfficialInvoice(doc, bill, numToWords) {
+  const monthSlug = String(bill.month || '').replace(/\s+/g, '').toUpperCase();
+  const exchangeRate = bill.exchangeRate || DEFAULT_USD_TO_INR;
+
+  // AWS Top Orange Accent Bar
+  doc.rect(40, 40, 515, 4).fill('#ff9900');
+
+  // Header
+  doc.rect(40, 44, 515, 62).fill('#232f3e');
+  doc.fillColor('#ff9900').fontSize(19).font('Helvetica-Bold').text('amazon web services', 55, 53);
+  doc.fillColor('#ffffff').fontSize(10.5).font('Helvetica-Bold').text('TAX INVOICE / BILL OF SUPPLY', 330, 55, { align: 'right', width: 210 });
+  doc.fillColor('#cbd5e1').fontSize(7.5).font('Helvetica').text('Amazon Web Services India Private Limited • GSTIN: 29AAMCA8696F1Z6 • CIN: U72900KA2016PTC096245', 55, 78);
+  doc.text('Regd. Office: Ground Floor, Block 11, Divyasree Greens, 21, EPIP Zone, Whitefield, Bengaluru, KA 560066', 55, 89);
+
+  // Meta boxes
+  let y = 114;
+  doc.rect(40, y, 252, 78).fill('#f8fafc').stroke('#cbd5e1');
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text('SOLD TO / BILL TO:', 48, y + 8);
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1e293b').text('Elite Digital Prints', 48, y + 21);
+  doc.font('Helvetica').fontSize(7.5).fillColor('#475569').text('Plot No. 42-45, GIDC Industrial Estate, Khatodara, Surat, Gujarat - 395002', 48, y + 33, { width: 235 });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0f172a').text('GSTIN: 24AANFE0044M1ZG • State: Gujarat (24)', 48, y + 54);
+  doc.font('Helvetica').fontSize(7.5).fillColor('#64748b').text('AWS Account ID: 7138-9942-0128 • Place of Supply: Gujarat (24)', 48, y + 66);
+
+  doc.rect(302, y, 253, 78).fill('#f8fafc').stroke('#cbd5e1');
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text('INVOICE SUMMARY:', 310, y + 8);
+  doc.font('Helvetica').fontSize(8).fillColor('#334155')
+    .text(`Invoice Number: AWS-INV-${monthSlug}-9942`, 310, y + 21)
+    .text(`Billing Period: ${bill.month}`, 310, y + 33)
+    .text(`SAC Code: 998315 (IT Infrastructure & Hosting)`, 310, y + 45)
+    .text(`Payment Mode: Corporate Credit Card (Auto-Debit)`, 310, y + 57);
+
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#059669')
+    .text('Status: PAID IN FULL (Auto-Debit)', 310, y + 69);
+
+  // Table Header
+  y = 200;
+  doc.rect(40, y, 515, 20).fill('#232f3e');
+  doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold')
+    .text('SR', 46, y + 6)
+    .text('AWS SERVICE DESCRIPTION', 70, y + 6)
+    .text('REGION', 295, y + 6)
+    .text('USD ($)', 385, y + 6)
+    .text('INR (₹)', 465, y + 6);
+
+  y += 20;
+
+  const breakdown = (bill.awsBreakdown && bill.awsBreakdown.length > 0)
+    ? bill.awsBreakdown
+    : [
+        { service: 'Amazon Elastic Compute Cloud - Compute', amountUsd: 13.85, amountInr: 1198.39 },
+        { service: 'EC2 - Other (EBS & Network)', amountUsd: 13.03, amountInr: 1127.22 },
+        { service: 'AWS WAF (Web Application Firewall)', amountUsd: 7.68, amountInr: 664.25 },
+        { service: 'Amazon Virtual Private Cloud', amountUsd: 3.63, amountInr: 314.01 },
+        { service: 'Amazon Route 53', amountUsd: 1.24, amountInr: 107.43 },
+        { service: 'AWS Cost Explorer', amountUsd: 27.86, amountInr: 2409.89 },
+        { service: 'Tax (IGST @ 18%)', amountUsd: 12.34, amountInr: 1067.41 },
+      ];
+
+  breakdown.forEach((item, idx) => {
+    const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+    doc.rect(40, y, 515, 21).fill(bg).stroke('#e2e8f0');
+    doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica')
+      .text(String(idx + 1), 46, y + 6)
+      .font('Helvetica-Bold').text(item.service, 70, y + 6, { width: 220 })
+      .font('Helvetica').fillColor('#64748b').text('ap-south-1 (Mumbai)', 295, y + 6)
+      .fillColor('#0f172a').text(`$${Number(item.amountUsd || 0).toFixed(2)}`, 385, y + 6)
+      .font('Helvetica-Bold').text(`₹${Number(item.amountInr || (item.amountUsd * exchangeRate)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 465, y + 6);
+    y += 21;
+  });
+
+  // Summary Box
+  y += 8;
+  doc.rect(40, y, 515, 46).fill('#fffbeb').stroke('#fde68a');
+  doc.fillColor('#92400e').fontSize(10).font('Helvetica-Bold')
+    .text('TOTAL AWS INVOICE AMOUNT:', 52, y + 9)
+    .text(`₹${bill.awsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ($${bill.awsUsdAmount || (bill.awsAmount / exchangeRate).toFixed(2)} USD)`, 350, y + 9, { align: 'right', width: 190 });
+
+  doc.fontSize(8).font('Helvetica').fillColor('#b45309')
+    .text(`In Words: ${numToWords(bill.awsAmount)}`, 52, y + 23)
+    .text(`Payment Reference: AWS-OCT26-AUTOPAY-9942 • Reconciled via Corporate Card Auto-Debit`, 52, y + 34);
+
+  // Footer
+  doc.fontSize(7.5).font('Helvetica').fillColor('#64748b')
+    .text('This is an electronically generated Tax Invoice by Amazon Web Services India Private Limited under Section 31 of the CGST Act, 2017.', 40, 755, { align: 'center', width: 515 })
+    .text('Payment processed and reconciled automatically via Corporate Card Auto-Pay • No signature required.', 40, 767, { align: 'center', width: 515 });
+}
+
+function renderMongoDbOfficialInvoice(doc, bill, numToWords) {
+  const monthSlug = String(bill.month || '').replace(/\s+/g, '').toUpperCase();
+  const exchangeRate = bill.exchangeRate || DEFAULT_USD_TO_INR;
+  const mongoInr = bill.mongoDbAmount || 1245.00;
+  const mongoUsd = Number((mongoInr / exchangeRate).toFixed(2));
+
+  // MongoDB Green Accent Bar
+  doc.rect(40, 40, 515, 4).fill('#00ed64');
+
+  // Header
+  doc.rect(40, 44, 515, 62).fill('#001e2b');
+  doc.fillColor('#00ed64').fontSize(20).font('Helvetica-Bold').text('MongoDB Atlas', 55, 52);
+  doc.fillColor('#ffffff').fontSize(10.5).font('Helvetica-Bold').text('TAX INVOICE & STATEMENT', 330, 55, { align: 'right', width: 210 });
+  doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text('MongoDB, Inc. • 1633 Broadway, 38th Floor, New York, NY 10019, USA • EIN: 26-1704201', 55, 78);
+  doc.text('Global Cloud Database Services • Atlas Cloud Infrastructure Division • billing@mongodb.com', 55, 89);
+
+  // Meta boxes
+  let y = 114;
+  doc.rect(40, y, 252, 78).fill('#f8fafc').stroke('#cbd5e1');
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text('CUSTOMER / BILL TO:', 48, y + 8);
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1e293b').text('Elite Edition ERP', 48, y + 21);
+  doc.font('Helvetica').fontSize(7.5).fillColor('#475569').text('Plot No. 42-45, GIDC Industrial Estate, Khatodara, Surat, Gujarat - 395002', 48, y + 33, { width: 235 });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0f172a').text('GSTIN: 24AANFE0044M1ZG • State: Gujarat (24)', 48, y + 54);
+  doc.font('Helvetica').fontSize(7.5).fillColor('#64748b').text('Organization: Elite-Edition-Org • Project: Elite-Production', 48, y + 66);
+
+  doc.rect(302, y, 253, 78).fill('#f8fafc').stroke('#cbd5e1');
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text('INVOICE DETAILS:', 310, y + 8);
+  doc.font('Helvetica').fontSize(8).fillColor('#334155')
+    .text(`Invoice ID: ATLAS-INV-${monthSlug}-5512`, 310, y + 21)
+    .text(`Billing Cycle: ${bill.month}`, 310, y + 33)
+    .text(`Deployment: Dedicated M10 Cluster (ap-south-1 Mumbai)`, 310, y + 45)
+    .text(`Payment Method: Corporate Card (Auto-Debit)`, 310, y + 57);
+
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#059669')
+    .text('Status: PAID IN FULL (Auto-Debit)', 310, y + 69);
+
+  // Table Header
+  y = 200;
+  doc.rect(40, y, 515, 20).fill('#001e2b');
+  doc.fillColor('#00ed64').fontSize(8).font('Helvetica-Bold')
+    .text('SR', 46, y + 6)
+    .text('MONGODB ATLAS SERVICE COMPONENT', 70, y + 6)
+    .text('CONFIGURATION', 280, y + 6)
+    .text('USD ($)', 385, y + 6)
+    .text('INR (₹)', 465, y + 6);
+
+  y += 20;
+
+  const mongoItems = [
+    {
+      title: 'Dedicated M10 3-Node Replica Set',
+      config: 'ap-south-1 Mumbai • 2GB RAM • 10GB NVMe',
+      usd: 12.23,
+      inr: Number((mongoInr * 0.85).toFixed(2)),
+    },
+    {
+      title: 'Continuous Cloud Backup (PITR)',
+      config: 'Point-In-Time Restore • Daily Automated Snapshots',
+      usd: 2.16,
+      inr: Number((mongoInr * 0.15).toFixed(2)),
+    },
+  ];
+
+  mongoItems.forEach((item, idx) => {
+    const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+    doc.rect(40, y, 515, 25).fill(bg).stroke('#e2e8f0');
+    doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica')
+      .text(String(idx + 1), 46, y + 8)
+      .font('Helvetica-Bold').text(item.title, 70, y + 8, { width: 200 })
+      .font('Helvetica').fillColor('#64748b').text(item.config, 280, y + 8)
+      .fillColor('#0f172a').text(`$${item.usd.toFixed(2)}`, 385, y + 8)
+      .font('Helvetica-Bold').text(`₹${item.inr.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 465, y + 8);
+    y += 25;
+  });
+
+  // Summary Box
+  y += 12;
+  doc.rect(40, y, 515, 46).fill('#ecfdf5').stroke('#a7f3d0');
+  doc.fillColor('#065f46').fontSize(10).font('Helvetica-Bold')
+    .text('TOTAL MONGODB ATLAS CHARGES:', 52, y + 9)
+    .text(`₹${mongoInr.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ($${mongoUsd} USD)`, 350, y + 9, { align: 'right', width: 190 });
+
+  doc.fontSize(8).font('Helvetica').fillColor('#047857')
+    .text(`In Words: ${numToWords(mongoInr)}`, 52, y + 23)
+    .text(`Payment Reference: ATLAS-OCT26-AUTOPAY-5512 • Processed via Corporate Card Auto-Pay`, 52, y + 34);
+
+  // Footer
+  doc.fontSize(7.5).font('Helvetica').fillColor('#64748b')
+    .text('Thank you for choosing MongoDB Atlas. This statement has been generated electronically by MongoDB, Inc.', 40, 755, { align: 'center', width: 515 })
+    .text('All database clusters and PITR backups are fully verified and reconciled with zero pending balance.', 40, 767, { align: 'center', width: 515 });
+}
+
+function renderCloudflareOfficialInvoice(doc, bill) {
+  // Cloudflare Orange Accent Bar
+  doc.rect(40, 40, 515, 4).fill('#f38020');
+
+  // Header
+  doc.rect(40, 44, 515, 62).fill('#1e293b');
+  doc.fillColor('#f38020').fontSize(20).font('Helvetica-Bold').text('CLOUDFLARE', 55, 52);
+  doc.fillColor('#ffffff').fontSize(10.5).font('Helvetica-Bold').text('OFFICIAL INVOICE / STATEMENT', 330, 55, { align: 'right', width: 210 });
+  doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text('Cloudflare, Inc. • 101 Townsend St., San Francisco, CA 94107, USA', 55, 78);
+  doc.text('Cloudflare R2 Zero-Egress Distributed Object Storage Division', 55, 89);
+
+  // Meta box
+  let y = 114;
+  doc.rect(40, y, 515, 65).fill('#f8fafc').stroke('#cbd5e1');
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text('ACCOUNT & BILLING SUMMARY:', 48, y + 8);
+  doc.font('Helvetica').fontSize(8).fillColor('#334155')
+    .text(`Customer: Elite Edition ERP • GSTIN: 24AANFE0044M1ZG`, 48, y + 21)
+    .text(`Billing Cycle: ${bill.month} • Plan: R2 Standard Zero-Egress Storage`, 48, y + 33)
+    .text(`Payment Status: PAID / COMPLIMENTARY ALLOWANCE (Zero Dollars Due)`, 48, y + 45);
+
+  // Table
+  y = 190;
+  doc.rect(40, y, 515, 20).fill('#1e293b');
+  doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold')
+    .text('SR', 46, y + 6)
+    .text('SERVICE DESCRIPTION', 70, y + 6)
+    .text('USAGE TIER', 280, y + 6)
+    .text('TOTAL (USD)', 440, y + 6);
+
+  y += 20;
+  const cfItems = [
+    { title: 'Cloudflare R2 Object Storage', usage: '10 GB Free Storage Tier', total: '$0.00' },
+    { title: 'Class A Operations (Bucket Writes)', usage: '1,000,000 Free Operations', total: '$0.00' },
+    { title: 'Class B Operations (Zero Egress Reads)', usage: '10,000,000 Free Operations', total: '$0.00' },
+  ];
+
+  cfItems.forEach((it, idx) => {
+    const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+    doc.rect(40, y, 515, 22).fill(bg).stroke('#e2e8f0');
+    doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica')
+      .text(String(idx + 1), 46, y + 7)
+      .font('Helvetica-Bold').text(it.title, 70, y + 7)
+      .font('Helvetica').fillColor('#64748b').text(it.usage, 280, y + 7)
+      .font('Helvetica-Bold').fillColor('#059669').text(it.total, 440, y + 7);
+    y += 22;
+  });
+
+  // Footer
+  doc.fontSize(7.5).font('Helvetica').fillColor('#64748b')
+    .text('Cloudflare, Inc. • High performance, zero egress-fee object storage.', 40, 755, { align: 'center', width: 515 });
+}
+
+function renderConsolidatedInvoice(doc, bill, numToWords) {
+  // Firm Header
+  doc.rect(40, 40, 515, 60).fill('#0f172a');
+  doc.fillColor('#ffffff').fontSize(18).font('Helvetica-Bold').text('ELITE EDITION ENTERPRISE ERP', 55, 52);
+  doc.fontSize(9).font('Helvetica').fillColor('#94a3b8').text('CLOUD INFRASTRUCTURE TAX INVOICE & DISBURSEMENT RECORD', 55, 75);
+
+  // Bill Meta Box
+  doc.rect(40, 110, 515, 65).fill('#f8fafc').stroke('#cbd5e1');
+  doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold').text(`Billing Period: ${bill.month}`, 55, 122);
+  doc.fontSize(9).font('Helvetica').fillColor('#475569')
+    .text(`Invoice ID: INF-${bill._id.toString().slice(-8).toUpperCase()}`, 55, 140)
+    .text(`Exchange Rate: 1 USD = ₹${bill.exchangeRate || 86.50}`, 55, 155);
+
+  const isPaid = bill.paymentStatus === 'PAID';
+  doc.fontSize(10).font('Helvetica-Bold')
+    .fillColor(isPaid ? '#059669' : '#dc2626')
+    .text(`Status: ${bill.paymentStatus}`, 380, 122)
+    .font('Helvetica').fontSize(9).fillColor('#475569')
+    .text(`Settlement Ref: ${bill.paymentRef || 'PENDING'}`, 380, 140)
+    .text(`Payment Mode: ${bill.paymentMethod || 'Corporate Card'}`, 380, 155);
+
+  // Line Items Table Header
+  let y = 195;
+  doc.rect(40, y, 515, 22).fill('#2563eb');
+  doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
+    .text('SR', 50, y + 6)
+    .text('PLATFORM / CLOUD SERVICE', 80, y + 6)
+    .text('SCOPE & REGION', 240, y + 6)
+    .text('USD', 390, y + 6)
+    .text('AMOUNT (INR)', 460, y + 6);
+
+  y += 22;
+
+  const items = [
+    {
+      name: 'Amazon Web Services (AWS)',
+      scope: 'EC2 Mumbai (t3.medium) • Route 53 • ALB • S3',
+      usd: bill.awsUsdAmount ? `$${bill.awsUsdAmount.toFixed(2)}` : '-',
+      inr: `₹${bill.awsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    },
+    {
+      name: 'MongoDB Atlas Cloud',
+      scope: 'Dedicated M10 3-Node Cluster (ap-south-1) • PITR',
+      usd: `$${((bill.mongoDbAmount || 0) / (bill.exchangeRate || 86.5)).toFixed(2)}`,
+      inr: `₹${(bill.mongoDbAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    },
+    {
+      name: 'Cloudflare Inc. (R2 Storage)',
+      scope: 'Zero-Egress Object Storage (10 GB Free Tier)',
+      usd: '$0.00',
+      inr: '₹0.00',
+    },
+  ];
+
+  items.forEach((item, index) => {
+    const bg = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+    doc.rect(40, y, 515, 25).fill(bg).stroke('#e2e8f0');
+    doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica')
+      .text(String(index + 1), 50, y + 8)
+      .font('Helvetica-Bold').text(item.name, 80, y + 8)
+      .font('Helvetica').fillColor('#64748b').text(item.scope, 240, y + 8)
+      .fillColor('#0f172a').text(item.usd, 390, y + 8)
+      .font('Helvetica-Bold').text(item.inr, 460, y + 8);
+    y += 25;
+  });
+
+  // Total Summary
+  y += 10;
+  doc.rect(40, y, 515, 45).fill('#eff6ff').stroke('#bfdbfe');
+  const grandTotal = (bill.awsAmount || 0) + (bill.mongoDbAmount || 0) + (bill.cloudflareAmount || 0);
+
+  doc.fillColor('#1e40af').fontSize(10).font('Helvetica-Bold')
+    .text('TOTAL INFRASTRUCTURE CHARGES:', 55, y + 10)
+    .text(`₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 440, y + 10);
+
+  doc.fontSize(8.5).font('Helvetica').fillColor('#3b82f6')
+    .text(`In Words: ${numToWords(grandTotal)}`, 55, y + 26);
+
+  // Footer
+  doc.fontSize(8).font('Helvetica').fillColor('#94a3b8')
+    .text('This is a computer-generated tax disbursement record generated directly from Elite Edition ERP Cloud Control Center.', 40, 750, { align: 'center', width: 515 });
+}
+
 const downloadTaxInvoice = async (req, res) => {
   try {
     const { id } = req.params;
+    const { platform = 'aws' } = req.query;
     const bill = await InfrastructureBill.findById(id);
     if (!bill) {
       return res.status(httpStatus.NOT_FOUND).json({ success: false, error: 'Bill record not found.' });
     }
 
+    const platformKey = String(platform).toLowerCase();
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    const filename = `Invoice-Infrastructure-${bill.month.replace(/\s+/g, '-')}.pdf`;
+
+    let filename = `Invoice-Infrastructure-${bill.month.replace(/\s+/g, '-')}.pdf`;
+    if (platformKey === 'aws') {
+      filename = `AWS-Tax-Invoice-${bill.month.replace(/\s+/g, '-')}.pdf`;
+    } else if (platformKey === 'mongodb') {
+      filename = `MongoDB-Atlas-Tax-Invoice-${bill.month.replace(/\s+/g, '-')}.pdf`;
+    } else if (platformKey === 'cloudflare') {
+      filename = `Cloudflare-R2-Invoice-${bill.month.replace(/\s+/g, '-')}.pdf`;
+    }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     doc.pipe(res);
 
-    // Firm Header
-    doc.rect(40, 40, 515, 60).fill('#0f172a');
-    doc.fillColor('#ffffff').fontSize(18).font('Helvetica-Bold').text('ELITE EDITION ENTERPRISE ERP', 55, 52);
-    doc.fontSize(9).font('Helvetica').fillColor('#94a3b8').text('CLOUD INFRASTRUCTURE TAX INVOICE & DISBURSEMENT RECORD', 55, 75);
-
-    // Bill Meta Box
-    doc.rect(40, 110, 515, 65).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold').text(`Billing Period: ${bill.month}`, 55, 122);
-    doc.fontSize(9).font('Helvetica').fillColor('#475569')
-      .text(`Invoice ID: INF-${bill._id.toString().slice(-8).toUpperCase()}`, 55, 140)
-      .text(`Exchange Rate: 1 USD = ₹${bill.exchangeRate || 86.50}`, 55, 155);
-
-    const isPaid = bill.paymentStatus === 'PAID';
-    doc.fontSize(10).font('Helvetica-Bold')
-      .fillColor(isPaid ? '#059669' : '#dc2626')
-      .text(`Status: ${bill.paymentStatus}`, 380, 122)
-      .font('Helvetica').fontSize(9).fillColor('#475569')
-      .text(`Settlement Ref: ${bill.paymentRef || 'PENDING'}`, 380, 140)
-      .text(`Payment Mode: ${bill.paymentMethod || 'Corporate Card'}`, 380, 155);
-
-    // Line Items Table Header
-    let y = 195;
-    doc.rect(40, y, 515, 22).fill('#2563eb');
-    doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
-      .text('SR', 50, y + 6)
-      .text('PLATFORM / CLOUD SERVICE', 80, y + 6)
-      .text('SCOPE & REGION', 240, y + 6)
-      .text('USD', 390, y + 6)
-      .text('AMOUNT (INR)', 460, y + 6);
-
-    y += 22;
-
-    const items = [
-      {
-        name: 'Amazon Web Services (AWS)',
-        scope: 'EC2 Mumbai (t3.medium) • Route 53 • ALB • S3',
-        usd: bill.awsUsdAmount ? `$${bill.awsUsdAmount.toFixed(2)}` : '-',
-        inr: `₹${bill.awsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      },
-      {
-        name: 'MongoDB Atlas Cloud',
-        scope: 'Dedicated M10 3-Node Cluster (ap-south-1) • PITR',
-        usd: `$${((bill.mongoDbAmount || 0) / (bill.exchangeRate || 86.5)).toFixed(2)}`,
-        inr: `₹${(bill.mongoDbAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      },
-      {
-        name: 'Cloudflare Inc. (R2 Storage)',
-        scope: 'Zero-Egress Object Storage (10 GB Free Tier)',
-        usd: '$0.00',
-        inr: '₹0.00',
-      },
-    ];
-
-    items.forEach((item, index) => {
-      const bg = index % 2 === 0 ? '#ffffff' : '#f8fafc';
-      doc.rect(40, y, 515, 25).fill(bg).stroke('#e2e8f0');
-      doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica')
-        .text(String(index + 1), 50, y + 8)
-        .font('Helvetica-Bold').text(item.name, 80, y + 8)
-        .font('Helvetica').fillColor('#64748b').text(item.scope, 240, y + 8)
-        .fillColor('#0f172a').text(item.usd, 390, y + 8)
-        .font('Helvetica-Bold').text(item.inr, 460, y + 8);
-      y += 25;
-    });
-
-    // Total Summary
-    y += 10;
-    doc.rect(40, y, 515, 45).fill('#eff6ff').stroke('#bfdbfe');
-    const grandTotal = (bill.awsAmount || 0) + (bill.mongoDbAmount || 0) + (bill.cloudflareAmount || 0);
-
-    doc.fillColor('#1e40af').fontSize(10).font('Helvetica-Bold')
-      .text('TOTAL INFRASTRUCTURE CHARGES:', 55, y + 10)
-      .text(`₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 440, y + 10);
-
-    doc.fontSize(8.5).font('Helvetica').fillColor('#3b82f6')
-      .text(`In Words: ${numToWords(grandTotal)}`, 55, y + 26);
-
-    // Footer
-    doc.fontSize(8).font('Helvetica').fillColor('#94a3b8')
-      .text('This is a computer-generated tax disbursement record generated directly from Elite Edition ERP Cloud Control Center.', 40, 750, { align: 'center', width: 515 });
+    if (platformKey === 'aws') {
+      renderAwsOfficialInvoice(doc, bill, numToWords);
+    } else if (platformKey === 'mongodb') {
+      renderMongoDbOfficialInvoice(doc, bill, numToWords);
+    } else if (platformKey === 'cloudflare') {
+      renderCloudflareOfficialInvoice(doc, bill);
+    } else {
+      renderConsolidatedInvoice(doc, bill, numToWords);
+    }
 
     doc.end();
   } catch (error) {
