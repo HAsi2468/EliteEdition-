@@ -54,13 +54,20 @@ const getAll = async (req, res) => {
         { category: { $regex: 'stitching', $options: 'i' } },
         { designName: { $regex: '^PKD-', $options: 'i' } }
       ];
+    } else if (department === 'ethno_wear') {
+      deptOr = [
+        { department: 'ethno_wear' },
+        { designName: { $regex: '^EW-', $options: 'i' } }
+      ];
     } else if (department === 'digital_print') {
-      filter.department = { $ne: 'stitching' };
+      filter.department = { $nin: ['stitching', 'ethno_wear'] };
       if (!filter.category) {
         filter.category = { $ne: 'Stitching' };
       }
-      // Allow all digital print designs (including sample designs like SM-18), only exclude stitching PKD- prefixes
-      filter.designName = { $not: /^PKD-/i };
+      // Allow all digital print designs (including sample designs like SM-18), only exclude stitching PKD- and ethno wear EW- prefixes
+      filter.designName = { $not: /^(PKD|EW)-/i };
+    } else if (department) {
+      filter.department = department;
     }
 
     if (deptOr) {
@@ -188,15 +195,23 @@ const remove = async (req, res) => {
   }
 };
 
-// Get next sequential design number (PKD-1001 for stitching, ED-709 for digital_print)
+// Get next sequential design number (PKD-1001 for stitching, EW-1 for ethno_wear, ED-709 for digital_print)
 const getNextDesignNumber = async (req, res) => {
   try {
     const { department = 'digital_print' } = req.query;
-    const prefix = department === 'stitching' ? 'PKD' : 'ED';
+    let prefix = 'ED';
+    let filter = {};
 
-    const filter = department === 'stitching'
-      ? { $or: [{ department: 'stitching' }, { category: /stitching/i }, { designName: /^PKD/i }] }
-      : { department: { $ne: 'stitching' }, designName: /^ED/i };
+    if (department === 'stitching') {
+      prefix = 'PKD';
+      filter = { $or: [{ department: 'stitching' }, { category: /stitching/i }, { designName: /^PKD/i }] };
+    } else if (department === 'ethno_wear') {
+      prefix = 'EW';
+      filter = { $or: [{ department: 'ethno_wear' }, { designName: /^EW/i }] };
+    } else {
+      prefix = 'ED';
+      filter = { department: { $nin: ['stitching', 'ethno_wear'] }, designName: /^ED/i };
+    }
 
     const designs = await db.Design.find(filter, { designName: 1 }).lean();
 
@@ -224,11 +239,25 @@ const getNextDesignNumber = async (req, res) => {
 // Get all distinct categories for filter dropdown
 const getCategories = async (req, res) => {
   try {
-    const rawCats = await db.Design.distinct('category');
-    const defaultCats = [
-      'SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC',
-      'Cotton', 'Polyester', 'Silk', 'Stitching', 'Digital Print'
-    ];
+    const { department } = req.query;
+    const filter = {};
+    if (department === 'stitching') {
+      filter.$or = [{ department: 'stitching' }, { category: /stitching/i }, { designName: /^PKD/i }];
+    } else if (department === 'ethno_wear') {
+      filter.$or = [{ department: 'ethno_wear' }, { designName: /^EW/i }];
+    } else if (department === 'digital_print') {
+      filter.department = { $nin: ['stitching', 'ethno_wear'] };
+      filter.designName = { $not: /^(PKD|EW)-/i };
+    }
+    const rawCats = await db.Design.distinct('category', Object.keys(filter).length ? filter : undefined);
+    const defaultCats = department === 'stitching'
+      ? ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC', 'OTHER']
+      : department === 'ethno_wear'
+      ? ['SUIT', 'KURTI', 'DUPATTA', 'SAREE', 'LEHENGA', 'TOP', 'BOTTOM', 'ETHNIC', 'OTHER']
+      : [
+          'SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC',
+          'Cotton', 'Polyester', 'Silk', 'Stitching', 'Digital Print'
+        ];
     const combined = new Set();
     [...defaultCats, ...(rawCats || [])].forEach(c => {
       if (c && typeof c === 'string' && c.trim()) {
