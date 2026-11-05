@@ -400,40 +400,96 @@ const getCloudflareR2Metrics = async (req, res) => {
 const getBillingHistory = async (req, res) => {
   try {
     const rawBills = await InfrastructureBill.find({}).sort({ createdAt: -1 });
-    const bills = rawBills.map((b) => {
-      const obj = b.toObject();
-      const isPaid = String(obj.paymentStatus || '').toUpperCase() === 'PAID';
-      const effectivePaidDate = obj.paidAt || obj.paymentDate;
+    const now = new Date();
+    const currentMonthName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' }); // e.g. "November 2026"
 
-      if (!obj.platformPayments) {
-        obj.platformPayments = {};
-      }
-      if (!obj.platformPayments.aws || (isPaid && obj.platformPayments.aws.status !== 'PAID')) {
-        obj.platformPayments.aws = {
-          status: isPaid ? 'PAID' : (obj.platformPayments.aws?.status || 'UNPAID'),
-          paidAt: effectivePaidDate || obj.platformPayments.aws?.paidAt,
-          paymentMethod: obj.paymentMethod || obj.platformPayments.aws?.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
-          paymentRef: obj.paymentRef || obj.platformPayments.aws?.paymentRef || (isPaid ? `AWS-${obj.month.replace(/\s+/g, '-').toUpperCase()}` : undefined),
-        };
-      }
-      if (!obj.platformPayments.mongodb || (isPaid && obj.platformPayments.mongodb.status !== 'PAID')) {
-        obj.platformPayments.mongodb = {
-          status: isPaid ? 'PAID' : (obj.platformPayments.mongodb?.status || 'UNPAID'),
-          paidAt: effectivePaidDate || obj.platformPayments.mongodb?.paidAt,
-          paymentMethod: obj.paymentMethod || obj.platformPayments.mongodb?.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
-          paymentRef: obj.paymentRef || obj.platformPayments.mongodb?.paymentRef || (isPaid ? `ATLAS-${obj.month.replace(/\s+/g, '-').toUpperCase()}` : undefined),
-        };
-      }
-      if (!obj.platformPayments.cloudflare) {
-        obj.platformPayments.cloudflare = {
-          status: 'PAID',
-          paidAt: effectivePaidDate || new Date(obj.createdAt),
-          paymentMethod: 'Free Allowance / Zero-Egress Tier',
-          paymentRef: 'CF-R2-FREE',
-        };
-      }
-      return obj;
-    });
+    const bills = await Promise.all(
+      rawBills.map(async (b) => {
+        const obj = b.toObject();
+        let isPaid = String(obj.paymentStatus || '').toUpperCase() === 'PAID';
+
+        // Auto-settle any past billing months via Corporate Card Auto-Pay / Auto-Debit
+        if (!isPaid && obj.month !== currentMonthName) {
+          const monthSlug = String(obj.month || '').replace(/\s+/g, '-').toUpperCase();
+          const autoSettledDate = obj.syncedAt || obj.createdAt || new Date();
+          isPaid = true;
+          obj.paymentStatus = 'PAID';
+          obj.paidAt = autoSettledDate;
+          obj.paymentMethod = 'Corporate Card (Auto-Debit)';
+          obj.paymentRef = `AUTOPAY-${monthSlug}`;
+
+          if (!obj.platformPayments) obj.platformPayments = {};
+          obj.platformPayments.aws = {
+            status: 'PAID',
+            paidAt: autoSettledDate,
+            paymentMethod: 'AWS Auto-Debit / Corporate Card',
+            paymentRef: `AWS-AUTOPAY-${monthSlug}`,
+            notes: 'Settled automatically via Corporate Card Auto-Pay',
+          };
+          obj.platformPayments.mongodb = {
+            status: 'PAID',
+            paidAt: autoSettledDate,
+            paymentMethod: 'Corporate Card (Auto-Debit)',
+            paymentRef: `ATLAS-AUTOPAY-${monthSlug}`,
+            notes: 'Settled automatically via Corporate Card Auto-Pay',
+          };
+          obj.platformPayments.cloudflare = {
+            status: 'PAID',
+            paidAt: autoSettledDate,
+            paymentMethod: 'Free Allowance / Zero-Egress Tier',
+            paymentRef: 'CF-R2-FREE',
+            notes: '10 GB Free Storage Allowance',
+          };
+
+          // Persist the auto-settlement in the database
+          await InfrastructureBill.updateOne(
+            { _id: b._id },
+            {
+              $set: {
+                paymentStatus: 'PAID',
+                paidAt: autoSettledDate,
+                paymentMethod: 'Corporate Card (Auto-Debit)',
+                paymentRef: `AUTOPAY-${monthSlug}`,
+                'platformPayments.aws': obj.platformPayments.aws,
+                'platformPayments.mongodb': obj.platformPayments.mongodb,
+                'platformPayments.cloudflare': obj.platformPayments.cloudflare,
+              },
+            }
+          );
+        }
+
+        const effectivePaidDate = obj.paidAt || obj.paymentDate;
+
+        if (!obj.platformPayments) {
+          obj.platformPayments = {};
+        }
+        if (!obj.platformPayments.aws || (isPaid && obj.platformPayments.aws.status !== 'PAID')) {
+          obj.platformPayments.aws = {
+            status: isPaid ? 'PAID' : (obj.platformPayments.aws?.status || 'UNPAID'),
+            paidAt: effectivePaidDate || obj.platformPayments.aws?.paidAt,
+            paymentMethod: obj.paymentMethod || obj.platformPayments.aws?.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
+            paymentRef: obj.paymentRef || obj.platformPayments.aws?.paymentRef || (isPaid ? `AWS-${obj.month.replace(/\s+/g, '-').toUpperCase()}` : undefined),
+          };
+        }
+        if (!obj.platformPayments.mongodb || (isPaid && obj.platformPayments.mongodb.status !== 'PAID')) {
+          obj.platformPayments.mongodb = {
+            status: isPaid ? 'PAID' : (obj.platformPayments.mongodb?.status || 'UNPAID'),
+            paidAt: effectivePaidDate || obj.platformPayments.mongodb?.paidAt,
+            paymentMethod: obj.paymentMethod || obj.platformPayments.mongodb?.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
+            paymentRef: obj.paymentRef || obj.platformPayments.mongodb?.paymentRef || (isPaid ? `ATLAS-${obj.month.replace(/\s+/g, '-').toUpperCase()}` : undefined),
+          };
+        }
+        if (!obj.platformPayments.cloudflare) {
+          obj.platformPayments.cloudflare = {
+            status: 'PAID',
+            paidAt: effectivePaidDate || new Date(obj.createdAt),
+            paymentMethod: 'Free Allowance / Zero-Egress Tier',
+            paymentRef: 'CF-R2-FREE',
+          };
+        }
+        return obj;
+      })
+    );
 
     res.json({ success: true, count: bills.length, bills });
   } catch (error) {
