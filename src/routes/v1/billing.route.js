@@ -18,6 +18,7 @@ router.post('/invoices/:id/payment', billingController.recordPayment);
 router.get('/invoices-bulk-pdf', billingController.downloadBulkInvoicesPdf);
 router.post('/invoices-bulk-pdf', billingController.downloadBulkInvoicesPdf);
 router.get('/invoices/:id/pdf', billingController.downloadInvoicePdf);
+router.get('/invoices/:id/html', billingController.getInvoiceHtml);
 
 // Reports & GST Compliance
 router.get('/reports/gstr1-table12', billingController.getGstr1Table12Summary);

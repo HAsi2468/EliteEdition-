@@ -2317,6 +2317,22 @@ const downloadInvoicePdf = async (req, res) => {
     const bankAcNo   = config.companyAccountNo || '';
     const bankIfsc   = config.companyIfscCode || '';
 
+    if (req.query?.template === 'master' || req.query?.modern === 'true') {
+      try {
+        const masterInvoicePdfService = require('../services/masterInvoicePdf.service');
+        const pdfBuffer = await masterInvoicePdfService.generateMasterInvoicePdf(invoice, config, {
+          copyType: req.query?.copyType || (includeDuplicate ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR RECIPIENT')
+        });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo || 'Draft'}.pdf"`);
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+        return res.send(pdfBuffer);
+      } catch (masterErr) {
+        console.error('Master PDF generator fallback to legacy:', masterErr);
+      }
+    }
+
     const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true, bufferPages: true, autoPageBreak: false });
     doc.options.autoPageBreak = false;
 
@@ -5190,6 +5206,57 @@ const lookupLocation = async (req, res) => {
   }
 };
 
+const getInvoiceHtml = async (req, res) => {
+  try {
+    const invoice = await BillingInvoice.findById(req.params.id).lean();
+    if (!invoice) return res.status(404).send('Invoice not found');
+
+    await enrichInvoiceItemsWithImages(invoice);
+
+    if (invoice.customer) {
+      try {
+        const BillingCustomer = require('../db/models/billingCustomer.model');
+        let matchedCustomer = null;
+        if (invoice.customer.customerId) {
+          matchedCustomer = await BillingCustomer.findById(invoice.customer.customerId).lean();
+        }
+        if (!matchedCustomer && invoice.customer.name) {
+          const cleanName = invoice.customer.name.trim();
+          matchedCustomer = await BillingCustomer.findOne({
+            $or: [
+              { name: cleanName },
+              { businessName: cleanName },
+              { name: { $regex: `^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, $options: 'i' } }
+            ]
+          }).lean();
+        }
+        if (matchedCustomer) {
+          invoice.customer = {
+            ...matchedCustomer,
+            ...invoice.customer
+          };
+        }
+      } catch (_) {}
+    }
+
+    const PrintConfig = require('../db/models/printConfig.model');
+    const companyEntity = resolveCompanyEntity(invoice.companyEntity || 'Elite Digital Print');
+    const filter = buildCompanyFilter(companyEntity);
+    const config = await PrintConfig.findOne(filter).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
+
+    const masterInvoicePdfService = require('../services/masterInvoicePdf.service');
+    const html = await masterInvoicePdfService.compileMasterInvoiceHtml(invoice, config, {
+      copyType: req.query?.copyType || 'ORIGINAL FOR RECIPIENT'
+    });
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    console.error('Failed to get invoice HTML:', err);
+    return res.status(500).send('Error generating invoice HTML: ' + err.message);
+  }
+};
+
 module.exports = {
   getBillingDashboardStats,
   getInvoices,
@@ -5202,6 +5269,7 @@ module.exports = {
   recordPayment,
   downloadInvoicePdf,
   downloadBulkInvoicesPdf,
+  getInvoiceHtml,
   getCustomers,
   createCustomer,
   updateCustomer,
