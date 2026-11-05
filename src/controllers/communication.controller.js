@@ -145,6 +145,12 @@ const getGroups = async (req, res) => {
               lastMsg.content = 'This message was deleted';
               lastMsg.attachment = null;
             }
+            if (lastMsg.senderId && typeof lastMsg.senderId === 'object') {
+              let senderAvatar = lastMsg.senderId.avatarUrl;
+              if (senderAvatar && typeof senderAvatar === 'string' && (senderAvatar.length > 2048 || senderAvatar.startsWith('data:'))) {
+                lastMsg.senderId.avatarUrl = '';
+              }
+            }
             lastMsgMap[String(r._id)] = lastMsg;
 
             // Smart Unread Calculation: If last message was sent by user or already read, unread count is 0!

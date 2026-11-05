@@ -65,7 +65,37 @@ router.patch('/me', requireAuth, async (req, res) => {
 			updates.phone = phone.trim().substring(0, 25);
 		}
 		if (typeof avatarUrl === 'string') {
-			updates.avatarUrl = avatarUrl.trim();
+			const cleanAvatar = avatarUrl.trim();
+			if (cleanAvatar.startsWith('data:image')) {
+				try {
+					const { uploadToR2, isR2Configured } = require('../../utils/r2Storage');
+					if (isR2Configured && isR2Configured()) {
+						const matches = cleanAvatar.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+						if (matches && matches.length === 3) {
+							const mimeType = matches[1];
+							const buffer = Buffer.from(matches[2], 'base64');
+							const ext = mimeType.includes('png') ? 'png' : (mimeType.includes('webp') ? 'webp' : 'jpg');
+							const fileName = `avatar_${userId}_${Date.now()}.${ext}`;
+							const r2Url = await uploadToR2({
+								buffer,
+								fileName,
+								mimeType,
+								folder: 'avatars'
+							});
+							updates.avatarUrl = r2Url;
+						} else {
+							updates.avatarUrl = cleanAvatar;
+						}
+					} else {
+						updates.avatarUrl = cleanAvatar;
+					}
+				} catch (upErr) {
+					console.warn('Failed to upload avatar to R2, saving fallback:', upErr);
+					updates.avatarUrl = cleanAvatar;
+				}
+			} else {
+				updates.avatarUrl = cleanAvatar;
+			}
 		}
 		if (typeof department === 'string' && department.trim() && req.user.role === 'admin') {
 			updates.department = department.trim().substring(0, 60);
