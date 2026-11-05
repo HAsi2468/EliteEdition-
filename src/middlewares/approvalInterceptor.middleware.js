@@ -387,6 +387,31 @@ const approvalInterceptor = async (req, res, next) => {
     // Calculate diff between existing document and proposed changes
     const diffSummary = computeDiff(beforeData, req.body || {});
 
+    // Check if an identical request is already pending for this target
+    if (targetId) {
+      const existingPending = await ChangeApprovalRequest.findOne({
+        targetId: String(targetId),
+        action: isDelete ? 'DELETE' : 'EDIT',
+        status: 'PENDING'
+      });
+      if (existingPending) {
+        return res.status(202).json({
+          success: true,
+          requiresApproval: true,
+          approvalId: existingPending._id,
+          message: 'Action already submitted for Admin Review & Approval. Awaiting Admin authorization.',
+          data: {
+            id: existingPending._id,
+            module: existingPending.module,
+            action: existingPending.action,
+            targetIdentifier: existingPending.targetIdentifier,
+            status: 'PENDING',
+            createdAt: existingPending.createdAt,
+          },
+        });
+      }
+    }
+
     // 7. Create Pending Change Approval Request with companyEntity
     const approval = await ChangeApprovalRequest.create({
       module: moduleName,
