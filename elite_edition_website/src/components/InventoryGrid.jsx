@@ -15,7 +15,7 @@ import VendorPartyManagerModal from './VendorPartyManagerModal';
 import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
-import { generateCode128Svg, resolveItemSize, resolveBarcodeTitle } from '../utils/barcodeHelper';
+import { generateCode128Svg, resolveItemSize, resolveBarcodeTitle, resolveBarcodeSkuAndSize } from '../utils/barcodeHelper';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -1379,12 +1379,32 @@ export default function InventoryGrid({
 
   // Thermal Barcode Printing
   const printBarcode = (item) => {
-    const sku = item.skuCode || 'NO-SKU';
-    const size = resolveItemSize(item, sku);
-    const companyTitle = resolveBarcodeTitle(item);
-    const barcodeSvg = generateCode128Svg(sku, 40);
+    const rawSku = item.skuCode || item.sku || 'NO-SKU';
+    const availableSizes = Array.isArray(item.size) 
+      ? item.size.filter(Boolean).map(s => String(s).trim())
+      : (typeof item.size === 'string' && item.size.includes('/') 
+          ? item.size.split('/').map(s => s.trim()).filter(Boolean)
+          : (typeof item.size === 'string' && item.size.includes(',')
+              ? item.size.split(',').map(s => s.trim()).filter(Boolean)
+              : []));
 
-    const countStr = window.prompt(`How many barcode stickers to print for SKU "${sku}"?`, "1");
+    let chosenSize = null;
+    if (availableSizes.length > 1) {
+      const sizePrompt = window.prompt(
+        `Select size to print for SKU "${rawSku}"\nAvailable: [ ${availableSizes.join(', ')} ]\nEnter size:`,
+        availableSizes[0]
+      );
+      if (sizePrompt === null) return;
+      if (sizePrompt.trim()) chosenSize = sizePrompt.trim().toUpperCase();
+    } else if (availableSizes.length === 1) {
+      chosenSize = availableSizes[0];
+    }
+
+    const { barcodeSku, size } = resolveBarcodeSkuAndSize(item, chosenSize);
+    const companyTitle = resolveBarcodeTitle(item);
+    const barcodeSvg = generateCode128Svg(barcodeSku, 40);
+
+    const countStr = window.prompt(`How many barcode stickers to print for SKU "${barcodeSku}" (Size: ${size})?`, "1");
     if (countStr === null) return;
 
     const count = parseInt(countStr, 10);
@@ -1407,7 +1427,7 @@ export default function InventoryGrid({
             ${barcodeSvg}
           </div>
           <div class="footer-row">
-            <span class="sku-text">${sku}</span>
+            <span class="sku-text">${barcodeSku}</span>
             <span class="size-text">Size: ${size}</span>
           </div>
         </div>
@@ -1421,7 +1441,7 @@ export default function InventoryGrid({
               ${barcodeSvg}
             </div>
             <div class="footer-row">
-              <span class="sku-text">${sku}</span>
+              <span class="sku-text">${barcodeSku}</span>
               <span class="size-text">Size: ${size}</span>
             </div>
           </div>
@@ -1440,7 +1460,7 @@ export default function InventoryGrid({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Print Barcodes - ${sku}</title>
+        <title>Print Barcodes - ${barcodeSku}</title>
         <style>
           @page { size: 100mm 25mm; margin: 0; }
           body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: white; color: black; }

@@ -23,6 +23,7 @@ import { SmartActionGroup } from './common/SmartActionGroup';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import * as XLSX from 'xlsx';
 import { lookupPincode, lookupLocation, getStateCode, inferStateFromGstin } from '../utils/postalCodeHelper';
+import MasterInvoiceTemplate, { getCompanyTheme } from './MasterInvoiceTemplate';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -110,7 +111,8 @@ import {
   Percent,
   Copy,
   Calculator,
-  ShieldCheck
+  ShieldCheck,
+  ArrowLeftRight
 } from 'lucide-react';
 
 import { cloneDocumentPayload, focusPrimaryQuantityInput } from '../utils/documentCloneUtility';
@@ -340,13 +342,19 @@ export default function EliteBillingDepartment({
   const [itemSortState, setItemSortState] = useState({ columnKey: 'name', order: 'asc' });
   const [selectedItemMap, setSelectedItemMap] = useState({});
 
+  const [companyPrintConfig, setCompanyPrintConfig] = useState(null);
+  const [invoiceViewTab, setInvoiceViewTab] = useState('details'); // 'master' | 'details'
+
   useEffect(() => {
     let isMounted = true;
     const fetchPurchaseTypes = async () => {
       try {
         const res = await api.getCompanySettings(companyEntity);
-        if (isMounted && res?.data?.purchaseTypes && Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
-          setDynamicPurchaseTypes(res.data.purchaseTypes);
+        if (isMounted && res?.data) {
+          setCompanyPrintConfig(res.data);
+          if (Array.isArray(res.data.purchaseTypes) && res.data.purchaseTypes.length > 0) {
+            setDynamicPurchaseTypes(res.data.purchaseTypes);
+          }
         }
       } catch (err) { }
     };
@@ -440,7 +448,39 @@ export default function EliteBillingDepartment({
     notes: 'Vendor purchase bill recorded in ERP.'
   });
 
-  const computeNextPurchaseNo = (list = purchases, forEntity = (purchaseForm?.companyEntity || companyEntity)) => {
+  // Contra Voucher / Party Havala Entry State (Tally F4 / F7 equivalent)
+  const [purchaseEntryType, setPurchaseEntryType] = useState('general'); // 'general' | 'contra'
+  const [contraForm, setContraForm] = useState({
+    voucherNo: '',
+    date: new Date().toISOString().split('T')[0],
+    contraMode: 'party_offset', // 'party_offset' (Vendor ↔ Customer Havala) | 'bank_cash' (Bank ↔ Cash)
+    debitPartyType: 'vendor', // 'vendor' | 'customer' | 'bank'
+    debitParty: '',
+    creditPartyType: 'customer', // 'customer' | 'vendor' | 'bank' | 'cash'
+    creditParty: '',
+    referenceNo: '',
+    amount: '',
+    narration: ''
+  });
+  const [purchaseTabFilter, setPurchaseTabFilter] = useState('all'); // 'all' | 'general' | 'contra'
+
+  const computeNextPurchaseNo = (list = purchases, forEntity = (purchaseForm?.companyEntity || companyEntity), isContra = (purchaseEntryType === 'contra')) => {
+    if (isContra) {
+      const prefix = 'CNTR-';
+      const regex = /^CNTR[-_]?(\d+)/i;
+      let maxNum = 0;
+      (list || []).forEach(p => {
+        if (p && p.purchaseNo) {
+          const match = String(p.purchaseNo).trim().match(regex);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+      const nextSeq = maxNum + 1;
+      return `${prefix}${String(nextSeq).padStart(2, '0')}`;
+    }
     const norm = String(forEntity || '').trim().toLowerCase();
     const isEthno = norm.includes('ethno') || norm === 'ew';
     const prefix = isEthno ? 'EWP-' : 'DP-';
@@ -819,6 +859,26 @@ export default function EliteBillingDepartment({
 
   const handleEditPurchase = (p) => {
     setEditingPurchaseId(p._id || p.id);
+
+    if (p.entryType === 'contra' || p.purchaseType === 'contra') {
+      setPurchaseEntryType('contra');
+      setContraForm({
+        voucherNo: p.purchaseNo || '',
+        date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : new Date().toISOString().split('T')[0],
+        contraMode: p.contraDetails?.contraMode || 'party_offset',
+        debitPartyType: p.contraDetails?.debitPartyType || 'vendor',
+        debitParty: p.contraDetails?.debitParty || p.vendorName || '',
+        creditPartyType: p.contraDetails?.creditPartyType || 'customer',
+        creditParty: p.contraDetails?.creditParty || '',
+        referenceNo: p.contraDetails?.referenceNo || (p.billNo !== 'CONTRA' ? p.billNo : '') || '',
+        amount: String(p.grandTotal || p.totalAmount || ''),
+        narration: p.contraDetails?.narration || p.notes || ''
+      });
+      setShowPurchaseModal(true);
+      return;
+    }
+
+    setPurchaseEntryType('general');
     const pGstRate = p.gstRate != null ? p.gstRate : 5;
     const pItems = Array.isArray(p.items) && p.items.length > 0
       ? p.items.map(it => ({
@@ -1176,6 +1236,120 @@ export default function EliteBillingDepartment({
   const handleCreatePurchase = async (e) => {
     e.preventDefault();
     if (isSavingPurchase) return; // Double-click submission guard
+
+    // ── CONTRA / PARTY HAVALA VOUCHER SUBMISSION (Tally F4 / F7 equivalent) ──
+    if (purchaseEntryType === 'contra') {
+      const contraAmt = parseFloat(contraForm.amount);
+      const cErrs = [];
+      if (!contraForm.debitParty || !contraForm.debitParty.trim()) {
+        cErrs.push({ fieldId: 'contra-debit-party', label: 'Debit Account', message: 'Please select party or account to Debit (Dr).' });
+      }
+      if (!contraForm.creditParty || !contraForm.creditParty.trim()) {
+        cErrs.push({ fieldId: 'contra-credit-party', label: 'Credit Account', message: 'Please select party or account to Credit (Cr).' });
+      }
+      if (contraForm.debitParty && contraForm.creditParty && contraForm.debitParty.trim().toLowerCase() === contraForm.creditParty.trim().toLowerCase()) {
+        cErrs.push({ fieldId: 'contra-credit-party', label: 'Credit Account', message: 'Debit and Credit accounts cannot be identical.' });
+      }
+      if (isNaN(contraAmt) || contraAmt <= 0) {
+        cErrs.push({ fieldId: 'contra-amount', label: 'Contra Amount', message: 'Please enter a valid amount greater than ₹0.' });
+      }
+      if (cErrs.length > 0) {
+        setValidationErrors(cErrs);
+        return;
+      }
+      clearValidationErrors();
+
+      const pNo = (contraForm.voucherNo && contraForm.voucherNo.trim()) || computeNextPurchaseNo(purchases, companyEntity, true);
+      const narrationStr = contraForm.narration || (contraForm.contraMode === 'party_offset'
+        ? `Party Offset: Dr. ${contraForm.debitParty} ⇄ Cr. ${contraForm.creditParty}${contraForm.referenceNo ? ` (Ref: ${contraForm.referenceNo})` : ''}`
+        : `Internal Transfer: Dr. ${contraForm.debitParty} ⇄ Cr. ${contraForm.creditParty}`);
+
+      const payload = {
+        entryType: 'contra',
+        purchaseType: 'contra',
+        purchaseNo: pNo,
+        billNo: contraForm.referenceNo || 'CONTRA',
+        ourChallanNo: '',
+        date: contraForm.date || new Date().toISOString().split('T')[0],
+        vendorName: `${contraForm.debitParty} ⇄ ${contraForm.creditParty}`,
+        vendor: {
+          name: contraForm.debitParty,
+          businessName: contraForm.debitParty,
+          state: 'Gujarat',
+          stateCode: '24',
+          country: 'India'
+        },
+        companyEntity: companyEntity || 'Elite Digital Prints',
+        contraDetails: {
+          contraMode: contraForm.contraMode,
+          debitPartyType: contraForm.debitPartyType,
+          debitParty: contraForm.debitParty,
+          creditPartyType: contraForm.creditPartyType,
+          creditParty: contraForm.creditParty,
+          referenceNo: contraForm.referenceNo || '',
+          narration: narrationStr
+        },
+        items: [{
+          itemName: `Contra: Dr. ${contraForm.debitParty} ⇄ Cr. ${contraForm.creditParty}`,
+          description: narrationStr,
+          quantity: 1,
+          qty: 1,
+          unit: 'Voucher',
+          unitPrice: contraAmt,
+          rate: contraAmt,
+          amount: contraAmt,
+          totalAmount: contraAmt
+        }],
+        subtotal: contraAmt,
+        taxableAmount: contraAmt,
+        totalTax: 0,
+        gstAmount: 0,
+        grandTotal: contraAmt,
+        totalAmount: contraAmt,
+        paidAmount: contraAmt,
+        balanceDue: 0,
+        paymentStatus: 'PAID',
+        notes: narrationStr
+      };
+
+      setIsSavingPurchase(true);
+      try {
+        if (editingPurchaseId) {
+          const res = await api.updateBillingPurchase(editingPurchaseId, payload);
+          const saved = (res && res.data) ? res.data : { ...payload, _id: editingPurchaseId, id: editingPurchaseId };
+          setPurchases(prev => prev.map(p => ((p._id === editingPurchaseId || p.id === editingPurchaseId) ? saved : p)));
+          setEditingPurchaseId(null);
+        } else {
+          const res = await api.createBillingPurchase(payload);
+          const saved = (res && res.data) ? res.data : { ...payload, id: `cntr_${Date.now()}` };
+          setPurchases(prev => [saved, ...prev]);
+        }
+      } catch (err) {
+        console.error('Error saving contra voucher:', err);
+        const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save contra voucher.';
+        alert(`⚠️ Save Failed: ${errMsg}`);
+        setIsSavingPurchase(false);
+        return;
+      } finally {
+        setIsSavingPurchase(false);
+      }
+
+      setShowPurchaseModal(false);
+      setContraForm({
+        voucherNo: '',
+        date: new Date().toISOString().split('T')[0],
+        contraMode: 'party_offset',
+        debitPartyType: 'vendor',
+        debitParty: '',
+        creditPartyType: 'customer',
+        creditParty: '',
+        referenceNo: '',
+        amount: '',
+        narration: ''
+      });
+      return;
+    }
+
     if (duplicatePurchaseMatch) {
       alert(`⚠️ Duplicate Purchase Blocked: Purchase #${duplicatePurchaseMatch.purchaseNo} already exists for Vendor "${duplicatePurchaseMatch.vendorName || duplicatePurchaseMatch.vendor?.businessName || duplicatePurchaseMatch.vendor?.name}", Bill #${duplicatePurchaseMatch.billNo || 'N/A'} (Total: ₹${(Number(duplicatePurchaseMatch.grandTotal || duplicatePurchaseMatch.totalAmount || 0)).toFixed(2)} on ${duplicatePurchaseMatch.date ? new Date(duplicatePurchaseMatch.date).toLocaleDateString('en-GB') : 'N/A'}). Duplicate purchase bills are not permitted.`);
       return;
@@ -1576,6 +1750,11 @@ export default function EliteBillingDepartment({
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter(p => {
+      // 0. Segmented Entry Type Filter (All vs General Purchase vs Contra Entry)
+      const isContra = p.entryType === 'contra' || p.purchaseType === 'contra';
+      if (purchaseTabFilter === 'general' && isContra) return false;
+      if (purchaseTabFilter === 'contra' && !isContra) return false;
+
       // 1. Text Search (tokenized for multi-word search)
       if (purchaseSearch && purchaseSearch.trim()) {
         const tokens = purchaseSearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -1643,7 +1822,7 @@ export default function EliteBillingDepartment({
 
       return true;
     });
-  }, [purchases, purchaseSearch, purchaseFilters, purchaseDateRange]);
+  }, [purchases, purchaseSearch, purchaseFilters, purchaseDateRange, purchaseTabFilter]);
 
   const paginatedPurchases = useMemo(() => {
     const list = [...filteredPurchases];
@@ -7155,7 +7334,62 @@ export default function EliteBillingDepartment({
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              {/* Segmented Entry Filter Tabs */}
+              <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--bg-input, #f1f5f9)', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', gap: '2px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPurchaseTabFilter('all')}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: purchaseTabFilter === 'all' ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: purchaseTabFilter === 'all' ? '#ffffff' : 'transparent',
+                    color: purchaseTabFilter === 'all' ? '#0f172a' : '#64748b',
+                    boxShadow: purchaseTabFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  All ({purchases.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPurchaseTabFilter('general')}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: purchaseTabFilter === 'general' ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: purchaseTabFilter === 'general' ? '#ffffff' : 'transparent',
+                    color: purchaseTabFilter === 'general' ? '#2563eb' : '#64748b',
+                    boxShadow: purchaseTabFilter === 'general' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📄 General ({purchases.filter(p => p.entryType !== 'contra' && p.purchaseType !== 'contra').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPurchaseTabFilter('contra')}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: purchaseTabFilter === 'contra' ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: purchaseTabFilter === 'contra' ? '#ffffff' : 'transparent',
+                    color: purchaseTabFilter === 'contra' ? '#7c3aed' : '#64748b',
+                    boxShadow: purchaseTabFilter === 'contra' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⇄ Contra ({purchases.filter(p => p.entryType === 'contra' || p.purchaseType === 'contra').length})
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setActiveTab('vendors')}
@@ -7182,9 +7416,42 @@ export default function EliteBillingDepartment({
               </button>
 
               <button
+                type="button"
                 onClick={async () => {
                   setEditingPurchaseId(null);
-                  let nextNo = computeNextPurchaseNo(purchases, companyEntity);
+                  setPurchaseEntryType('contra');
+                  const nextNo = computeNextPurchaseNo(purchases, companyEntity, true);
+                  setContraForm({
+                    voucherNo: nextNo,
+                    date: new Date().toISOString().split('T')[0],
+                    contraMode: 'party_offset',
+                    debitPartyType: 'vendor',
+                    debitParty: '',
+                    creditPartyType: 'customer',
+                    creditParty: '',
+                    referenceNo: '',
+                    amount: '',
+                    narration: ''
+                  });
+                  setShowPurchaseModal(true);
+                }}
+                style={{
+                  padding: '0.55rem 0.95rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  border: '1px solid #7c3aed', background: '#f5f3ff', color: '#7c3aed',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Create Contra Entry"
+              >
+                <ArrowLeftRight size={15} /> + Contra Entry
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setEditingPurchaseId(null);
+                  setPurchaseEntryType('general');
+                  let nextNo = computeNextPurchaseNo(purchases, companyEntity, false);
                   try {
                     const res = await api.getNextPurchaseNo(companyEntity);
                     if (res && res.purchaseNo) {
@@ -7298,17 +7565,17 @@ export default function EliteBillingDepartment({
                         />
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 800, color: '#4f46e5', fontSize: '0.92rem' }}>{p.purchaseNo}</span>
+                            <span style={{ fontWeight: 800, color: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#7c3aed' : '#4f46e5', fontSize: '0.92rem' }}>{p.purchaseNo}</span>
                             <span style={{
                               fontSize: '0.67rem',
                               fontWeight: 700,
                               padding: '2px 7px',
                               borderRadius: '4px',
-                              background: /asset/i.test(p.purchaseType) ? '#f5f3ff' : /expense/i.test(p.purchaseType) ? '#fef3c7' : /inventory/i.test(p.purchaseType) ? '#eff6ff' : '#f1f5f9',
-                              color: /asset/i.test(p.purchaseType) ? '#7c3aed' : /expense/i.test(p.purchaseType) ? '#b45309' : /inventory/i.test(p.purchaseType) ? '#1d4ed8' : '#334155',
-                              border: /asset/i.test(p.purchaseType) ? '1px solid #ddd6fe' : /expense/i.test(p.purchaseType) ? '1px solid #fde68a' : /inventory/i.test(p.purchaseType) ? '1px solid #bfdbfe' : '1px solid #cbd5e1'
+                              background: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#f5f3ff' : (/asset/i.test(p.purchaseType) ? '#f5f3ff' : /expense/i.test(p.purchaseType) ? '#fef3c7' : /inventory/i.test(p.purchaseType) ? '#eff6ff' : '#f1f5f9'),
+                              color: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#7c3aed' : (/asset/i.test(p.purchaseType) ? '#7c3aed' : /expense/i.test(p.purchaseType) ? '#b45309' : /inventory/i.test(p.purchaseType) ? '#1d4ed8' : '#334155'),
+                              border: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '1px solid #ddd6fe' : (/asset/i.test(p.purchaseType) ? '1px solid #ddd6fe' : /expense/i.test(p.purchaseType) ? '1px solid #fde68a' : /inventory/i.test(p.purchaseType) ? '1px solid #bfdbfe' : '1px solid #cbd5e1')
                             }}>
-                              {/asset/i.test(p.purchaseType) ? '🏛️ Asset' : /expense/i.test(p.purchaseType) ? '💼 Expense' : /inventory/i.test(p.purchaseType) ? '📦 Inventory' : `🏷️ ${p.purchaseType || 'Purchase'}`}
+                              {(p.entryType === 'contra' || p.purchaseType === 'contra') ? '⇄ CONTRA' : (/asset/i.test(p.purchaseType) ? '🏛️ Asset' : /expense/i.test(p.purchaseType) ? '💼 Expense' : /inventory/i.test(p.purchaseType) ? '📦 Inventory' : `🏷️ ${p.purchaseType || 'Purchase'}`)}
                             </span>
                           </div>
                           {p.billNo && (
@@ -7331,18 +7598,45 @@ export default function EliteBillingDepartment({
                           )}
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
-                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.vendor?.businessName || p.vendorName}</div>
-                          {p.vendor?.name && p.vendor?.name !== p.vendor?.businessName && (
-                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Contact: {p.vendor.name}</div>
-                          )}
-                          {p.vendor?.gstin && (
-                            <div style={{ fontSize: '0.68rem', color: '#4f46e5', fontWeight: 700, marginTop: 2 }}>
-                              GSTIN: {p.vendor.gstin}
+                          {(p.entryType === 'contra' || p.purchaseType === 'contra') && p.contraDetails ? (
+                            <div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#047857' }}>
+                                Dr: {p.contraDetails.debitParty}
+                              </div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#b91c1c', marginTop: '3px' }}>
+                                Cr: {p.contraDetails.creditParty}
+                              </div>
                             </div>
+                          ) : (
+                            <>
+                              <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.vendor?.businessName || p.vendorName}</div>
+                              {p.vendor?.name && p.vendor?.name !== p.vendor?.businessName && (
+                                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Contact: {p.vendor.name}</div>
+                              )}
+                              {p.vendor?.gstin && (
+                                <div style={{ fontSize: '0.68rem', color: '#4f46e5', fontWeight: 700, marginTop: 2 }}>
+                                  GSTIN: {p.vendor.gstin}
+                                </div>
+                              )}
+                            </>
                           )}
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
-                          {Array.isArray(p.items) && p.items.length > 0 ? (
+                          {(p.entryType === 'contra' || p.purchaseType === 'contra') ? (
+                            <div>
+                              <div style={{ fontWeight: 800, color: '#7c3aed', fontSize: '0.82rem' }}>
+                                {p.contraDetails?.contraMode === 'party_offset' ? 'Party Settlement / Offset' : 'Internal Bank / Cash Transfer'}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '3px', fontStyle: 'italic' }}>
+                                "{p.contraDetails?.narration || p.notes || 'Internal fund transfer / adjustment'}"
+                              </div>
+                              {(p.contraDetails?.referenceNo || (p.billNo && p.billNo !== 'CONTRA')) && (
+                                <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700, marginTop: '3px' }}>
+                                  Ref: {p.contraDetails?.referenceNo || p.billNo}
+                                </div>
+                              )}
+                            </div>
+                          ) : Array.isArray(p.items) && p.items.length > 0 ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               {p.items.slice(0, 3).map((it, idx) => (
                                 <div key={idx} style={{ fontSize: '0.8rem' }}>
@@ -7366,7 +7660,7 @@ export default function EliteBillingDepartment({
                           ) : (
                             <span style={{ fontWeight: 700 }}>{p.itemName || 'Material Purchase'}</span>
                           )}
-                          {p.notes && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '3px' }}>{p.notes}</div>}
+                          {p.notes && !p.contraDetails && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '3px' }}>{p.notes}</div>}
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
                           {(() => {
@@ -7494,25 +7788,495 @@ export default function EliteBillingDepartment({
           <div style={{ width: '100%', maxWidth: '1080px', maxHeight: '92vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-light, #cbd5e1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', color: 'var(--text-primary, #1e293b)' }}>
 
             {/* Header */}
-            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--border-light, #e2e8f0)', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--border-light, #e2e8f0)', background: purchaseEntryType === 'contra' ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <ShoppingBag size={22} />
+                {purchaseEntryType === 'contra' ? <ArrowLeftRight size={22} /> : <ShoppingBag size={22} />}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
-                      {editingPurchaseId ? `Edit Vendor Purchase Bill — ${purchaseForm.purchaseNo}` : `New Vendor Purchase Inward Generator (${purchaseForm.purchaseNo || 'DP-01'})`}
+                      {purchaseEntryType === 'contra'
+                        ? (editingPurchaseId ? `Edit Contra Entry — ${contraForm.voucherNo || 'CNTR'}` : `New Contra Entry (${contraForm.voucherNo || computeNextPurchaseNo(purchases, companyEntity, true)})`)
+                        : (editingPurchaseId ? `Edit Purchase Bill — ${purchaseForm.purchaseNo}` : `New Purchase Bill (${purchaseForm.purchaseNo || 'DP-01'})`)}
                     </h3>
                     <EntityBrandBadge entityId={companyEntity} />
                   </div>
                   <div style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: 2 }}>
-                    Comprehensive GST Inward Bill Entry & Vendor Accounting System
+                    {purchaseEntryType === 'contra' ? 'Internal bank transfers, cash movements, and party balance adjustments' : 'Inward bill entry for inventory, stock materials, and expenses'}
                   </div>
                 </div>
               </div>
               <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
 
+            {/* Segmented Mode Switcher */}
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              padding: '0.85rem 1.5rem',
+              background: 'var(--bg-subtle, #f8fafc)',
+              borderBottom: '1px solid var(--border-light, #e2e8f0)'
+            }}>
+              <button
+                type="button"
+                onClick={() => setPurchaseEntryType('general')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  border: purchaseEntryType === 'general' ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                  background: purchaseEntryType === 'general' ? '#eef2ff' : '#ffffff',
+                  color: purchaseEntryType === 'general' ? '#4f46e5' : '#64748b',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  boxShadow: purchaseEntryType === 'general' ? '0 2px 6px rgba(79,70,229,0.15)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <FileSpreadsheet size={18} />
+                <span>📄 General Purchase Bill</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPurchaseEntryType('contra');
+                  if (!contraForm.voucherNo) {
+                    setContraForm(c => ({ ...c, voucherNo: computeNextPurchaseNo(purchases, companyEntity, true) }));
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  border: purchaseEntryType === 'contra' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                  background: purchaseEntryType === 'contra' ? '#f5f3ff' : '#ffffff',
+                  color: purchaseEntryType === 'contra' ? '#7c3aed' : '#64748b',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  boxShadow: purchaseEntryType === 'contra' ? '0 2px 6px rgba(124,58,237,0.15)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <ArrowLeftRight size={18} />
+                <span>⇄ Contra Entry</span>
+              </button>
+            </div>
+
             <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {purchaseEntryType === 'contra' ? (
+                /* ── CONTRA ENTRY FORM ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Mode Selector */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '1.5rem',
+                    background: 'rgba(124, 58, 237, 0.05)',
+                    padding: '0.85rem 1.1rem',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(124, 58, 237, 0.2)',
+                    flexWrap: 'wrap'
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', color: contraForm.contraMode === 'bank_cash' ? '#7c3aed' : '#475569' }}>
+                      <input
+                        type="radio"
+                        name="contraMode"
+                        checked={contraForm.contraMode === 'bank_cash'}
+                        onChange={() => setContraForm(c => ({
+                          ...c,
+                          contraMode: 'bank_cash',
+                          debitPartyType: 'bank',
+                          debitParty: c.debitParty && c.debitPartyType === 'bank' ? c.debitParty : 'Kotak Mahindra Bank',
+                          creditPartyType: 'bank',
+                          creditParty: c.creditParty && c.creditPartyType === 'bank' ? c.creditParty : 'HDFC Bank Current A/c'
+                        }))}
+                      />
+                      <span>Internal Bank / Cash Transfer</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', color: contraForm.contraMode === 'party_offset' ? '#7c3aed' : '#475569' }}>
+                      <input
+                        type="radio"
+                        name="contraMode"
+                        checked={contraForm.contraMode === 'party_offset'}
+                        onChange={() => setContraForm(c => ({
+                          ...c,
+                          contraMode: 'party_offset',
+                          debitPartyType: 'vendor',
+                          debitParty: '',
+                          creditPartyType: 'customer',
+                          creditParty: ''
+                        }))}
+                      />
+                      <span>Party Settlement / Offset</span>
+                    </label>
+                  </div>
+
+                  {/* Metadata Row: Voucher No, Date, Entity */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <label style={labelStyle}>Voucher No. *</label>
+                      <input
+                        type="text"
+                        value={contraForm.voucherNo}
+                        onChange={e => setContraForm(c => ({ ...c, voucherNo: e.target.value }))}
+                        placeholder="e.g. CNTR-01"
+                        style={{ ...inputStyle, fontWeight: 700, color: '#7c3aed' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Voucher Date *</label>
+                      <input
+                        type="date"
+                        value={contraForm.date}
+                        onChange={e => setContraForm(c => ({ ...c, date: e.target.value }))}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Purchasing Entity</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={companyEntity || 'Elite Digital Prints'}
+                        style={{ ...inputStyle, background: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Double-Entry Account Selection (Debit vs Credit) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                    {/* Debit Box */}
+                    <div style={{
+                      background: 'rgba(5, 150, 105, 0.04)',
+                      padding: '1.1rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid rgba(5, 150, 105, 0.3)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          Debit (Dr.) Account
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#059669', background: 'rgba(5, 150, 105, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          Received In / To Account
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Account Type</label>
+                          <select
+                            value={contraForm.debitPartyType}
+                            onChange={e => setContraForm(c => ({ ...c, debitPartyType: e.target.value, debitParty: '' }))}
+                            style={{ ...inputStyle, padding: '0.45rem', fontSize: '0.82rem', fontWeight: 700 }}
+                          >
+                            <option value="bank">Bank Account</option>
+                            <option value="cash">Cash Account</option>
+                            <option value="vendor">Vendor</option>
+                            <option value="customer">Customer</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Account Name *</label>
+                          {contraForm.debitPartyType === 'vendor' ? (
+                            <select
+                              value={contraForm.debitParty}
+                              onChange={e => setContraForm(c => ({ ...c, debitParty: e.target.value }))}
+                              style={{ ...inputStyle, fontWeight: 700 }}
+                            >
+                              <option value="">-- Select Vendor --</option>
+                              {vendorsList.map((v, i) => (
+                                <option key={i} value={v.businessName || v.name}>
+                                  {v.businessName || v.name} {v.gstin ? `(${v.gstin})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : contraForm.debitPartyType === 'customer' ? (
+                            <select
+                              value={contraForm.debitParty}
+                              onChange={e => setContraForm(c => ({ ...c, debitParty: e.target.value }))}
+                              style={{ ...inputStyle, fontWeight: 700 }}
+                            >
+                              <option value="">-- Select Customer --</option>
+                              {customers.map((c, i) => (
+                                <option key={i} value={c.businessName || c.name}>
+                                  {c.businessName || c.name} {c.phone ? `(${c.phone})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : contraForm.debitPartyType === 'bank' ? (
+                            <div>
+                              <input
+                                list="debitBankList"
+                                type="text"
+                                value={contraForm.debitParty}
+                                onChange={e => setContraForm(c => ({ ...c, debitParty: e.target.value }))}
+                                placeholder="Select or type internal Bank Account..."
+                                style={{ ...inputStyle, fontWeight: 700 }}
+                              />
+                              <datalist id="debitBankList">
+                                <option value="Kotak Mahindra Bank" />
+                                <option value="HDFC Bank Current A/c" />
+                                <option value="ICICI Bank Current A/c" />
+                                <option value="State Bank of India (SBI)" />
+                                <option value="Bank of Baroda (BOB)" />
+                                <option value="Axis Bank" />
+                                <option value="Punjab National Bank (PNB)" />
+                              </datalist>
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={contraForm.debitParty || 'Cash in Hand'}
+                              onChange={e => setContraForm(c => ({ ...c, debitParty: e.target.value }))}
+                              placeholder="Cash in Hand"
+                              style={{ ...inputStyle, fontWeight: 700 }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Credit Box */}
+                    <div style={{
+                      background: 'rgba(220, 38, 38, 0.04)',
+                      padding: '1.1rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid rgba(220, 38, 38, 0.3)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          Credit (Cr.) Account
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#dc2626', background: 'rgba(220, 38, 38, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          Paid Out / From Account
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Account Type</label>
+                          <select
+                            value={contraForm.creditPartyType}
+                            onChange={e => setContraForm(c => ({ ...c, creditPartyType: e.target.value, creditParty: '' }))}
+                            style={{ ...inputStyle, padding: '0.45rem', fontSize: '0.82rem', fontWeight: 700 }}
+                          >
+                            <option value="bank">Bank Account</option>
+                            <option value="cash">Cash Account</option>
+                            <option value="customer">Customer</option>
+                            <option value="vendor">Vendor</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Account Name *</label>
+                          {contraForm.creditPartyType === 'customer' ? (
+                            <select
+                              value={contraForm.creditParty}
+                              onChange={e => setContraForm(c => ({ ...c, creditParty: e.target.value }))}
+                              style={{ ...inputStyle, fontWeight: 700 }}
+                            >
+                              <option value="">-- Select Customer --</option>
+                              {customers.map((c, i) => (
+                                <option key={i} value={c.businessName || c.name}>
+                                  {c.businessName || c.name} {c.phone ? `(${c.phone})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : contraForm.creditPartyType === 'vendor' ? (
+                            <select
+                              value={contraForm.creditParty}
+                              onChange={e => setContraForm(c => ({ ...c, creditParty: e.target.value }))}
+                              style={{ ...inputStyle, fontWeight: 700 }}
+                            >
+                              <option value="">-- Select Vendor --</option>
+                              {vendorsList.map((v, i) => (
+                                <option key={i} value={v.businessName || v.name}>
+                                  {v.businessName || v.name} {v.gstin ? `(${v.gstin})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : contraForm.creditPartyType === 'bank' ? (
+                            <div>
+                              <input
+                                list="creditBankList"
+                                type="text"
+                                value={contraForm.creditParty}
+                                onChange={e => setContraForm(c => ({ ...c, creditParty: e.target.value }))}
+                                placeholder="Select or type internal Bank Account..."
+                                style={{ ...inputStyle, fontWeight: 700 }}
+                              />
+                              <datalist id="creditBankList">
+                                <option value="Kotak Mahindra Bank" />
+                                <option value="HDFC Bank Current A/c" />
+                                <option value="ICICI Bank Current A/c" />
+                                <option value="State Bank of India (SBI)" />
+                                <option value="Bank of Baroda (BOB)" />
+                                <option value="Axis Bank" />
+                                <option value="Punjab National Bank (PNB)" />
+                              </datalist>
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={contraForm.creditParty || 'Cash in Hand'}
+                              onChange={e => setContraForm(c => ({ ...c, creditParty: e.target.value }))}
+                              placeholder="Cash in Hand"
+                              style={{ ...inputStyle, fontWeight: 700 }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Amount & Reference Details */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#0f172a' }}>
+                        Amount (₹) *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: '1.1rem', color: '#7c3aed' }}>₹</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          value={contraForm.amount}
+                          onChange={e => setContraForm(c => ({ ...c, amount: e.target.value }))}
+                          placeholder="0.00"
+                          style={{
+                            ...inputStyle,
+                            paddingLeft: '28px',
+                            fontSize: '1.25rem',
+                            fontWeight: 800,
+                            color: '#0f172a',
+                            letterSpacing: '0.5px'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#0f172a' }}>
+                        Reference Bill / Invoice No.
+                      </label>
+                      <input
+                        type="text"
+                        value={contraForm.referenceNo}
+                        onChange={e => setContraForm(c => ({ ...c, referenceNo: e.target.value }))}
+                        placeholder="e.g. Bill #2092 / Inv #401 / Cheque #123456"
+                        style={{ ...inputStyle, fontWeight: 700 }}
+                      />
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
+                        Optional reference number for cheque, bill, or invoice.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Narration */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <label style={{ ...labelStyle, marginBottom: 0 }}>
+                        Narration / Remarks
+                      </label>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        Quick Templates:
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setContraForm(c => ({
+                          ...c,
+                          narration: `Amount transferred from ${c.creditParty || 'Bank A'} to ${c.debitParty || 'Bank B'}${c.referenceNo ? ` (Ref: ${c.referenceNo})` : ''} for internal fund transfer.`
+                        }))}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                      >
+                        + Bank Transfer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContraForm(c => ({
+                          ...c,
+                          narration: `Cash deposited into ${c.debitParty || 'Bank Account'} from Cash in Hand.`
+                        }))}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                      >
+                        + Cash Deposit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContraForm(c => ({
+                          ...c,
+                          narration: `Cash withdrawn from ${c.creditParty || 'Bank Account'} for office cash expenses.`
+                        }))}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                      >
+                        + Cash Withdrawal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContraForm(c => ({
+                          ...c,
+                          narration: `Amount adjusted between ${c.debitParty || 'Party A'} and ${c.creditParty || 'Party B'}${c.referenceNo ? ` against Ref: ${c.referenceNo}` : ''}.`
+                        }))}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                      >
+                        + Party Settlement
+                      </button>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={contraForm.narration}
+                      onChange={e => setContraForm(c => ({ ...c, narration: e.target.value }))}
+                      placeholder="Enter transaction narration / explanation..."
+                      style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  {/* Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPurchaseModal(false)}
+                      style={{ padding: '0.55rem 1.2rem', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingPurchase}
+                      style={{
+                        padding: '0.6rem 1.8rem',
+                        background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontWeight: 800,
+                        cursor: isSavingPurchase ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <ArrowLeftRight size={16} />
+                      {isSavingPurchase ? 'Saving Contra...' : editingPurchaseId ? 'Update Contra Voucher' : `Save Contra Voucher (₹${parseFloat(contraForm.amount || 0).toFixed(2)})`}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ── GENERAL PURCHASE FORM (TALLY F9) ── */
+                <>
 
               {/* Top Metadata Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', background: 'rgba(79, 70, 229, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(79, 70, 229, 0.15)' }}>
@@ -8395,7 +9159,9 @@ export default function EliteBillingDepartment({
                   {isSavingPurchase ? 'Saving...' : duplicatePurchaseMatch ? '⚠️ Duplicate Purchase Bill Detected' : editingPurchaseId ? 'Update Purchase Entry' : 'Save Purchase Inward Entry'}
                 </button>
               </div>
-            </form>
+            </>
+          )}
+        </form>
           </div>
         </div>
       )}
@@ -8407,14 +9173,76 @@ export default function EliteBillingDepartment({
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
         >
           <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
-            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: (viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShoppingBag size={20} /> Purchase Inward Details — {viewPurchaseModal.purchaseNo}
+                {(viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? (
+                  <>
+                    <ArrowLeftRight size={20} /> Contra Entry — {viewPurchaseModal.purchaseNo}
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag size={20} /> Purchase Inward Details — {viewPurchaseModal.purchaseNo}
+                  </>
+                )}
               </h3>
               <button onClick={() => setViewPurchaseModal(null)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+            {(viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? (
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+                {/* Contra Overview */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', marginBottom: 4 }}>DEBIT (Dr.) ACCOUNT</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{viewPurchaseModal.contraDetails?.debitParty || viewPurchaseModal.vendorName}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#047857', marginTop: 3 }}>Received In / To Account</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c', textTransform: 'uppercase', marginBottom: 4 }}>CREDIT (Cr.) ACCOUNT</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{viewPurchaseModal.contraDetails?.creditParty || viewPurchaseModal.vendor?.businessName || '-'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: 3 }}>Paid Out / From Account</div>
+                  </div>
+                </div>
+
+                {/* Amount & Status Card */}
+                <div style={{ background: '#f5f3ff', border: '1.5px solid #c4b5fd', borderRadius: '10px', padding: '1.25rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase' }}>CONTRA AMOUNT</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#7c3aed', marginTop: '0.3rem' }}>
+                    ₹ {Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                    {numToWords(Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount || 0))}
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>VOUCHER DATE:</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem' }}>{viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>REF / BILL NO:</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0284c7' }}>{viewPurchaseModal.contraDetails?.referenceNo || viewPurchaseModal.billNo || 'None'}</div>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>NARRATION / REMARKS:</span>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#334155', marginTop: 2, fontStyle: 'italic' }}>"{viewPurchaseModal.contraDetails?.narration || viewPurchaseModal.notes || 'None'}"</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setViewPurchaseModal(null)}
+                    style={{ padding: '0.55rem 1.25rem', background: '#7c3aed', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    Close Voucher
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
               {/* Metadata & Vendor Info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <div>
@@ -8653,6 +9481,7 @@ export default function EliteBillingDepartment({
                 </button>
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -8664,15 +9493,49 @@ export default function EliteBillingDepartment({
           onClick={(e) => { if (e.target === e.currentTarget) setViewInvoiceModal(null); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
         >
-          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
+          <div style={{ width: '100%', maxWidth: '860px', maxHeight: '94vh', overflowY: 'auto', padding: '1.5rem', background: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
 
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.9rem', marginBottom: '1.1rem' }}>
               <div>
-                <h3 style={{ margin: 0, color: '#6d28d9', fontWeight: 900, fontSize: '1.25rem' }}>
-                  🧾 Tax Invoice — {viewInvoiceModal.invoiceNo}
-                </h3>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginTop: 2, display: 'block' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h3 style={{ margin: 0, color: '#1e3a8a', fontWeight: 900, fontSize: '1.25rem' }}>
+                    🧾 Tax Invoice — {viewInvoiceModal.invoiceNo}
+                  </h3>
+                  <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                    <button
+                      onClick={() => setInvoiceViewTab('master')}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: invoiceViewTab === 'master' ? '#1e3a8a' : 'transparent',
+                        color: invoiceViewTab === 'master' ? '#ffffff' : '#64748b'
+                      }}
+                    >
+                      📄 Master PDF View
+                    </button>
+                    <button
+                      onClick={() => setInvoiceViewTab('details')}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: invoiceViewTab === 'details' ? '#1e3a8a' : 'transparent',
+                        color: invoiceViewTab === 'details' ? '#ffffff' : '#64748b'
+                      }}
+                    >
+                      📋 Quick Summary
+                    </button>
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginTop: 4, display: 'block' }}>
                   Invoice Date: <strong>{formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)}</strong> {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
                   {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
                 </span>
@@ -8682,6 +9545,15 @@ export default function EliteBillingDepartment({
               </button>
             </div>
 
+            {invoiceViewTab === 'master' ? (
+              <div style={{ marginBottom: '1.25rem', overflowX: 'auto' }}>
+                <MasterInvoiceTemplate
+                  invoice={viewInvoiceModal}
+                  printConfig={companyPrintConfig || {}}
+                />
+              </div>
+            ) : (
+              <>
             {/* Billed To & Status Box */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '1.1rem', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
               <div>
@@ -8884,6 +9756,8 @@ export default function EliteBillingDepartment({
                 )}
               </div>
             </div>
+            </>
+            )}
 
             {/* Modal Actions */}
             <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>

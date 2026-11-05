@@ -92,7 +92,8 @@ import {
   ZoomOut,
   RotateCw,
   Settings,
-  Camera
+  Camera,
+  Film
 } from 'lucide-react';
 
 function formatChatPreviewSnippet(text) {
@@ -846,11 +847,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewportHeight, setViewportHeight] = useState(null);
   const [viewportTop, setViewportTop] = useState(0);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const isKeyboardOpen = Boolean(
     isMobileScreen &&
+    isInputFocused &&
     viewportHeight !== null &&
     typeof window !== 'undefined' &&
-    viewportHeight < (window.innerHeight - 60)
+    viewportHeight < (window.innerHeight - 150)
   );
 
   useEffect(() => {
@@ -869,6 +872,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           const newH = vv ? Math.round(vv.height) : window.innerHeight;
           const newTop = vv ? Math.round(vv.offsetTop) : 0;
           setViewportTop(newTop);
+          if (window.scrollY > 0) {
+            window.scrollTo(0, 0);
+          }
           // Only trigger state re-render if height change is substantial (> 30px, e.g. software keyboard)
           if (lastHeight === null || Math.abs(newH - lastHeight) > 30) {
             lastHeight = newH;
@@ -2707,7 +2713,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           });
           try {
             if (typeof localStorage !== 'undefined') {
-              localStorage.setItem('elite_cached_groups', JSON.stringify(merged));
+              const lightweightCache = merged.map((g) => ({
+                _id: g._id,
+                name: g.name,
+                type: g.type,
+                department: g.department,
+                companyEntity: g.companyEntity,
+                avatarUrl: (g.avatarUrl && !g.avatarUrl.startsWith('data:')) ? g.avatarUrl : '',
+                members: Array.isArray(g.members) ? g.members.map(m => ({
+                  _id: m?._id || m,
+                  name: m?.name || '',
+                  username: m?.username || '',
+                  email: m?.email || '',
+                  avatarUrl: (m?.avatarUrl && !m?.avatarUrl.startsWith('data:')) ? m.avatarUrl : ''
+                })) : [],
+                lastMessage: g.lastMessage ? {
+                  _id: g.lastMessage._id,
+                  content: g.lastMessage.content,
+                  type: g.lastMessage.type,
+                  msgType: g.lastMessage.msgType,
+                  createdAt: g.lastMessage.createdAt,
+                  senderName: g.lastMessage.senderName,
+                  senderId: typeof g.lastMessage.senderId === 'object' ? {
+                    _id: g.lastMessage.senderId._id,
+                    name: g.lastMessage.senderId.name
+                  } : g.lastMessage.senderId
+                } : null,
+                unreadCount: g.unreadCount || 0,
+                updatedAt: g.updatedAt || g.createdAt
+              }));
+              localStorage.setItem('elite_cached_groups', JSON.stringify(lightweightCache));
             }
           } catch (e) {}
           return merged;
@@ -2757,13 +2792,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         params.msgType = filter;
       }
 
-      // Safety timeout: prevent loading state from hanging indefinitely (>8s)
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Network timeout loading stream history')), 8000)
-      );
+      // Safety timeout: generous 18s to prevent prematurely aborting on cellular/office latency
+      const executeFetch = () => {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Network timeout loading stream history')), 18000)
+        );
+        const fetchPromise = api.getCommunicationMessages(groupId, params);
+        return Promise.race([fetchPromise, timeoutPromise]);
+      };
 
-      const fetchPromise = api.getCommunicationMessages(groupId, params);
-      const res = await Promise.race([fetchPromise, timeoutPromise]);
+      let res;
+      try {
+        res = await executeFetch();
+      } catch (firstErr) {
+        // Quick 600ms automatic retry before giving up
+        console.warn('First attempt to load stream history timed out or failed, retrying once...', firstErr);
+        await new Promise((r) => setTimeout(r, 600));
+        res = await executeFetch();
+      }
 
       // If user navigated away to another room before response arrived, drop stale payload
       if (activeGroupIdRef.current && String(activeGroupIdRef.current) !== String(groupId)) {
@@ -2797,13 +2843,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         );
       } else {
         if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
-          setStreamHistoryError(res?.message || 'Failed to load stream history');
+          const cached = messagesCacheRef.current[groupId];
+          if (cached && cached.length > 0) {
+            setMessages(cached);
+          } else {
+            setStreamHistoryError(res?.message || 'Failed to load stream history');
+          }
         }
       }
     } catch (err) {
       console.error('Failed to fetch group messages:', err);
       if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
-        setStreamHistoryError(err.message || 'Network timeout loading stream history');
+        const cached = messagesCacheRef.current[groupId];
+        if (cached && cached.length > 0) {
+          // Fall back gracefully to cached messages so user can continue viewing chat uninterrupted
+          setMessages(cached);
+        } else {
+          setStreamHistoryError(err.message || 'Network timeout loading stream history');
+        }
       }
     } finally {
       if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
@@ -5249,7 +5306,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         maxHeight: (isMobileScreen && isKeyboardOpen && viewportHeight) ? `${viewportHeight}px` : '100%',
         ...(isMobileScreen && isKeyboardOpen && viewportHeight ? {
           position: 'fixed',
-          top: `${viewportTop || 0}px`,
+          top: 0,
           left: 0,
           right: 0,
           zIndex: 1000,
@@ -6312,7 +6369,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     return <ChatStreamSkeleton count={5} />;
                   }
 
-                  if (streamHistoryError) {
+                  if (streamHistoryError && (!messages || messages.length === 0)) {
                     return (
                       <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1.5rem' }}>
                         <AlertCircle size={28} color="#ef4444" style={{ marginBottom: '0.5rem' }} />
@@ -8271,14 +8328,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           }
                         }}
                         onFocus={() => {
+                          setIsInputFocused(true);
                           if (isMobileScreen && typeof window !== 'undefined') {
                             window.scrollTo(0, 0);
+                            if (document.body) document.body.scrollTop = 0;
+                            if (document.documentElement) document.documentElement.scrollTop = 0;
                           }
                           setTimeout(() => {
                             if (chatScrollRef.current) {
                               chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
                             }
-                          }, 100);
+                            if (typeof window !== 'undefined') {
+                              window.scrollTo(0, 0);
+                            }
+                          }, 150);
+                        }}
+                        onBlur={() => {
+                          setIsInputFocused(false);
+                          if (typeof window !== 'undefined') {
+                            window.scrollTo(0, 0);
+                          }
                         }}
                         onChange={handleInputChange}
                         className="phoenix-chat-textarea"
@@ -8434,10 +8503,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         )}
                       </div>
 
-                      {/* 4. GIF Shortcut Button inside pill (Desktop/Tablet) */}
+                      {/* 4. GIF Shortcut Button inside pill */}
                       <button
                         type="button"
-                        className={`hidden md:inline-flex phoenix-pill-btn ${showEmojiPicker && mediaPickerTab === 'gif' ? 'is-active' : ''}`}
+                        className={`phoenix-pill-btn ${showEmojiPicker && mediaPickerTab === 'gif' ? 'is-active' : ''}`}
                         title="Send Animated GIF"
                         onClick={() => {
                           if (showEmojiPicker && mediaPickerTab === 'gif') {
@@ -8448,19 +8517,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           }
                         }}
                         style={{
-                          borderRadius: '12px',
+                          borderRadius: '8px',
                           width: '32px',
-                          height: '26px',
-                          border: '1.5px solid #cbd5e1',
+                          height: '32px',
+                          border: 'none',
+                          background: showEmojiPicker && mediaPickerTab === 'gif' ? '#eff6ff' : 'transparent',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: '0 2px'
+                          padding: 0,
+                          cursor: 'pointer'
                         }}
                       >
-                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: showEmojiPicker && mediaPickerTab === 'gif' ? '#2563eb' : '#64748b' }}>
-                          GIF
-                        </span>
+                        <Film size={20} color={showEmojiPicker && mediaPickerTab === 'gif' ? '#2563eb' : '#64748b'} />
                       </button>
                     </div>
 

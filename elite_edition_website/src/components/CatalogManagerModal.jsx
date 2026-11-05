@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check, Warehouse, SlidersHorizontal, MapPin, Phone, User, Sparkles, CheckCircle2, Layers } from 'lucide-react';
 import { api } from '../services/api';
+import { extractSizeFromSku } from '../utils/skuHelper';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'brands'); // 'brands', 'vendors', 'parties', 'products', 'history'
@@ -358,11 +359,23 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     setError('');
     setSuccess('');
     try {
+      let finalSku = (productForm.skuCode || '').trim();
+      const cleanSize = productForm.size ? String(productForm.size).trim().toUpperCase() : '';
+      const hasSizeInSku = extractSizeFromSku(finalSku);
+      if (!hasSizeInSku && cleanSize && !cleanSize.includes(',') && !cleanSize.includes('/') && cleanSize !== 'FREE' && cleanSize !== 'FREE SIZE') {
+        finalSku = `${finalSku}_${cleanSize}`;
+      }
+
+      const payload = {
+        ...productForm,
+        skuCode: finalSku
+      };
+
       if (editingId) {
-        await api.updateProductCatalog(editingId, productForm);
+        await api.updateProductCatalog(editingId, payload);
         setSuccess('Product updated successfully.');
       } else {
-        await api.createProductCatalog(productForm);
+        await api.createProductCatalog(payload);
         setSuccess('Product created successfully.');
       }
       setProductForm({ skuCode: '', description: '', imageUrl: '', size: '' });

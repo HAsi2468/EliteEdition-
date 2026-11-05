@@ -5,13 +5,14 @@ const logger = require('../config/logger');
  * Company Themes
  */
 const COMPANY_THEMES = {
-  'elite digital print': { primary: '#1e1b4b', border: '#1e1b4b' },
-  'elite digital prints': { primary: '#1e1b4b', border: '#1e1b4b' },
+  'elite digital print': { primary: '#1e3a8a', border: '#1e3a8a' },
+  'elite digital prints': { primary: '#1e3a8a', border: '#1e3a8a' },
   'elite edition': { primary: '#312e81', border: '#312e81' },
   'elite stitching': { primary: '#064e3b', border: '#064e3b' },
-  'ethno wear': { primary: '#701a75', border: '#701a75' },
-  'elite fabtex': { primary: '#78350f', border: '#78350f' },
-  'sobise': { primary: '#134e4a', border: '#134e4a' },
+  'ethno wear': { primary: '#8b5a2b', border: '#8b5a2b' }, // Ethnowear Brand Brown
+  'elite ethnowear': { primary: '#8b5a2b', border: '#8b5a2b' }, // Ethnowear Brand Brown
+  'elite fabtex': { primary: '#d97706', border: '#d97706' }, // Fabtex Amber / Gold
+  'sobise': { primary: '#e11d48', border: '#e11d48' }, // Sobise Rose
   'yamunaji': { primary: '#581c87', border: '#581c87' },
   'elite online': { primary: '#1e3a8a', border: '#1e3a8a' },
   'exedp': { primary: '#1e293b', border: '#1e293b' }
@@ -163,90 +164,180 @@ const compileMasterInvoiceHtml = async (invoice, printConfig = {}, options = {})
     @page { size: A4 portrait; margin: 6mm 8mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; color: #000000; font-size: 10px; line-height: 1.25; }
-    .invoice-wrapper { width: 100%; max-width: 800px; margin: 0 auto; background: #ffffff; border: 1px solid ${theme.border}; }
-    .top-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px 8px 14px; border-bottom: 1px solid #cbd5e1; }
-    .title-bar { display: flex; justify-content: space-between; align-items: center; padding: 5px 14px; border-bottom: 1px solid ${theme.border}; }
-    .info-grid { display: grid; grid-template-columns: 1.1fr 1fr; border-bottom: 1px solid ${theme.border}; }
-    .section-bar { background: ${theme.primary}; color: #ffffff; font-size: 9px; font-weight: 800; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.4px; }
-    table.invoice-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
-    table.invoice-table th { background: ${theme.primary}; color: #ffffff; padding: 6px; font-size: 9px; font-weight: 800; border: 1px solid ${theme.primary}; text-align: center; }
-    .totals-area { border-top: 1px solid ${theme.border}; border-bottom: 1px solid ${theme.border}; }
-    .calc-row { display: flex; justify-content: flex-end; align-items: center; padding: 2.5px 12px; font-size: 9.5px; }
-    .banner-row { display: flex; justify-content: space-between; align-items: center; background: ${theme.primary}; color: #ffffff; padding: 4px 12px; font-size: 10.5px; font-weight: 800; }
+    .invoice-wrapper { width: 100%; height: 284mm; max-width: 800px; margin: 0 auto; background: #ffffff; border: 1.5px solid ${theme.border}; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+    .invoice-header {
+      flex: 0 0 auto;
+      background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+      border-bottom: 3px solid ${theme.primary};
+      padding: 12px 18px 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .company-title {
+      font-size: 21px;
+      font-weight: 900;
+      color: ${theme.primary};
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+    .meta-badge {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .info-grid { flex: 0 0 auto; display: grid; grid-template-columns: 1.1fr 1fr; border-bottom: 1.5px solid ${theme.border}; }
+    .section-bar { background: ${theme.primary}; color: #ffffff; font-size: 9px; font-weight: 800; padding: 3.5px 8px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .items-table-container { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+    table.invoice-table { width: 100%; height: 100%; border-collapse: collapse; font-size: 9.5px; }
+    table.invoice-table th { background: ${theme.primary}; color: #ffffff; padding: 5px 6px; font-size: 9px; font-weight: 800; border: 1px solid ${theme.primary}; text-align: center; }
+    tr.table-filler-row { height: 100%; }
+    tr.table-filler-row td { border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: none !important; padding: 0; }
+    .invoice-bottom-block { flex: 0 0 auto; margin-top: auto; }
+    .totals-area { border-top: 1.5px solid ${theme.border}; border-bottom: 1.5px solid ${theme.border}; }
+    .calc-row { display: flex; justify-content: flex-end; align-items: center; padding: 2px 12px; font-size: 9px; }
+    .banner-row { display: flex; justify-content: space-between; align-items: center; background: ${theme.primary}; color: #ffffff; padding: 3.5px 12px; font-size: 10.5px; font-weight: 800; }
     table.hsn-table { width: 100%; border-collapse: collapse; font-size: 8.5px; border-bottom: 1px solid ${theme.border}; }
-    table.hsn-table th { background: ${theme.primary}; color: #ffffff; padding: 4px 6px; font-size: 8.5px; font-weight: 800; border: 1px solid ${theme.primary}; text-align: center; }
-    table.hsn-table td { border: 1px solid #cbd5e1; padding: 3.5px 6px; text-align: right; }
-    .footer-grid { display: grid; grid-template-columns: 1.3fr 1fr; padding: 8px 12px; font-size: 8.5px; line-height: 1.35; }
+    table.hsn-table th { background: ${theme.primary}; color: #ffffff; padding: 3px 6px; font-size: 8.5px; font-weight: 800; border: 1px solid ${theme.primary}; text-align: center; }
+    table.hsn-table td { border: 1px solid #cbd5e1; padding: 2.5px 6px; text-align: right; }
+    .footer-grid { display: grid; grid-template-columns: 1.3fr 1fr; padding: 5px 12px; font-size: 8.5px; line-height: 1.35; }
   </style>
 </head>
 <body>
   <div class="invoice-wrapper">
-    <div class="top-header">
-      <div>
-        <img src="DigitalLogo.png" alt="Logo" style="height: 48px; display: block;" onerror="this.style.display='none'" />
+    <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+    <div class="invoice-header">
+      <div style="max-width: 60%;">
+        <div class="company-title">${companyName}</div>
+        <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+          ${companyAddress}
+        </div>
+        <div style="font-size: 10.5px; color: #475569;">
+          Phone: <strong style="color: #0f172a;">${companyPhone}</strong> &bull; Email: ${companyEmail}
+        </div>
+        <div style="margin-top: 5px; font-size: 11px;">
+          <span style="display: inline-block; margin-right: 12px;">
+            GSTIN: <strong style="color: ${theme.primary}; font-family: monospace;">${companyGstin}</strong>
+          </span>
+          <span>
+            State: <strong>${companyState} (${companyStateCode})</strong>
+          </span>
+          ${companyPan ? `
+            <span style="margin-left: 12px;">
+              PAN: <strong>${companyPan}</strong>
+            </span>
+          ` : ''}
+        </div>
       </div>
+
       <div style="text-align: right;">
-        <div style="font-size: 13.5px; font-weight: 900; color: #000000;">${companyName} (${companyGstin})</div>
-        <div style="font-size: 8.5px; color: #1e293b; margin-top: 2px; line-height: 1.35;">
-          ${companyAddress}<br />
-          PHONE: ${companyPhone} &nbsp;&nbsp; STATE: ${companyState}, CODE: ${companyStateCode}
+        <span class="meta-badge">${copyTitle}</span>
+        <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+          ${invNo}
+        </div>
+        <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+          Invoice Date: <strong style="color: #0f172a;">${invDate}</strong>
+        </div>
+        ${dueDate ? `
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>${dueDate}</strong>
+          </div>
+        ` : ''}
+        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+          Place of Supply: <strong>${placeOfSupply}</strong>
         </div>
       </div>
     </div>
 
-    <div class="title-bar">
-      <div style="width: 80px;"></div>
-      <div style="flex: 1; text-align: center; font-size: 15px; font-weight: 900; color: ${theme.primary}; letter-spacing: 0.5px;">TAX INVOICE</div>
-      <div style="font-size: 11px; font-weight: 800;">Date: ${invDate}</div>
-    </div>
-
+    <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
     <div class="info-grid">
-      <div style="border-right: 1px solid ${theme.border};">
+      <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+      <div style="border-right: 1.5px solid ${theme.border};">
         <div class="section-bar">BILL TO</div>
-        <div style="padding: 6px 10px; font-size: 9.5px; line-height: 1.35;">
-          <div style="font-size: 11px; font-weight: 800;">${customerName} ${customerGstin ? `(GST: ${customerGstin})` : ''}</div>
-          <div style="color: #1e293b; margin-top: 2px;">${customerAddress}</div>
-          <div style="font-weight: 700; margin-top: 3px;">State: ${customerState}, Code: ${customerStateCode}</div>
+        <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+          <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">${customerName}</div>
+          <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">${customerAddress}</div>
+          <div style="margin-top: 5px; font-size: 10.5px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: ${theme.primary}; font-family: monospace;">${customerGstin || 'URP'}</strong>
+            </span>
+            <span>
+              State: <strong>${customerState} (${customerStateCode})</strong>
+            </span>
+            ${(cust.pan || (customerGstin && customerGstin.length >= 12)) ? `
+              <span style="margin-left: 12px;">
+                PAN: <strong>${cust.pan || customerGstin.substring(2, 12)}</strong>
+              </span>
+            ` : ''}
+          </div>
         </div>
       </div>
 
+      <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
       <div>
         <div class="section-bar">SELLER / DISPATCH DETAILS</div>
         <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
           <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
             <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
-            <div style="font-weight: 800; margin-top: 2px;">${challanNos}</div>
+            <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">${challanNos}</div>
+            <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+            <div style="font-weight: 800;">${invoice.transport || invoice.dispatchThrough || 'BY ROAD (MAHESH TRANSPORT)'}</div>
           </div>
           <div style="padding: 6px 10px; font-size: 9px;">
-            <div style="color: #475569; font-size: 8.5px;">Tax Invoice No.:</div>
-            <div style="font-weight: 800; font-size: 10px;">${invNo}</div>
-            <div style="color: #475569; font-size: 8.5px; marginTop: 4px;">Terms of Delivery:</div>
-            <div style="font-weight: 800;">${deliveryTerms}</div>
+            <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+            <div style="font-weight: 800; font-size: 10px; color: ${theme.primary}; margin-top: 2px;">
+              ${invoice.agentName || invoice.brokerName || deliveryTerms}
+            </div>
+            <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+            <div style="font-weight: 800;">${invoice.deliveryTerms || invoice.termsOfDelivery || 'DOOR DELIVERY / SURAT'}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <table class="invoice-table">
-      <thead>
-        <tr>
-          <th style="width: 25px;">Sr.</th>
-          <th style="width: 55px;">Image</th>
-          <th style="text-align: left;">Description of Goods</th>
-          <th style="width: 50px;">HSN</th>
-          <th style="width: 45px;">GST%</th>
-          <th style="width: 60px; text-align: right;">Qty</th>
-          <th style="width: 50px; text-align: right;">Rate</th>
-          <th style="width: 40px; text-align: center;">Per</th>
-          <th style="width: 75px; text-align: right;">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-    </table>
+    <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ────────────────────── -->
+    <div class="items-table-container">
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th style="width: 25px;">Sr.</th>
+            <th style="width: 55px;">Image</th>
+            <th style="text-align: left;">Description of Goods</th>
+            <th style="width: 50px;">HSN</th>
+            <th style="width: 45px;">GST%</th>
+            <th style="width: 60px; text-align: right;">Qty</th>
+            <th style="width: 50px; text-align: right;">Rate</th>
+            <th style="width: 40px; text-align: center;">Per</th>
+            <th style="width: 75px; text-align: right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+          <tr class="table-filler-row">
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <div class="totals-area">
+    <!-- ── ANCHORED AT END OF PAGE ──────────────────────────────────────── -->
+    <div class="invoice-bottom-block">
+      <div class="totals-area">
       <div class="calc-row" style="background: #ffffff; padding: 4px 12px; border-bottom: 1px solid #e2e8f0;">
         <div style="flex: 1; text-align: right; font-weight: 800; padding-right: 50px;">
           Total Qty: &nbsp;&nbsp; ${totalQty.toFixed(2)} MTR
@@ -361,16 +452,23 @@ const compileMasterInvoiceHtml = async (invoice, printConfig = {}, options = {})
         </div>
       </div>
 
-      <div style="text-align: right; display: flex; flex-direction: column; justify-content: space-between;">
-        <div style="font-weight: 800; font-size: 10px;">for ${companyName}</div>
-        <div style="margin-top: 38px; border-top: 1px solid #000000; width: 140px; margin-left: auto; text-align: center; padding-top: 2px;">
-          <span style="font-weight: 700; font-size: 8.5px;">Authorised Signatory</span>
+      <div class="signatory-box">
+        <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+          For ${companyName}
+        </div>
+        <div style="height: 35px;"></div>
+        <div style="width: 145px; margin-left: auto; text-align: center;">
+          <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+          <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+            Authorized Signatory
+          </div>
         </div>
       </div>
     </div>
 
     <div style="text-align: center; font-size: 8px; color: #475569; padding: 4px; border-top: 1px solid #e2e8f0; background: #fafafa;">
       This is a Computer Generated Document
+    </div>
     </div>
   </div>
 </body>

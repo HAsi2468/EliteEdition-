@@ -377,17 +377,18 @@
   align-items: center !important;
   gap: 8px !important;
   padding: 8px 12px !important;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: max(16px, calc(10px + env(safe-area-inset-bottom, 22px))) !important;
   background: var(--bg-main, #f8fafc) !important; /* Elite ERP clean light background */
   border-top: 1px solid var(--border-light, #e2e8f0) !important;
   flex-shrink: 0 !important;
   position: relative !important;
   box-sizing: border-box !important;
-  min-height: 56px !important;
+  min-height: calc(56px + env(safe-area-inset-bottom, 22px)) !important;
 }
 
 .phoenix-chat-input-bar.is-keyboard-open {
   padding-bottom: 8px !important;
+  min-height: 56px !important;
 }
 
 .phoenix-chat-input-pill {

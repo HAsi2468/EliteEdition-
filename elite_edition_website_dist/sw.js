@@ -1,6 +1,6 @@
 // Service Worker for Elite Edition Enterprise ERP
 // High performance, offline-capable PWA with strict company data isolation
-const CACHE_VERSION = 'v2.2.2';
+const CACHE_VERSION = 'v2.3.2';
 const STATIC_CACHE = `elite-erp-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `elite-erp-runtime-${CACHE_VERSION}`;
 

@@ -57,10 +57,12 @@ const getAll = async (req, res) => {
     } else if (department === 'ethno_wear') {
       deptOr = [
         { department: 'ethno_wear' },
+        { companyEntity: { $regex: '^ethno\\s*wear$', $options: 'i' } },
         { designName: { $regex: '^EW-', $options: 'i' } }
       ];
     } else if (department === 'digital_print') {
       filter.department = { $nin: ['stitching', 'ethno_wear'] };
+      filter.companyEntity = { $nin: ['Ethno wear', 'Ethnowear', 'Elite Stitching'] };
       if (!filter.category) {
         filter.category = { $ne: 'Stitching' };
       }
@@ -139,18 +141,28 @@ const create = async (req, res) => {
     const body = { ...req.body };
     if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
     if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
-    if (body.parties !== undefined) {
-      body.parties = Array.isArray(body.parties)
-        ? body.parties.map(p => String(p).trim()).filter(Boolean)
-        : (typeof body.parties === 'string' && body.parties.trim() ? [body.parties.trim()] : []);
-      if (!body.party && body.parties.length > 0) {
-        body.party = body.parties[0];
+
+    // Ethnowear strict isolation: zero party info, strictly isolated
+    if (body.department === 'ethno_wear' || /^EW-/i.test(body.designName || '')) {
+      body.department = 'ethno_wear';
+      body.companyEntity = 'Ethno wear';
+      body.parties = [];
+      body.party = '';
+      body.partySkuId = '';
+    } else {
+      if (body.parties !== undefined) {
+        body.parties = Array.isArray(body.parties)
+          ? body.parties.map(p => String(p).trim()).filter(Boolean)
+          : (typeof body.parties === 'string' && body.parties.trim() ? [body.parties.trim()] : []);
+        if (!body.party && body.parties.length > 0) {
+          body.party = body.parties[0];
+        }
+      } else if (body.party && !body.parties) {
+        body.parties = typeof body.party === 'string' ? body.party.split(',').map(p => p.trim()).filter(Boolean) : [body.party];
       }
-    } else if (body.party && !body.parties) {
-      body.parties = typeof body.party === 'string' ? body.party.split(',').map(p => p.trim()).filter(Boolean) : [body.party];
-    }
-    if (body.party && (!body.parties || body.parties.length === 0)) {
-      body.parties = [body.party.trim()];
+      if (body.party && (!body.parties || body.parties.length === 0)) {
+        body.parties = [body.party.trim()];
+      }
     }
     const doc = await db.Design.create(body);
     const result = doc.toObject ? doc.toObject() : doc;
@@ -169,7 +181,15 @@ const update = async (req, res) => {
     const body = { ...req.body };
     if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
     if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
-    if (body.parties !== undefined) {
+
+    // Ethnowear strict isolation: zero party info, strictly isolated
+    if (body.department === 'ethno_wear' || /^EW-/i.test(body.designName || '')) {
+      body.department = 'ethno_wear';
+      body.companyEntity = 'Ethno wear';
+      body.parties = [];
+      body.party = '';
+      body.partySkuId = '';
+    } else if (body.parties !== undefined) {
       body.parties = Array.isArray(body.parties)
         ? body.parties.map(p => String(p).trim()).filter(Boolean)
         : (typeof body.parties === 'string' && body.parties.trim() ? [body.parties.trim()] : []);

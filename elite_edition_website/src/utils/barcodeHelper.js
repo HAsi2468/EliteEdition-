@@ -55,6 +55,44 @@ export function generateCode128Svg(rawText, height = 40, barColor = '#000000') {
   return `<svg viewBox="0 0 ${x} ${height}" preserveAspectRatio="none" style="width:100%;height:100%;display:block;" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
 }
 
+import { extractSizeFromSku, extractBaseSku } from './skuHelper';
+
+/**
+ * Resolves both the barcode SKU (embedding size if needed) and the clean display size.
+ * Ensures the printed Code128 barcode and footer text always contain the size variant: e.g. "A-433_L" and "Size: L".
+ */
+export function resolveBarcodeSkuAndSize(item, requestedSize = null) {
+  const rawSku = (item?.skuCode || item?.sku || 'NO-SKU').trim();
+  const extracted = extractSizeFromSku(rawSku);
+
+  // 1. Resolve size
+  let size = requestedSize ? String(requestedSize).trim().toUpperCase() : '';
+  if (!size) {
+    size = resolveItemSize(item, rawSku);
+  }
+
+  // If size resolved to "Free Size" or generic but SKU had an extracted size, use the extracted size
+  if ((!size || size === 'Free Size') && extracted) {
+    size = extracted;
+  }
+
+  // 2. Ensure Barcode SKU has the size appended if single specific size is present
+  let barcodeSku = rawSku;
+  if (size && size !== 'Free Size' && !size.includes('/')) {
+    if (!extracted) {
+      // Append size suffix so both the scanned barcode and the sticker text encode the size: e.g. "A-433_L"
+      barcodeSku = `${rawSku}_${size}`;
+    } else {
+      barcodeSku = rawSku;
+    }
+  }
+
+  return {
+    barcodeSku,
+    size: size || 'Free Size'
+  };
+}
+
 export function resolveItemSize(item, sku) {
   let s = '';
   if (Array.isArray(item?.size)) {

@@ -59,6 +59,7 @@ export const AVAILABLE_SCREENS = [
 
   // Ethno wear (Company)
   { id: 'ew_dashboard', label: 'Ethno wear: Dashboard Overview', category: 'Ethno wear' },
+  { id: 'ew_design', label: 'Ethno wear: Design Room & Catalog', category: 'Ethno wear' },
   { id: 'ew_rfd', label: 'Ethno wear: Fabric Process', category: 'Ethno wear' },
   { id: 'ew_invoices', label: 'Ethno wear: Invoices & GST Billing', category: 'Ethno wear' },
   { id: 'ew_expenses', label: 'Ethno wear: Expense Ledger', category: 'Ethno wear' },

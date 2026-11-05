@@ -372,8 +372,16 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
       primaryBrand = 'ELITE EDITION';
     }
 
+    let finalSku = formData.skuCode.trim();
+    const cleanSize = formData.size ? String(formData.size).trim().toUpperCase() : '';
+    const hasSizeInSku = extractSizeFromSku(finalSku);
+    if (!hasSizeInSku && cleanSize && !cleanSize.includes(',') && !cleanSize.includes('/') && cleanSize !== 'FREE' && cleanSize !== 'FREE SIZE') {
+      finalSku = `${finalSku}_${cleanSize}`;
+    }
+
     const payload = {
       ...formData,
+      skuCode: finalSku,
       party: primaryBrand,
       brand: primaryBrand,
       brandCodes: validBrandCodes,

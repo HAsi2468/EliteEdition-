@@ -890,13 +890,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
   };
 
   const handleEditClick = (user) => {
+    const userIsMain = Boolean(user.isMainAdmin === true || (user.email && String(user.email).toLowerCase() === MASTER_ADMIN_EMAIL));
     setEditingUser(user);
     setFormData({
       name: user.name || '',
       email: user.email || '',
       password: '',
       role: user.role || (user.permissions?.length === AVAILABLE_SCREENS.length ? 'admin' : 'user'),
-      isMainAdmin: Boolean(user.isMainAdmin || user.isAdmin || user.role === 'admin'),
+      isMainAdmin: userIsMain,
       department: user.department || 'General',
       designerName: user.designerName || '',
       status: user.status || 'Active',
@@ -1948,7 +1949,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   <tbody>
                     {filteredUsers
                       .map((u) => {
-                        const isMain = Boolean(u.isMainAdmin || u.isAdmin || u.role === 'admin');
+                        const isMain = Boolean(u.isMainAdmin === true || (u.email && String(u.email).toLowerCase() === MASTER_ADMIN_EMAIL));
                         const checkAdmin = u.role === 'admin' || isMain;
                         const isCurrentlyEditing = editingUser && (editingUser.id === u.id || editingUser._id === u.id);
                         const userCompanies = Array.isArray(u.allowedCompanies) && u.allowedCompanies.length > 0

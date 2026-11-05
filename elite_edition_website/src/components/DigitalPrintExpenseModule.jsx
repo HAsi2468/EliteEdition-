@@ -1990,7 +1990,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     <Wallet size={13} color={Number(ledgerBalances.cashClosing || 0) >= 0 ? '#16a34a' : '#dc2626'} />
                   </div>
                   <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                    ₹{Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {Number(ledgerBalances.cashClosing || 0) < 0
+                      ? `-₹${Math.abs(Number(ledgerBalances.cashClosing || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : `₹${Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </div>
                   <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>Net Cash</span>
                 </div>
@@ -2109,7 +2111,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         <Landmark size={13} color={isPositive ? '#16a34a' : '#dc2626'} />
                       </div>
                       <div style={{ fontSize: '0.96rem', fontWeight: 900, color: isPositive ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                        ₹{Number(bData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {Number(bData.bankClosing || 0) < 0
+                          ? `-₹${Math.abs(Number(bData.bankClosing || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : `₹${Number(bData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                       </div>
                       <span style={{ fontSize: '0.63rem', fontWeight: 700, color: isPositive ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>
                         Net {bName}

@@ -1,0 +1,2871 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Elite Edition - All Companies Master Tax Invoices</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 4mm 6mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+      color: #000000;
+      font-size: 10px;
+      line-height: 1.25;
+    }
+    .page-container {
+      page-break-after: always;
+      width: 100%;
+      height: 288mm;
+      max-height: 288mm;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      padding: 2px 0;
+    }
+    .page-container:last-child {
+      page-break-after: auto;
+    }
+    .invoice-wrapper {
+      width: 100%;
+      height: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .invoice-header {
+      flex: 0 0 auto;
+      padding: 12px 18px 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .company-title {
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+    .meta-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .info-grid {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+    }
+    .section-bar {
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 3.5px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    /* ── ITEMS AREA EXPANDS TO FILL AVAILABLE HEIGHT ── */
+    .items-table-container {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    table.invoice-table {
+      width: 100%;
+      height: 100%;
+      border-collapse: collapse;
+      font-size: 9.5px;
+    }
+    table.invoice-table th {
+      color: #ffffff;
+      padding: 5px 6px;
+      font-size: 9px;
+      font-weight: 800;
+      border: 1px solid transparent;
+      text-align: center;
+    }
+    tr.table-filler-row {
+      height: 100%;
+    }
+    tr.table-filler-row td {
+      border-left: 1px solid #cbd5e1;
+      border-right: 1px solid #cbd5e1;
+      border-bottom: none !important;
+      padding: 0;
+    }
+
+    /* ── PINNED AT THE END OF THE PAGE ── */
+    .invoice-bottom-block {
+      flex: 0 0 auto;
+      margin-top: auto;
+    }
+    .calc-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 2px 12px;
+      font-size: 9px;
+    }
+    .calc-row .calc-label {
+      width: 180px;
+      text-align: right;
+      padding-right: 15px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .calc-row .calc-val {
+      width: 90px;
+      text-align: right;
+      font-weight: 800;
+      color: #000000;
+    }
+    .banner-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #ffffff;
+      padding: 3.5px 12px;
+      font-size: 10.5px;
+      font-weight: 800;
+    }
+    .words-bar {
+      padding: 4.5px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      border-bottom: 1px solid #cbd5e1;
+      background: #f8fafc;
+    }
+    table.hsn-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    table.hsn-table th {
+      color: #ffffff;
+      padding: 3px 6px;
+      font-size: 8.5px;
+      font-weight: 800;
+      border: 1px solid transparent;
+      text-align: center;
+    }
+    table.hsn-table td {
+      border: 1px solid #cbd5e1;
+      padding: 2.5px 6px;
+      text-align: right;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      padding: 5px 12px;
+      font-size: 8.5px;
+      line-height: 1.35;
+    }
+    .bank-box {
+      font-size: 8.5px;
+    }
+    .signatory-box {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .computer-tag {
+      text-align: center;
+      font-size: 8px;
+      color: #475569;
+      padding: 3px;
+      border-top: 1px solid #e2e8f0;
+      background: #fafafa;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #1d4ed8;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #1d4ed8; background: linear-gradient(135deg, #dbeafe 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #1d4ed8;">ELITE DIGITAL PRINTS</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            Plot No. 42-45, GIDC Industrial Estate, Khatodara, Surat, Gujarat - 395002
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99098 66667</strong> &bull; Email: billing@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #1d4ed8; font-family: monospace;">24AANFE0044M1ZG</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AANFE0044M</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #1d4ed8;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            EDP-2627-1042
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">05/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>20/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #1d4ed8;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #1d4ed8;">
+          <div class="section-bar" style="background: #1d4ed8;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              YAMUNAJI CREATION
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Plot No. 115/116, Kohinoor 2 Textile Plaza, Canal Road, Surat, Gujarat - 395010
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #1d4ed8; font-family: monospace;">24AAEFY0361N1ZZ</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAEFY0361N</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #1d4ed8;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                EDP-1388, EDP-1389, EDP-1390, EDP-1391
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY ROAD (MAHESH TRANSPORT)</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #1d4ed8; margin-top: 2px;">
+                SUNIL (SHREE RAM TEXTILE)
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DOOR DELIVERY / SURAT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #1d4ed8;">
+              <th style="width: 25px; border-color: #1d4ed8;">Sr.</th>
+              <th style="width: 55px; border-color: #1d4ed8;">Image</th>
+              <th style="text-align: left; border-color: #1d4ed8;">Description of Goods</th>
+              <th style="width: 55px; border-color: #1d4ed8;">HSN</th>
+              <th style="width: 38px; border-color: #1d4ed8;">GST%</th>
+              <th style="width: 65px; border-color: #1d4ed8; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #1d4ed8; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #1d4ed8;">Per</th>
+              <th style="width: 85px; border-color: #1d4ed8; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #1d4ed8;">
+          ED-35
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">DIGITAL PRINT JOB WORK 58"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #1d4ed8; margin-top: 1px;">Design No: ED-35</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-4412 &nbsp;|&nbsp; Fabric: CAPSULE FOIL &nbsp;|&nbsp; Lot: LOT-982</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1532.50<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">11.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">17623.75</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #1d4ed8;">
+          ED-36
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">DIGITAL PRINT JOB WORK 58"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #1d4ed8; margin-top: 1px;">Design No: ED-36</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-4413 &nbsp;|&nbsp; Fabric: ROMAN SILK &nbsp;|&nbsp; Lot: LOT-983</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1840.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">12.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">22080.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">3</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #1d4ed8;">
+          ED-37
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">DIGITAL PRINT JOB WORK 44"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #1d4ed8; margin-top: 1px;">Design No: ED-37</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-4414 &nbsp;|&nbsp; Fabric: PURE VISCOSE &nbsp;|&nbsp; Lot: LOT-984</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1180.20<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">11.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">13572.30</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #1d4ed8; border-bottom: 1.5px solid #1d4ed8;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">4552.70 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹53276.05</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1331.90</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1331.90</div>
+            </div>
+          
+          
+            <div class="calc-row">
+              <div class="calc-label">Round Off:</div>
+              <div class="calc-val">+0.25</div>
+            </div>
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #1d4ed8;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹55940.00</div>
+          </div>
+
+          
+            <div class="calc-row" style="background: #fffbeb; color: #b45309; font-weight: 700;">
+              <div class="calc-label" style="color: #b45309;">Less: TDS (Sec 194C @ 2%):</div>
+              <div class="calc-val" style="color: #b45309;">- ₹1065.52</div>
+            </div>
+            <!-- Net Receivable Banner -->
+            <div class="banner-row" style="background: #1d4ed8;">
+              <div>NET RECEIVABLE AMOUNT</div>
+              <div style="font-size: 13px;">₹54874.48</div>
+            </div>
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Fifty Five Thousand Nine Hundred Forty Only</span>
+            
+              <br />
+              <span style="font-weight: 700; color: #334155;">Net Receivable in Words:</span>
+              <span style="font-weight: 900; color: #1d4ed8; margin-left: 4px;">Rupees Fifty Four Thousand Eight Hundred Seventy Four Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #1d4ed8;">
+              <th rowspan="2" style="border-color: #1d4ed8;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #1d4ed8;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #1d4ed8;">CGST</th>
+                <th colspan="2" style="border-color: #1d4ed8;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #1d4ed8;">Total Tax</th>
+            </tr>
+            <tr style="background: #1d4ed8;">
+              
+                <th style="border-color: #1d4ed8;">Rate</th>
+                <th style="border-color: #1d4ed8;">Amount</th>
+                <th style="border-color: #1d4ed8;">Rate</th>
+                <th style="border-color: #1d4ed8;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹53276.05</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1331.90</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1331.90</td>
+                <td style="font-weight: 800;">₹2663.80</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #1d4ed8;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For ELITE DIGITAL PRINTS
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #059669;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #059669; background: linear-gradient(135deg, #d1fae5 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #059669;">ELITE STITCHING</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            G.F., Plot No. B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99098 66667</strong> &bull; Email: stitching@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #059669; font-family: monospace;">24AANFE0044M1ZG</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AANFE0044M</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #d1fae5; color: #065f46; border: 1px solid #059669;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            ES-2627-0210
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">05/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>20/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #059669;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #059669;">
+          <div class="section-bar" style="background: #059669;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              KESHAR FASHIONS
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Shop 208, Avadh Textile Market, Sahara Darwaja, Ring Road, Surat - 395002
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #059669; font-family: monospace;">24AAPFK8819P1ZL</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAPFK8819P</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #059669;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                ES-104, ES-105
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY AUTO TEMPO</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #059669; margin-top: 2px;">
+                HITESHBHAI PATEL
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DELIVERY AT GODOWN</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #059669;">
+              <th style="width: 25px; border-color: #059669;">Sr.</th>
+              <th style="width: 55px; border-color: #059669;">Image</th>
+              <th style="text-align: left; border-color: #059669;">Description of Goods</th>
+              <th style="width: 55px; border-color: #059669;">HSN</th>
+              <th style="width: 38px; border-color: #059669;">GST%</th>
+              <th style="width: 65px; border-color: #059669; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #059669; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #059669;">Per</th>
+              <th style="width: 85px; border-color: #059669; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #059669;">
+          KS-12
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">KURTI STITCHING & OVERLOCK JOB WORK</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #059669; margin-top: 1px;">Design No: KS-12</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-1201 &nbsp;|&nbsp; Fabric: RAYON 14KG &nbsp;|&nbsp; Lot: LOT-301</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998822</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        850.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">35.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">29750.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #059669;">
+          KS-12P
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">PANT INTERLOCK & BUTTON FINISHING</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #059669; margin-top: 1px;">Design No: KS-12P</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-1202 &nbsp;|&nbsp; Fabric: COTTON SLUB &nbsp;|&nbsp; Lot: LOT-302</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998822</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        850.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">18.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">15300.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #059669; border-bottom: 1.5px solid #059669;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">1700.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹45050.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1126.25</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1126.25</div>
+            </div>
+          
+          
+            <div class="calc-row">
+              <div class="calc-label">Round Off:</div>
+              <div class="calc-val">-0.50</div>
+            </div>
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #059669;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹47302.00</div>
+          </div>
+
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Forty Seven Thousand Three Hundred Two Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #059669;">
+              <th rowspan="2" style="border-color: #059669;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #059669;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #059669;">CGST</th>
+                <th colspan="2" style="border-color: #059669;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #059669;">Total Tax</th>
+            </tr>
+            <tr style="background: #059669;">
+              
+                <th style="border-color: #059669;">Rate</th>
+                <th style="border-color: #059669;">Amount</th>
+                <th style="border-color: #059669;">Rate</th>
+                <th style="border-color: #059669;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998822</td>
+              <td>₹45050.00</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1126.25</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1126.25</td>
+                <td style="font-weight: 800;">₹2252.50</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #059669;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For ELITE STITCHING
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #6d28d9;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #6d28d9; background: linear-gradient(135deg, #ede9fe 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #6d28d9;">ELITE EDITION</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 76006 65058</strong> &bull; Email: accounts@eliteedition.in
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #6d28d9; font-family: monospace;">24BSWPA7682P1ZS</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>BSWPA7682P</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #ede9fe; color: #5b21b6; border: 1px solid #6d28d9;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            EE-2627-0815
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">04/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>19/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #6d28d9;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #6d28d9;">
+          <div class="section-bar" style="background: #6d28d9;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              SHREE RAM FASHIONS
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Shop No. 402-404, Millennium Textile Market 2, Ring Road, Surat - 395002
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #6d28d9; font-family: monospace;">24AAJFS1294K1Z8</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAJFS1294K</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #6d28d9;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                EE-0921, EE-0922
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY TEMPO (LOCAL)</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #6d28d9; margin-top: 2px;">
+                RAJESHBHAI CHOTHANI
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">EX-MILL / SURAT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #6d28d9;">
+              <th style="width: 25px; border-color: #6d28d9;">Sr.</th>
+              <th style="width: 55px; border-color: #6d28d9;">Image</th>
+              <th style="text-align: left; border-color: #6d28d9;">Description of Goods</th>
+              <th style="width: 55px; border-color: #6d28d9;">HSN</th>
+              <th style="width: 38px; border-color: #6d28d9;">GST%</th>
+              <th style="width: 65px; border-color: #6d28d9; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #6d28d9; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #6d28d9;">Per</th>
+              <th style="width: 85px; border-color: #6d28d9; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #6d28d9;">
+          EE-102
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">PREMIUM HEAVY RAYON PRINT 44"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #6d28d9; margin-top: 1px;">Design No: EE-102</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-8810 &nbsp;|&nbsp; Fabric: 14KG RAYON &nbsp;|&nbsp; Lot: LOT-551</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        2450.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">13.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">31850.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #6d28d9;">
+          EE-103
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">MODAL SATIN DIGITAL PRINT 44"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #6d28d9; margin-top: 1px;">Design No: EE-103</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-8811 &nbsp;|&nbsp; Fabric: MODAL SATIN &nbsp;|&nbsp; Lot: LOT-552</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1980.50<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">14.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">28717.25</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #6d28d9; border-bottom: 1.5px solid #6d28d9;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">4430.50 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹60567.25</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1514.18</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1514.18</div>
+            </div>
+          
+          
+            <div class="calc-row">
+              <div class="calc-label">Round Off:</div>
+              <div class="calc-val">+0.39</div>
+            </div>
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #6d28d9;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹63596.00</div>
+          </div>
+
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Sixty Three Thousand Five Hundred Ninety Six Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #6d28d9;">
+              <th rowspan="2" style="border-color: #6d28d9;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #6d28d9;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #6d28d9;">CGST</th>
+                <th colspan="2" style="border-color: #6d28d9;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #6d28d9;">Total Tax</th>
+            </tr>
+            <tr style="background: #6d28d9;">
+              
+                <th style="border-color: #6d28d9;">Rate</th>
+                <th style="border-color: #6d28d9;">Amount</th>
+                <th style="border-color: #6d28d9;">Rate</th>
+                <th style="border-color: #6d28d9;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹60567.25</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1514.18</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1514.18</td>
+                <td style="font-weight: 800;">₹3028.36</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #6d28d9;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For ELITE EDITION
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #d97706;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #d97706; background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #d97706;">ELITE FABTEX</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            101-102, KOHINOOR-2 TEXTILE PLAZA, OPPO AVADH-2, SAROLI, SURAT - 395010
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99791 12777</strong> &bull; Email: fabtex@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #d97706; font-family: monospace;">24AAJFE5663L1Z3</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AAJFE5663L</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #d97706;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            EF-2627-0312
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">02/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>17/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #d97706;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #d97706;">
+          <div class="section-bar" style="background: #d97706;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              MAHAVIR SILK MILLS
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              B-301, New Bombay Market, Umarwada, Surat, Gujarat - 395010
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #d97706; font-family: monospace;">24AACCM4411Q1ZW</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AACCM4411Q</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #d97706;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                EFT-710, EFT-711, EFT-712
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY ROAD (JAI HIND CARRIERS)</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #d97706; margin-top: 2px;">
+                JAGDISHBHAI PATEL
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DOOR DELIVERY / SURAT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #d97706;">
+              <th style="width: 25px; border-color: #d97706;">Sr.</th>
+              <th style="width: 55px; border-color: #d97706;">Image</th>
+              <th style="text-align: left; border-color: #d97706;">Description of Goods</th>
+              <th style="width: 55px; border-color: #d97706;">HSN</th>
+              <th style="width: 38px; border-color: #d97706;">GST%</th>
+              <th style="width: 65px; border-color: #d97706; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #d97706; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #d97706;">Per</th>
+              <th style="width: 85px; border-color: #d97706; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #d97706;">
+          FT-801
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">ORGANZA PRINTING & FINISHING 58"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #d97706; margin-top: 1px;">Design No: FT-801</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-7210 &nbsp;|&nbsp; Fabric: GLASS ORGANZA &nbsp;|&nbsp; Lot: LOT-412</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        2100.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">12.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">26250.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #d97706;">
+          FT-802
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">TABBY SILK PRINTING JOB WORK 44"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #d97706; margin-top: 1px;">Design No: FT-802</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-7211 &nbsp;|&nbsp; Fabric: TABBY SILK &nbsp;|&nbsp; Lot: LOT-413</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1750.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">14.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">24500.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #d97706; border-bottom: 1.5px solid #d97706;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">3850.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹50750.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1268.75</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1268.75</div>
+            </div>
+          
+          
+            <div class="calc-row">
+              <div class="calc-label">Round Off:</div>
+              <div class="calc-val">-0.50</div>
+            </div>
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #d97706;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹53287.00</div>
+          </div>
+
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Fifty Three Thousand Two Hundred Eighty Seven Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #d97706;">
+              <th rowspan="2" style="border-color: #d97706;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #d97706;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #d97706;">CGST</th>
+                <th colspan="2" style="border-color: #d97706;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #d97706;">Total Tax</th>
+            </tr>
+            <tr style="background: #d97706;">
+              
+                <th style="border-color: #d97706;">Rate</th>
+                <th style="border-color: #d97706;">Amount</th>
+                <th style="border-color: #d97706;">Rate</th>
+                <th style="border-color: #d97706;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹50750.00</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1268.75</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1268.75</td>
+                <td style="font-weight: 800;">₹2537.50</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #d97706;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For ELITE FABTEX
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #4f46e5;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #4f46e5; background: linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #4f46e5;">ELITE ONLINE</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            G.F., Plot No. B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99098 66667</strong> &bull; Email: online@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #4f46e5; font-family: monospace;">24AANFE0044M1ZG</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AANFE0044M</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #e0e7ff; color: #3730a3; border: 1px solid #4f46e5;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            EON-2627-0540
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">03/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>18/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #4f46e5;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #4f46e5;">
+          <div class="section-bar" style="background: #4f46e5;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              MYNTRA DESIGNS PRIVATE LIMITED
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Buildings Alyssa, Begonia & Clover, Embassy Tech Village, Outer Ring Road, Bengaluru, Karnataka - 560103
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #4f46e5; font-family: monospace;">29AAACM2284N1Z1</strong>
+              </span>
+              <span>
+                State: <strong>Karnataka (29)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAACM2284N</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #4f46e5;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                EON-890, EON-891
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">DELHIVERY AIR CARGO</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #4f46e5; margin-top: 2px;">
+                ECOMMERCE B2B DESK
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DOOR DELIVERY / BENGALURU</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #4f46e5;">
+              <th style="width: 25px; border-color: #4f46e5;">Sr.</th>
+              <th style="width: 55px; border-color: #4f46e5;">Image</th>
+              <th style="text-align: left; border-color: #4f46e5;">Description of Goods</th>
+              <th style="width: 55px; border-color: #4f46e5;">HSN</th>
+              <th style="width: 38px; border-color: #4f46e5;">GST%</th>
+              <th style="width: 65px; border-color: #4f46e5; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #4f46e5; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #4f46e5;">Per</th>
+              <th style="width: 85px; border-color: #4f46e5; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #4f46e5;">
+          ON-201
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">PRINTED READYMADE ANARKALI SUIT SET</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #4f46e5; margin-top: 1px;">Design No: ON-201</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: EON-7701 &nbsp;|&nbsp; Fabric: CHANDERI COTTON &nbsp;|&nbsp; Lot: LOT-901</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">6204</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">12%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        450.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">145.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">65250.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #4f46e5;">
+          ON-202
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">EMBROIDERED DUPATTA SET (PACK OF 2)</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #4f46e5; margin-top: 1px;">Design No: ON-202</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: EON-7702 &nbsp;|&nbsp; Fabric: NET CHANDERI &nbsp;|&nbsp; Lot: LOT-902</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">6204</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">12%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        300.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">65.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">19500.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #4f46e5; border-bottom: 1.5px solid #4f46e5;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">750.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹84750.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">IGST @ 12%:</div>
+              <div class="calc-val">₹10170.00</div>
+            </div>
+          
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #4f46e5;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹94920.00</div>
+          </div>
+
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Ninety Four Thousand Nine Hundred Twenty Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #4f46e5;">
+              <th rowspan="2" style="border-color: #4f46e5;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #4f46e5;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #4f46e5;">IGST</th>
+              
+              <th rowspan="2" style="border-color: #4f46e5;">Total Tax</th>
+            </tr>
+            <tr style="background: #4f46e5;">
+              
+                <th style="border-color: #4f46e5;">Rate</th>
+                <th style="border-color: #4f46e5;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">6204</td>
+              <td>₹84750.00</td>
+              
+                <td style="text-align: center;">12%</td>
+                <td>₹10170.00</td>
+                <td style="font-weight: 800;">₹10170.00</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #4f46e5;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For ELITE ONLINE
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #e11d48;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #e11d48; background: linear-gradient(135deg, #ffe4e6 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #e11d48;">SOBISE</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            G.F., Plot No. B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99098 66667</strong> &bull; Email: sobise@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #e11d48; font-family: monospace;">24AANFE0044M1ZG</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AANFE0044M</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #ffe4e6; color: #9f1239; border: 1px solid #e11d48;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            SO-2627-0198
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">02/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>17/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #e11d48;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #e11d48;">
+          <div class="section-bar" style="background: #e11d48;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              VISHAL FASHION PVT LTD
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Shop 104-106, Surat Textile Market, Ring Road, Surat - 395002
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #e11d48; font-family: monospace;">24AAACV1298E1Z4</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAACV1298E</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #e11d48;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                SO-341, SO-342
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY ROAD (SUPER FAST)</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #e11d48; margin-top: 2px;">
+                KETANBHAI DESAI
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DOOR DELIVERY / SURAT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #e11d48;">
+              <th style="width: 25px; border-color: #e11d48;">Sr.</th>
+              <th style="width: 55px; border-color: #e11d48;">Image</th>
+              <th style="text-align: left; border-color: #e11d48;">Description of Goods</th>
+              <th style="width: 55px; border-color: #e11d48;">HSN</th>
+              <th style="width: 38px; border-color: #e11d48;">GST%</th>
+              <th style="width: 65px; border-color: #e11d48; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #e11d48; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #e11d48;">Per</th>
+              <th style="width: 85px; border-color: #e11d48; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #e11d48;">
+          SO-55
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">WESTERN DRESS FABRIC DIGITAL PRINT</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #e11d48; margin-top: 1px;">Design No: SO-55</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-901 &nbsp;|&nbsp; Fabric: CREPE GEORGETTE &nbsp;|&nbsp; Lot: LOT-110</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1650.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">14.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">23100.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #e11d48;">
+          SO-56
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">CO-ORD SET DIGITAL PRINT WORK</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #e11d48; margin-top: 1px;">Design No: SO-56</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-902 &nbsp;|&nbsp; Fabric: HEAVY POPLIN &nbsp;|&nbsp; Lot: LOT-111</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1400.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">15.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">21700.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #e11d48; border-bottom: 1.5px solid #e11d48;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">3050.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹44800.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1120.00</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1120.00</div>
+            </div>
+          
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #e11d48;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹47040.00</div>
+          </div>
+
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Forty Seven Thousand Forty Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #e11d48;">
+              <th rowspan="2" style="border-color: #e11d48;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #e11d48;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #e11d48;">CGST</th>
+                <th colspan="2" style="border-color: #e11d48;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #e11d48;">Total Tax</th>
+            </tr>
+            <tr style="background: #e11d48;">
+              
+                <th style="border-color: #e11d48;">Rate</th>
+                <th style="border-color: #e11d48;">Amount</th>
+                <th style="border-color: #e11d48;">Rate</th>
+                <th style="border-color: #e11d48;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹44800.00</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1120.00</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1120.00</td>
+                <td style="font-weight: 800;">₹2240.00</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #e11d48;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For SOBISE
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #8b5a2b;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #8b5a2b; background: linear-gradient(135deg, #fbf3ec 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #8b5a2b;">ELITE ETHNOWEAR</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            F-112/113, Laxminarayan Industrial Society, Oppo Daxeshvar Mandir, Udhna, Surat - 394210
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 90337 55661</strong> &bull; Email: ethnowear@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #8b5a2b; font-family: monospace;">24AANFE3950C1ZO</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AANFE3950C</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #fbf3ec; color: #6b3e1b; border: 1px solid #8b5a2b;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            EW-2627-0420
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">03/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>18/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #8b5a2b;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #8b5a2b;">
+          <div class="section-bar" style="background: #8b5a2b;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              RADHE KRISHNA TEXTILES
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              201-203, Raghukul Textile Market, Ring Road, Surat, Gujarat - 395002
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #8b5a2b; font-family: monospace;">24ABUPR9812M1Z2</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>ABUPR9812M</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #8b5a2b;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                ETW-512, ETW-513
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY PARCEL (SURAT EXPRESS)</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #8b5a2b; margin-top: 2px;">
+                BHARATBHAI DESAI
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DOOR DELIVERY</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #8b5a2b;">
+              <th style="width: 25px; border-color: #8b5a2b;">Sr.</th>
+              <th style="width: 55px; border-color: #8b5a2b;">Image</th>
+              <th style="text-align: left; border-color: #8b5a2b;">Description of Goods</th>
+              <th style="width: 55px; border-color: #8b5a2b;">HSN</th>
+              <th style="width: 38px; border-color: #8b5a2b;">GST%</th>
+              <th style="width: 65px; border-color: #8b5a2b; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #8b5a2b; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #8b5a2b;">Per</th>
+              <th style="width: 85px; border-color: #8b5a2b; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #8b5a2b;">
+          EW-504
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">KURTI DIGITAL FOIL JOB WORK</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #8b5a2b; margin-top: 1px;">Design No: EW-504</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-3101 &nbsp;|&nbsp; Fabric: CHANDERI SILK &nbsp;|&nbsp; Lot: LOT-210</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1250.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">16.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">20000.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #8b5a2b;">
+          EW-505
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">ETHNIC PRINT WITH FOIL 58"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #8b5a2b; margin-top: 1px;">Design No: EW-505</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-3102 &nbsp;|&nbsp; Fabric: ORGANZA TISSUE &nbsp;|&nbsp; Lot: LOT-211</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1600.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">15.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">24800.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #8b5a2b; border-bottom: 1.5px solid #8b5a2b;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">2850.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹44800.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1120.00</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1120.00</div>
+            </div>
+          
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #8b5a2b;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹47040.00</div>
+          </div>
+
+          
+            <div class="calc-row" style="background: #fffbeb; color: #b45309; font-weight: 700;">
+              <div class="calc-label" style="color: #b45309;">Less: TDS (Sec 194C @ 2%):</div>
+              <div class="calc-val" style="color: #b45309;">- ₹896.00</div>
+            </div>
+            <!-- Net Receivable Banner -->
+            <div class="banner-row" style="background: #8b5a2b;">
+              <div>NET RECEIVABLE AMOUNT</div>
+              <div style="font-size: 13px;">₹46144.00</div>
+            </div>
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Forty Seven Thousand Forty Only</span>
+            
+              <br />
+              <span style="font-weight: 700; color: #334155;">Net Receivable in Words:</span>
+              <span style="font-weight: 900; color: #8b5a2b; margin-left: 4px;">Rupees Forty Six Thousand One Hundred Forty Four Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #8b5a2b;">
+              <th rowspan="2" style="border-color: #8b5a2b;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #8b5a2b;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #8b5a2b;">CGST</th>
+                <th colspan="2" style="border-color: #8b5a2b;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #8b5a2b;">Total Tax</th>
+            </tr>
+            <tr style="background: #8b5a2b;">
+              
+                <th style="border-color: #8b5a2b;">Rate</th>
+                <th style="border-color: #8b5a2b;">Amount</th>
+                <th style="border-color: #8b5a2b;">Rate</th>
+                <th style="border-color: #8b5a2b;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹44800.00</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1120.00</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1120.00</td>
+                <td style="font-weight: 800;">₹2240.00</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #8b5a2b;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For ELITE ETHNOWEAR
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #581c87;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #581c87; background: linear-gradient(135deg, #f3e8ff 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #581c87;">YAMUNAJI CREATION</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            GROUND FLOOR, PLOT NO-115/116, Kohinoor 2 Textile Plaza, CANAL ROAD, Surat - 395010
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99791 12777</strong> &bull; Email: yamunajicreation@gmail.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #581c87; font-family: monospace;">24AAEFY0361N1ZZ</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AAEFY0361N</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #f3e8ff; color: #6b21a8; border: 1px solid #581c87;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            YJ-2627-1190
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">01/11/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>16/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #581c87;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #581c87;">
+          <div class="section-bar" style="background: #581c87;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              BALAJI TEXTILE AGENCY
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Shop 118, Good Luck Textile Market, Ring Road, Surat, Gujarat - 395002
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #581c87; font-family: monospace;">24AAGPB7722R1ZE</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAGPB7722R</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #581c87;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                YC-911, YC-912
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY HAND DELIVERY</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #581c87; margin-top: 2px;">
+                RAMESHBHAI PARMAR
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DOOR DELIVERY / SURAT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #581c87;">
+              <th style="width: 25px; border-color: #581c87;">Sr.</th>
+              <th style="width: 55px; border-color: #581c87;">Image</th>
+              <th style="text-align: left; border-color: #581c87;">Description of Goods</th>
+              <th style="width: 55px; border-color: #581c87;">HSN</th>
+              <th style="width: 38px; border-color: #581c87;">GST%</th>
+              <th style="width: 65px; border-color: #581c87; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #581c87; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #581c87;">Per</th>
+              <th style="width: 85px; border-color: #581c87; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #581c87;">
+          YC-210
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">DUPATTA DIGITAL ROTARY JOB 2.25M</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #581c87; margin-top: 1px;">Design No: YC-210</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-1901 &nbsp;|&nbsp; Fabric: CHIFFON CRAPE &nbsp;|&nbsp; Lot: LOT-671</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1450.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">18.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">26100.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #581c87;">
+          YC-211
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">SCARF & STOLE PRINTING JOB</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #581c87; margin-top: 1px;">Design No: YC-211</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-1902 &nbsp;|&nbsp; Fabric: POLY SATIN &nbsp;|&nbsp; Lot: LOT-672</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1300.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">15.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">19500.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #581c87; border-bottom: 1.5px solid #581c87;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">2750.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹45600.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹1140.00</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹1140.00</div>
+            </div>
+          
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #581c87;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹47880.00</div>
+          </div>
+
+          
+            <div class="calc-row" style="background: #fffbeb; color: #b45309; font-weight: 700;">
+              <div class="calc-label" style="color: #b45309;">Less: TDS (Sec 194C @ 2%):</div>
+              <div class="calc-val" style="color: #b45309;">- ₹912.00</div>
+            </div>
+            <!-- Net Receivable Banner -->
+            <div class="banner-row" style="background: #581c87;">
+              <div>NET RECEIVABLE AMOUNT</div>
+              <div style="font-size: 13px;">₹46968.00</div>
+            </div>
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Forty Seven Thousand Eight Hundred Eighty Only</span>
+            
+              <br />
+              <span style="font-weight: 700; color: #334155;">Net Receivable in Words:</span>
+              <span style="font-weight: 900; color: #581c87; margin-left: 4px;">Rupees Forty Six Thousand Nine Hundred Sixty Eight Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #581c87;">
+              <th rowspan="2" style="border-color: #581c87;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #581c87;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #581c87;">CGST</th>
+                <th colspan="2" style="border-color: #581c87;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #581c87;">Total Tax</th>
+            </tr>
+            <tr style="background: #581c87;">
+              
+                <th style="border-color: #581c87;">Rate</th>
+                <th style="border-color: #581c87;">Amount</th>
+                <th style="border-color: #581c87;">Rate</th>
+                <th style="border-color: #581c87;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹45600.00</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1140.00</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹1140.00</td>
+                <td style="font-weight: 800;">₹2280.00</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #581c87;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For YAMUNAJI CREATION
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <div class="page-container">
+    <div class="invoice-wrapper" style="border: 1.5px solid #475569;">
+      <!-- ── 1. HEADER (USER APPROVED MODERN DESIGN) ────────────────────── -->
+      <div class="invoice-header" style="border-bottom: 3px solid #475569; background: linear-gradient(135deg, #f1f5f9 0%, #ffffff 100%);">
+        <div style="max-width: 60%;">
+          <div class="company-title" style="color: #475569;">EXEDP (ELITE DIGITAL PRINTS - ARCHIVE)</div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 2px;">
+            Plot No. 42-45, GIDC Industrial Estate, Khatodara, Surat, Gujarat - 395002
+          </div>
+          <div style="font-size: 10.5px; color: #475569;">
+            Phone: <strong style="color: #0f172a;">+91 99098 66667</strong> &bull; Email: archive@elitedigitalprints.com
+          </div>
+          <div style="margin-top: 5px; font-size: 11px;">
+            <span style="display: inline-block; margin-right: 12px;">
+              GSTIN: <strong style="color: #475569; font-family: monospace;">24AANFE0044M1ZG</strong>
+            </span>
+            <span>
+              State: <strong>Gujarat (24)</strong>
+            </span>
+            <span style="margin-left: 12px;">
+              PAN: <strong>AANFE0044M</strong>
+            </span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <span class="meta-badge" style="background: #f1f5f9; color: #334155; border: 1px solid #475569;">ORIGINAL FOR RECIPIENT</span>
+          <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 5px; letter-spacing: -0.3px;">
+            EXEDP-2627-0991
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">
+            Invoice Date: <strong style="color: #0f172a;">30/10/2026</strong>
+          </div>
+          <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">
+            Due Date: <strong>14/11/2026</strong>
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Place of Supply: <strong>Gujarat (24)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. BILL TO & DISPATCH SECTION ────────────────────────────────── -->
+      <div class="info-grid" style="border-bottom: 1.5px solid #475569;">
+        <!-- Left Column: BILL TO (MATCHING HEADER STYLING) -->
+        <div style="border-right: 1.5px solid #475569;">
+          <div class="section-bar" style="background: #475569;">BILL TO</div>
+          <div style="padding: 8px 12px; font-size: 9.5px; line-height: 1.35;">
+            <div style="font-size: 12px; font-weight: 900; color: #000000; letter-spacing: -0.2px;">
+              MAHESHWARI CREATION
+            </div>
+            <div style="color: #475569; font-size: 10px; margin-top: 2px; line-height: 1.35;">
+              Shop 512, Radha Krishna Textile Market, Ring Road, Surat - 395002
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px;">
+              <span style="display: inline-block; margin-right: 12px;">
+                GSTIN: <strong style="color: #475569; font-family: monospace;">24AAGFM8822K1Z9</strong>
+              </span>
+              <span>
+                State: <strong>Gujarat (24)</strong>
+              </span>
+              <span style="margin-left: 12px;">
+                PAN: <strong>AAGFM8822K</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: SELLER / DISPATCH DETAILS (NO TAX INVOICE NO, ADDS AGENT & DISPATCH DETAILS) -->
+        <div>
+          <div class="section-bar" style="background: #475569;">SELLER / DISPATCH DETAILS</div>
+          <div style="display: grid; grid-template-columns: 1.1fr 1fr; height: 100%;">
+            <div style="padding: 6px 10px; font-size: 9px; border-right: 1px solid #e2e8f0;">
+              <div style="color: #475569; font-size: 8.5px;">Challan No.:</div>
+              <div style="font-weight: 800; margin-top: 2px; font-size: 9.5px; line-height: 1.3;">
+                EX-401, EX-402
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Dispatched Through:</div>
+              <div style="font-weight: 800;">BY ROAD</div>
+            </div>
+            <div style="padding: 6px 10px; font-size: 9px;">
+              <div style="color: #475569; font-size: 8.5px;">Agent / Broker:</div>
+              <div style="font-weight: 800; font-size: 10px; color: #475569; margin-top: 2px;">
+                SUNIL (OLD)
+              </div>
+              <div style="color: #475569; font-size: 8.5px; margin-top: 4px;">Terms of Delivery:</div>
+              <div style="font-weight: 800;">DELIVERED</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. ITEMS TABLE (FILLS AVAILABLE HEIGHT) ──────────────────────── -->
+      <div class="items-table-container">
+        <table class="invoice-table">
+          <thead>
+            <tr style="background: #475569;">
+              <th style="width: 25px; border-color: #475569;">Sr.</th>
+              <th style="width: 55px; border-color: #475569;">Image</th>
+              <th style="text-align: left; border-color: #475569;">Description of Goods</th>
+              <th style="width: 55px; border-color: #475569;">HSN</th>
+              <th style="width: 38px; border-color: #475569;">GST%</th>
+              <th style="width: 65px; border-color: #475569; text-align: right;">Qty</th>
+              <th style="width: 50px; border-color: #475569; text-align: right;">Rate</th>
+              <th style="width: 35px; border-color: #475569;">Per</th>
+              <th style="width: 85px; border-color: #475569; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">1</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #475569;">
+          EX-91
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">FABRIC PRINTING OLD LOT 58"</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #475569; margin-top: 1px;">Design No: EX-91</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-091 &nbsp;|&nbsp; Fabric: CREPE 58 &nbsp;|&nbsp; Lot: LOT-011</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1500.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">10.50</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">15750.00</td>
+    </tr>
+  
+    <tr>
+      <td style="text-align: center; font-weight: 700; padding: 6px 4px; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">2</td>
+      <td style="text-align: center; padding: 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 44px; height: 44px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #475569;">
+          EX-92
+        </div>
+      </td>
+      <td style="padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        <div style="font-weight: 900; font-size: 10.5px; color: #000000;">POLYESTER SATIN JOB WORK</div>
+        <div style="font-size: 8.5px; font-weight: 700; color: #475569; margin-top: 1px;">Design No: EX-92</div>
+        <div style="font-size: 8.5px; color: #0f172a;">Job Card: JC-092 &nbsp;|&nbsp; Fabric: POLYESTER SATIN &nbsp;|&nbsp; Lot: LOT-012</div>
+      </td>
+      <td style="text-align: center; font-family: monospace; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">998821</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">5%</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">
+        1200.00<br /><span style="font-size: 8px; font-weight: 500; color: #64748b;">MTR</span>
+      </td>
+      <td style="text-align: right; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">11.00</td>
+      <td style="text-align: center; padding: 6px 4px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">MTR</td>
+      <td style="text-align: right; font-weight: 800; padding: 6px 8px; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;">13200.00</td>
+    </tr>
+  
+            <tr class="table-filler-row">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── ANCHORED BOTTOM SECTION (AT THE END OF THE PAGE) ──────────────── -->
+      <div class="invoice-bottom-block">
+        <!-- ── 4. TOTALS & TDS SECTION ──────────────────────────────────────── -->
+        <div class="totals-area" style="border-top: 1.5px solid #475569; border-bottom: 1.5px solid #475569;">
+          <div class="calc-row">
+            <div class="calc-label">Total Quantity:</div>
+            <div class="calc-val">2700.00 MTR</div>
+          </div>
+          <div class="calc-row">
+            <div class="calc-label">Taxable Amount:</div>
+            <div class="calc-val">₹28950.00</div>
+          </div>
+          
+            <div class="calc-row">
+              <div class="calc-label">CGST @ 2.5%:</div>
+              <div class="calc-val">₹723.75</div>
+            </div>
+            <div class="calc-row">
+              <div class="calc-label">SGST @ 2.5%:</div>
+              <div class="calc-val">₹723.75</div>
+            </div>
+          
+          
+            <div class="calc-row">
+              <div class="calc-label">Round Off:</div>
+              <div class="calc-val">-0.50</div>
+            </div>
+          
+
+          <!-- Total Invoice Amount Banner -->
+          <div class="banner-row" style="background: #475569;">
+            <div>TOTAL INVOICE AMOUNT</div>
+            <div style="font-size: 13px;">₹30397.00</div>
+          </div>
+
+          
+        </div>
+
+        <!-- ── 5. AMOUNT IN WORDS ────────────────────────────────────────────── -->
+        <div class="words-bar">
+          <div>
+            <span style="font-weight: 700; color: #334155;">Invoice Amount in Words:</span>
+            <span style="font-weight: 900; color: #000000; margin-left: 4px;">Rupees Thirty Thousand Three Hundred Ninety Seven Only</span>
+            
+          </div>
+          <div style="font-size: 8.5px; color: #64748b; font-weight: 700;">E. & O.E.</div>
+        </div>
+
+        <!-- ── 6. HSN TAX SUMMARY ────────────────────────────────────────────── -->
+        <table class="hsn-table">
+          <thead>
+            <tr style="background: #475569;">
+              <th rowspan="2" style="border-color: #475569;">HSN/SAC</th>
+              <th rowspan="2" style="border-color: #475569;">Taxable Value</th>
+              
+                <th colspan="2" style="border-color: #475569;">CGST</th>
+                <th colspan="2" style="border-color: #475569;">SGST</th>
+              
+              <th rowspan="2" style="border-color: #475569;">Total Tax</th>
+            </tr>
+            <tr style="background: #475569;">
+              
+                <th style="border-color: #475569;">Rate</th>
+                <th style="border-color: #475569;">Amount</th>
+                <th style="border-color: #475569;">Rate</th>
+                <th style="border-color: #475569;">Amount</th>
+              
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-family: monospace; font-weight: 800;">998821</td>
+              <td>₹28950.00</td>
+              
+                <td style="text-align: center;">2.5%</td>
+                <td>₹723.75</td>
+                <td style="text-align: center;">2.5%</td>
+                <td>₹723.75</td>
+                <td style="font-weight: 800;">₹1447.50</td>
+              
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ── 7. FOOTER: BANK & SIGNATURE (EXACT SHORT DOTTED LINE LIKE IMAGE) ─ -->
+        <div class="footer-grid">
+          <div class="bank-box">
+            <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 2px; color: #475569;">
+              Bank Details (For RTGS / NEFT / IMPS):
+            </div>
+            <div>Bank Name: <strong>KOTAK MAHINDRA BANK</strong></div>
+            <div>A/C No.: <strong>9909866667</strong></div>
+            <div>IFSC Code: <strong>KKBK0000883</strong> &nbsp;|&nbsp; Branch: <strong>SURAT</strong></div>
+            <div style="margin-top: 5px; font-size: 8px; color: #475569; line-height: 1.3;">
+              1. Goods once sold will not be taken back.<br />
+              2. Payment is due within 15 days from the invoice date. Interest @ 18% p.a. will be charged thereafter.<br />
+              3. Subject to Surat Jurisdiction only.
+            </div>
+          </div>
+
+          <div class="signatory-box">
+            <div style="font-weight: 800; font-size: 10px; color: #000000; text-align: right;">
+              For EXEDP (ELITE DIGITAL PRINTS - ARCHIVE)
+            </div>
+            <div style="height: 35px;"></div>
+            <!-- EXACT SHORT DOTTED LINE MATCHING USER IMAGE (WIDTH: 140px) -->
+            <div style="width: 145px; margin-left: auto; text-align: center;">
+              <div style="border-top: 1.5px dashed #94a3b8; margin-bottom: 4px;"></div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #000000;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="computer-tag">
+          This is a Computer Generated Tax Invoice &bull; Powered by Elite Edition OS
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</body>
+</html>
+  

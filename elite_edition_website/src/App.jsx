@@ -77,6 +77,7 @@ const ScanAndPackScreen = lazyWithRetry(() => import('./components/ScanAndPackSc
 const DesignerModule = lazyWithRetry(() => import('./components/DesignerModule'));
 const DesignerScreen = lazyWithRetry(() => import('./components/DesignerScreen'));
 const LedgerReconciliationPanel = lazyWithRetry(() => import('./components/LedgerReconciliationPanel'));
+const DesignCatalogue = lazyWithRetry(() => import('./components/DesignCatalogue'));
 
 import EliteModalDialog from './components/EliteModalDialog';
 import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService';
@@ -196,6 +197,12 @@ export const ROUTE_ALIASES = {
   'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ew_invoices': { tab: 'ew_invoices', dept: 'ethno_wear' },
+  'ew_design': { tab: 'ew_design', dept: 'ethno_wear' },
+  'ew-design': { tab: 'ew_design', dept: 'ethno_wear' },
+  'ew_catalogue': { tab: 'ew_design', dept: 'ethno_wear' },
+  'ew-catalogue': { tab: 'ew_design', dept: 'ethno_wear' },
+  'ew_design_room': { tab: 'ew_design', dept: 'ethno_wear' },
+  'ew-design-room': { tab: 'ew_design', dept: 'ethno_wear' },
   'ethno_wear': { tab: 'ew_invoices', dept: 'ethno_wear' },
   'yj_invoices': { tab: 'yj_invoices', dept: 'yamunaji' },
   'yamunaji': { tab: 'yj_invoices', dept: 'yamunaji' },
@@ -252,6 +259,14 @@ export const ROUTE_ALIASES = {
   'yj_raw_materials': { tab: 'yj_raw_materials', dept: 'yamunaji' },
   'es-raw-materials': { tab: 'es_raw_materials', dept: 'stitching' },
   'es_raw_materials': { tab: 'es_raw_materials', dept: 'stitching' },
+  'es_invoices': { tab: 'es_invoices', dept: 'stitching' },
+  'es-invoices': { tab: 'es_invoices', dept: 'stitching' },
+  'es_finance': { tab: 'es_invoices', dept: 'stitching' },
+  'es-finance': { tab: 'es_invoices', dept: 'stitching' },
+  'stitching_invoices': { tab: 'es_invoices', dept: 'stitching' },
+  'stitching-invoices': { tab: 'es_invoices', dept: 'stitching' },
+  'stitching_finance': { tab: 'es_invoices', dept: 'stitching' },
+  'stitching-finance': { tab: 'es_invoices', dept: 'stitching' },
   'eo_invoices': { tab: 'eo_invoices', dept: 'elite_online' },
   'eo_expenses': { tab: 'eo_expenses', dept: 'elite_online' },
   'exedp_invoices': { tab: 'exedp_invoices', dept: 'exedp' },
@@ -269,9 +284,9 @@ export const ALL_KNOWN_ERP_TABS = new Set([
   'ee_dashboard', 'ee_rfd', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
   'ef_dashboard', 'ef_rfd', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
   'so_dashboard', 'so_rfd', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
-  'ew_dashboard', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+  'ew_dashboard', 'ew_design', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
   'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials', 'yj_rfd',
-  'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials',
+  'es_dashboard', 'es_invoices', 'es_finance', 'stitching_invoices', 'stitching_finance', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials',
   'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'eo_invoices',
   'exedp_invoices', 'exedp_expenses',
   'raw_materials', 'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master',
@@ -381,6 +396,7 @@ export function getCanonicalHashForTab(tab, queryString = '') {
   else if (tab === 'ef_rfd') alias = 'ef-fabric-process';
   else if (tab === 'so_raw_materials') alias = 'so-raw-materials';
   else if (tab === 'ew_raw_materials') alias = 'ew-raw-materials';
+  else if (tab === 'ew_design') alias = 'ew-design';
   else if (tab === 'yj_raw_materials') alias = 'yj-raw-materials';
   else if (tab === 'yj_rfd') alias = 'fabric-process';
   else if (tab === 'es_raw_materials') alias = 'es-raw-materials';
@@ -1045,7 +1061,7 @@ export default function App() {
   const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_rfd', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses', 'ee_raw_materials'];
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_rfd', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses', 'ef_raw_materials'];
   const SOBISE_PERMISSIONS = ['so_dashboard', 'so_rfd', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses', 'so_raw_materials'];
-  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_rfd', 'ew_complaints', 'ew_settings', 'ew_expenses', 'ew_raw_materials'];
+  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_design', 'ew_rfd', 'ew_complaints', 'ew_settings', 'ew_expenses', 'ew_raw_materials'];
   const YAMUNAJI_PERMISSIONS = ['yj_rfd', 'yj_invoices', 'yj_dashboard', 'yj_complaints', 'yj_settings', 'yj_expenses', 'yj_raw_materials'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
@@ -1053,18 +1069,24 @@ export default function App() {
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching', 'es_complaints', 'es_expenses', 'es_raw_materials'
   ];
 
-  const isSuperOrAdmin = Boolean(
-    currentUser?.role === 'admin' || 
+  const MASTER_ADMIN_EMAIL = 'harshitsidapara2468@gmail.com';
+  const isMasterOrMainAdmin = Boolean(
     currentUser?.role === 'super_admin' || 
     currentUser?.role === 'main_admin' || 
-    currentUser?.isMainAdmin || 
-    currentUser?.isAdmin === true ||
+    currentUser?.isMainAdmin === true || 
+    (currentUser?.email || '').toLowerCase() === MASTER_ADMIN_EMAIL ||
     (currentUser?.username || '').toLowerCase() === 'admin'
+  );
+
+  const isSuperOrAdmin = Boolean(
+    isMasterOrMainAdmin ||
+    currentUser?.role === 'admin' || 
+    currentUser?.isAdmin === true
   );
 
   const isCompanyAllowed = (companyNameOrId) => {
     if (!currentUser) return false;
-    if (isSuperOrAdmin) return true;
+    if (isMasterOrMainAdmin) return true;
     if (Array.isArray(currentUser.allowedCompanies)) {
       if (currentUser.allowedCompanies.length === 0) return false;
       const target = String(companyNameOrId || '').toLowerCase().trim();
@@ -1136,15 +1158,15 @@ export default function App() {
     return false;
   };
 
-  const hasEliteOnlineAccess = isSuperOrAdmin || isCompanyAllowed('elite_online');
-  const hasDigitalPrintAccess = isSuperOrAdmin || isCompanyAllowed('digital_print');
-  const hasStitchingAccess = isSuperOrAdmin || isCompanyAllowed('stitching');
-  const hasEliteEditionAccess = isSuperOrAdmin || isCompanyAllowed('elite_edition');
-  const hasEliteFabtexAccess = isSuperOrAdmin || isCompanyAllowed('elite_fabtex');
-  const hasSobiseAccess = isSuperOrAdmin || isCompanyAllowed('sobise');
-  const hasEthnoWearAccess = isSuperOrAdmin || isCompanyAllowed('ethno_wear');
-  const hasYamunajiAccess = isSuperOrAdmin || isCompanyAllowed('yamunaji');
-  const hasExedpAccess = isSuperOrAdmin || isCompanyAllowed('exedp');
+  const hasEliteOnlineAccess = isMasterOrMainAdmin || isCompanyAllowed('elite_online');
+  const hasDigitalPrintAccess = isMasterOrMainAdmin || isCompanyAllowed('digital_print');
+  const hasStitchingAccess = isMasterOrMainAdmin || isCompanyAllowed('stitching');
+  const hasEliteEditionAccess = isMasterOrMainAdmin || isCompanyAllowed('elite_edition');
+  const hasEliteFabtexAccess = isMasterOrMainAdmin || isCompanyAllowed('elite_fabtex');
+  const hasSobiseAccess = isMasterOrMainAdmin || isCompanyAllowed('sobise');
+  const hasEthnoWearAccess = isMasterOrMainAdmin || isCompanyAllowed('ethno_wear');
+  const hasYamunajiAccess = isMasterOrMainAdmin || isCompanyAllowed('yamunaji');
+  const hasExedpAccess = isMasterOrMainAdmin || isCompanyAllowed('exedp');
 
   const hasCommunicationAccess = !currentUser || isSuperOrAdmin || 
     Boolean(currentUser?.canBroadcastChat) || 
@@ -1259,7 +1281,7 @@ export default function App() {
 
   // Auto-switch department if user lacks permission for current activeDepartment
   useEffect(() => {
-    if (!currentUser || isSuperOrAdmin) return;
+    if (!currentUser || isMasterOrMainAdmin) return;
     const allowedDepts = [];
     if (isCompanyAllowed('elite_online') && hasEliteOnlineAccess) allowedDepts.push('elite_online');
     if (isCompanyAllowed('digital_print') && hasDigitalPrintAccess) allowedDepts.push('digital_print');
@@ -1298,7 +1320,7 @@ export default function App() {
         }
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment, hasEliteOnlineAccess, hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasEthnoWearAccess, hasYamunajiAccess, hasExedpAccess, hasCommunicationAccess, hasTaskAccess, isSuperOrAdmin]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment, hasEliteOnlineAccess, hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasEthnoWearAccess, hasYamunajiAccess, hasExedpAccess, hasCommunicationAccess, hasTaskAccess, isMasterOrMainAdmin, isSuperOrAdmin]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -1383,9 +1405,9 @@ export default function App() {
       'ee_dashboard', 'ee_rfd', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
       'ef_dashboard', 'ef_rfd', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
       'so_dashboard', 'so_rfd', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
-      'ew_dashboard', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+      'ew_dashboard', 'ew_design', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
       'yj_dashboard', 'yj_rfd', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials',
-      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
+      'es_dashboard', 'es_invoices', 'es_finance', 'stitching_invoices', 'stitching_finance', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
       'exedp_invoices', 'exedp_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
@@ -2847,28 +2869,21 @@ export default function App() {
                 onClick={() => setShowGlobalSearch(true)}
                 className="btn-secondary"
                 title="Global Search (Ctrl/Cmd+K)"
+                aria-label="Global Search"
                 style={{
                   minHeight: '38px',
                   height: '38px',
-                  padding: '6px 12px',
-                  fontSize: '0.82rem',
+                  minWidth: '38px',
+                  width: '38px',
+                  padding: '0',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  justifyContent: 'center',
                   cursor: 'pointer',
                   borderRadius: '8px'
                 }}
               >
-                <Search size={15} style={{ flexShrink: 0 }} />
-                <span>Search</span>
-                <kbd style={{
-                  fontSize: '10px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  padding: '2px 5px',
-                  borderRadius: '4px',
-                  border: '1px solid #cbd5e1'
-                }}>⌘K</kbd>
+                <Search size={16} style={{ flexShrink: 0 }} />
               </button>
 
               {deferredInstallPrompt && !isStandalone && (
@@ -2886,29 +2901,32 @@ export default function App() {
               <ChangelogDrawer />
 
               <button
+                type="button"
                 onClick={() => setShowNotificationDrawer(true)}
                 className="btn-secondary"
                 title="Notifications & Alerts"
+                aria-label="Notifications & Alerts"
                 style={{
                   minHeight: '38px',
                   height: '38px',
-                  padding: '6px 12px',
-                  fontSize: '0.82rem',
+                  minWidth: '38px',
+                  padding: unreadNotifCount > 0 ? '0 8px' : '0',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: '8px'
+                  justifyContent: 'center',
+                  gap: '4px',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
                 }}
               >
-                <Bell size={15} style={{ flexShrink: 0 }} />
-                <span>Alerts</span>
+                <Bell size={16} style={{ flexShrink: 0 }} />
                 {unreadNotifCount > 0 && (
                   <span style={{
                     background: '#ef4444',
                     color: '#ffffff',
-                    padding: '2px 6px',
+                    padding: '2px 5px',
                     borderRadius: '8px',
-                    fontSize: '0.7rem',
+                    fontSize: '0.68rem',
                     fontWeight: 800,
                     lineHeight: 1
                   }}>
@@ -2921,6 +2939,7 @@ export default function App() {
               <QuickTipPill activeTab={activeTab} />
 
               <button
+                type="button"
                 onClick={() => {
                   fetchData();
                   triggerGlobalDataRefresh();
@@ -2930,19 +2949,21 @@ export default function App() {
                 }}
                 className="btn-secondary"
                 title="Refresh data"
+                aria-label="Refresh data"
                 style={{
                   minHeight: '38px',
                   height: '38px',
-                  padding: '6px 12px',
-                  fontSize: '0.82rem',
+                  minWidth: '38px',
+                  width: '38px',
+                  padding: '0',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
                   borderRadius: '8px'
                 }}
               >
-                <RefreshCw size={14} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
-                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+                <RefreshCw size={16} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
               </button>
 
               {currentUser && (
@@ -2971,22 +2992,25 @@ export default function App() {
                     </span>
                   </div>
                   <button
+                    type="button"
                     onClick={handleLogout}
                     className="btn-secondary"
                     title="Sign Out"
+                    aria-label="Sign Out"
                     style={{
                       minHeight: '38px',
                       height: '38px',
-                      padding: '6px 12px',
-                      fontSize: '0.8rem',
+                      minWidth: '38px',
+                      width: '38px',
+                      padding: '0',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
                       borderRadius: '8px'
                     }}
                   >
-                    <LogOut size={14} style={{ flexShrink: 0 }} />
-                    <span>Sign Out</span>
+                    <LogOut size={16} style={{ flexShrink: 0 }} />
                   </button>
                 </div>
               )}
@@ -3249,9 +3273,16 @@ export default function App() {
                       </button>
                     )}
                     {activeDepartment === 'ethno_wear' && (
-                      <button onClick={() => { setActiveTab('ew_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ew_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
+                      <>
+                        {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_design') || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                          <button onClick={() => { setActiveTab('ew_design'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ew_design' ? 'active' : ''}`}>
+                            Design Room
+                          </button>
+                        )}
+                        <button onClick={() => { setActiveTab('ew_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ew_raw_materials' ? 'active' : ''}`}>
+                          Raw Materials
+                        </button>
+                      </>
                     )}
                     {activeDepartment === 'yamunaji' && (
                       <>
@@ -3624,6 +3655,9 @@ export default function App() {
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_dashboard')) &&
                       renderNavItem('ew_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_design') || currentUser.permissions?.includes('jobcards_catalogue')) &&
+                      renderNavItem('ew_design', 'Design room', BookOpen, null, 'Design')
                     }
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_rfd')) &&
                       renderNavItem('ew_rfd', 'Fabric Process', Layers, null, 'Fabric Process')
@@ -4037,6 +4071,13 @@ export default function App() {
             <EliteBillingDepartment companyEntity="Sobise" />
           ) : activeTab === 'ew_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'ew_design' ? (
+            <DesignCatalogue
+              department="ethno_wear"
+              companyEntity="Ethno wear"
+              currentUser={currentUser}
+              initialSubTab="catalogue"
+            />
           ) : activeTab === 'ew_rfd' ? (
             <YamunajiRfdPanel key="Ethno wear" companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ew_settings' ? (
@@ -4076,7 +4117,7 @@ export default function App() {
             <DigitalPrintExpenseModule companyEntity="Elite Stitching" />
           ) : activeTab === 'es_raw_materials' ? (
             <RawMaterialsPanel companyEntity="Elite Stitching" />
-          ) : activeTab === 'es_invoices' ? (
+          ) : (activeTab === 'es_invoices' || activeTab === 'stitching_invoices' || activeTab === 'es_finance') ? (
             <EliteBillingDepartment companyEntity="Elite Stitching" department="stitching" />
           ) : activeTab === 'eo_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Online" />
@@ -4152,7 +4193,7 @@ export default function App() {
               </p>
             </div>
           ) : activeDepartment === 'ethno_wear' && hasEthnoWearAccess ? (
-            <EliteBillingDepartment companyEntity="Ethno wear" department="ethno_wear" />
+            <CompanyDedicatedDashboard companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeDepartment === 'yamunaji' && hasYamunajiAccess ? (
             <CompanyDedicatedDashboard companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeDepartment === 'elite_edition' && hasEliteEditionAccess ? (

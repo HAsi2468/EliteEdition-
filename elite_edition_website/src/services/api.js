@@ -1206,8 +1206,11 @@ export const api = {
   async deleteDesign(id) {
     return request(`/designs/${id}`, { method: 'DELETE' });
   },
-  async getDesignCategories() {
-    return request('/designs/categories');
+  async getDesignCategories(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/designs/categories${qs}`);
   },
   async getNextDesignNumber(params = {}) {
     const query = new URLSearchParams();
@@ -2066,9 +2069,27 @@ export const api = {
   },
 
   async downloadFabricChallanPdf(id, challanNo) {
+    if (!id) throw new Error('Invalid challan ID');
     const baseUrl = getBaseUrl();
     const response = await authFetch(`${baseUrl}/fabric-challan/${id}/pdf`);
-    if (!response.ok) throw new Error('Failed to generate challan PDF');
+    if (!response.ok) {
+      let errMsg = 'Failed to generate challan PDF';
+      try {
+        const text = await response.text();
+        if (text) {
+          try {
+            const j = JSON.parse(text);
+            errMsg = j.message || j.error || errMsg;
+          } catch (_) {
+            if (text.length < 200) errMsg = text;
+          }
+        }
+      } catch (_) {}
+      if (response.status === 401) {
+        errMsg = 'Session expired. Please refresh your browser or sign in again.';
+      }
+      throw new Error(errMsg);
+    }
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, `Challan_${challanNo || 'preview'}.pdf`, { title: `Fabric Challan #${challanNo || id}` });
   },
@@ -2077,7 +2098,21 @@ export const api = {
     if (!ids || ids.length === 0) return;
     const baseUrl = getBaseUrl();
     const response = await authFetch(`${baseUrl}/fabric-challan/bulk-pdf?ids=${ids.join(',')}`);
-    if (!response.ok) throw new Error('Failed to generate combined Fabric Challans PDF');
+    if (!response.ok) {
+      let errMsg = 'Failed to generate combined Fabric Challans PDF';
+      try {
+        const text = await response.text();
+        if (text) {
+          try {
+            const j = JSON.parse(text);
+            errMsg = j.message || j.error || errMsg;
+          } catch (_) {
+            if (text.length < 200) errMsg = text;
+          }
+        }
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Combined Fabric Challans' });
   },
@@ -2441,10 +2476,11 @@ export const api = {
     return request(`/scan-pack/analytics${qs ? `?${qs}` : ''}`);
   },
 
-  async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
+  async downloadInvoicePdf(id, invoiceNo, duplicate = false, options = {}) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
-    const url = `${baseUrl}/billing/invoices/${id}/pdf?nocache=true&t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
+    const templateParam = options.template ? `&template=${options.template}` : '';
+    const url = `${baseUrl}/billing/invoices/${id}/pdf?nocache=true&t=${Date.now()}${duplicate ? '&duplicate=true' : ''}${templateParam}`;
     const response = await authFetch(url);
     if (!response.ok) {
       let errMsg = 'Failed to generate Invoice PDF';
@@ -2465,6 +2501,11 @@ export const api = {
     const pdfName = `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`;
     downloadOrPreviewPdf(blob, pdfName, { title: `Tax Invoice #${invoiceNo || 'Draft'}` });
     console.log(`[PDF Download] Generated & downloaded in ${(performance.now() - t0).toFixed(0)}ms`);
+  },
+
+  getInvoiceHtmlUrl(id, copyType = 'ORIGINAL FOR RECIPIENT') {
+    const baseUrl = getBaseUrl();
+    return `${baseUrl}/billing/invoices/${id}/html?copyType=${encodeURIComponent(copyType)}&t=${Date.now()}`;
   },
 
   async downloadBulkInvoicesPdf(ids = [], fileName = 'Combined_Invoices.pdf') {

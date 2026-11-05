@@ -685,7 +685,8 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
   );
 }
 
-export default function DesignCatalogue({ department, initialSubTab = 'catalogue', currentUser }) {
+export default function DesignCatalogue({ department: rawDepartment, companyEntity, initialSubTab = 'catalogue', currentUser }) {
+  const department = (rawDepartment === 'ethno_wear' || companyEntity === 'Ethno wear') ? 'ethno_wear' : rawDepartment;
   const userPerms = currentUser?.permissions || [];
   const hasSampleOnly = currentUser &&
     currentUser.role !== 'admin' &&
@@ -749,7 +750,18 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
   const loadAllDesigns = useCallback(async () => {
     try {
       const res = await api.getDesigns({ department, limit: 2000 });
-      if (res && res.data) setAllDesignsList(res.data);
+      if (res && res.data) {
+        const cleanList = res.data.filter(d => {
+          if (department === 'ethno_wear') {
+            return d.department === 'ethno_wear' || /^EW-/i.test(d.designName || '') || d.companyEntity === 'Ethno wear';
+          }
+          if (department === 'stitching') {
+            return d.department === 'stitching' || /^PKD-/i.test(d.designName || '');
+          }
+          return d.department !== 'stitching' && d.department !== 'ethno_wear' && !/^(PKD|EW)-/i.test(d.designName || '');
+        });
+        setAllDesignsList(cleanList);
+      }
     } catch (e) {
       console.warn('Failed to load all designs for validation/filters', e);
     }
@@ -812,19 +824,19 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       icon: Palette,
       options: availableColors
     },
-    {
+    ...(department !== 'ethno_wear' ? [{
       id: 'party',
       label: 'Party (Client)',
       icon: User,
       options: availableParties
-    },
+    }] : []),
     {
       id: 'status',
       label: 'Status',
       multi: false,
       options: ['Active', 'Inactive', 'All']
     }
-  ], [availableCategories, availableColors, availableParties]);
+  ], [availableCategories, availableColors, availableParties, department]);
 
   const catalogueFilterValues = useMemo(() => ({
     category: Array.isArray(categoryFilter) ? categoryFilter : (categoryFilter && categoryFilter !== 'All' ? [categoryFilter] : []),
@@ -885,7 +897,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           api.getPrintConfig().catch(() => ({})),
           api.getStitchingConfig().catch(() => ({}))
         ]);
-        const activeCfg = department === 'stitching' ? stitchingCfg : printCfg;
+        const isGarment = department === 'stitching' || department === 'ethno_wear';
+        const activeCfg = isGarment ? stitchingCfg : printCfg;
         const combinedParties = Array.from(new Set([
           ...(printCfg?.parties || []),
           ...(stitchingCfg?.parties || []),
@@ -951,8 +964,17 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         limit: 24
       });
       if (res && res.data) {
-        setDesigns(res.data);
-        setTotal(res.total || 0);
+        const cleanData = res.data.filter(d => {
+          if (department === 'ethno_wear') {
+            return d.department === 'ethno_wear' || /^EW-/i.test(d.designName || '') || d.companyEntity === 'Ethno wear';
+          }
+          if (department === 'stitching') {
+            return d.department === 'stitching' || /^PKD-/i.test(d.designName || '');
+          }
+          return d.department !== 'stitching' && d.department !== 'ethno_wear' && !/^(PKD|EW)-/i.test(d.designName || '');
+        });
+        setDesigns(cleanData);
+        setTotal(department === 'ethno_wear' ? cleanData.length : (res.total || 0));
         setPages(res.pages || 1);
         setPage(targetPage);
         pageRef.current = targetPage;
@@ -985,16 +1007,25 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         limit: 24
       });
       if (res && res.data && res.data.length > 0) {
+        const cleanMore = res.data.filter(d => {
+          if (department === 'ethno_wear') {
+            return d.department === 'ethno_wear' || /^EW-/i.test(d.designName || '') || d.companyEntity === 'Ethno wear';
+          }
+          if (department === 'stitching') {
+            return d.department === 'stitching' || /^PKD-/i.test(d.designName || '');
+          }
+          return d.department !== 'stitching' && d.department !== 'ethno_wear' && !/^(PKD|EW)-/i.test(d.designName || '');
+        });
         setDesigns(prev => {
           const map = new Map();
           prev.forEach(d => map.set(d._id || d.id, d));
-          res.data.forEach(d => map.set(d._id || d.id, d));
+          cleanMore.forEach(d => map.set(d._id || d.id, d));
           return Array.from(map.values());
         });
         setPage(nextPage);
         pageRef.current = nextPage;
         if (res.pages) setPages(res.pages);
-        if (res.total !== undefined) setTotal(res.total);
+        if (res.total !== undefined) setTotal(department === 'ethno_wear' ? designs.length + cleanMore.length : res.total);
       }
     } catch (err) {
       console.warn('Failed to load more designs:', err);
@@ -1006,7 +1037,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
   const fetchCategories = async () => {
     try {
-      const cats = await api.getDesignCategories();
+      const cats = await api.getDesignCategories({ department });
       setCategories(cats || []);
     } catch (e) {
       console.error(e);
@@ -1137,8 +1168,11 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     try {
       const sanitizedVal = {
         ...formVal,
-        parties: Array.isArray(formVal.parties) ? formVal.parties.filter(Boolean) : (formVal.parties ? [formVal.parties] : []),
+        parties: department === 'ethno_wear' ? [] : (Array.isArray(formVal.parties) ? formVal.parties.filter(Boolean) : (formVal.parties ? [formVal.parties] : [])),
+        party: department === 'ethno_wear' ? '' : (formVal.party || ''),
+        partySkuId: department === 'ethno_wear' ? '' : (formVal.partySkuId || ''),
         department: department || (formDesign?.department) || 'digital_print',
+        companyEntity: department === 'ethno_wear' ? 'Ethno wear' : (formVal.companyEntity || ''),
         category: formVal.category || '',
         top100: formVal.top100 === '' || formVal.top100 === null || formVal.top100 === undefined ? 0 : Number(formVal.top100),
         sleeve100: formVal.sleeve100 === '' || formVal.sleeve100 === null || formVal.sleeve100 === undefined ? 0 : Number(formVal.sleeve100),
@@ -1200,8 +1234,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     setBulkProgress({ current: 0, total: 0, updated: 0, skipped: 0, failed: 0, log: [] });
 
     try {
-      // Fetch ALL designs (no filter, large limit)
-      const res = await api.getDesigns({ status: 'All', limit: 9999 });
+      // Fetch ALL designs for current department (no filter, large limit)
+      const res = await api.getDesigns({ department, status: 'All', limit: 9999 });
       const allDesigns = res?.data || [];
       const totalCount = allDesigns.length;
       setBulkProgress(prev => ({ ...prev, total: totalCount }));
@@ -1276,8 +1310,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <h2 className="ent-header-title">
                 {activeSubTab === 'sample' || activeSubTab === 'sample_design'
-                  ? (department === 'stitching' ? 'Stitching Sample Designs' : 'Sample Designs')
-                  : (department === 'stitching' ? 'Stitching Design Room' : 'Design Catalog')}
+                  ? (department === 'stitching' ? 'Stitching Sample Designs' : department === 'ethno_wear' ? 'Ethno Wear Sample Designs' : 'Sample Designs')
+                  : (department === 'stitching' ? 'Stitching Design Room' : department === 'ethno_wear' ? 'Ethno Wear Design Room' : 'Design Catalog')}
               </h2>
               <span className="ent-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
                 {loading && total === 0 ? (
@@ -1340,7 +1374,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         </div>
 
         {/* Sub-Tab Navigation Bar */}
-        {department !== 'stitching' && (
+        {department !== 'stitching' && department !== 'ethno_wear' && (
           <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Design Room Primary Tabs">
             <button
               type="button"
@@ -1512,7 +1546,16 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         </div>
       ) : (
         (() => {
-          const filteredDesigns = designs.filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']));
+          const deptFiltered = designs.filter(d => {
+            if (department === 'ethno_wear') {
+              return d.department === 'ethno_wear' || /^EW-/i.test(d.designName || '') || d.companyEntity === 'Ethno wear';
+            }
+            if (department === 'stitching') {
+              return d.department === 'stitching' || /^PKD-/i.test(d.designName || '');
+            }
+            return d.department !== 'stitching' && d.department !== 'ethno_wear' && !/^(PKD|EW)-/i.test(d.designName || '');
+          });
+          const filteredDesigns = deptFiltered.filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']));
           return (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
@@ -1628,7 +1671,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                     </div>
 
                     {/* Assigned Parties */}
-                    {((Array.isArray(d.parties) && d.parties.length > 0) || d.party) && (
+                    {department !== 'ethno_wear' && ((Array.isArray(d.parties) && d.parties.length > 0) || d.party) && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                         {(Array.isArray(d.parties) ? d.parties : [d.parties || d.party]).filter(Boolean).map((pName, pIdx) => (
                           <span
@@ -1662,7 +1705,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
                     {/* Parameters grid: only show clean design-specific details */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem 0.5rem', fontSize: '0.78rem', borderTop: '1px dashed var(--border-light)', paddingTop: '0.5rem' }}>
-                      {(department === 'stitching' ? [
+                      {((department === 'stitching' || department === 'ethno_wear') ? [
                         ['Fabric', d.fabricName],
                         ['Category', d.category]
                       ] : [
@@ -1699,8 +1742,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       ))}
                     </div>
 
-                    {/* STITCHING ONLY: Size Sales Rates display */}
-                    {department === 'stitching' && d.sizeSalesRates && Object.values(d.sizeSalesRates).some(v => Number(v) > 0) && (
+                    {/* STITCHING & ETHNO WEAR: Size Sales Rates display */}
+                    {(department === 'stitching' || department === 'ethno_wear') && d.sizeSalesRates && Object.values(d.sizeSalesRates).some(v => Number(v) > 0) && (
                       <div style={{ width: '100%', marginTop: '0.4rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.4rem' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>
                           💰 Size Sales Rates (₹):
@@ -1845,20 +1888,22 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               )}
 
               <FormField
-                label={department === 'stitching' ? "Design Name (e.g. PKD-1001)" : "Design Name (e.g. ED-709, ED-710)"}
+                label={department === 'stitching' ? "Design Name (e.g. PKD-1001)" : department === 'ethno_wear' ? "Design Name (e.g. EW-1, EW-2)" : "Design Name (e.g. ED-709, ED-710)"}
                 name="designName"
                 value={formVal.designName}
                 onChange={handleFormChange}
                 required
-                placeholder={department === 'stitching' ? "PKD-1001" : "e.g. ED-709"}
+                placeholder={department === 'stitching' ? "PKD-1001" : department === 'ethno_wear' ? "EW-1" : "e.g. ED-709"}
               />
 
-              <PartyMultiSelect
-                label="Parties (Clients)"
-                selected={formVal.parties || []}
-                options={printConfig.parties || []}
-                onChange={(updated) => setFormVal(prev => ({ ...prev, parties: updated }))}
-              />
+              {department !== 'ethno_wear' && (
+                <PartyMultiSelect
+                  label="Parties (Clients)"
+                  selected={formVal.parties || []}
+                  options={printConfig.parties || []}
+                  onChange={(updated) => setFormVal(prev => ({ ...prev, parties: updated }))}
+                />
+              )}
 
               {department === 'stitching' && (
                 <FormField label="Party SKU ID" name="partySkuId" value={formVal.partySkuId} onChange={handleFormChange} placeholder="e.g. SKU-9042" />
@@ -1870,7 +1915,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                 </div>
               )}
 
-              {department !== 'stitching' && (
+              {department !== 'stitching' && department !== 'ethno_wear' && (
                 <FormField label="Colour Matching Name" name="colourMatching" value={formVal.colourMatching} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Green Matching" />
               )}
 
@@ -1879,10 +1924,10 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                 name="fabricName" 
                 value={formVal.fabricName} 
                 onChange={handleFormChange} 
-                options={department === 'stitching' ? ['', ...(printConfig.fabrics?.length ? printConfig.fabrics : ['Cotton', 'Silk', 'Georgette', 'Chiffon', 'Organza', 'Velvet', 'Rayon', 'Crepe'])] : ['', ...(printConfig.fabrics || [])]} 
+                options={department === 'stitching' || department === 'ethno_wear' ? ['', ...(printConfig.fabrics?.length ? printConfig.fabrics : ['Cotton', 'Silk', 'Georgette', 'Chiffon', 'Organza', 'Velvet', 'Rayon', 'Crepe'])] : ['', ...(printConfig.fabrics || [])]} 
               />
 
-              {department !== 'stitching' && (
+              {department !== 'stitching' && department !== 'ethno_wear' && (
                 <FormField label="Paper Type" name="paperType" value={formVal.paperType} onChange={handleFormChange} options={['', ...(printConfig.paperTypes || [])]} />
               )}
 
@@ -1891,11 +1936,11 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                 name="category"
                 value={formVal.category}
                 onChange={handleFormChange}
-                options={department === 'stitching' ? ['', ...(printConfig.categories?.length ? printConfig.categories : ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC', 'OTHER'])] : ['', ...(printConfig.categories || [])]}
+                options={department === 'stitching' || department === 'ethno_wear' ? ['', ...(printConfig.categories?.length ? printConfig.categories : ['SUIT', 'KURTI', 'DUPATTA', 'SAREE', 'LEHENGA', 'TOP', 'BOTTOM', 'ETHNIC', 'OTHER'])] : ['', ...(printConfig.categories || [])]}
               />
 
-              {/* STITCHING ONLY: Dynamic Size-Wise Sales Rates (Dropdown & Grid from Stitching Settings) */}
-              {department === 'stitching' && (
+              {/* STITCHING & ETHNO WEAR: Dynamic Size-Wise Sales Rates (Dropdown & Grid) */}
+              {(department === 'stitching' || department === 'ethno_wear') && (
                 <>
                   <div style={{
                     fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
@@ -1903,7 +1948,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                     borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'
                   }}>
-                    <span>💰 Size-Wise Sales Rates (₹) — Taken from Stitching Sizes</span>
+                    <span>💰 Size-Wise Sales Rates (₹)</span>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <select
                         id="select-size-rate-shortcut"
@@ -1968,12 +2013,12 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               {/* Design Image Field */}
               <DesignImageField label="Primary Design Image (Upload File or Drive Link)" name="imageUrl" value={formVal.imageUrl} onChange={handleFormChange} placeholder="Paste Drive link or upload file..." />
 
-              {department !== 'stitching' && (
+              {department !== 'stitching' && department !== 'ethno_wear' && (
                 <DesignImageField label="Secondary Design Image URL (Optional)" name="imageUrl2" value={formVal.imageUrl2} onChange={handleFormChange} placeholder="Paste Drive link..." />
               )}
 
               {/* DIGITAL PRINT ONLY SECTIONS */}
-              {department !== 'stitching' && (
+              {department !== 'stitching' && department !== 'ethno_wear' && (
                 <>
                   {/* Section: Fusing Configuration */}
                   <div style={{

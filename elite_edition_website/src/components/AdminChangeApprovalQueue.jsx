@@ -784,9 +784,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                           borderRadius: '6px',
                           fontSize: '0.7rem',
                           fontWeight: 800,
-                          background: item.action === 'DELETE' ? '#eff6ff' : '#eff6ff',
-                          color: '#1e40af',
-                          border: '1px solid #bfdbfe'
+                          background: item.action === 'DELETE' ? '#fff1f2' : item.action === 'CREATE' ? '#f0fdf4' : '#eff6ff',
+                          color: item.action === 'DELETE' ? '#be123c' : item.action === 'CREATE' ? '#15803d' : '#1d4ed8',
+                          border: item.action === 'DELETE' ? '1px solid #fecdd3' : item.action === 'CREATE' ? '1px solid #bbf7d0' : '1px solid #bfdbfe'
                         }}>
                           {item.action}
                         </span>
@@ -797,9 +797,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                           borderRadius: '6px',
                           fontSize: '0.7rem',
                           fontWeight: 800,
-                          background: item.status === 'APPROVED' ? '#eff6ff' : item.status === 'REJECTED' ? '#eff6ff' : '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe'
+                          background: item.status === 'APPROVED' ? '#f0fdf4' : item.status === 'REJECTED' ? '#fef2f2' : '#fffbeb',
+                          color: item.status === 'APPROVED' ? '#166534' : item.status === 'REJECTED' ? '#991b1b' : '#b45309',
+                          border: item.status === 'APPROVED' ? '1px solid #bbf7d0' : item.status === 'REJECTED' ? '1px solid #fecaca' : '1px solid #fde68a'
                         }}>
                           {item.status}
                         </span>
@@ -908,18 +908,34 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                     <div style={{
                       padding: '0.75rem 1rem',
                       borderRadius: '8px',
-                      background: '#eff6ff',
-                      border: '1.5px solid #bfdbfe',
+                      background: item.status === 'APPROVED' ? '#f0fdf4' : item.status === 'REJECTED' ? '#fef2f2' : '#eff6ff',
+                      border: item.status === 'APPROVED' ? '1.5px solid #86efac' : item.status === 'REJECTED' ? '1.5px solid #fca5a5' : '1.5px solid #bfdbfe',
                       fontSize: '0.8rem',
-                      color: '#1e40af',
+                      color: item.status === 'APPROVED' ? '#166534' : item.status === 'REJECTED' ? '#991b1b' : '#1e40af',
                       fontWeight: 700
                     }}>
-                      ⚠️ User has requested to permanently DELETE this entire record. Approving will delete it from the database.
+                      {item.status === 'APPROVED' ? (
+                        `✅ Record Permanently Deleted: This ${item.module || 'record'} was approved and deleted from the database by ${item.reviewedBy?.name || 'Admin'} on ${item.reviewedAt ? new Date(item.reviewedAt).toLocaleDateString('en-IN') : 'recently'}.`
+                      ) : item.status === 'REJECTED' ? (
+                        `✕ Deletion Request Rejected: Record was kept in the database.`
+                      ) : (
+                        '⚠️ User has requested to permanently DELETE this entire record. Approving will delete it from the database.'
+                      )}
                     </div>
                   ) : diffs.length > 0 ? (
                     <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a', marginBottom: '0.45rem', textTransform: 'uppercase' }}>
-                        Proposed Field Modifications ({diffs.length} changed):
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        color: item.status === 'APPROVED' ? '#166534' : item.status === 'REJECTED' ? '#991b1b' : '#1e3a8a',
+                        marginBottom: '0.45rem',
+                        textTransform: 'uppercase'
+                      }}>
+                        {item.status === 'APPROVED'
+                          ? `Applied Modifications (${diffs.length} updated):`
+                          : item.status === 'REJECTED'
+                          ? `Rejected Modifications (${diffs.length} discarded):`
+                          : `Proposed Field Modifications (${diffs.length} changed):`}
                       </div>
 
                       <div style={{ overflowX: 'auto' }}>
