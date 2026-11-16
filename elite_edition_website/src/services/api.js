@@ -3072,6 +3072,13 @@ export const api = {
       });
     },
 
+  async toggleAdminQaBotAccess(qaBotEnabled) {
+      return request('/admin-control/qa-bot-access', {
+        method: 'POST',
+        body: JSON.stringify({ qaBotEnabled }),
+      });
+    },
+
   async listBackupHistory() {
       return request('/backup/history');
     },

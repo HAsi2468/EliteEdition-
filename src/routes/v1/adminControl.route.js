@@ -16,5 +16,6 @@ router.get('/chat-storage', ctrl.getChatStorage);
 router.post('/chat-storage/cleanup', ctrl.cleanupChatStorage);
 router.get('/party-ageing', ctrl.getPartyAgeing);
 router.post('/send-payment-reminder', ctrl.sendPaymentReminder);
+router.post('/qa-bot-access', ctrl.toggleQaBotAccess);
 
 module.exports = router;

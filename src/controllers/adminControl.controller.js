@@ -593,6 +593,27 @@ const sendPaymentReminder = async (req, res) => {
   }
 };
 
+/**
+ * POST /v1/admin-control/qa-bot-access
+ * Enables or disables Main Admin access for the QA testing bot.
+ */
+const toggleQaBotAccess = async (req, res) => {
+  try {
+    if (!isAdminReq(req)) return res.status(403).json({ error: 'Admin access required.' });
+    const qaBotEnabled = Boolean(req.body?.qaBotEnabled);
+    const updated = await saveAdminSettingPatch({ qaBotEnabled });
+    return res.json({
+      success: true,
+      qaBotEnabled: updated?.qaBotEnabled !== false,
+      message: qaBotEnabled
+        ? 'QA Testing Bot Main Admin access ENABLED.'
+        : 'QA Testing Bot Main Admin access DISABLED.',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to update QA Bot access' });
+  }
+};
+
 module.exports = {
   getOverview,
   approveSampleDesign,
@@ -607,4 +628,5 @@ module.exports = {
   cleanupChatStorage,
   getPartyAgeing,
   sendPaymentReminder,
+  toggleQaBotAccess,
 };

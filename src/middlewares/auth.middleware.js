@@ -303,6 +303,33 @@ const requireAuth = async (req, res, next) => {
     }
 
     if (!user && (decoded.role === 'qa-automation' || decoded.isBot === true)) {
+      // Check live Admin Control kill-switch (qaBotEnabled, defaults to true) + optional QA_BOT_SECRET
+      let qaBotEnabled = true;
+      try {
+        if (db.PrintConfig) {
+          const cfg = await db.PrintConfig.findOne({ key: 'admin_control_settings' }).lean().catch(() => null);
+          if (cfg?.value && cfg.value.qaBotEnabled === false) {
+            qaBotEnabled = false;
+          }
+        }
+      } catch (e) {}
+
+      if (!qaBotEnabled) {
+        return res.status(401).json({
+          success: false,
+          code: 'QA_BOT_DISABLED',
+          message: 'QA Bot Main Admin access is currently disabled by Master Admin.'
+        });
+      }
+
+      if (process.env.QA_BOT_SECRET && req.headers['x-qa-bot-key'] !== process.env.QA_BOT_SECRET) {
+        return res.status(401).json({
+          success: false,
+          code: 'QA_BOT_SECRET_INVALID',
+          message: 'Invalid QA Bot secret key.'
+        });
+      }
+
       user = {
         _id: mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : new mongoose.Types.ObjectId('666666666666666666666666'),
         id: String(userId),
@@ -312,11 +339,14 @@ const requireAuth = async (req, res, next) => {
         role: 'admin',
         isMainAdmin: true,
         isAdmin: true,
+        isBot: true,
         isActive: true,
         status: 'Active',
-        allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex']
+        allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno Wear', 'Yamunaji', 'EXEDP']
       };
-      setCachedUser(userId, user, false);
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+        logger.info(`[QA-BOT] ${req.method} ${req.originalUrl}`);
+      }
     }
 
     if (!user || user.isActive === false || user.status === 'Inactive') {
