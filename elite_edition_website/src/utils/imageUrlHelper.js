@@ -346,7 +346,7 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   }
 
   // 4. Direct absolute HTTP/HTTPS URL (API product image link / Marketplace CDN / Cloudflare R2)
-  // When an explicit URL is provided from the API, prioritize it immediately!
+  // Prioritize lightweight resized preview for thumbnails so 5-20MB raw R2 photos load in <100ms.
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     if (isExternalCdnUrl(raw)) {
       const httpsRaw = raw.startsWith('http://') ? raw.replace(/^http:\/\//i, 'https://') : raw;
@@ -355,16 +355,16 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
       if (raw !== httpsRaw) add(raw);
       return candidates;
     }
+    if (isThumb) {
+      add(`/v1/upload/preview?url=${encodeURIComponent(raw)}&w=${width}`);
+    }
     add(raw);
     if (raw.includes('/designs/')) {
       add(raw.replace('/designs/', '/sample_reference/'));
-      add(raw.replace('/designs/', '/design_samples/'));
-      add(raw.replace('/designs/', '/uploads/'));
     } else if (raw.includes('/sample_reference/')) {
       add(raw.replace('/sample_reference/', '/designs/'));
-      add(raw.replace('/sample_reference/', '/design_samples/'));
-      add(raw.replace('/sample_reference/', '/uploads/'));
     }
+    return candidates;
   }
 
   // 5. Direct Cloudflare R2 links from rawFilename
@@ -447,9 +447,11 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     // Sample reference & design samples folders on R2
     add(`${R2_PUBLIC_BASE}/sample_reference/${encodeURIComponent(cleanIdent)}.jpg`);
     add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(cleanIdent)}.jpg`);
+
+    if (candidates.length >= 6) break;
   }
 
-  return candidates;
+  return candidates.slice(0, 6);
 }
 
 /**
