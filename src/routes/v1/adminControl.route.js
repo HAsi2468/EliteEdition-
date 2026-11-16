@@ -1,7 +1,10 @@
 const express = require('express');
 const ctrl = require('../../controllers/adminControl.controller');
+const { requireAdmin } = require('../../middlewares/roleGuard.middleware');
 
 const router = express.Router();
+
+router.use(requireAdmin);
 
 router.get('/overview', ctrl.getOverview);
 router.post('/sample-approve/:taskId', ctrl.approveSampleDesign);
@@ -16,6 +19,5 @@ router.get('/chat-storage', ctrl.getChatStorage);
 router.post('/chat-storage/cleanup', ctrl.cleanupChatStorage);
 router.get('/party-ageing', ctrl.getPartyAgeing);
 router.post('/send-payment-reminder', ctrl.sendPaymentReminder);
-router.post('/qa-bot-access', ctrl.toggleQaBotAccess);
 
 module.exports = router;

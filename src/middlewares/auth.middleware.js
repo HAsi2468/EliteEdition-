@@ -302,31 +302,30 @@ const requireAuth = async (req, res, next) => {
       }
     }
 
+    // Synthetic QA-bot auth is strictly forbidden in production; only allowed in non-prod
+    // when ALLOW_QA_BOT_AUTH=true and a timing-safe QA_BOT_SECRET header matches.
     if (!user && (decoded.role === 'qa-automation' || decoded.isBot === true)) {
-      // Check live Admin Control kill-switch (qaBotEnabled, defaults to true) + optional QA_BOT_SECRET
-      let qaBotEnabled = true;
-      try {
-        if (db.PrintConfig) {
-          const cfg = await db.PrintConfig.findOne({ key: 'admin_control_settings' }).lean().catch(() => null);
-          if (cfg?.value && cfg.value.qaBotEnabled === false) {
-            qaBotEnabled = false;
-          }
+      const isNonProd = process.env.NODE_ENV !== 'production';
+      const allowBot = process.env.ALLOW_QA_BOT_AUTH === 'true';
+      const expectedSecret = process.env.QA_BOT_SECRET || '';
+      const providedSecret = String(req.headers['x-qa-bot-key'] || '');
+      let secretMatches = false;
+      if (expectedSecret && providedSecret.length === expectedSecret.length) {
+        try {
+          secretMatches = require('crypto').timingSafeEqual(
+            Buffer.from(providedSecret, 'utf8'),
+            Buffer.from(expectedSecret, 'utf8')
+          );
+        } catch (_) {
+          secretMatches = false;
         }
-      } catch (e) {}
-
-      if (!qaBotEnabled) {
-        return res.status(401).json({
-          success: false,
-          code: 'QA_BOT_DISABLED',
-          message: 'QA Bot Main Admin access is currently disabled by Master Admin.'
-        });
       }
 
-      if (process.env.QA_BOT_SECRET && req.headers['x-qa-bot-key'] !== process.env.QA_BOT_SECRET) {
+      if (!isNonProd || !allowBot || !secretMatches) {
         return res.status(401).json({
           success: false,
-          code: 'QA_BOT_SECRET_INVALID',
-          message: 'Invalid QA Bot secret key.'
+          code: 'UNAUTHORIZED',
+          message: 'Virtual bot authentication is disabled. Use a valid database user account.'
         });
       }
 
@@ -337,16 +336,13 @@ const requireAuth = async (req, res, next) => {
         username: 'qa-bot',
         email: decoded.email || 'qa-bot@eliteedition.in',
         role: 'admin',
-        isMainAdmin: true,
+        isMainAdmin: false,
         isAdmin: true,
         isBot: true,
         isActive: true,
         status: 'Active',
-        allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno Wear', 'Yamunaji', 'EXEDP']
+        allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex']
       };
-      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        logger.info(`[QA-BOT] ${req.method} ${req.originalUrl}`);
-      }
     }
 
     if (!user || user.isActive === false || user.status === 'Inactive') {

@@ -1,25 +1,10 @@
 const express = require('express');
 const backupController = require('../../controllers/backup.controller');
+const { requireAdmin } = require('../../middlewares/roleGuard.middleware');
 
 const router = express.Router();
 
-const requireBackupAdmin = (req, res, next) => {
-  const u = req.user || {};
-  const roleStr = String(u.role || '').toLowerCase();
-  const isAdm = Boolean(
-    u.isMainAdmin ||
-    u.isAdmin === true ||
-    roleStr === 'admin' ||
-    roleStr === 'master_admin' ||
-    roleStr === 'master'
-  );
-  if (!isAdm) {
-    return res.status(403).json({ success: false, error: 'Admin access required for database backups.' });
-  }
-  return next();
-};
-
-router.use(requireBackupAdmin);
+router.use(requireAdmin);
 
 router.get('/download', backupController.getDepartmentBackup);
 router.post('/trigger-r2', backupController.triggerR2Backup);

@@ -1,7 +1,10 @@
 const express = require('express');
 const gstController = require('../../controllers/gst.controller');
+const { requireStaff } = require('../../middlewares/roleGuard.middleware');
 
 const router = express.Router();
+
+router.use(requireStaff);
 
 // Table 12 HSN Summary routes
 router.get('/table12', gstController.getTable12Aggregates);

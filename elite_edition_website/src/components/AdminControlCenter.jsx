@@ -67,8 +67,6 @@ export default function AdminControlCenter({ users = [], onRefreshUsers }) {
   const [r2Backups, setR2Backups] = useState([]);
   const [backingUpR2, setBackingUpR2] = useState(false);
   const [emailingBackup, setEmailingBackup] = useState(false);
-  const [qaBotEnabled, setQaBotEnabled] = useState(true);
-  const [togglingBot, setTogglingBot] = useState(false);
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -84,7 +82,6 @@ export default function AdminControlCenter({ users = [], onRefreshUsers }) {
         setData(res.data);
         setBooksLockDate(res.data.settings?.booksLockDate || '');
         setGstApiProvider(res.data.settings?.gstApiProvider || 'gstincheck');
-        setQaBotEnabled(res.data.settings?.qaBotEnabled !== false);
       }
       if (finRes?.success && Array.isArray(finRes.data)) setCompanyFinancials(finRes.data);
       if (chatRes?.success && chatRes.data) setChatStorage(chatRes.data);
@@ -495,32 +492,6 @@ export default function AdminControlCenter({ users = [], onRefreshUsers }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              disabled={togglingBot}
-              onClick={async () => {
-                setTogglingBot(true);
-                try {
-                  const next = !qaBotEnabled;
-                  const res = await api.toggleAdminQaBotAccess(next);
-                  setQaBotEnabled(res?.qaBotEnabled !== false);
-                  triggerPushNotification('QA Bot Access', res?.message || 'Updated QA Bot access', 'success');
-                } catch (e) {
-                  triggerPushNotification('Error', e.message || 'Failed to toggle QA Bot access', 'error');
-                } finally {
-                  setTogglingBot(false);
-                }
-              }}
-              style={{
-                ...btnPrimary,
-                background: qaBotEnabled ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)',
-                borderColor: qaBotEnabled ? 'rgba(52, 211, 153, 0.45)' : 'rgba(248, 113, 113, 0.45)',
-                color: qaBotEnabled ? '#6ee7b7' : '#fca5a5',
-              }}
-              title="Toggle Main Admin API access for qa-bot"
-            >
-              <ShieldCheck size={14} /> QA Bot Admin: {qaBotEnabled ? 'ON' : 'OFF'}
-            </button>
             <button
               type="button"
               disabled={backingUpR2}
