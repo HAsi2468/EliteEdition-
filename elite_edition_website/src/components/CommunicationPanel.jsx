@@ -2819,28 +2819,54 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     return () => window.removeEventListener('popstate', handlePopState);
   }, [isMobileScreen]);
 
-  // Auto-scroll to bottom on thread open
+  const forceScrollBottomUntilRef = useRef(0);
+
+  // Auto-scroll to bottom on thread open (handles async E2EE decrypt + image/PDF height expansion)
   useEffect(() => {
-    if (activeGroup?._id) {
-      isNearBottomRef.current = true;
-      setShowScrollBottom(false);
-      setUnreadBelowCount(0);
-      if (chatScrollRef.current) {
+    if (!activeGroup?._id) return;
+    isNearBottomRef.current = true;
+    forceScrollBottomUntilRef.current = Date.now() + 1800;
+    setShowScrollBottom(false);
+    setUnreadBelowCount(0);
+
+    const snapBottom = () => {
+      if (chatScrollRef.current && Date.now() <= forceScrollBottomUntilRef.current) {
         chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
       }
-      const t = setTimeout(() => {
-        if (chatScrollRef.current) {
-          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-        }
-      }, 60);
-      return () => clearTimeout(t);
+    };
+
+    const cancelForceScroll = () => {
+      forceScrollBottomUntilRef.current = 0;
+    };
+
+    const el = chatScrollRef.current;
+    if (el) {
+      el.addEventListener('wheel', cancelForceScroll, { passive: true });
+      el.addEventListener('touchstart', cancelForceScroll, { passive: true });
     }
+
+    const rafId = requestAnimationFrame(snapBottom);
+    const timers = [60, 180, 420, 850].map((ms) => setTimeout(snapBottom, ms));
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      timers.forEach(clearTimeout);
+      if (el) {
+        el.removeEventListener('wheel', cancelForceScroll);
+        el.removeEventListener('touchstart', cancelForceScroll);
+      }
+    };
   }, [activeGroup?._id]);
 
   // Auto-scroll to chat bottom safely strictly within message container
   useEffect(() => {
-    if (isNearBottomRef.current && chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    if ((isNearBottomRef.current || Date.now() <= forceScrollBottomUntilRef.current) && chatScrollRef.current) {
+      const rafId = requestAnimationFrame(() => {
+        if (chatScrollRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      });
+      return () => cancelAnimationFrame(rafId);
     }
   }, [messages, viewportHeight]);
 
