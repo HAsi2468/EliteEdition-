@@ -23,11 +23,11 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
       const parts = rawName.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
       const searchKey = parts[0] || rawName.trim();
 
-      (api.getDesigns ? api.getDesigns({ search: searchKey, limit: 1 }) : api.getDesignCatalogue({ search: searchKey, limit: 1 }))
+      (api.getDesigns ? api.getDesigns({ search: searchKey, limit: 10 }) : api.getDesignCatalogue({ search: searchKey, limit: 10 }))
         .then((res) => {
           const list = Array.isArray(res) ? res : (res?.data || []);
           if (list.length > 0) {
-            const matched = list[0];
+            const matched = list.find((d) => String(d.designName || d.designNo || '').trim().toUpperCase() === searchKey.toUpperCase()) || list[0];
             setResolvedImages({
               imageUrl1: matched.imageUrl || matched.imageUrl2 || '',
               imageUrl2: matched.imageUrl2 && matched.imageUrl !== matched.imageUrl2 ? matched.imageUrl2 : (parts.length > 1 ? card.imageUrl2 || '' : ''),
@@ -431,11 +431,13 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                     {resolvedImages.imageUrl1 && (
                       <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', minHeight: '130px' }}>
                         <DesignImage
+                          priority
+                          showShimmer={false}
                           rawUrl={resolvedImages.imageUrl1}
                           designName={card?.designName || card?.designNo || ''}
                           thumbnail={true}
                           width={450}
-                          style={{ width: '100%', height: '100%', maxHeight: '190px' }}
+                          style={{ width: '100%', height: '100%', maxHeight: '190px', background: 'transparent' }}
                           imgStyle={{ objectFit: 'contain' }}
                           showPlaceholderBadge={true}
                         />
@@ -444,11 +446,13 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                     {resolvedImages.imageUrl2 && (
                       <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderLeft: '1.2px solid #000', minHeight: '130px' }}>
                         <DesignImage
+                          priority
+                          showShimmer={false}
                           rawUrl={resolvedImages.imageUrl2}
                           designName={`${card?.designName || card?.designNo || ''}-2`}
                           thumbnail={true}
                           width={450}
-                          style={{ width: '100%', height: '100%', maxHeight: '190px' }}
+                          style={{ width: '100%', height: '100%', maxHeight: '190px', background: 'transparent' }}
                           imgStyle={{ objectFit: 'contain' }}
                           showPlaceholderBadge={true}
                         />
