@@ -35,10 +35,12 @@ export default function DesignImage({
   strictDirectOnly = false
 }) {
   const containerRef = useRef(null);
+  const imgRef = useRef(null);
   const hoverTimerRef = useRef(null);
 
-  // Viewport intersection state: priority images render immediately; others defer until near viewport
-  const [isInView, setIsInView] = useState(priority);
+  // Always mount <img> and rely on native browser loading="lazy" / "eager"
+  // (avoids IntersectionObserver getting stuck false inside scrolled/tabbed containers)
+  const isInView = true;
 
   const candidates = useMemo(
     () => getImageCandidates(rawUrl, designName, { thumbnail, width, identifiers, category, strictDirectOnly }),
@@ -49,35 +51,6 @@ export default function DesignImage({
   const [hasLoaded, setHasLoaded] = useState(false);
   const [allFailed, setAllFailed] = useState(false);
 
-  // Viewport Intersection Observer (250px rootMargin for butter-smooth scrolling)
-  useEffect(() => {
-    if (priority || isInView) return;
-
-    if (typeof IntersectionObserver === 'undefined') {
-      setIsInView(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry && (entry.isIntersecting || entry.intersectionRatio > 0)) {
-          setIsInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '250px 0px 250px 0px', threshold: 0 }
-    );
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [priority, isInView]);
-
   // Reset state when candidate source changes
   useEffect(() => {
     setCandidateIdx(0);
@@ -86,6 +59,13 @@ export default function DesignImage({
   }, [candidates]);
 
   const currentSrc = candidates[candidateIdx] || '';
+
+  // Ensure already-cached images reveal immediately even if onLoad fires synchronously
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
+      setHasLoaded(true);
+    }
+  }, [currentSrc]);
 
   const handleError = () => {
     if (currentSrc) {
@@ -195,7 +175,7 @@ export default function DesignImage({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f8fafc',
+        background: 'rgba(11, 17, 32, 0.72)',
         contain: 'layout paint',
         ...style
       }}
@@ -206,12 +186,10 @@ export default function DesignImage({
       {/* Subtle loader shimmer until image successfully loads */}
       {showShimmer && !hasLoaded && (
         <div
+          className="erp-shimmer-box"
           style={{
             position: 'absolute',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite',
             zIndex: 1
           }}
         />
@@ -219,6 +197,7 @@ export default function DesignImage({
 
       {isInView ? (
         <img
+          ref={imgRef}
           src={currentSrc}
           alt={alt || designName || 'Design'}
           width={width || 360}

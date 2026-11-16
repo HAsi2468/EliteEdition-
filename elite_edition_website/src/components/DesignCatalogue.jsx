@@ -1598,21 +1598,21 @@ export default function DesignCatalogue({ department: rawDepartment, companyEnti
                       <div
                         style={{
                           height: '180px',
-                          background: '#f8fafc',
+                          background: 'rgba(11, 17, 32, 0.75)',
                           borderRadius: '10px',
                           overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           position: 'relative',
-                          border: '1px solid var(--border-light, #e2e8f0)'
+                          border: '1px solid rgba(148, 163, 184, 0.22)'
                         }}
                       >
                         <DesignImage
                           rawUrl={d.imageUrl}
                           designName={d.designName}
                           category={d.category}
-                          department={department}
+                          identifiers={[d.designName, d.partySkuId].filter(Boolean)}
                           thumbnail={true}
                           width={360}
                           onZoom={(src) => setZoomImg(src)}
