@@ -2857,7 +2857,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
 
       {/* ── MAIN CONTENT AREA ── */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
         
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '280px', color: 'var(--text-muted)' }}>
