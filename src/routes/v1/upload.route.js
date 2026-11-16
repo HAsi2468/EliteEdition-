@@ -2,6 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
 const { isR2Configured, uploadToR2 } = require('../../utils/r2Storage');
 const { decodeUnicodeFileName, sanitizeUnicodeKeyName } = require('../../utils/unicodeFileHelper');
 const { requireAuth } = require('../../middlewares/auth.middleware');
@@ -256,6 +258,11 @@ function isSafeImageUrl(targetUrl) {
  * Converts TIFF (.tif/.tiff) or large images into web-compatible JPEG on the fly using Sharp.
  * Allows browsers (Chrome/Firefox/Safari) to display TIFF artwork thumbnails and lightbox previews.
  */
+const THUMB_CACHE_DIR = path.join(os.tmpdir(), 'elite_thumb_cache');
+try {
+  if (!fs.existsSync(THUMB_CACHE_DIR)) fs.mkdirSync(THUMB_CACHE_DIR, { recursive: true });
+} catch (_) {}
+
 router.get('/preview', async (req, res) => {
   try {
     const rawUrl = req.query.url;
@@ -264,12 +271,25 @@ router.get('/preview', async (req, res) => {
     }
 
     const targetUrl = rawUrl.trim();
+    const width = parseInt(req.query.w, 10);
 
     // SSRF Guard Check: Validate URL safety before attempting any network requests or file reads
     if (!isSafeImageUrl(targetUrl)) {
       return res.status(403).json({
         error: 'Forbidden: Access to requested URL host or protocol is blocked by SSRF security policies.'
       });
+    }
+
+    // Fast SSD thumbnail cache hit (~10ms from Mumbai EC2 instead of downloading multi-MB R2 files)
+    let cacheFile = '';
+    if (width && width > 0 && width <= 800) {
+      const hash = crypto.createHash('sha1').update(`${targetUrl}::${width}`).digest('hex');
+      cacheFile = path.join(THUMB_CACHE_DIR, `${hash}.jpg`);
+      if (fs.existsSync(cacheFile)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=2592000');
+        return res.sendFile(cacheFile);
+      }
     }
 
     let imageBuffer = null;
@@ -326,12 +346,15 @@ router.get('/preview', async (req, res) => {
     let pipeline = sharp(imageBuffer).rotate();
 
     // Optional width resize for thumbnails
-    const width = parseInt(req.query.w, 10);
     if (width && width > 0 && width <= 3000) {
       pipeline = pipeline.resize({ width, withoutEnlargement: true });
     }
 
-    const jpegBuffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+    const jpegBuffer = await pipeline.jpeg({ quality: 80, progressive: true }).toBuffer();
+
+    if (cacheFile) {
+      fs.promises.writeFile(cacheFile, jpegBuffer).catch(() => {});
+    }
 
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=2592000');

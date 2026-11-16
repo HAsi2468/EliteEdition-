@@ -355,6 +355,9 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
       if (raw !== httpsRaw) add(raw);
       return candidates;
     }
+    if (isThumb) {
+      add(`/v1/upload/preview?url=${encodeURIComponent(raw)}&w=${width}`);
+    }
     add(raw);
     if (raw.includes('/designs/')) {
       add(raw.replace('/designs/', '/sample_reference/'));
