@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import socketManager from '../services/socketManager';
-import { isAuthenticated } from '../services/api';
+import { api, isAuthenticated } from '../services/api';
+import { getFloorQueueCount } from '../services/offlineFloorQueue';
 import { lifecycleManager } from '../services/resilientLifecycleManager';
 
 /**
@@ -20,6 +21,18 @@ export function ConnectionBanner() {
   );
   const [showRecoveredBadge, setShowRecoveredBadge] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [floorQueueCount, setFloorQueueCount] = useState(0);
+  const [syncingFloor, setSyncingFloor] = useState(false);
+
+  useEffect(() => {
+    getFloorQueueCount().then(setFloorQueueCount).catch(() => {});
+    const onFloorQueue = (e) => {
+      if (typeof e?.detail?.count === 'number') setFloorQueueCount(e.detail.count);
+      else getFloorQueueCount().then(setFloorQueueCount).catch(() => {});
+    };
+    window.addEventListener('elite-floor-queue-updated', onFloorQueue);
+    return () => window.removeEventListener('elite-floor-queue-updated', onFloorQueue);
+  }, []);
 
   const prevConnectedRef = useRef(
     socketManager.isConnected() && (typeof navigator !== 'undefined' ? navigator.onLine : true)
@@ -145,6 +158,65 @@ export function ConnectionBanner() {
   };
 
   const pendingCount = queueStatus?.count || 0;
+
+  if (floorQueueCount > 0 && hasAuthToken) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '54px',
+          right: '16px',
+          zIndex: 99990,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          padding: '0.5rem 0.85rem',
+          borderRadius: '999px',
+          background: 'rgba(11, 17, 32, 0.94)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(251, 191, 36, 0.45)',
+          color: '#fde68a',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.55)',
+        }}
+      >
+        {isOffline ? <WifiOff size={14} color="#fbbf24" /> : <Wifi size={14} color="#34d399" />}
+        <span>
+          {floorQueueCount} floor scan/log{floorQueueCount > 1 ? 's' : ''} queued {isOffline ? '(Offline)' : ''}
+        </span>
+        {!isOffline && (
+          <button
+            type="button"
+            disabled={syncingFloor}
+            onClick={async () => {
+              setSyncingFloor(true);
+              try {
+                await api.syncOfflineFloorQueue();
+              } finally {
+                setSyncingFloor(false);
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '0.24rem 0.6rem',
+              borderRadius: '999px',
+              border: '1px solid rgba(56, 189, 248, 0.45)',
+              background: 'rgba(37, 99, 235, 0.7)',
+              color: '#ffffff',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={11} /> {syncingFloor ? 'Syncing...' : 'Sync Now'}
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // Enterprise Silent Reconnection:
   // Reconnection and sync happen 100% automatically in the background without intrusive floating popups or banners.

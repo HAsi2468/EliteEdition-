@@ -3621,15 +3621,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         ) : activeView === 'calendar' ? (
 
           /* ════ VIEW 2.5: TASKOPAD INTERACTIVE CALENDAR VIEW ════ */
-          <div className="glass-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', padding: '1rem', boxSizing: 'border-box' }}>
+          <div className="glass-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(15, 23, 42, 0.82)', borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.22)', overflow: 'hidden', padding: '1rem', boxSizing: 'border-box' }}>
             
             {/* Calendar Controls Bar */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
                   {calendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
                 </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(11, 17, 32, 0.78)', border: '1px solid rgba(148, 163, 184, 0.24)', borderRadius: '8px', padding: '2px' }}>
                   <button
                     type="button"
                     onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
@@ -3808,21 +3808,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         ) : activeView === 'timeline' ? (
 
           /* ════ VIEW 3: GANTT CHART & TIMELINE VIEW ════ */
-          <div className="glass-panel" style={{ height: '100%', borderRadius: '12px', overflow: 'auto', background: '#ffffff', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="glass-panel" style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'auto', background: 'rgba(15, 23, 42, 0.82)', border: '1px solid rgba(148, 163, 184, 0.22)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <CalendarRange size={18} color="#2563eb" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CalendarRange size={18} color="#38bdf8" />
                   <span>14-Day Gantt Schedule &amp; Production Timeline</span>
                 </h3>
-                <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>
                   Interactive visual timeline showing start dates, due dates, and real-time sub-task completion progress.
                 </p>
               </div>
             </div>
 
             {/* Timeline Table */}
-            <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '10px' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'auto', border: '1px solid rgba(148, 163, 184, 0.22)', borderRadius: '10px' }}>
               {(() => {
                 const today = new Date();
                 const calendarDays = Array.from({ length: 14 }).map((_, i) => {
@@ -3834,14 +3834,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 return (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 1000 }}>
                     <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-light)' }}>
-                        <th style={{ width: 280, padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--text-muted)', position: 'sticky', left: 0, background: '#f8fafc', zIndex: 2 }}>
+                      <tr style={{ background: 'rgba(11, 17, 32, 0.92)', borderBottom: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                        <th style={{ width: 280, padding: '0.6rem 0.8rem', textAlign: 'left', color: '#94a3b8', position: 'sticky', left: 0, background: '#0b1120', zIndex: 2 }}>
                           Task &amp; Assignees
                         </th>
                         {calendarDays.map((date, idx) => {
                           const isToday = idx === 0;
                           return (
-                            <th key={idx} style={{ padding: '0.5rem 0.3rem', textAlign: 'center', borderLeft: '1px solid var(--border-light)', background: isToday ? '#eff6ff' : '#f8fafc' }}>
+                            <th key={idx} style={{ padding: '0.5rem 0.3rem', textAlign: 'center', borderLeft: '1px solid rgba(148, 163, 184, 0.16)', background: isToday ? 'rgba(37, 99, 235, 0.22)' : 'rgba(11, 17, 32, 0.92)' }}>
                               <div style={{ fontSize: '0.62rem', color: isToday ? '#2563eb' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>
                                 {date.toLocaleDateString('en-US', { weekday: 'short' })}
                               </div>
@@ -3949,7 +3949,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         ) : activeView === 'leaderboard' ? (
 
           /* ════ VIEW 4: STAFF PRODUCTIVITY LEADERBOARD ════ */
-          <div className="glass-panel" style={{ height: '100%', borderRadius: '12px', overflowY: 'auto', background: '#ffffff', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+          <div className="glass-panel" style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflowY: 'auto', background: 'rgba(15, 23, 42, 0.82)', border: '1px solid rgba(148, 163, 184, 0.22)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -4158,22 +4158,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         ) : (
 
           /* ════ VIEW 3: TIMESHEETS & UTILIZATION VIEW ════ */
-          <div className="glass-panel" style={{ height: '100%', borderRadius: '12px', overflowY: 'auto', padding: '1rem', background: '#ffffff' }}>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          <div className="glass-panel" style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflowY: 'auto', padding: '1rem', background: 'rgba(15, 23, 42, 0.82)', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+            <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 800, color: '#f8fafc' }}>
               Workforce Time Logs &amp; Utilization Summary
             </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
-              <div style={{ padding: '1rem', borderRadius: '10px', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700 }}>Total Hours Logged</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1d4ed8', marginTop: '4px' }}>
+              <div style={{ padding: '1rem', borderRadius: '10px', background: 'rgba(37, 99, 235, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+                <div style={{ fontSize: '0.75rem', color: '#93c5fd', fontWeight: 700 }}>Total Hours Logged</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8', marginTop: '4px' }}>
                   {tasks.reduce((acc, t) => acc + parseFloat(calculateTotalLoggedHours(t.timeLogs)), 0).toFixed(1)} hrs
                 </div>
               </div>
 
-              <div style={{ padding: '1rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>Total Billable Hours</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
+              <div style={{ padding: '1rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.16)', border: '1px solid rgba(52, 211, 153, 0.35)' }}>
+                <div style={{ fontSize: '0.75rem', color: '#6ee7b7', fontWeight: 700 }}>Total Billable Hours</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
                   {tasks.reduce((acc, t) => acc + (t.timeLogs || []).filter(l => l.isBillable !== false).reduce((a, l) => a + (l.hours || 0), 0), 0).toFixed(1)} hrs
                 </div>
               </div>
@@ -4181,7 +4181,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
+                <tr style={{ background: 'rgba(11, 17, 32, 0.92)', borderBottom: '1px solid rgba(148, 163, 184, 0.22)', textAlign: 'left', color: '#94a3b8' }}>
                   <th style={{ padding: '0.6rem 0.8rem' }}>Staff User</th>
                   <th style={{ padding: '0.6rem 0.8rem' }}>Task Title</th>
                   <th style={{ padding: '0.6rem 0.8rem' }}>Hours</th>

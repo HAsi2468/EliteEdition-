@@ -1,6 +1,40 @@
 import { downloadOrPreviewPdf } from '../utils/pdfDownloadService';
 import { triggerPushNotification } from '../components/NotificationToast';
 import { silentAuth } from './authInterceptor';
+import {
+  enqueueFloorAction,
+  flushFloorQueue,
+  initOfflineFloorQueueSync,
+  isLikelyNetworkError,
+} from './offlineFloorQueue';
+
+async function requestWithOfflineQueue(endpoint, method, data, label) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    await enqueueFloorAction({ endpoint, method, body: data, label });
+    return {
+      success: true,
+      queuedOffline: true,
+      message: `${label} saved offline — will auto-sync when Wi-Fi returns.`,
+    };
+  }
+  try {
+    return await request(endpoint, { method, body: JSON.stringify(data) });
+  } catch (err) {
+    if (isLikelyNetworkError(err)) {
+      await enqueueFloorAction({ endpoint, method, body: data, label });
+      return {
+        success: true,
+        queuedOffline: true,
+        message: `${label} saved offline — will auto-sync when Wi-Fi returns.`,
+      };
+    }
+    throw err;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  initOfflineFloorQueueSync((ep, opts) => request(ep, opts));
+}
 
 // API Base URL management
 const DEFAULT_URL = '/v1';
@@ -1073,7 +1107,7 @@ export const api = {
 
   // ─── Machine Print Logs ──────────────────────────────────────────────────
   async createJobPrintLog(data) {
-    return request('/jobPrintLogs', { method: 'POST', body: JSON.stringify(data) });
+    return requestWithOfflineQueue('/jobPrintLogs', 'POST', data, 'Print Log');
   },
   async getJobPrintLogs(params = {}) {
     const query = new URLSearchParams();
@@ -1102,7 +1136,7 @@ export const api = {
 
   // ─── Machine Fusing Logs ──────────────────────────────────────────────────
   async createJobFusingLog(data) {
-    return request('/jobFusingLogs', { method: 'POST', body: JSON.stringify(data) });
+    return requestWithOfflineQueue('/jobFusingLogs', 'POST', data, 'Fusing Log');
   },
   async getJobFusingLogs(params = {}) {
     const query = new URLSearchParams();
@@ -2354,24 +2388,15 @@ export const api = {
     },
 
   async packAwbOrder(data) {
-      return request('/scan-pack/pack', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return requestWithOfflineQueue('/scan-pack/pack', 'POST', data, 'Scan & Pack');
     },
 
   async markAwbDelivered(data) {
-      return request('/scan-pack/deliver', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return requestWithOfflineQueue('/scan-pack/deliver', 'POST', data, 'AWB Dispatch');
     },
 
   async processAwbReturn(data) {
-      return request('/scan-pack/return', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return requestWithOfflineQueue('/scan-pack/return', 'POST', data, 'AWB Return');
     },
 
   async getScanPackHistory({ limit, page, mode, search, startDate, endDate, courier, channel, status } = {}) {
@@ -2414,10 +2439,11 @@ export const api = {
     },
 
   async logScan(data) {
-      return request('/scan-pack/log-scan', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return requestWithOfflineQueue('/scan-pack/log-scan', 'POST', data, 'Floor Scan');
+    },
+
+  async syncOfflineFloorQueue() {
+      return flushFloorQueue((ep, opts) => request(ep, opts));
     },
 
   async clearScanHistory(daysOld = 0) {
