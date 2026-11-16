@@ -3,6 +3,7 @@ import { Package, TrendingUp, IndianRupee, AlertTriangle, Layers, ShoppingBag, M
 import DashboardList from './DashboardList';
 import { EntityBrandBadge } from './common/EntityBrandBadge';
 import QuickActionMenu from './common/QuickActionMenu';
+import CountUpNumber from './common/CountUpNumber';
 
 function DashboardStats({ items = [], sales = [] }) {
   const safeItems = Array.isArray(items) ? items : [];
@@ -248,21 +249,23 @@ function DashboardStats({ items = [], sales = [] }) {
         <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Sales Revenue</span>
           <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
-            ₹{totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            <CountUpNumber value={totalRevenue} prefix="₹" />
           </span>
           <span className="glass-calc-sub">Gross E-Commerce Sales</span>
         </div>
 
         <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Total Orders</span>
-          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{totalOrders}</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>
+            <CountUpNumber value={totalOrders} />
+          </span>
           <span className="glass-calc-sub">{deliveredOrders} Delivered Orders</span>
         </div>
 
         <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Avg Order Value</span>
           <span className="glass-calc-value" style={{ color: '#c084fc' }}>
-            ₹{avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            <CountUpNumber value={avgOrderValue} prefix="₹" />
           </span>
           <span className="glass-calc-sub">Per Customer Order</span>
         </div>
@@ -270,7 +273,7 @@ function DashboardStats({ items = [], sales = [] }) {
         <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Available Stock</span>
           <span className="glass-calc-value" style={{ color: '#34d399' }}>
-            {totalStock.toLocaleString('en-IN')} Pcs
+            <CountUpNumber value={totalStock} suffix=" Pcs" />
           </span>
           <span className="glass-calc-sub">Across {totalUnique} SKUs</span>
         </div>
@@ -278,7 +281,7 @@ function DashboardStats({ items = [], sales = [] }) {
         <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Potential Profit</span>
           <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
-            ₹{potentialProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            <CountUpNumber value={potentialProfit} prefix="₹" />
           </span>
           <span className="glass-calc-sub">{averageMargin}% Avg Margin</span>
         </div>
@@ -339,10 +342,11 @@ function DashboardStats({ items = [], sales = [] }) {
                 })}
 
                 {/* Shaded Area Fill */}
-                <path d={areaPath} fill="url(#areaGrad)" />
+                <path className="erp-chart-area-fade" d={areaPath} fill="url(#areaGrad)" />
 
                 {/* Graph Line */}
-                <path 
+                <path
+                  className="erp-chart-line-draw"
                   d={linePath} 
                   fill="none" 
                   stroke="var(--primary)" 

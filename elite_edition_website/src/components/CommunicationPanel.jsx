@@ -12702,6 +12702,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           }}
         >
           <div
+            className="erp-dp-lightbox-card"
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 'min(380px, 92vw)',
@@ -12790,6 +12791,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             style={{ position: 'fixed', inset: 0, zIndex: 100005, background: 'rgba(2, 6, 23, 0.58)', backdropFilter: 'blur(4px)' }}
           />
           <aside
+            className="erp-drawer-slide-in"
             style={{
               position: 'fixed',
               top: 0,

@@ -2860,8 +2860,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
         
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '280px', color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading TaskOPad workforce board...</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem', padding: '0.25rem 0' }}>
+            {[1, 2, 3, 4].map((col) => (
+              <div key={col} style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(148, 163, 184, 0.18)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div className="erp-shimmer-box" style={{ height: '24px', width: '55%' }} />
+                <div className="erp-shimmer-box" style={{ height: '86px', width: '100%' }} />
+                <div className="erp-shimmer-box" style={{ height: '86px', width: '100%' }} />
+                <div className="erp-shimmer-box" style={{ height: '72px', width: '100%' }} />
+              </div>
+            ))}
           </div>
         ) : activeView === 'kanban' ? (
           

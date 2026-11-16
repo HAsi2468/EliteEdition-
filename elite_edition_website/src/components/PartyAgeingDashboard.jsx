@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
+import CountUpNumber from './common/CountUpNumber';
 
 const fmtINR = (val) =>
   `₹ ${Number(val || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -139,25 +140,25 @@ export default function PartyAgeingDashboard({ companyEntity = 'ALL', allowCompa
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.6rem', marginBottom: '0.9rem' }}>
         <div style={{ background: 'rgba(11, 17, 32, 0.75)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '10px', padding: '0.65rem 0.8rem' }}>
           <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>TOTAL RECEIVABLE</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>{fmtINR(summary.totalDue)}</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}><CountUpNumber value={summary.totalDue} prefix="₹ " /></div>
         </div>
         <div style={{ background: 'rgba(11, 17, 32, 0.75)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '0.65rem 0.8rem' }}>
           <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>0–30 DAYS</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#34d399', marginTop: '2px' }}>{fmtINR(summary.b0_30)}</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#34d399', marginTop: '2px' }}><CountUpNumber value={summary.b0_30} prefix="₹ " /></div>
         </div>
         <div style={{ background: 'rgba(11, 17, 32, 0.75)', border: '1px solid rgba(251, 191, 36, 0.25)', borderRadius: '10px', padding: '0.65rem 0.8rem' }}>
           <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>31–60 DAYS</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fbbf24', marginTop: '2px' }}>{fmtINR(summary.b31_60)}</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fbbf24', marginTop: '2px' }}><CountUpNumber value={summary.b31_60} prefix="₹ " /></div>
         </div>
         <div style={{ background: 'rgba(11, 17, 32, 0.75)', border: '1px solid rgba(249, 115, 22, 0.3)', borderRadius: '10px', padding: '0.65rem 0.8rem' }}>
           <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>61–90 DAYS</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fb923c', marginTop: '2px' }}>{fmtINR(summary.b61_90)}</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fb923c', marginTop: '2px' }}><CountUpNumber value={summary.b61_90} prefix="₹ " /></div>
         </div>
         <div style={{ background: 'rgba(127, 29, 29, 0.25)', border: '1px solid rgba(248, 113, 113, 0.38)', borderRadius: '10px', padding: '0.65rem 0.8rem' }}>
           <div style={{ fontSize: '0.68rem', color: '#fca5a5', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
             <AlertTriangle size={11} /> 90+ DAYS CRITICAL
           </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f87171', marginTop: '2px' }}>{fmtINR(summary.b90_plus)}</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f87171', marginTop: '2px' }}><CountUpNumber value={summary.b90_plus} prefix="₹ " /></div>
         </div>
       </div>
 
@@ -233,9 +234,17 @@ export default function PartyAgeingDashboard({ companyEntity = 'ALL', allowCompa
       {/* Table */}
       <div style={{ overflowX: 'auto', maxHeight: '360px', overflowY: 'auto' }}>
         {filteredParties.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.84rem' }}>
-            {loading ? 'Loading party ageing...' : 'No overdue invoices matching the current filter.'}
-          </div>
+          loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', padding: '0.5rem 0' }}>
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="erp-shimmer-box" style={{ height: '42px', width: '100%' }} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.84rem' }}>
+              No overdue invoices matching the current filter.
+            </div>
+          )
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
