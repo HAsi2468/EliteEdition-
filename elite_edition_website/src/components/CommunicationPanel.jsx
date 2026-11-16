@@ -37,11 +37,15 @@ import {
   Monitor,
   MonitorOff,
   PhoneIncoming,
+  PhoneCall,
   Grid,
   MoreHorizontal,
   UserCheck,
   Building2,
   Zap,
+  Bookmark,
+  Bell,
+  Minimize2,
   Sparkles,
   Info,
   Paperclip,
@@ -93,8 +97,53 @@ import {
   RotateCw,
   Settings,
   Camera,
-  Film
+  Film,
+  Star,
+  Timer,
+  Archive,
+  MapPin,
+  Radio,
+  UserPlus
 } from 'lucide-react';
+import {
+  getWallpaperStyle,
+  ChatLockModal,
+  WallpaperPickerModal,
+  LocationShareModal,
+  ContactShareModal,
+  GroupInviteModal,
+  BroadcastListModal,
+  ChatSettingsModal,
+  ViewOnceViewerModal,
+  LocationBubbleCard,
+  ContactBubbleCard,
+  ViewOnceBubbleCard,
+  VideoNoteBubble,
+} from './ChatWhatsAppFeatures';
+import {
+  encryptRoomMessage,
+  decryptRoomMessage,
+  playRoomNotificationTone,
+  E2EEVerifyModal,
+  CommunityModal,
+  GroupEventModal,
+  EventBubbleCard,
+  CallLinkModal,
+  CallLinkBubbleCard,
+  CustomToneModal,
+  ImageMarkupModal,
+  MessageReminderModal,
+  DraggablePiPCallWindow,
+} from './ChatWhatsAppExtra';
+import {
+  ThreadDrawer,
+  MessageInfoModal,
+  ScheduleMessageModal,
+  StarredMessagesModal,
+  DisappearTimerModal,
+  LinkPreviewCard,
+  BulkActionToolbar
+} from './ChatAdvancedFeatures';
 
 function formatChatPreviewSnippet(text) {
   if (!text || typeof text !== 'string') return '';
@@ -694,6 +743,99 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, []);
   const [showInRoomSearch, setShowInRoomSearch] = useState(false);
   const [inRoomQuery, setInRoomQuery] = useState('');
+  const [threadParentMsg, setThreadParentMsg] = useState(null);
+  const [infoTargetMsg, setInfoTargetMsg] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showStarredModal, setShowStarredModal] = useState(false);
+  const [showDisappearModal, setShowDisappearModal] = useState(false);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedMsgIds, setSelectedMsgIds] = useState([]);
+  // WhatsApp-parity states
+  const [chatPrefs, setChatPrefs] = useState({ globalWallpaper: 'default', roomWallpapers: {}, privacy: { lastSeen: 'everyone', readReceipts: true, onlineVisible: true }, mediaAutoDownload: { photos: true, videos: false, documents: true, audio: true } });
+  const [unlockedRoomIds, setUnlockedRoomIds] = useState([]);
+  const [lockModalState, setLockModalState] = useState(null); // { mode: 'unlock'|'manage', room }
+  const [showWallpaperModal, setShowWallpaperModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [showChatSettingsModal, setShowChatSettingsModal] = useState(false);
+  const [viewOnceSend, setViewOnceSend] = useState(false);
+  const [viewOnceViewerMsg, setViewOnceViewerMsg] = useState(null);
+  const [showE2EEModal, setShowE2EEModal] = useState(false);
+  const [showCommunityModal, setShowCommunityModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showCallLinkModal, setShowCallLinkModal] = useState(false);
+  const [showToneModal, setShowToneModal] = useState(false);
+  const [markupImageFile, setMarkupImageFile] = useState(null);
+  const [hdImageUpload, setHdImageUpload] = useState(false);
+  const [decryptedMap, setDecryptedMap] = useState({});
+  const [reminderTargetMsg, setReminderTargetMsg] = useState(null);
+  const [myReminders, setMyReminders] = useState([]);
+  const [dueReminderBanner, setDueReminderBanner] = useState(null);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadReminders = async () => {
+      try {
+        const res = await api.getMyChatReminders();
+        if (!cancelled && res?.success && Array.isArray(res.data)) {
+          setMyReminders(res.data);
+        }
+      } catch {
+        // Ignore silent reminder load failure
+      }
+    };
+    loadReminders();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!myReminders.length) return;
+    const checkDue = () => {
+      const now = Date.now();
+      const due = myReminders.find((r) => new Date(r.remindAt).getTime() <= now);
+      if (due) {
+        playRoomNotificationTone('bell');
+        setDueReminderBanner(due);
+        setMyReminders((prev) => prev.filter((item) => item._id !== due._id));
+        api.deleteChatReminder(due._id).catch(() => {});
+      }
+    };
+    checkDue();
+    const timer = setInterval(checkDue, 25000);
+    return () => clearInterval(timer);
+  }, [myReminders]);
+
+  useEffect(() => {
+    if (!activeGroup?._id || !Array.isArray(messages)) return;
+    let cancelled = false;
+    const encryptedMsgs = messages.filter((m) => m.isEncrypted && m.encryptedPayload && !decryptedMap[m._id]);
+    if (encryptedMsgs.length === 0) return;
+    (async () => {
+      const updates = {};
+      for (const m of encryptedMsgs) {
+        const plain = await decryptRoomMessage(m.encryptedPayload, activeGroup._id);
+        if (plain) updates[m._id] = plain;
+      }
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setDecryptedMap((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeGroup?._id, messages]);
+  const [isRecordingVideoNote, setIsRecordingVideoNote] = useState(false);
+  const videoNoteRecorderRef = useRef(null);
+  const videoNoteChunksRef = useRef([]);
+  const liveTranscriptRef = useRef('');
+  const speechRecRef = useRef(null);
+
+  useEffect(() => {
+    api.getChatPreferences().then((res) => {
+      if (res?.success && res.data) setChatPrefs(res.data);
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     setShowInRoomSearch(false);
     setInRoomQuery('');
@@ -924,6 +1066,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   // ─── Real-Time Voice & Video Calling Suite State ───
   const [activeCall, setActiveCall] = useState(null); // { type: 'voice' | 'video', recipientName, recipientAvatar, status: 'calling' | 'connected' | 'ended', isMuted: false, isVideoOff: false, isSpeakerOn: true, isScreenSharing: false, error: null }
+
+  useEffect(() => {
+    if (!activeCall) setIsCallMinimized(false);
+  }, [activeCall]);
   const [incomingCall, setIncomingCall] = useState(null);
   const [callDuration, setCallDuration] = useState(0);
   const [showDialpad, setShowDialpad] = useState(false);
@@ -2109,6 +2255,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             }
           } catch (e) {}
         }
+      } else if (!chatSoundMuted) {
+        const senderId = typeof msg.senderId === 'object' ? (msg.senderId._id || msg.senderId.id) : msg.senderId;
+        if (String(senderId) !== String(uId)) {
+          const rTone = chatPrefs?.roomTones?.[String(msg.roomId)] || 'default';
+          if (rTone !== 'silent') playRoomNotificationTone(rTone);
+        }
       }
 
       fetchGroups(false);
@@ -2591,6 +2743,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleSelectGroup = (targetGroup) => {
     if (!targetGroup) return;
+    const myId = String(currentUser?._id || currentUser?.id || '');
+    const isLockedForMe = Array.isArray(targetGroup.lockedBy) && targetGroup.lockedBy.some((l) => String(l.userId || l) === myId);
+    if (isLockedForMe && !unlockedRoomIds.includes(String(targetGroup._id))) {
+      setLockModalState({ mode: 'unlock', room: targetGroup });
+      return;
+    }
+    if (myId && Array.isArray(targetGroup.unreadBy) && targetGroup.unreadBy.some((id) => String(id) === myId)) {
+      setGroups((prev) => prev.map((g) => String(g._id) === String(targetGroup._id) ? { ...g, unreadBy: (g.unreadBy || []).filter((id) => String(id) !== myId) } : g));
+    }
     setShowScrollBottom(false);
     setUnreadBelowCount(0);
     if (activeGroup?._id && inputMessage) {
@@ -3223,6 +3384,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.type && file.type.startsWith('image/') && !file.type.includes('gif')) {
+      setMarkupImageFile(file);
+      e.target.value = '';
+      return;
+    }
     await processFileUpload(file);
     e.target.value = '';
   };
@@ -3372,6 +3538,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       content: messageText,
       priority: isUrgent ? 'urgent' : 'normal',
       attachment: audioAttachment,
+      transcript: audioAttachment.transcript || '',
     };
 
     const tempId = 'temp_' + Date.now();
@@ -3463,7 +3630,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               fileType: 'audio',
               fileUrl: res.fileUrl,
               fileSize: res.fileSize || audioBlob.size,
-              durationSec: duration
+              durationSec: duration,
+              transcript: liveTranscriptRef.current || '',
             };
             if (autoSendRef.current) {
               await sendVoiceNoteMessage(attachmentData);
@@ -3481,6 +3649,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
       mediaRecorder.start();
       setIsRecordingAudio(true);
+      liveTranscriptRef.current = '';
+      try {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+          const rec = new SpeechRec();
+          rec.continuous = true;
+          rec.interimResults = false;
+          rec.lang = 'en-US';
+          rec.onresult = (ev) => {
+            const chunks = [];
+            for (let i = 0; i < ev.results.length; i += 1) {
+              chunks.push(ev.results[i][0].transcript);
+            }
+            liveTranscriptRef.current = chunks.join(' ').trim();
+          };
+          rec.start();
+          speechRecRef.current = rec;
+        }
+      } catch (_) {}
       setRecordingSeconds(0);
       recordingSecondsRef.current = 0;
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
@@ -3499,6 +3686,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const stopAudioRecording = (autoSend = false) => {
     autoSendRef.current = autoSend;
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    try {
+      if (speechRecRef.current) {
+        speechRecRef.current.stop();
+        speechRecRef.current = null;
+      }
+    } catch (_) {}
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -4358,6 +4551,95 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  const handleSendLocationMsg = async (locationMeta) => {
+    if (!activeGroup?._id) return;
+    setShowLocationModal(false);
+    const res = await api.sendCommunicationMessage(activeGroup._id, {
+      content: `Location: ${locationMeta.label || 'Shared Location'}`,
+      type: 'location',
+      locationMeta,
+    });
+    if (res?.success && res.data) {
+      setMessages((prev) => mergeMessages(prev, [res.data]));
+    }
+  };
+
+  const handleSendContactMsg = async (contactMeta) => {
+    if (!activeGroup?._id) return;
+    setShowContactModal(false);
+    const res = await api.sendCommunicationMessage(activeGroup._id, {
+      content: `Contact: ${contactMeta.name}`,
+      type: 'contact',
+      contactMeta,
+    });
+    if (res?.success && res.data) {
+      setMessages((prev) => mergeMessages(prev, [res.data]));
+    }
+  };
+
+  const handleToggleVideoNoteRecording = async () => {
+    if (isRecordingVideoNote) {
+      try {
+        if (videoNoteRecorderRef.current && videoNoteRecorderRef.current.state !== 'inactive') {
+          videoNoteRecorderRef.current.stop();
+        }
+      } catch (_) {}
+      setIsRecordingVideoNote(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      videoNoteChunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      videoNoteRecorderRef.current = rec;
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) videoNoteChunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(videoNoteChunksRef.current, { type: 'video/webm' });
+        if (blob.size === 0 || !activeGroup?._id) return;
+        const file = new File([blob], `video_note_${Date.now()}.webm`, { type: 'video/webm' });
+        setUploadingFile(true);
+        try {
+          const uploaded = await api.uploadChatAttachment(file, activeGroup.name || 'General');
+          if (uploaded?.fileUrl) {
+            const res = await api.sendCommunicationMessage(activeGroup._id, {
+              content: 'Instant Video Note',
+              type: 'video-note',
+              attachment: {
+                fileName: 'Video Note',
+                fileType: 'video',
+                fileUrl: uploaded.fileUrl,
+                fileSize: uploaded.fileSize || blob.size,
+              },
+            });
+            if (res?.success && res.data) setMessages((prev) => mergeMessages(prev, [res.data]));
+          }
+        } finally {
+          setUploadingFile(false);
+        }
+      };
+      rec.start();
+      setIsRecordingVideoNote(true);
+    } catch (err) {
+      alert('Camera/microphone permission needed for Video Note: ' + err.message);
+    }
+  };
+
+  const handleOpenViewOnce = async (msg) => {
+    setViewOnceViewerMsg(msg);
+    const res = await api.markViewOnceOpened(msg._id).catch(() => null);
+    if (res?.success) {
+      const myId = currentUser?._id || currentUser?.id;
+      setMessages((prev) => prev.map((m) => (
+        String(m._id) === String(msg._id)
+          ? { ...m, viewedBy: [...(m.viewedBy || []), { userId: myId, viewedAt: new Date().toISOString() }] }
+          : m
+      )));
+    }
+  };
+
   const handleSendMessage = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (uploadingFile) {
@@ -4420,14 +4702,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
 
+    let encryptedPayload = undefined;
+    let isEncrypted = false;
+    if (activeGroup?.e2eeEnabled && messageText) {
+      const enc = await encryptRoomMessage(messageText, activeGroup._id);
+      if (enc) {
+        isEncrypted = true;
+        encryptedPayload = enc;
+      }
+    }
+
     const messagePayload = {
       roomId: activeGroup._id,
       senderId,
       clientMsgId,
       content: messageText,
+      isEncrypted,
+      encryptedPayload,
       priority: isUrgent ? 'urgent' : 'normal',
       replyTo: replyToMessage ? replyToMessage._id : undefined,
       attachment: attachedFile || undefined,
+      viewOnce: Boolean(attachedFile && viewOnceSend),
       mentionedUserIds: finalMentionedUserIds.length > 0 ? finalMentionedUserIds : undefined,
     };
 
@@ -4473,6 +4768,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     setInputMessage('');
     setAttachedFile(null);
+    setViewOnceSend(false);
     setReplyToMessage(null);
     setIsUrgent(false);
     setMentionQuery(null);
@@ -4493,7 +4789,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
 
     try {
-      const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      const res = activeGroup?.type === 'broadcast'
+        ? await api.sendBroadcastMessage(activeGroup._id, messagePayload)
+        : await api.sendCommunicationMessage(activeGroup._id, messagePayload);
       if (res && res.success && res.data) {
         const realMsg = { ...res.data, isOptimistic: false };
         setMessages((prev) => {
@@ -4733,7 +5031,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       )
     );
     try {
-      const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      const res = activeGroup?.type === 'broadcast'
+        ? await api.sendBroadcastMessage(activeGroup._id, messagePayload)
+        : await api.sendCommunicationMessage(activeGroup._id, messagePayload);
       if (res && res.success && res.data) {
         setMessages((prev) =>
           prev.map((m) => (m._id === failedMsg._id ? { ...res.data, isOptimistic: false, sendFailed: false } : m))
@@ -4924,9 +5224,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     // Filter by Phoenix Segmented Tabs: All | Personal | Groups | Unread
     if (phoenixFilter === 'read') {
-      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) === 0);
+      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) === 0 && !(g.unreadBy || []).some((id) => String(id) === myId));
     } else if (phoenixFilter === 'unread') {
-      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0);
+      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0 || (g.unreadBy || []).some((id) => String(id) === myId));
+    } else if (phoenixFilter === 'broadcast') {
+      baseItems = baseItems.filter((g) => g.type === 'broadcast');
     }
 
     // WhatsApp Recency Sorting Helper:
@@ -4938,10 +5240,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return isNaN(parsed) ? 0 : parsed;
     };
 
-    // Sort WhatsApp-style: Most recent message sent/received always appears at the top!
+    const isRoomPinnedForMe = (g) => Boolean(g.isPinned || (Array.isArray(g.pinnedBy) && g.pinnedBy.some((id) => String(id) === myId)));
+
+    // Sort WhatsApp-style: Pinned chats first, then most recent message!
     baseItems.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
+      const aPin = isRoomPinnedForMe(a);
+      const bPin = isRoomPinnedForMe(b);
+      if (aPin && !bPin) return -1;
+      if (!aPin && bPin) return 1;
       return getChatTimestamp(b) - getChatTimestamp(a);
     });
 
@@ -5165,7 +5471,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </a>
         );
       }
-      return part;
+      const formatInlineMd = (txt, subKey) => {
+        const mdRegex = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`)/g;
+        const segs = String(txt).split(mdRegex);
+        return segs.map((s, sIdx) => {
+          if (s.startsWith('*') && s.endsWith('*') && s.length > 2) return <strong key={`${subKey}_b_${sIdx}`}>{s.slice(1, -1)}</strong>;
+          if (s.startsWith('_') && s.endsWith('_') && s.length > 2) return <em key={`${subKey}_i_${sIdx}`}>{s.slice(1, -1)}</em>;
+          if (s.startsWith('~') && s.endsWith('~') && s.length > 2) return <del key={`${subKey}_s_${sIdx}`}>{s.slice(1, -1)}</del>;
+          if (s.startsWith('`') && s.endsWith('`') && s.length > 2) {
+            return <code key={`${subKey}_c_${sIdx}`} style={{ background: 'rgba(148,163,184,0.2)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.84em', fontFamily: 'monospace' }}>{s.slice(1, -1)}</code>;
+          }
+          return s;
+        });
+      };
+      return formatInlineMd(part, `${keyPrefix}_md_${pIdx}`);
     });
   };
 
@@ -5369,6 +5688,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Saved Messages ("Chat with Yourself") */}
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await api.getSavedMessagesRoom();
+                    if (res?.success && res.data) {
+                      setGroups((prev) => prev.some((g) => String(g._id) === String(res.data._id)) ? prev : [res.data, ...prev]);
+                      handleSelectGroup(res.data);
+                    }
+                  } catch (e) {
+                    alert(e.message || 'Failed to open Saved Messages');
+                  }
+                }}
+                className="phoenix-action-btn-neutral"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+                title="Saved Messages (Chat with Yourself)"
+                aria-label="Saved Messages"
+              >
+                <Bookmark size={16} color="#38bdf8" />
+              </button>
+
               {/* WhatsApp-Style User Settings Button */}
               <button
                 type="button"
@@ -5448,6 +5797,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 onClick={() => setPhoenixFilter('groups')}
               >
                 <span>Groups</span>
+              </button>
+              <button
+                type="button"
+                className={`phoenix-tab-pill ${phoenixFilter === 'broadcast' ? 'active' : ''}`}
+                onClick={() => setPhoenixFilter('broadcast')}
+              >
+                <span>Broadcast</span>
               </button>
               <button
                 type="button"
@@ -5582,8 +5938,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           color: 'var(--text-primary)',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis'
+                          textOverflow: 'ellipsis',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}>
+                          {group.type === 'broadcast' && <Radio size={12} color="#f59e0b" title="Broadcast List" />}
+                          {group.e2eeEnabled && <Shield size={12} color="#22c55e" title="End-to-End Encrypted" />}
+                          {Array.isArray(group.lockedBy) && group.lockedBy.some((l) => String(l.userId || l) === String(currentUser?._id || currentUser?.id || '')) && (
+                            <Lock size={11} color="#fbbf24" title="PIN Locked Chat" />
+                          )}
+                          {(group.isPinned || (Array.isArray(group.pinnedBy) && group.pinnedBy.some((id) => String(id) === String(currentUser?._id || currentUser?.id || '')))) && (
+                            <Pin size={11} color="#38bdf8" title="Pinned to Top" />
+                          )}
                           {displayName}
                         </span>
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -5771,11 +6138,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           style={{
                             width: isMobileScreen ? 36 : 40,
                             height: isMobileScreen ? 36 : 40,
+                            minWidth: isMobileScreen ? 36 : 40,
+                            minHeight: isMobileScreen ? 36 : 40,
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            position: 'relative',
                             background: isDirect
                               ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
-                              : `${deptCol}18`,
+                              : `${deptCol}22`,
                             color: isDirect ? '#ffffff' : deptCol,
-                            border: isDirect ? 'none' : `1.5px solid ${deptCol}35`
+                            border: isDirect ? 'none' : `1.5px solid ${deptCol}55`
                           }}
                         >
                           {isDirect ? (
@@ -5971,13 +6346,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 position: 'absolute',
                                 top: 'calc(100% + 6px)',
                                 right: 0,
-                                background: 'var(--bg-card, #ffffff)',
-                                border: '1px solid var(--border-light, #e2e8f0)',
+                                background: 'var(--bg-card, #0f172a)',
+                                border: '1px solid var(--border-light, rgba(148,163,184,0.22))',
                                 borderRadius: '12px',
-                                boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+                                boxShadow: '0 12px 30px rgba(0,0,0,0.35)',
                                 zIndex: 9999,
                                 padding: '6px',
-                                minWidth: '210px',
+                                minWidth: '240px',
+                                maxHeight: '68vh',
+                                overflowY: 'auto',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '2px'
@@ -6066,6 +6443,104 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 >
                                   <BarChart2 size={14} color="#059669" />
                                   <span>Create Poll</span>
+                                </button>
+
+                                {/* Starred Messages */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowStarredModal(true); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Star size={14} color="#fbbf24" />
+                                  <span>Starred Messages</span>
+                                </button>
+
+                                {/* Schedule Message */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowScheduleModal(true); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Clock size={14} color="#38bdf8" />
+                                  <span>Schedule Message</span>
+                                </button>
+
+                                {/* Disappearing Messages */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowDisappearModal(true); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Timer size={14} color="#a78bfa" />
+                                  <span>Disappearing Timer</span>
+                                </button>
+
+                                {/* Multi-Select Messages */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setIsMultiSelectMode((v) => !v); setSelectedMsgIds([]); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <CheckSquare size={14} color="#38bdf8" />
+                                  <span>{isMultiSelectMode ? 'Exit Multi-Select' : 'Select Messages'}</span>
+                                </button>
+
+                                {/* Mute Room */}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowDesktopHeaderMenu(false);
+                                    if (!activeGroup?._id) return;
+                                    const uid = String(currentUser?._id || currentUser?.id || '');
+                                    const isMuted = Array.isArray(activeGroup.mutedBy) && activeGroup.mutedBy.some(m => String(m.userId) === uid);
+                                    await api.toggleMuteChatRoom(activeGroup._id, !isMuted).catch(() => {});
+                                    fetchGroups(true);
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <VolumeX size={14} color="#f59e0b" />
+                                  <span>Mute / Unmute Chat</span>
+                                </button>
+
+                                {/* Archive Room */}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowDesktopHeaderMenu(false);
+                                    if (!activeGroup?._id) return;
+                                    const uid = String(currentUser?._id || currentUser?.id || '');
+                                    const isArch = Array.isArray(activeGroup.archivedBy) && activeGroup.archivedBy.some(id => String(id) === uid);
+                                    await api.toggleArchiveChatRoom(activeGroup._id, !isArch).catch(() => {});
+                                    fetchGroups(true);
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Archive size={14} color="#94a3b8" />
+                                  <span>Archive / Unarchive</span>
                                 </button>
 
                                 {/* Share Record */}
@@ -6166,6 +6641,126 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 >
                                   <FileText size={14} color="#8b5cf6" />
                                   <span>Export Chat Log</span>
+                                </button>
+
+                                {/* WhatsApp-Parity Room & Global Actions */}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowDesktopHeaderMenu(false);
+                                    const res = await api.togglePinChatRoom(activeGroup._id);
+                                    if (res?.success) {
+                                      const myId = String(currentUser?._id || currentUser?.id || '');
+                                      setGroups((prev) => prev.map((g) => {
+                                        if (String(g._id) !== String(activeGroup._id)) return g;
+                                        const curr = Array.isArray(g.pinnedBy) ? g.pinnedBy : [];
+                                        const nextPinned = res.isPinned ? [...curr, myId] : curr.filter((id) => String(id) !== myId);
+                                        return { ...g, pinnedBy: nextPinned };
+                                      }));
+                                    }
+                                  }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Pin size={14} color="#f59e0b" />
+                                  <span>Pin / Unpin Chat to Top</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowDesktopHeaderMenu(false);
+                                    const res = await api.toggleMarkChatUnread(activeGroup._id, true);
+                                    if (res?.success) {
+                                      const myId = String(currentUser?._id || currentUser?.id || '');
+                                      setGroups((prev) => prev.map((g) => String(g._id) === String(activeGroup._id) ? { ...g, unreadBy: [...(g.unreadBy || []), myId] } : g));
+                                      setActiveGroup(null);
+                                    }
+                                  }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <MessageSquare size={14} color="#38bdf8" />
+                                  <span>Mark as Unread</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setLockModalState({ mode: 'manage', room: activeGroup }); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Lock size={14} color="#fbbf24" />
+                                  <span>Chat Lock (PIN)</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowWallpaperModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <ImageIcon size={14} color="#38bdf8" />
+                                  <span>Chat Wallpaper</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowInviteModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Share2 size={14} color="#22c55e" />
+                                  <span>Group Invite Link & Join</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowBroadcastModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Radio size={14} color="#f59e0b" />
+                                  <span>New Broadcast List</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowChatSettingsModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Settings size={14} color="#94a3b8" />
+                                  <span>Privacy, Auto-Download & Storage</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowE2EEModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Shield size={14} color="#22c55e" />
+                                  <span>Encryption (E2EE) &amp; Security Code</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowToneModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Volume2 size={14} color="#38bdf8" />
+                                  <span>Custom Notification Tone</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowCommunityModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <Layers size={14} color="#a78bfa" />
+                                  <span>Communities &amp; Sub-Groups</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowCallLinkModal(true); }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  <PhoneCall size={14} color="#4ade80" />
+                                  <span>Create Shareable Call Link</span>
                                 </button>
 
                                 {/* Direct Chat or Admin Delete / Clear Options */}
@@ -6319,7 +6914,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   onDrop={handleChatDrop}
                   onPaste={handlePasteClipboard}
                   className="phoenix-chat-stream"
-                  style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}
+                  style={{
+                    flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative',
+                    ...getWallpaperStyle((activeGroup?._id && chatPrefs?.roomWallpapers?.[String(activeGroup._id)]) || chatPrefs?.globalWallpaper || 'default'),
+                  }}
                 >
                   {/* Drag and Drop Visual Dropzone Overlay */}
                   {isChatDragging && (
@@ -6551,10 +7149,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     const canDelete = !msg.isDeleted && (isAdmin || (isSender && isWithin24h));
 
                     return (
+                      <React.Fragment key={msg._id}>
+                      {(() => {
+                        const myId = String(currentUser?._id || currentUser?.id || '');
+                        const isUnreadForMe = !isMe && myId && !(Array.isArray(msg.readBy) && msg.readBy.some((r) => String(r?._id || r) === myId));
+                        const prevMsg = msgIndex > 0 ? group.messages[msgIndex - 1] : null;
+                        const prevUnread = prevMsg && String(prevMsg.senderId?._id || prevMsg.senderId) !== myId && !(Array.isArray(prevMsg.readBy) && prevMsg.readBy.some((r) => String(r?._id || r) === myId));
+                        if (isUnreadForMe && !prevUnread) {
+                          return (
+                            <div style={{ alignSelf: 'center', margin: '0.45rem 0', padding: '3px 14px', borderRadius: '999px', background: 'rgba(56,189,248,0.16)', border: '1px solid rgba(56,189,248,0.35)', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700 }}>
+                              Unread Messages
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div
-                        key={msg._id}
                         id={`msg_${msg._id}`}
                         data-msg-id={msg._id}
+                        onDoubleClick={() => {
+                          if (!msg.isDeleted) handleToggleReaction(msg._id, '❤️');
+                        }}
                         onTouchStart={(e) => {
                             if (isMobileScreen) {
                               touchStartXRef.current = e.touches[0].clientX;
@@ -6633,7 +7248,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 color: msg.priority === 'urgent'
                                   ? (isMe ? '#ffffff' : '#991b1b')
                                   : (isMe ? '#ffffff' : 'var(--text-primary, #141824)'),
-                                padding: isStickerOnly ? '2px' : (isImageOnly ? '4px' : (isImageAttachment ? '4px 4px 8px 4px' : '10px 14px')),
+                                padding: isStickerOnly ? '2px' : (isImageOnly ? '4px' : (isImageAttachment ? '4px 4px 8px 4px' : '10px 26px 10px 14px')),
                                 borderRadius: isStickerOnly ? '0' : (isImageOnly ? '10px' : '12px'),
                                 border: isStickerOnly
                                   ? 'none'
@@ -6664,19 +7279,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 onClick={(e) => handleOpenMsgMenu(e, msg._id)}
                                 style={{
                                   position: 'absolute',
-                                  top: isImageOnly ? '8px' : '3px',
-                                  right: isImageOnly ? '8px' : '3px',
-                                  background: isImageOnly ? 'rgba(0, 0, 0, 0.45)' : (isMe ? 'rgba(255, 255, 255, 0.25)' : 'rgba(241, 245, 249, 0.95)'),
-                                  border: 'none',
-                                  borderRadius: '50%',
-                                  width: '20px',
-                                  height: '20px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  cursor: 'pointer',
-                                  color: (isImageOnly || isMe) ? '#ffffff' : '#64748b',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                  top: isImageOnly ? '8px' : '4px',
+                                  right: isImageOnly ? '8px' : '4px',
                                   zIndex: 4
                                 }}
                                 title="Message options"
@@ -6707,15 +7311,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       marginBottom: isUpward ? '4px' : 0,
                                       right: isMe ? 0 : 'auto',
                                       left: isMe ? 'auto' : 0,
-                                      background: '#ffffff',
-                                      borderRadius: '10px',
-                                      boxShadow: '0 12px 35px rgba(0,0,0,0.25)',
+                                      background: 'rgba(15, 23, 42, 0.96)',
+                                      backdropFilter: 'blur(20px)',
+                                      borderRadius: '12px',
+                                      boxShadow: '0 16px 40px rgba(2, 6, 23, 0.65)',
                                       zIndex: 99999,
-                                      minWidth: '190px',
+                                      minWidth: '196px',
                                       maxHeight: 'min(380px, 85vh)',
                                       overflowY: 'auto',
                                       padding: '6px 0',
-                                      border: '1.5px solid #bfdbfe',
+                                      border: '1px solid rgba(148, 163, 184, 0.25)',
                                       animation: 'fadeIn 0.15s ease'
                                     }}
                                     onClick={(e) => e.stopPropagation()}
@@ -6730,9 +7335,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                             setActiveMsgMenuId(null);
                                             handleRetryFailedMessage(msg);
                                           }}
-                                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#2563eb', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
+                                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#38bdf8', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
                                         >
-                                          <RefreshCw size={14} color="#2563eb" />
+                                          <RefreshCw size={14} color="#38bdf8" />
                                           <span>Retry Send</span>
                                         </button>
                                       )}
@@ -6744,16 +7349,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                           setActiveMsgMenuId(null);
                                           setMessages((prev) => prev.filter((m) => m._id !== msg._id && m.clientMsgId !== msg.clientMsgId));
                                         }}
-                                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
+                                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f87171', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
                                       >
-                                        <Trash2 size={14} color="#dc2626" />
+                                        <Trash2 size={14} color="#f87171" />
                                         <span>Remove Unsent Message</span>
                                       </button>
                                     </div>
                                   ) : (
                                     <>
                                   {/* Quick Reactions Bar */}
-                                  <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid rgba(148, 163, 184, 0.16)' }}>
                                     {['👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'].map((emo) => (
                                       <button
                                         key={emo}
@@ -6776,9 +7381,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       setReplyToMessage(msg);
                                       setActiveMsgMenuId(null);
                                     }}
-                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                   >
-                                    <Reply size={14} color="#2563eb" />
+                                    <Reply size={14} color="#38bdf8" />
                                     <span>Reply</span>
                                   </button>
 
@@ -6788,9 +7393,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       handleOpenForwardModal(msg);
                                       setActiveMsgMenuId(null);
                                     }}
-                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                   >
-                                    <CornerUpRight size={14} color="#8b5cf6" />
+                                    <CornerUpRight size={14} color="#a78bfa" />
                                     <span>Forward</span>
                                   </button>
 
@@ -6800,10 +7405,71 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       handleTogglePin(msg._id);
                                       setActiveMsgMenuId(null);
                                     }}
-                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                   >
-                                    {msg.isPinned ? <PinOff size={14} color="#d97706" /> : <Pin size={14} color="#64748b" />}
+                                    {msg.isPinned ? <PinOff size={14} color="#fbbf24" /> : <Pin size={14} color="#94a3b8" />}
                                     <span>{msg.isPinned ? 'Unpin message' : 'Pin message'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setActiveMsgMenuId(null);
+                                      await api.toggleStarChatMessage(msg._id).catch(() => {});
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <Star size={14} color="#fbbf24" />
+                                    <span>Star / Unstar</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setThreadParentMsg(msg);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <MessageSquare size={14} color="#38bdf8" />
+                                    <span>Reply in Thread</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setInfoTargetMsg(msg);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <Info size={14} color="#94a3b8" />
+                                    <span>Message Info</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReminderTargetMsg(msg);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <Bell size={14} color="#f59e0b" />
+                                    <span>Remind Me</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsMultiSelectMode(true);
+                                      setSelectedMsgIds((prev) => prev.includes(msg._id) ? prev : [...prev, msg._id]);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <CheckSquare size={14} color="#38bdf8" />
+                                    <span>Select Message</span>
                                   </button>
 
                                   {isSender && !msg.isDeleted && !isPollMsg && !isCallLog && (
@@ -6817,9 +7483,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                           chatTextareaRef.current.focus();
                                         }
                                       }}
-                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                     >
-                                      <Edit3 size={14} color="#0284c7" />
+                                      <Edit3 size={14} color="#38bdf8" />
                                       <span>Edit Message</span>
                                     </button>
                                   )}
@@ -6833,7 +7499,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                         }
                                         setActiveMsgMenuId(null);
                                       }}
-                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                     >
                                       <span>📋</span>
                                       <span>Copy Text</span>
@@ -6849,9 +7515,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                         setActiveMsgMenuId(null);
                                         handleDeleteMessage(msg);
                                       }}
-                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', borderTop: '1px solid #fee2e2', fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', borderTop: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.8rem', color: '#f87171', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
                                     >
-                                      <Trash2 size={14} color="#dc2626" />
+                                      <Trash2 size={14} color="#f87171" />
                                       <span>Delete Message</span>
                                     </button>
                                   )}
@@ -7190,7 +7856,65 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       {playbackSpeed}x
                                     </button>
                                   </div>
+                                  {msg.transcript && (
+                                    <div style={{ fontSize: '0.73rem', opacity: 0.88, marginTop: '3px', fontStyle: 'italic' }}>
+                                      “{msg.transcript}”
+                                    </div>
+                                  )}
                                 </div>
+                              </div>
+                            )}
+
+                            {/* WhatsApp Message Types: View-Once, Location, Contact Card & Video Note */}
+                            {msg.viewOnce && msg.attachment?.fileUrl && (
+                              <div style={{ marginBottom: '0.35rem' }}>
+                                <ViewOnceBubbleCard message={msg} currentUserId={currentUser?._id || currentUser?.id} onOpen={handleOpenViewOnce} />
+                              </div>
+                            )}
+                            {msg.type === 'location' && msg.locationMeta && (
+                              <div style={{ marginBottom: '0.35rem' }}>
+                                <LocationBubbleCard locationMeta={msg.locationMeta} />
+                              </div>
+                            )}
+                            {msg.type === 'contact' && msg.contactMeta && (
+                              <div style={{ marginBottom: '0.35rem' }}>
+                                <ContactBubbleCard contactMeta={msg.contactMeta} onStartDM={(uId) => handleStartDirectChat({ _id: uId })} />
+                              </div>
+                            )}
+                            {msg.type === 'video-note' && msg.attachment?.fileUrl && (
+                              <div style={{ marginBottom: '0.35rem' }}>
+                                <VideoNoteBubble fileUrl={msg.attachment.fileUrl} />
+                              </div>
+                            )}
+                            {msg.type === 'event' && msg.eventMeta && (
+                              <div style={{ marginBottom: '0.35rem' }}>
+                                <EventBubbleCard
+                                  message={msg}
+                                  currentUserId={currentUser?._id || currentUser?.id}
+                                  onRsvp={async (mId, status) => {
+                                    const res = await api.rsvpChatEvent(mId, status);
+                                    if (res?.success && res.data) {
+                                      setMessages((prev) => prev.map((m) => String(m._id) === String(mId) ? { ...m, eventMeta: res.data } : m));
+                                    }
+                                  }}
+                                />
+                              </div>
+                            )}
+                            {msg.type === 'call-link' && msg.callLinkMeta && (
+                              <div style={{ marginBottom: '0.35rem' }}>
+                                <CallLinkBubbleCard
+                                  callLinkMeta={msg.callLinkMeta}
+                                  onJoin={(meta) => {
+                                    if (typeof startCall === 'function') {
+                                      startCall(meta.callType === 'voice' ? 'voice' : 'video');
+                                    }
+                                  }}
+                                />
+                              </div>
+                            )}
+                            {msg.isEncrypted && (
+                              <div style={{ fontSize: '0.68rem', color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
+                                <Lock size={10} /> End-to-End Encrypted
                               </div>
                             )}
 
@@ -7303,7 +8027,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             })()}
 
                             {/* Attachment: Image, PDF, Spreadsheet or Document */}
-                            {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
+                            {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && !msg.viewOnce && msg.type !== 'video-note' && (
                               <div style={{ marginBottom: hasVisibleContent ? '0.4rem' : 0 }}>
                                 {(() => {
                                   const rawName = msg.attachment.fileName || msg.attachment.originalName || (typeof msg.attachment.fileUrl === 'string' ? decodeURIComponent(msg.attachment.fileUrl.split('/').pop().split('?')[0]) : 'Attachment');
@@ -7441,6 +8165,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   }
 
                                   if (isImg) {
+                                    const rawImgUrl = msg.attachment.fileUrl || '';
+                                    const resolvedImgUrl = (rawImgUrl.startsWith('/uploads/') || rawImgUrl.startsWith('uploads/'))
+                                      ? `${getBaseUrl()}/${rawImgUrl.replace(/^\/+/, '')}`
+                                      : rawImgUrl;
                                     return (
                                       <div
                                           style={{
@@ -7460,7 +8188,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                             setViewerZoom(1);
                                             setViewerRotation(0);
                                             setAttachmentViewer({
-                                              url: msg.attachment.fileUrl,
+                                              url: resolvedImgUrl,
                                               fileName: fileNameDisplay,
                                               fileType: 'image',
                                               fileSize: msg.attachment.fileSize,
@@ -7471,11 +8199,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                           title="Click to view full image"
                                         >
                                           <img
-                                            src={msg.attachment.fileUrl}
+                                            src={resolvedImgUrl}
                                             alt={fileNameDisplay}
                                             loading="lazy"
                                             onError={(e) => {
-                                              console.warn('Image failed to load:', msg.attachment.fileUrl);
+                                              if (!e.currentTarget.dataset.retried && resolvedImgUrl.startsWith('http')) {
+                                                e.currentTarget.dataset.retried = 'true';
+                                                e.currentTarget.src = `${getBaseUrl()}/v1/upload/download?url=${encodeURIComponent(resolvedImgUrl)}&filename=${encodeURIComponent(fileNameDisplay || 'image.png')}`;
+                                                return;
+                                              }
+                                              console.warn('Image failed to load:', resolvedImgUrl);
                                               e.currentTarget.style.display = 'none';
                                               if (e.currentTarget.nextElementSibling) {
                                                 e.currentTarget.nextElementSibling.style.display = 'flex';
@@ -7625,7 +8358,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 padding: isImageAttachment ? '4px 6px 2px 6px' : 0,
                                 boxSizing: 'border-box'
                               }}>
-                                {!isPollMsg && renderContentWithMentions(msg.content, msg)}
+                                {!isPollMsg && renderContentWithMentions((msg.isEncrypted && decryptedMap[msg._id]) ? decryptedMap[msg._id] : msg.content, msg)}
                                 {msg.isEdited && (
                                   <span style={{ fontSize: '0.68rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
                                     (edited)
@@ -7802,6 +8535,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                               </div>
                             </div>
+                            </React.Fragment>
                           );
                         })}
                       </div>
@@ -8133,17 +8867,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       bottom: 'calc(100% + 8px)',
                       left: '12px',
                       right: '12px',
-                      background: '#ffffff',
-                      border: '1.5px solid #bfdbfe',
+                      background: 'rgba(15, 23, 42, 0.96)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1.5px solid rgba(56, 189, 248, 0.35)',
                       borderRadius: '12px',
-                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+                      boxShadow: '0 16px 36px rgba(2, 6, 23, 0.65)',
                       overflow: 'hidden',
                       zIndex: 60,
                       maxHeight: '210px',
                       overflowY: 'auto'
                     }}
                   >
-                    <div style={{ padding: '6px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ padding: '6px 12px', background: 'rgba(11, 17, 32, 0.9)', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Mention team member (Use ↑↓ and Enter)
                     </div>
                     {mentionCandidates.map((u, idx) => {
@@ -8161,10 +8896,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             padding: '8px 12px',
-                            background: isSelected ? (isAll ? 'rgba(245, 158, 11, 0.14)' : 'rgba(37, 99, 235, 0.1)') : 'transparent',
+                            background: isSelected ? (isAll ? 'rgba(245, 158, 11, 0.2)' : 'rgba(37, 99, 235, 0.25)') : 'transparent',
                             cursor: 'pointer',
                             transition: 'background 0.1s ease',
-                            borderBottom: idx < mentionCandidates.length - 1 ? '1px solid #f1f5f9' : 'none'
+                            borderBottom: idx < mentionCandidates.length - 1 ? '1px solid rgba(148, 163, 184, 0.14)' : 'none'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -8183,10 +8918,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               {isAll ? <Users size={13} color="#ffffff" /> : uName.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isAll ? '#b45309' : '#0f172a' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isAll ? '#fbbf24' : '#f8fafc' }}>
                                 {isAll ? '@all (All Members)' : uName}
                               </div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                                 {isAll ? 'Notify everyone in this conversation' : `@${u.username || uName.toLowerCase().replace(/\s+/g, '')}`}
                               </div>
                             </div>
@@ -8194,9 +8929,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           <span style={{
                             fontSize: '0.68rem',
                             padding: '2px 6px',
-                            background: isAll ? '#fef3c7' : '#e2e8f0',
+                            background: isAll ? 'rgba(245, 158, 11, 0.2)' : 'rgba(30, 41, 59, 0.9)',
                             borderRadius: '4px',
-                            color: isAll ? '#92400e' : '#475569',
+                            color: isAll ? '#fde68a' : '#cbd5e1',
                             fontWeight: 700
                           }}>
                             {uRole}
@@ -8378,13 +9113,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 position: 'absolute',
                                 bottom: 'calc(100% + 12px)',
                                 right: 0,
-                                background: '#ffffff',
-                                border: '1px solid #e2e8f0',
+                                background: 'rgba(15, 23, 42, 0.96)',
+                                backdropFilter: 'blur(20px)',
+                                border: '1px solid rgba(148, 163, 184, 0.25)',
                                 borderRadius: '16px',
-                                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.16)',
+                                boxShadow: '0 16px 40px rgba(2, 6, 23, 0.65)',
                                 zIndex: 9999,
                                 padding: '8px',
-                                minWidth: '230px',
+                                minWidth: '240px',
+                                maxHeight: '62vh',
+                                overflowY: 'auto',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '3px',
@@ -8400,11 +9138,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
                                   background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <ImageIcon size={16} color="#2563eb" />
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <ImageIcon size={16} color="#38bdf8" />
                                 </div>
                                 <span>Photos & Media</span>
                               </button>
@@ -8418,13 +9156,136 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
                                   background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <FileText size={16} color="#8b5cf6" />
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <FileText size={16} color="#a78bfa" />
                                 </div>
                                 <span>Document / PDF</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  setShowScheduleModal(true);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Clock size={16} color="#38bdf8" />
+                                </div>
+                                <span>Schedule Message</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  setShowLocationModal(true);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <MapPin size={16} color="#4ade80" />
+                                </div>
+                                <span>Share Location</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  setShowContactModal(true);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(167, 139, 250, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <UserPlus size={16} color="#c4b5fd" />
+                                </div>
+                                <span>Share Contact Card</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  handleToggleVideoNoteRecording();
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Video size={16} color="#38bdf8" />
+                                </div>
+                                <span>{isRecordingVideoNote ? 'Stop & Send Video Note' : 'Record Video Note'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setViewOnceSend((v) => !v)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: viewOnceSend ? 'rgba(56, 189, 248, 0.16)' : 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: viewOnceSend ? '#38bdf8' : '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Eye size={16} color="#38bdf8" />
+                                </div>
+                                <span>View-Once Media: {viewOnceSend ? 'ON' : 'OFF'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  setShowEventModal(true);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Calendar size={16} color="#fbbf24" />
+                                </div>
+                                <span>Create Group Event</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDesktopAttachMenu(false);
+                                  setShowCallLinkModal(true);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <PhoneCall size={16} color="#4ade80" />
+                                </div>
+                                <span>Shareable Call Link</span>
                               </button>
 
                               <button
@@ -8436,11 +9297,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
                                   background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <BarChart2 size={16} color="#059669" />
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <BarChart2 size={16} color="#34d399" />
                                 </div>
                                 <span>Create Poll</span>
                               </button>
@@ -8454,11 +9315,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
                                   background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <CheckSquare size={16} color="#10b981" />
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <CheckSquare size={16} color="#34d399" />
                                 </div>
                                 <span>Create Task</span>
                               </button>
@@ -8472,11 +9333,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
                                   background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#faf5ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Share2 size={16} color="#9333ea" />
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(168, 85, 247, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Share2 size={16} color="#c084fc" />
                                 </div>
                                 <span>Quick Share Record</span>
                               </button>
@@ -8489,12 +9350,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: isUrgent ? '#fee2e2' : 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: isUrgent ? '#dc2626' : '#0f172a', cursor: 'pointer', fontWeight: 600
+                                  background: isUrgent ? 'rgba(239, 68, 68, 0.2)' : 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                  fontSize: '0.84rem', color: isUrgent ? '#f87171' : '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <AlertTriangle size={16} color="#dc2626" />
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <AlertTriangle size={16} color="#f87171" />
                                 </div>
                                 <span>{isUrgent ? 'Disable Urgent Alert' : 'Mark as Urgent (SOS)'}</span>
                               </button>
@@ -8516,20 +9377,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             setShowEmojiPicker(true);
                           }
                         }}
-                        style={{
-                          borderRadius: '8px',
-                          width: '32px',
-                          height: '32px',
-                          border: 'none',
-                          background: showEmojiPicker && mediaPickerTab === 'gif' ? '#eff6ff' : 'transparent',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 0,
-                          cursor: 'pointer'
-                        }}
                       >
-                        <Film size={20} color={showEmojiPicker && mediaPickerTab === 'gif' ? '#2563eb' : '#64748b'} />
+                        <Film size={19} />
                       </button>
                     </div>
 
@@ -10035,6 +10884,301 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
       )}
 
+      {/* ── ADVANCED CHAT MODALS (THREAD, INFO, SCHEDULE, STARRED, DISAPPEAR, BULK) ── */}
+      {isMultiSelectMode && selectedMsgIds.length > 0 && (
+        <BulkActionToolbar
+          count={selectedMsgIds.length}
+          groups={groups}
+          onBulkDelete={async () => {
+            await api.bulkChatMessageAction('delete', selectedMsgIds).catch(() => {});
+            setIsMultiSelectMode(false);
+            setSelectedMsgIds([]);
+            if (activeGroup?._id) fetchGroupMessages(activeGroup._id, 'all', false);
+          }}
+          onBulkForward={async (targetRoomId) => {
+            await api.bulkChatMessageAction('forward', selectedMsgIds, targetRoomId).catch(() => {});
+            setIsMultiSelectMode(false);
+            setSelectedMsgIds([]);
+          }}
+          onCancel={() => { setIsMultiSelectMode(false); setSelectedMsgIds([]); }}
+        />
+      )}
+
+      {threadParentMsg && (
+        <ThreadDrawer
+          parentMessage={threadParentMsg}
+          onClose={() => setThreadParentMsg(null)}
+          onSendThreadReply={async (txt, parentId) => {
+            if (!activeGroup?._id) return null;
+            const res = await api.sendCommunicationMessage(activeGroup._id, {
+              content: txt,
+              replyTo: parentId,
+              type: 'text',
+            });
+            return res?.data || null;
+          }}
+        />
+      )}
+
+      {infoTargetMsg && (
+        <MessageInfoModal
+          message={infoTargetMsg}
+          onClose={() => setInfoTargetMsg(null)}
+        />
+      )}
+
+      {showScheduleModal && activeGroup?._id && (
+        <ScheduleMessageModal
+          roomId={activeGroup._id}
+          initialText={inputMessage}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => setInputMessage('')}
+        />
+      )}
+
+      {showStarredModal && (
+        <StarredMessagesModal
+          onClose={() => setShowStarredModal(false)}
+          onJumpToRoom={(rId) => {
+            const found = groups.find((g) => String(g._id) === String(rId));
+            if (found) setActiveGroup(found);
+          }}
+        />
+      )}
+
+      {showDisappearModal && activeGroup?._id && (
+        <DisappearTimerModal
+          roomId={activeGroup._id}
+          currentSeconds={activeGroup.disappearAfterSec || 0}
+          onClose={() => setShowDisappearModal(false)}
+          onUpdated={(sec) => {
+            setActiveGroup((prev) => prev ? { ...prev, disappearAfterSec: sec } : prev);
+          }}
+        />
+      )}
+
+      {lockModalState && (
+        <ChatLockModal
+          mode={lockModalState.mode}
+          roomName={lockModalState.room?.name || 'Chat'}
+          onClose={() => setLockModalState(null)}
+          onConfirm={async (pin) => {
+            if (lockModalState.mode === 'unlock') {
+              const res = await api.verifyChatRoomLock(lockModalState.room._id, pin);
+              if (!res?.success) throw new Error(res?.message || 'Incorrect PIN');
+              setUnlockedRoomIds((prev) => [...prev, String(lockModalState.room._id)]);
+              const roomToOpen = lockModalState.room;
+              setLockModalState(null);
+              setActiveGroup(roomToOpen);
+            } else {
+              const res = await api.setChatRoomLock(lockModalState.room._id, pin, true);
+              if (!res?.success) throw new Error(res?.message || 'Failed to lock');
+              const myId = String(currentUser?._id || currentUser?.id || '');
+              setGroups((prev) => prev.map((g) => String(g._id) === String(lockModalState.room._id) ? { ...g, lockedBy: [...(g.lockedBy || []), { userId: myId }] } : g));
+              setLockModalState(null);
+            }
+          }}
+          onRemoveLock={async () => {
+            await api.setChatRoomLock(lockModalState.room._id, '', false);
+            const myId = String(currentUser?._id || currentUser?.id || '');
+            setGroups((prev) => prev.map((g) => String(g._id) === String(lockModalState.room._id) ? { ...g, lockedBy: (g.lockedBy || []).filter((l) => String(l.userId || l) !== myId) } : g));
+            setLockModalState(null);
+          }}
+        />
+      )}
+
+      {showWallpaperModal && (
+        <WallpaperPickerModal
+          currentWallpaper={(activeGroup?._id && chatPrefs?.roomWallpapers?.[String(activeGroup._id)]) || chatPrefs?.globalWallpaper || 'default'}
+          scopeLabel={activeGroup?.name || 'Global'}
+          onClose={() => setShowWallpaperModal(false)}
+          onSelect={async (val) => {
+            const payload = activeGroup?._id ? { roomId: activeGroup._id, roomWallpaper: val } : { globalWallpaper: val };
+            const res = await api.updateChatPreferences(payload);
+            if (res?.success && res.data) setChatPrefs(res.data);
+            setShowWallpaperModal(false);
+          }}
+        />
+      )}
+
+      {showLocationModal && (
+        <LocationShareModal
+          onClose={() => setShowLocationModal(false)}
+          onSendLocation={handleSendLocationMsg}
+        />
+      )}
+
+      {showContactModal && (
+        <ContactShareModal
+          allUsers={allUsers}
+          onClose={() => setShowContactModal(false)}
+          onSendContact={handleSendContactMsg}
+        />
+      )}
+
+      {showInviteModal && (
+        <GroupInviteModal
+          group={activeGroup}
+          onClose={() => setShowInviteModal(false)}
+          onJoined={() => fetchGroups && fetchGroups()}
+        />
+      )}
+
+      {showBroadcastModal && (
+        <BroadcastListModal
+          allUsers={allUsers}
+          currentUserId={currentUser?._id || currentUser?.id}
+          onClose={() => setShowBroadcastModal(false)}
+          onCreated={(newRoom) => {
+            setGroups((prev) => [newRoom, ...prev]);
+            setActiveGroup(newRoom);
+          }}
+        />
+      )}
+
+      {showChatSettingsModal && (
+        <ChatSettingsModal
+          prefs={chatPrefs}
+          onClose={() => setShowChatSettingsModal(false)}
+          onUpdatePrefs={async (patch) => {
+            const res = await api.updateChatPreferences(patch);
+            if (res?.success && res.data) setChatPrefs(res.data);
+          }}
+        />
+      )}
+
+      {viewOnceViewerMsg && (
+        <ViewOnceViewerModal
+          message={viewOnceViewerMsg}
+          onClose={() => setViewOnceViewerMsg(null)}
+        />
+      )}
+
+      {showE2EEModal && activeGroup?._id && (
+        <E2EEVerifyModal
+          group={activeGroup}
+          onClose={() => setShowE2EEModal(false)}
+          onUpdated={(enabled) => {
+            setActiveGroup((prev) => prev ? { ...prev, e2eeEnabled: enabled } : prev);
+            setGroups((prev) => prev.map((g) => String(g._id) === String(activeGroup._id) ? { ...g, e2eeEnabled: enabled } : g));
+          }}
+        />
+      )}
+
+      {showCommunityModal && (
+        <CommunityModal
+          groups={groups}
+          onSelectRoom={(room) => handleSelectGroup(room)}
+          onCreated={() => fetchGroups && fetchGroups()}
+          onClose={() => setShowCommunityModal(false)}
+        />
+      )}
+
+      {reminderTargetMsg && (
+        <MessageReminderModal
+          message={reminderTargetMsg}
+          existingReminders={myReminders}
+          onClose={() => setReminderTargetMsg(null)}
+          onCreated={(created) => {
+            if (created) setMyReminders((prev) => [...prev, created]);
+          }}
+          onDeleted={(deletedId) => {
+            setMyReminders((prev) => prev.filter((r) => String(r._id) !== String(deletedId)));
+          }}
+        />
+      )}
+
+      {dueReminderBanner && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <div
+          className="erp-island-toast"
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 99999,
+            width: 'min(360px, 92vw)',
+            background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+            border: '1px solid rgba(245, 158, 11, 0.55)',
+            borderRadius: '14px',
+            boxShadow: '0 20px 45px rgba(0, 0, 0, 0.55)',
+            padding: '0.85rem 1rem',
+            color: '#f8fafc',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.7rem',
+          }}
+        >
+          <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Bell size={18} color="#fbbf24" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#fcd34d' }}>Message Reminder Due</div>
+            <div style={{ fontSize: '0.8rem', color: '#e2e8f0', marginTop: '2px', wordBreak: 'break-word' }}>
+              {dueReminderBanner.note || dueReminderBanner.previewText || 'Check your saved reminder'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDueReminderBanner(null)}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+          >
+            <X size={16} />
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {showEventModal && activeGroup?._id && (
+        <GroupEventModal
+          onClose={() => setShowEventModal(false)}
+          onCreateEvent={async (eventMeta) => {
+            setShowEventModal(false);
+            const res = await api.sendCommunicationMessage(activeGroup._id, {
+              content: `Event: ${eventMeta.title}`,
+              type: 'event',
+              eventMeta,
+            });
+            if (res?.success && res.data) {
+              setMessages((prev) => mergeMessages(prev, [res.data]));
+            }
+          }}
+        />
+      )}
+
+      {showCallLinkModal && activeGroup?._id && (
+        <CallLinkModal
+          groupId={activeGroup._id}
+          onClose={() => setShowCallLinkModal(false)}
+          onCreated={(msg) => setMessages((prev) => mergeMessages(prev, [msg]))}
+        />
+      )}
+
+      {showToneModal && activeGroup?._id && (
+        <CustomToneModal
+          roomName={activeGroup.name || 'Chat'}
+          currentTone={chatPrefs?.roomTones?.[String(activeGroup._id)] || 'default'}
+          onClose={() => setShowToneModal(false)}
+          onSelectTone={async (toneKey) => {
+            const res = await api.updateChatPreferences({ roomId: activeGroup._id, roomTone: toneKey });
+            if (res?.success && res.data) setChatPrefs(res.data);
+            setShowToneModal(false);
+          }}
+        />
+      )}
+
+      {markupImageFile && (
+        <ImageMarkupModal
+          file={markupImageFile}
+          isHdInitial={hdImageUpload}
+          onClose={() => setMarkupImageFile(null)}
+          onConfirm={async (editedFile, isHd) => {
+            setHdImageUpload(isHd);
+            setMarkupImageFile(null);
+            await processFileUpload(editedFile);
+          }}
+        />
+      )}
+
       {/* ── CROSS-ROOM FORWARD MESSAGE MODAL ── */}
       {showForwardModal && forwardTargetMsg && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -10329,6 +11473,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
       {/* ─── ACTIVE CALL MODAL (Portal to document.body so call stays visible over any screen) ─── */}
       {activeCall && typeof document !== 'undefined' && ReactDOM.createPortal(
+        isCallMinimized ? (
+          <DraggablePiPCallWindow
+            activeCall={activeCall}
+            isMuted={Boolean(activeCall.isMuted)}
+            onToggleMute={toggleMute}
+            onExpand={() => setIsCallMinimized(false)}
+            onEndCall={() => {
+              setIsCallMinimized(false);
+              endCall(true);
+            }}
+          />
+        ) : (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -10377,24 +11533,45 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   Encrypted
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => endCall(true)}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#94a3b8',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={16} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsCallMinimized(true)}
+                  title="Minimize to Picture-in-Picture"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#38bdf8',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Minimize2 size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => endCall(true)}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#94a3b8',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Main Call Body */}
@@ -10730,7 +11907,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               </button>
             </div>
           </div>
-        </div>,
+        </div>
+        ),
         document.body
       )}
 

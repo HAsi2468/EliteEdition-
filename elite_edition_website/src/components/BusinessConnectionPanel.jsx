@@ -20,6 +20,8 @@ import {
 import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import ConnectionProfilesPanel from './ConnectionProfilesPanel';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const RECORD_TYPES = [
   { key: 'ALL', label: 'All Connections', icon: Users, color: '#2563eb' },
@@ -29,6 +31,7 @@ const RECORD_TYPES = [
 ];
 
 export default function BusinessConnectionPanel({ currentUser }) {
+  const [connectionViewMode, setConnectionViewMode] = useState('table'); // 'table' | 'cards'
   const [subTab, setSubTab] = useState(() => {
     if (typeof window !== 'undefined' && window.location.hash.toLowerCase().includes('profile')) {
       return 'profiles';
@@ -345,102 +348,17 @@ export default function BusinessConnectionPanel({ currentUser }) {
         }
       `}</style>
 
-      {/* Top Header */}
-      <div style={styles.headerRow}>
-        <div>
-          <h2 style={styles.pageTitle}>
-            <UserCheck size={28} color="#2563eb" />
-            <span>Business Connection</span>
-          </h2>
-          <p style={styles.pageSubtitle}>
-            Centralized directory for managing Fabric Vendors, Salaried Staff &amp; Factory Workers.
-          </p>
+      {/* ── TIER 1: HEADER (Rule 5: No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header" style={{ marginBottom: '0.65rem' }}>
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+            <UserCheck size={16} color="#ffffff" />
+          </div>
+          <span className="glass-screen-title">Business Connection</span>
+          <EntityBrandBadge entityId="EDP" />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* SubTab Switcher Buttons */}
-          <div
-            style={{
-              display: 'inline-flex',
-              padding: '4px',
-              borderRadius: '12px',
-              background: 'var(--bg-card, #ffffff)',
-              border: '1px solid var(--border-light, #e2e8f0)',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-              gap: '4px'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setSubTab('profiles')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: subTab === 'profiles' ? '#2563eb' : 'transparent',
-                color: subTab === 'profiles' ? '#ffffff' : '#64748b',
-                fontWeight: subTab === 'profiles' ? 700 : 600,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: subTab === 'profiles' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
-              }}
-            >
-              <Users size={16} />
-              <span>Connection Profiles</span>
-              <span
-                style={{
-                  fontSize: '10px',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  background: subTab === 'profiles' ? 'rgba(255,255,255,0.25)' : '#dbeafe',
-                  color: subTab === 'profiles' ? '#ffffff' : '#1e40af',
-                  fontWeight: 700
-                }}
-              >
-                Directory
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSubTab('directory')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: subTab === 'directory' ? '#2563eb' : 'transparent',
-                color: subTab === 'directory' ? '#ffffff' : '#64748b',
-                fontWeight: subTab === 'directory' ? 700 : 600,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: subTab === 'directory' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
-              }}
-            >
-              <FileText size={16} />
-              <span>List / Board View</span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  background: subTab === 'directory' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
-                  color: subTab === 'directory' ? '#ffffff' : '#475569',
-                  fontWeight: 700
-                }}
-              >
-                {connections.length}
-              </span>
-            </button>
-          </div>
-
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             onClick={() => {
               setEditingId(null);
@@ -453,12 +371,43 @@ export default function BusinessConnectionPanel({ currentUser }) {
               });
               setShowModal(true);
             }}
-            style={styles.addBtn}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.45rem 0.95rem',
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+            }}
           >
-            <Plus size={18} />
-            <span>Add Connection</span>
+            <Plus size={15} /> + Add Connection
           </button>
+          <QuickActionMenu />
         </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Rule 5) ── */}
+      <div className="glass-subtabs-bar" style={{ marginBottom: '1rem' }}>
+        <button
+          type="button"
+          className={`glass-subtab-btn ${subTab === 'profiles' ? 'active' : ''}`}
+          onClick={() => setSubTab('profiles')}
+        >
+          <span>Connection Profiles Directory</span>
+        </button>
+        <button
+          type="button"
+          className={`glass-subtab-btn ${subTab === 'directory' ? 'active' : ''}`}
+          onClick={() => setSubTab('directory')}
+        >
+          <span>List &amp; Category View ({connections.length})</span>
+        </button>
       </div>
 
       {subTab === 'profiles' ? (
@@ -468,81 +417,144 @@ export default function BusinessConnectionPanel({ currentUser }) {
         />
       ) : (
         <>
-          {/* Metric Cards Grid */}
-      <div style={styles.metricsGrid}>
-        {RECORD_TYPES.map((cat) => {
-          const IconComponent = cat.icon;
-          const isSelected = activeType === cat.key;
-          let count = counts.total;
-          if (cat.key === 'VENDOR') count = counts.vendor;
-          if (cat.key === 'EMPLOYEE') count = counts.employee;
-          if (cat.key === 'WORKER') count = counts.worker;
+          {/* ── TIER 3: SIDE SCROLLING CALCULATION & CONNECTION METRICS TRACK (Rule 5) ── */}
+          <div className="glass-scroll-track" style={{ marginBottom: '1rem' }}>
+            {RECORD_TYPES.map((cat) => {
+              const IconComponent = cat.icon;
+              const isSelected = activeType === cat.key;
+              let count = counts.total;
+              if (cat.key === 'VENDOR') count = counts.vendor;
+              if (cat.key === 'EMPLOYEE') count = counts.employee;
+              if (cat.key === 'WORKER') count = counts.worker;
 
-          return (
-            <div
-              key={cat.key}
-              onClick={() => setActiveType(cat.key)}
-              style={{
-                ...styles.metricCard,
-                ...(isSelected ? styles.metricCardSelected : {})
-              }}
-            >
-              <div>
-                <span style={styles.metricLabel}>{cat.label}</span>
-                <div style={styles.metricCount}>{count}</div>
+              return (
+                <div
+                  key={cat.key}
+                  onClick={() => setActiveType(cat.key)}
+                  className="glass-card"
+                  style={{
+                    minWidth: '220px',
+                    flex: '0 0 auto',
+                    padding: '0.9rem 1.15rem',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    border: isSelected ? '1px solid rgba(56, 189, 248, 0.6)' : '1px solid rgba(255, 255, 255, 0.14)',
+                    background: isSelected ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.08)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>{cat.label}</span>
+                    <IconComponent size={16} color={isSelected ? '#38bdf8' : cat.color} />
+                  </div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 900, color: isSelected ? '#38bdf8' : '#ffffff', marginTop: '4px' }}>{count}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>Registered in Directory</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── TIER 4: ACTION TOOLBAR WITH VIEW TOGGLE (Rule 5: Table | Cards) ── */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.06)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            padding: '0.75rem 1rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
+            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flex: '1', minWidth: '240px', maxWidth: '380px' }}>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search name, phone, city..."
+                  style={{
+                    width: '100%',
+                    paddingLeft: 32,
+                    paddingRight: 10,
+                    paddingTop: 7,
+                    paddingBottom: 7,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.18)',
+                    background: 'rgba(15, 23, 42, 0.65)',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    outline: 'none'
+                  }}
+                />
               </div>
-              <div style={styles.metricIconBox}>
-                <IconComponent size={22} color="#2563eb" />
+            </form>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <DateRangePicker
+                preset={datePreset}
+                onChange={({ preset, dateStart, dateEnd }) => {
+                  setDatePreset(preset);
+                  if (preset === 'custom') {
+                    setCustomStart(dateStart);
+                    setCustomEnd(dateEnd);
+                  }
+                }}
+                customStart={customStart}
+                customEnd={customEnd}
+                onCustomChange={(s, e) => {
+                  setCustomStart(s);
+                  setCustomEnd(e);
+                }}
+              />
+
+              <button
+                onClick={handleExportPDF}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer'
+                }}
+                title="Export PDF Report of Business Connections"
+              >
+                <Printer size={15} color="#38bdf8" />
+                <span>Export PDF</span>
+              </button>
+
+              {/* View Mode Toggle */}
+              <div className="glass-view-toggle">
+                <button
+                  type="button"
+                  className={connectionViewMode === 'table' ? 'active' : ''}
+                  onClick={() => setConnectionViewMode('table')}
+                  title="Switch to High-Density Table View"
+                >
+                  <FileText size={14} />
+                  <span>Table</span>
+                </button>
+                <button
+                  type="button"
+                  className={connectionViewMode === 'cards' ? 'active' : ''}
+                  onClick={() => setConnectionViewMode('cards')}
+                  title="Switch to Card Grid View"
+                >
+                  <Users size={14} />
+                  <span>Cards</span>
+                </button>
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div style={styles.filterBar}>
-        <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
-          <Search size={18} color="#64748b" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, designation, phone, city, or company..."
-            style={styles.searchInput}
-          />
-          <button type="submit" style={styles.searchBtn}>
-            Search
-          </button>
-        </form>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <DateRangePicker
-            preset={datePreset}
-            onChange={({ preset, dateStart, dateEnd }) => {
-              setDatePreset(preset);
-              if (preset === 'custom') {
-                setCustomStart(dateStart);
-                setCustomEnd(dateEnd);
-              }
-            }}
-            customStart={customStart}
-            customEnd={customEnd}
-            onCustomChange={(s, e) => {
-              setCustomStart(s);
-              setCustomEnd(e);
-            }}
-          />
-
-          <button
-            onClick={handleExportPDF}
-            style={styles.pdfBtn}
-            title="Export PDF Report of Business Connections"
-          >
-            <Printer size={15} color="#2563eb" />
-            <span>Export PDF</span>
-          </button>
-        </div>
-      </div>
+          </div>
 
       {/* Connections Data List */}
       {loading ? (

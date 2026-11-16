@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="glassBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.96" />
+      <stop offset="50%" stop-color="#0f172a" stop-opacity="0.98" />
+      <stop offset="100%" stop-color="#090f1d" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="glassBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#eab308" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0.75" />
+    </linearGradient>
+    <linearGradient id="topSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="50%" stop-color="#e5c168" />
+      <stop offset="100%" stop-color="#ca9a3b" />
+    </linearGradient>
+    <radialGradient id="ambientGlow" cx="25%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Frosted Glass Rounded Square Base -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#glassBg)" stroke="url(#glassBorder)" stroke-width="2" />
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#ambientGlow)" />
+
+  <!-- Top Specular Glass Reflection -->
+  <path d="M 18 3.5 L 46 3.5 C 54 3.5 59.5 9 59.5 17 L 59.5 24 C 42 19 22 19 4.5 24 L 4.5 17 C 4.5 9 10 3.5 18 3.5 Z" fill="url(#topSheen)" />
+
+  <!-- Luminous Gold Elite Emblem & Monogram -->
+  <g transform="translate(8, 13)">
+    <!-- Left Oval Emblem -->
+    <rect x="2" y="4" width="16" height="30" rx="8" fill="none" stroke="url(#goldGrad)" stroke-width="3.2" />
+    <path d="M 6.5 12 L 6.5 27" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 6.5 24 C 9 16 14 13 18 12" fill="none" stroke="url(#goldGrad)" stroke-width="2.6" stroke-linecap="round" />
+    <circle cx="10.5" cy="10.5" r="2.6" fill="url(#goldGrad)" />
+
+    <!-- Glass Divider Bar -->
+    <line x1="23" y1="5" x2="23" y2="33" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.7" />
+
+    <!-- Stylized "EE" Monogram -->
+    <path d="M 28 8 H 43 M 28 8 V 24 H 43 M 28 16 H 39" fill="none" stroke="url(#goldGrad)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="27.5" y="33" font-family="Inter, system-ui, sans-serif" font-size="6.2" font-weight="900" letter-spacing="1.6" fill="#f8fafc">ELITE</text>
+  </g>
+</svg>

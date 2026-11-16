@@ -380,22 +380,14 @@ const broadcastApprovalResolution = (req, approval, status, executionResult = nu
         timestamp: Date.now(),
       });
 
-      // 2. Direct user notification to the requester
+      // 2. Direct user notification ONLY to the user who requested the change approval
       if (approval.requestedBy?.userId) {
+        const requesterId = String(approval.requestedBy.userId);
         const userMsg = status === 'APPROVED'
           ? `Your edit on ${targetIdentifier || moduleName} has been approved by Admin and updated.`
           : `Your edit on ${targetIdentifier || moduleName} was rejected: ${approval.rejectionReason || 'No reason provided'}`;
-        
-        io.to(`user:${approval.requestedBy.userId}`).emit('approval-result-notify', {
-          id: approval._id,
-          status,
-          module: moduleName,
-          targetId,
-          targetIdentifier,
-          message: userMsg,
-          timestamp: Date.now()
-        });
-        io.emit('approval-result-notify', {
+
+        io.to(`user:${requesterId}`).emit('approval-result-notify', {
           id: approval._id,
           status,
           module: moduleName,
@@ -405,6 +397,19 @@ const broadcastApprovalResolution = (req, approval, status, executionResult = nu
           requestedBy: approval.requestedBy,
           timestamp: Date.now()
         });
+
+        // Also send a targeted Web Push ONLY to the requesting user
+        try {
+          const webPushService = require('../services/webPush.service');
+          if (webPushService && typeof webPushService.sendPushToUsers === 'function') {
+            webPushService.sendPushToUsers([requesterId], {
+              title: status === 'APPROVED' ? '✅ Edit Approved by Admin' : '❌ Edit Request Rejected',
+              body: userMsg,
+              tag: `approval-${approval._id}`,
+              data: { url: '/', approvalId: String(approval._id), status }
+            }).catch(() => {});
+          }
+        } catch (pushErr) {}
       }
 
       // If approved, trigger instant data refresh across the whole system

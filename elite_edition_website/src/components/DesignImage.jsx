@@ -29,7 +29,10 @@ export default function DesignImage({
   showPlaceholderBadge = true,
   thumbnail = true,
   width = 360,
-  priority = false
+  priority = false,
+  showShimmer = true,
+  identifiers = [],
+  strictDirectOnly = false
 }) {
   const containerRef = useRef(null);
   const hoverTimerRef = useRef(null);
@@ -38,8 +41,8 @@ export default function DesignImage({
   const [isInView, setIsInView] = useState(priority);
 
   const candidates = useMemo(
-    () => getImageCandidates(rawUrl, designName, { thumbnail, width }),
-    [rawUrl, designName, thumbnail, width]
+    () => getImageCandidates(rawUrl, designName, { thumbnail, width, identifiers, category, strictDirectOnly }),
+    [rawUrl, designName, thumbnail, width, identifiers, category, strictDirectOnly]
   );
 
   const [candidateIdx, setCandidateIdx] = useState(0);
@@ -201,7 +204,7 @@ export default function DesignImage({
       onMouseLeave={handleMouseLeave}
     >
       {/* Subtle loader shimmer until image successfully loads */}
-      {!hasLoaded && (
+      {showShimmer && !hasLoaded && (
         <div
           style={{
             position: 'absolute',
@@ -223,6 +226,7 @@ export default function DesignImage({
           loading={priority ? 'eager' : 'lazy'}
           fetchpriority={priority ? 'high' : 'auto'}
           decoding="async"
+          referrerPolicy="no-referrer"
           onError={handleError}
           onLoad={handleLoad}
           style={{

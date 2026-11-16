@@ -48,6 +48,8 @@ import {
   Cpu
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 import { triggerEliteConfirm } from './EliteModalDialog';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignImage from './DesignImage';
@@ -81,10 +83,10 @@ export const FINAL_DESIGN_OPTIONS = [
 ];
 
 export const PRIORITY_STYLES = {
-  Urgent: { bg: '#fee2e2', color: '#dc2626', border: '#fca5a5', badge: '🔴' },
-  High: { bg: '#ffedd5', color: '#ea580c', border: '#fdba74', badge: '🟠' },
-  Medium: { bg: '#fef9c3', color: '#ca8a04', border: '#fde047', badge: '🟡' },
-  Low: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', badge: '🟢' },
+  Urgent: { bg: 'rgba(239, 68, 68, 0.20)', color: '#fca5a5', border: 'rgba(248, 113, 113, 0.45)', badge: '🔴' },
+  High: { bg: 'rgba(249, 115, 22, 0.20)', color: '#fdba74', border: 'rgba(251, 146, 60, 0.45)', badge: '🟠' },
+  Medium: { bg: 'rgba(245, 158, 11, 0.20)', color: '#fde047', border: 'rgba(250, 204, 21, 0.45)', badge: '🟡' },
+  Low: { bg: 'rgba(16, 185, 129, 0.20)', color: '#6ee7b7', border: 'rgba(52, 211, 153, 0.45)', badge: '🟢' },
 };
 
 /**
@@ -1194,6 +1196,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         notes: catalogUploadForm.notes || '',
         status: 'Active',
         department: 'digital_print',
+        sampleTaskId: catalogUploadModalTask._id,
       };
 
       const createdDesign = await api.createDesign(payload);
@@ -2107,96 +2110,38 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   return (
     <div style={{ padding: embedded ? '0' : '1rem', maxWidth: embedded ? 'none' : '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
-      {/* ─── Top Header Bar (Only visible in standalone mode) ─────────── */}
+      {/* ─── TIER 1: HEADER (Only visible in standalone mode) ─────────── */}
       {!embedded && (
-        <div className="ent-screen-header" style={{ marginBottom: '1rem' }}>
-          <div className="ent-header-title-wrap">
-            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)' }}>
-              <Palette size={18} color="#ffffff" />
+        <div className="glass-screen-header" style={{ marginBottom: '0.65rem' }}>
+          <div className="glass-title-capsule">
+            <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+              <Palette size={16} color="#ffffff" />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <h1 className="ent-header-title">
-                Designer Screen
-              </h1>
-              <span className="ent-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
-              </span>
-            </div>
+            <span className="glass-screen-title">Designer Screen</span>
+            <EntityBrandBadge entityId="EDP" />
           </div>
-
-
         </div>
       )}
 
-
-
-      {/* ─── Operational Stage Navigation Tabs (Drawing, Colour Match, Hold, Approved, Revisions) ── */}
-      <div
-        className="ent-tab-bar horizontal-scroll-tabs"
-        data-screen-subtabs="primary"
-        role="tablist"
-        aria-label="Designer Stage Navigation Tabs"
-        style={{
-          display: 'flex',
-          gap: '0.45rem',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-x pan-y',
-          flexWrap: 'nowrap',
-          maxWidth: '100%',
-          width: '100%',
-          paddingBottom: '0.4rem',
-          marginBottom: '0.85rem',
-          scrollbarWidth: 'none',
-        }}
-      >
+      {/* ─── TIER 2: STAGE NAVIGATION SUBTABS BAR ── */}
+      <div className="glass-subtabs-bar" style={{ marginBottom: '1rem' }}>
         {[
-          { id: 'ALL', label: 'All Designs', count: stageCounts.all, color: '#1d4ed8', bg: '#eff6ff' },
-          { id: 'DROW', label: '1. Drawing', count: stageCounts.drow, color: '#0284c7', bg: '#f0f9ff' },
-          { id: 'CM', label: '2. Colour Match', count: stageCounts.cm, color: '#db2777', bg: '#fdf2f8' },
-          { id: 'STAGE_3', label: '3. Hold / Continue', count: stageCounts.stage3, color: '#ea580c', bg: '#fff7ed' },
-          { id: 'APPROVED', label: 'Approved', count: stageCounts.approved, color: '#16a34a', bg: '#f0fdf4' },
-          { id: 'REVISION', label: 'Reject / Revisions', count: stageCounts.revision, color: '#dc2626', bg: '#fef2f2' },
+          { id: 'ALL', label: `All Designs (${stageCounts.all})` },
+          { id: 'DROW', label: `1. Drawing (${stageCounts.drow})` },
+          { id: 'CM', label: `2. Colour Match (${stageCounts.cm})` },
+          { id: 'STAGE_3', label: `3. Hold / Continue (${stageCounts.stage3})` },
+          { id: 'APPROVED', label: `Approved (${stageCounts.approved})` },
+          { id: 'REVISION', label: `Reject / Revisions (${stageCounts.revision})` },
         ].map((tab) => {
           const isActive = stageTab === tab.id;
           return (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setStageTab(tab.id)}
-              className="ent-tab-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                border: isActive ? `1.5px solid ${tab.color}` : '1px solid #cbd5e1',
-                background: isActive ? tab.color : '#ffffff',
-                color: isActive ? '#ffffff' : '#475569',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                flex: '0 0 auto',
-                minWidth: 'max-content',
-                boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
-                transition: 'all 0.15s ease',
-              }}
+              className={`glass-subtab-btn ${isActive ? 'active' : ''}`}
             >
               <span>{tab.label}</span>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 800,
-                  padding: '0.1rem 0.45rem',
-                  borderRadius: '10px',
-                  background: isActive ? 'rgba(255, 255, 255, 0.25)' : tab.bg,
-                  color: isActive ? '#ffffff' : tab.color,
-                }}
-              >
-                {tab.count}
-              </span>
             </button>
           );
         })}
@@ -2208,10 +2153,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         style={{
           padding: '0.85rem 1.15rem',
           marginBottom: '1rem',
-          background: '#ffffff',
+          background: 'rgba(15, 23, 42, 0.65)',
           borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
         }}
       >
         <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2588,13 +2533,14 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
-                    padding: '3px 10px',
+                    padding: '4px 11px',
+                    minHeight: '30px',
                     borderRadius: '8px',
-                    background: '#ede9fe',
-                    border: '1px solid #ddd6fe',
-                    color: '#7c3aed',
+                    background: 'rgba(124, 58, 237, 0.22)',
+                    border: '1px solid rgba(167, 139, 250, 0.45)',
+                    color: '#ddd6fe',
                     fontSize: '0.74rem',
-                    fontWeight: 800,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     marginLeft: '8px',
                   }}
@@ -3695,24 +3641,24 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                           return (
                             <div
                               style={{
-                                padding: '0.45rem 0.6rem',
-                                borderRadius: '8px',
-                                background: displayText ? '#f8fafc' : '#fbfcfd',
-                                border: displayText ? '1px solid #cbd5e1' : '1.5px dashed #94a3b8',
+                                padding: '0.5rem 0.65rem',
+                                borderRadius: '10px',
+                                background: displayText ? 'rgba(15, 23, 42, 0.72)' : 'rgba(15, 23, 42, 0.48)',
+                                border: displayText ? '1px solid rgba(148, 163, 184, 0.24)' : '1px dashed rgba(148, 163, 184, 0.35)',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '0.3rem',
+                                gap: '0.35rem',
                                 transition: 'all 0.15s ease',
                               }}
                             >
                               {/* Header: Author + Role + Thread Count + Edit & Upload Quick Actions */}
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#38bdf8', whiteSpace: 'nowrap' }}>
                                     {displayAuthor || 'Note'}
                                   </span>
                                   {latestComment?.authorRole && (
-                                    <span style={{ fontSize: '0.6rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: '0.6rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                                       {latestComment.authorRole}
                                     </span>
                                   )}
@@ -3727,11 +3673,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                       style={{
                                         fontSize: '0.62rem',
                                         fontWeight: 800,
-                                        background: '#eff6ff',
-                                        color: '#2563eb',
-                                        border: '1px solid #bfdbfe',
+                                        background: 'rgba(37, 99, 235, 0.22)',
+                                        color: '#38bdf8',
+                                        border: '1px solid rgba(56, 189, 248, 0.35)',
                                         borderRadius: '10px',
-                                        padding: '1px 5px',
+                                        padding: '1px 6px',
                                         cursor: 'pointer',
                                       }}
                                       title="View complete comments thread"
@@ -3746,12 +3692,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                     style={{
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '2px',
-                                      padding: '2px 5px',
-                                      borderRadius: '4px',
-                                      background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
-                                      border: uploadingRowId === task._id ? '1px solid #6366f1' : '1px solid #bbf7d0',
-                                      color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
+                                      gap: '3px',
+                                      padding: '2px 6px',
+                                      borderRadius: '5px',
+                                      background: uploadingRowId === task._id ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.18)',
+                                      border: uploadingRowId === task._id ? '1px solid rgba(129, 140, 248, 0.5)' : '1px solid rgba(52, 211, 153, 0.4)',
+                                      color: uploadingRowId === task._id ? '#a5b4fc' : '#6ee7b7',
                                       fontSize: '0.64rem',
                                       fontWeight: 800,
                                       cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
@@ -3787,13 +3733,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                       setCommentDraftImages([]);
                                     }}
                                     style={{
-                                      background: 'none',
+                                      background: 'transparent',
                                       border: 'none',
-                                      padding: '2px',
+                                      padding: '3px',
+                                      minWidth: '24px',
+                                      minHeight: '24px',
                                       cursor: 'pointer',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      color: '#2563eb',
+                                      justifyContent: 'center',
+                                      color: '#38bdf8',
                                     }}
                                     title="Click to write/edit comment"
                                   >
@@ -3961,7 +3910,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                     e.stopPropagation();
                                     setCommentModalTask(task);
                                   }}
-                                  style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.64rem', cursor: 'pointer' }}
+                                  style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.64rem', cursor: 'pointer' }}
                                   title="Open full discussion & image upload thread"
                                 >
                                   Thread &amp; Images →

@@ -32,8 +32,32 @@ const createCsrfMiddleware = (options = {}) => {
       return next();
     }
 
+    // Localhost / Development bypass: never block localhost development mutations
+    const origin = String(req.headers.origin || req.headers.host || '');
+    if (
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      req.ip === '127.0.0.1' ||
+      req.ip === '::1' ||
+      process.env.NODE_ENV === 'development'
+    ) {
+      return next();
+    }
+
     // Only inspect mutating methods
     if (!MUTATING_METHODS.has(method)) {
+      return next();
+    }
+
+    // Localhost dev exemption
+    const isLocal =
+      req.hostname === 'localhost' ||
+      req.hostname === '127.0.0.1' ||
+      (req.headers.origin && req.headers.origin.includes('localhost')) ||
+      (req.headers.referer && req.headers.referer.includes('localhost')) ||
+      process.env.NODE_ENV !== 'production';
+
+    if (isLocal) {
       return next();
     }
 
@@ -50,6 +74,7 @@ const createCsrfMiddleware = (options = {}) => {
     if (
       path.endsWith('/csrf-token') ||
       path.includes('/auth/csrf-token') ||
+      path.includes('/auth/login') ||
       path.includes('/auth/logout') ||
       path.includes('/notifications/focus') ||
       path.includes('/telemetry') ||

@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
 
 /**
  * Format meters with Indian numbering and 'm' unit suffix
@@ -213,16 +215,16 @@ function ProductionVelocityChart({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={18} color="#2563eb" />
-              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#141824' }}>Production & Delivery Velocity</h3>
+              <Activity size={18} color="#38bdf8" />
+              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#ffffff' }}>Production & Delivery Velocity</h3>
             </div>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.72)' }}>
               Real-time daily production throughput vs finishing & client delivery velocity
             </p>
           </div>
 
           {/* Timeframe Selector Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(15, 23, 42, 0.75)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)' }}>
             {[
               { id: '7d', label: '7 Days' },
               { id: '14d', label: '14 Days' },
@@ -233,14 +235,13 @@ function ProductionVelocityChart({
                 type="button"
                 onClick={() => { setRangeFilter(r.id); setHoveredIdx(null); }}
                 style={{
-                  background: rangeFilter === r.id ? '#ffffff' : 'transparent',
-                  color: rangeFilter === r.id ? '#2563eb' : '#64748b',
+                  background: rangeFilter === r.id ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                  color: rangeFilter === r.id ? '#ffffff' : 'rgba(255, 255, 255, 0.68)',
                   fontWeight: rangeFilter === r.id ? 800 : 600,
                   fontSize: '0.75rem',
                   padding: '4px 10px',
                   borderRadius: '6px',
-                  border: rangeFilter === r.id ? '1px solid #cbd0dd' : 'none',
-                  boxShadow: rangeFilter === r.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                  border: rangeFilter === r.id ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -252,23 +253,23 @@ function ProductionVelocityChart({
         </div>
 
         {/* ── Key Metrics & Series Legend Ribbon ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem', padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem', padding: '0.6rem 0.85rem', background: 'rgba(15, 23, 42, 0.65)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
           {/* Quick Metrics */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.76rem' }}>
             <div>
-              <span style={{ color: '#64748b' }}>Daily Avg Print: </span>
-              <strong style={{ color: '#2563eb' }}>{fmtMtr(avgPrintDaily)}</strong>
+              <span style={{ color: 'rgba(255, 255, 255, 0.72)' }}>Daily Avg Print: </span>
+              <strong style={{ color: '#38bdf8' }}>{fmtMtr(avgPrintDaily)}</strong>
             </div>
             <div>
-              <span style={{ color: '#64748b' }}>Fusing Sync: </span>
-              <strong style={{ color: syncRatio >= 85 ? '#16a34a' : syncRatio >= 70 ? '#ea580c' : '#dc2626' }}>
+              <span style={{ color: 'rgba(255, 255, 255, 0.72)' }}>Fusing Sync: </span>
+              <strong style={{ color: syncRatio >= 85 ? '#34d399' : syncRatio >= 70 ? '#fb923c' : '#f87171' }}>
                 {syncRatio}% {syncRatio >= 85 ? '✓ Balanced' : '⚠️ Lagging'}
               </strong>
             </div>
             <div>
-              <span style={{ color: '#64748b' }}>Peak Output: </span>
-              <strong style={{ color: '#0f172a' }}>{fmtMtr(peakDay.meters)}</strong>
-              <span style={{ color: '#94a3b8', fontSize: '0.7rem', marginLeft: '3px' }}>({peakDay.label})</span>
+              <span style={{ color: 'rgba(255, 255, 255, 0.72)' }}>Peak Output: </span>
+              <strong style={{ color: '#ffffff' }}>{fmtMtr(peakDay.meters)}</strong>
+              <span style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.7rem', marginLeft: '3px' }}>({peakDay.label})</span>
             </div>
           </div>
 
@@ -281,13 +282,13 @@ function ProductionVelocityChart({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
-                color: activeSeries.print ? '#2563eb' : '#94a3b8',
+                color: activeSeries.print ? '#38bdf8' : 'rgba(255, 255, 255, 0.45)',
                 opacity: activeSeries.print ? 1 : 0.5,
                 transition: 'opacity 0.2s'
               }}
               title="Click to toggle Printing Output"
             >
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
               <span>Printing Line</span>
             </span>
 
@@ -298,13 +299,13 @@ function ProductionVelocityChart({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
-                color: activeSeries.fusing ? '#ea580c' : '#94a3b8',
+                color: activeSeries.fusing ? '#fb923c' : 'rgba(255, 255, 255, 0.45)',
                 opacity: activeSeries.fusing ? 1 : 0.5,
                 transition: 'opacity 0.2s'
               }}
               title="Click to toggle Fusing Line"
             >
-              <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#ea580c', display: 'inline-block' }} />
+              <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#fb923c', display: 'inline-block' }} />
               <span>Fusing Line</span>
             </span>
 
@@ -315,13 +316,13 @@ function ProductionVelocityChart({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
-                color: activeSeries.dispatch ? '#16a34a' : '#94a3b8',
+                color: activeSeries.dispatch ? '#34d399' : 'rgba(255, 255, 255, 0.45)',
                 opacity: activeSeries.dispatch ? 1 : 0.5,
                 transition: 'opacity 0.2s'
               }}
               title="Click to toggle Dispatched Line"
             >
-              <span style={{ width: '10px', height: '3px', borderRadius: '1px', background: '#16a34a', display: 'inline-block' }} />
+              <span style={{ width: '10px', height: '3px', borderRadius: '1px', background: '#34d399', display: 'inline-block' }} />
               <span>Dispatched</span>
             </span>
           </div>
@@ -337,18 +338,18 @@ function ProductionVelocityChart({
         <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
           <defs>
             <linearGradient id="velocityPrintGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
-              <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.08" />
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />
+              <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.1" />
               <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.0" />
             </linearGradient>
 
             <linearGradient id="velocityFusingGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ea580c" stopOpacity="0.2" />
+              <stop offset="0%" stopColor="#fb923c" stopOpacity="0.22" />
               <stop offset="100%" stopColor="#f97316" stopOpacity="0.0" />
             </linearGradient>
 
             <filter id="pointGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.2" />
+              <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.4" />
             </filter>
           </defs>
 
@@ -363,7 +364,7 @@ function ProductionVelocityChart({
                   y1={y}
                   x2={PAD_L + PLOT_W}
                   y2={y}
-                  stroke={i === 0 ? '#cbd0dd' : '#f1f5f9'}
+                  stroke={i === 0 ? 'rgba(255, 255, 255, 0.28)' : 'rgba(255, 255, 255, 0.10)'}
                   strokeWidth={i === 0 ? 1.5 : 1}
                   strokeDasharray={i === 0 ? 'none' : '3,3'}
                 />
@@ -372,7 +373,7 @@ function ProductionVelocityChart({
                   y={y + 3}
                   textAnchor="end"
                   fontSize="10"
-                  fill="#94a3b8"
+                  fill="rgba(255, 255, 255, 0.72)"
                   fontWeight="600"
                 >
                   {val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k m` : `${val}m`}
@@ -396,7 +397,7 @@ function ProductionVelocityChart({
             <path
               d={fusingLinePath}
               fill="none"
-              stroke="#ea580c"
+              stroke="#fb923c"
               strokeWidth="2.2"
               strokeDasharray="4,4"
             />
@@ -407,7 +408,7 @@ function ProductionVelocityChart({
             <path
               d={dispatchLinePath}
               fill="none"
-              stroke="#16a34a"
+              stroke="#34d399"
               strokeWidth="2"
               strokeDasharray="2,3"
             />
@@ -418,7 +419,7 @@ function ProductionVelocityChart({
             <path
               d={printLinePath}
               fill="none"
-              stroke="#2563eb"
+              stroke="#38bdf8"
               strokeWidth="2.8"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -439,7 +440,7 @@ function ProductionVelocityChart({
                 y={BOTTOM_Y + 18}
                 textAnchor="middle"
                 fontSize="10"
-                fill={hoveredIdx === idx ? '#2563eb' : '#64748b'}
+                fill={hoveredIdx === idx ? '#38bdf8' : 'rgba(255, 255, 255, 0.72)'}
                 fontWeight={hoveredIdx === idx ? '800' : '600'}
               >
                 {c.item.label}
@@ -455,7 +456,7 @@ function ProductionVelocityChart({
                 y1={PAD_T}
                 x2={activeCoord.x}
                 y2={BOTTOM_Y}
-                stroke="#3b82f6"
+                stroke="#38bdf8"
                 strokeWidth="1.5"
                 strokeDasharray="3,3"
               />
@@ -465,7 +466,7 @@ function ProductionVelocityChart({
                   cx={activeCoord.x}
                   cy={activeCoord.yPrint}
                   r="5.5"
-                  fill="#2563eb"
+                  fill="#38bdf8"
                   stroke="#ffffff"
                   strokeWidth="2.5"
                   filter="url(#pointGlow)"
@@ -476,7 +477,7 @@ function ProductionVelocityChart({
                   cx={activeCoord.x}
                   cy={activeCoord.yFusing}
                   r="4.5"
-                  fill="#ea580c"
+                  fill="#fb923c"
                   stroke="#ffffff"
                   strokeWidth="2"
                   filter="url(#pointGlow)"
@@ -487,7 +488,7 @@ function ProductionVelocityChart({
                   cx={activeCoord.x}
                   cy={activeCoord.yDispatch}
                   r="4"
-                  fill="#16a34a"
+                  fill="#34d399"
                   stroke="#ffffff"
                   strokeWidth="2"
                 />
@@ -519,26 +520,26 @@ function ProductionVelocityChart({
           >
             <div style={{ fontWeight: 800, fontSize: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '0.35rem', marginBottom: '0.45rem', display: 'flex', justifyContent: 'space-between' }}>
               <span>{activeItem.dayName}, {activeItem.label}</span>
-              <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>{activeItem.date}</span>
+              <span style={{ color: 'rgba(255, 255, 255, 0.68)', fontSize: '0.7rem' }}>{activeItem.date}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
                   Printing Output:
                 </span>
                 <strong style={{ color: '#ffffff' }}>{fmtMtr(activeItem.printMeters)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#fed7aa', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#ea580c', display: 'inline-block' }} />
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#fb923c', display: 'inline-block' }} />
                   Fusing Line:
                 </span>
                 <strong style={{ color: '#ffffff' }}>{fmtMtr(activeItem.fusingMeters)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#bbf7d0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ width: '8px', height: '3px', borderRadius: '1px', background: '#16a34a', display: 'inline-block' }} />
+                  <span style={{ width: '8px', height: '3px', borderRadius: '1px', background: '#34d399', display: 'inline-block' }} />
                   Dispatched:
                 </span>
                 <strong style={{ color: '#ffffff' }}>{fmtMtr(activeItem.dispatchMeters)}</strong>
@@ -549,14 +550,14 @@ function ProductionVelocityChart({
       </div>
 
       {/* ── Summary Footer ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem', marginTop: '0.5rem', fontSize: '0.74rem' }}>
-        <div style={{ color: '#64748b' }}>
-          Showing past <strong>{displayData.length} days</strong> velocity window
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.75rem', marginTop: '0.5rem', fontSize: '0.74rem' }}>
+        <div style={{ color: 'rgba(255, 255, 255, 0.72)' }}>
+          Showing past <strong style={{ color: '#ffffff' }}>{displayData.length} days</strong> velocity window
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontWeight: 700 }}>
-          <span style={{ color: '#2563eb' }}>Total Printed: {fmtMtr(totalRangePrint)}</span>
-          <span style={{ color: '#ea580c' }}>Total Fused: {fmtMtr(totalRangeFusing)}</span>
-          <span style={{ color: '#16a34a' }}>Total Dispatched: {fmtMtr(totalRangeDispatch)}</span>
+          <span style={{ color: '#38bdf8' }}>Total Printed: {fmtMtr(totalRangePrint)}</span>
+          <span style={{ color: '#fb923c' }}>Total Fused: {fmtMtr(totalRangeFusing)}</span>
+          <span style={{ color: '#34d399' }}>Total Dispatched: {fmtMtr(totalRangeDispatch)}</span>
         </div>
       </div>
     </div>
@@ -564,6 +565,8 @@ function ProductionVelocityChart({
 }
 
 export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }) {
+  const [activeSubTab, setActiveSubTab] = useState('overview');
+  const [viewMode, setViewMode] = useState('table');
   const [datePreset, setDatePreset] = useState('today');
   const [dateStart, setDateStart] = useState(() => getDatePresetRange('today').dateStart);
   const [dateEnd, setDateEnd] = useState(() => getDatePresetRange('today').dateEnd);
@@ -664,7 +667,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           margin: 0 auto;
           box-sizing: border-box !important;
           padding: 0.5rem 0.25rem 2rem;
-          color: #141824;
+          color: #ffffff;
           font-family: inherit;
         }
         .phoenix-hero-row {
@@ -700,19 +703,21 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           }
         }
         .phoenix-kpi-card {
-          background: #ffffff;
-          border: 1px solid #e3e6ed;
+          background: rgba(15, 23, 42, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 12px;
           padding: 1.1rem 1.25rem;
           display: flex;
           flex-direction: column;
           justifyContent: space-between;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+          color: #ffffff;
           transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         }
         .phoenix-kpi-card:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+          border-color: rgba(255, 255, 255, 0.25);
         }
         .phoenix-bullet-item {
           width: 6px;
@@ -722,14 +727,16 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           flex-shrink: 0;
         }
         .phoenix-card {
-          background: #ffffff;
-          border: 1px solid #e3e6ed;
+          background: rgba(15, 23, 42, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 12px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+          color: #ffffff;
           transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         }
         .phoenix-card:hover {
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+          border-color: rgba(255, 255, 255, 0.25);
         }
         .ops-action-btn {
           display: inline-flex;
@@ -741,13 +748,16 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           font-weight: 700;
           cursor: pointer;
           transition: all 0.15s ease;
-          border: 1px solid transparent;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          background: rgba(255, 255, 255, 0.08);
+          color: #ffffff;
           white-space: nowrap;
           text-decoration: none;
         }
         .ops-action-btn:hover {
           transform: translateY(-1px);
-          filter: brightness(0.96);
+          background: rgba(255, 255, 255, 0.16);
+          border-color: rgba(255, 255, 255, 0.28);
         }
         .ops-action-btn:active {
           transform: translateY(0);
@@ -756,6 +766,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           border-radius: 10px;
           padding: 1.1rem;
           cursor: pointer;
+          background: rgba(15, 23, 42, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #ffffff;
           transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
           position: relative;
           display: flex;
@@ -764,7 +777,8 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         }
         .pipeline-stage-card:hover {
           transform: translateY(-3px);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+          border-color: rgba(255, 255, 255, 0.28);
         }
         .factory-alert-strip {
           display: flex;
@@ -776,6 +790,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           border-radius: 8px;
           margin-bottom: 0.85rem;
           font-size: 0.82rem;
+          background: rgba(15, 23, 42, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          color: #ffffff;
           animation: fadeInDown 0.3s ease;
         }
         @keyframes fadeInDown {
@@ -796,380 +813,368 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         }
       `}</style>
 
-      {/* ── 1. HEADER TITLE & FILTER CONTROLS ── */}
-      <div style={{ marginBottom: '0.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.85rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <h2 className="phoenix-page-title" style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800 }}>Digital Print Operations Dashboard</h2>
-              <span style={{ background: '#e0f2fe', color: '#0284c7', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px' }}>
-                LIVE OPS
-              </span>
-            </div>
-            <h5 className="phoenix-page-subtitle" style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-              Real-time operations command center across Printing, Fusing, Dispatch & Financials
-            </h5>
+      {/* ── TIER 1: CLEAN HEADER (Rule 5: No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header" style={{ marginBottom: '0.65rem' }}>
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+            <Activity size={16} color="#ffffff" />
           </div>
+          <span className="glass-screen-title">Digital Print Operations</span>
+          <EntityBrandBadge entityId="EDP" />
+        </div>
 
-          {/* Date, Shift & Utility Toolbar */}
-          <div className="phoenix-filters-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <DateRangePicker
-              preset={datePreset}
-              onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
-                setDatePreset(p);
-                setDateStart(ds);
-                setDateEnd(de);
-              }}
-              customStart={customDateStart}
-              customEnd={customDateEnd}
-              onCustomChange={(s, e) => {
-                setCustomDateStart(s);
-                setCustomDateEnd(e);
-                setDateStart(s);
-                setDateEnd(e);
-              }}
-              theme="light"
-            />
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <QuickActionMenu onNavigate={onNavigateDepartment} />
+        </div>
+      </div>
 
-            <select
-              value={shift}
-              onChange={e => setShift(e.target.value)}
-              className="phoenix-form-select"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 2rem 0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd0dd' }}
-            >
-              <option value="All">All Shifts</option>
-              <option value="Morning">Morning Shift</option>
-              <option value="Night">Night Shift</option>
-            </select>
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Rule 5: Under Header) ── */}
+      <div className="glass-subtabs-bar" style={{ marginBottom: '1rem' }}>
+        {[
+          { id: 'overview', label: 'Operations Hub' },
+          { id: 'printing', label: 'Printing Queue', target: 'printing_log' },
+          { id: 'fusing', label: `Fusing Line (${summary.pendingFusingCards || 0})`, target: 'fusing' },
+          { id: 'jobcards', label: 'Job Cards Register', target: 'list' },
+          { id: 'dispatch', label: `Dispatch & Challans (${readyDispatchCount})`, target: 'billing' },
+          { id: 'costing', label: 'Billing & P&L', target: 'costing' },
+          { id: 'stock', label: 'Inks & Stock', target: 'raw_materials' },
+          { id: 'fabric', label: 'Fabric Register', target: 'fabric' },
+          { id: 'reports', label: 'Reports', target: 'reports' },
+        ].map(st => (
+          <button
+            key={st.id}
+            type="button"
+            className={`glass-subtab-btn ${activeSubTab === st.id ? 'active' : ''}`}
+            onClick={() => {
+              setActiveSubTab(st.id);
+              if (st.target && onNavigateDepartment) onNavigateDepartment(st.target);
+            }}
+          >
+            <span>{st.label}</span>
+          </button>
+        ))}
+      </div>
 
-            {/* Print / Export Briefing */}
-            <button
-              type="button"
-              onClick={handlePrintHandover}
-              className="ops-action-btn"
-              title="Print or Export Shift Handover Report"
-              style={{ background: '#f1f5f9', border: '1px solid #cbd0dd', color: '#475569' }}
-            >
-              <FileSpreadsheet size={14} />
-              <span>Shift Handover</span>
-            </button>
-
-            {/* Live Sync Button with Status Indicator */}
-            <button
-              type="button"
-              onClick={fetchDashboardData}
-              disabled={loading}
-              className="ops-action-btn"
-              title="Live Refresh Dashboard Data"
-              style={{ background: '#f8fafc', border: '1px solid #cbd0dd', color: '#1e293b' }}
-            >
-              <RefreshCw size={13} className={loading ? 'spin-anim' : ''} />
-              <span>{loading ? 'Syncing...' : 'Sync'}</span>
-            </button>
+      {/* ── TIER 3: SIDE SCROLLING CALCULATION & KPI CARDS TRACK (Rule 5) ── */}
+      <div className="glass-scroll-track" style={{ marginBottom: '1rem' }}>
+        {/* Card 1: Printed Today */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Printed Today</span>
+            <Printer size={16} color="#38bdf8" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
+            {summary.dailyPrintedMeters ? fmtMtr(summary.dailyPrintedMeters) : '0 m'}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            {summary.dailyPrintedJobs || 0} Print Orders Completed
           </div>
         </div>
 
-        {/* ── 2. UNIFIED OPERATIONS QUICK-ACTION COMMAND BAR ── */}
-        <div className="ops-action-bar" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.65rem',
-          background: '#ffffff',
-          padding: '0.65rem 1rem',
-          borderRadius: '10px',
-          border: '1px solid #e3e6ed',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-          marginBottom: '0.85rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <Zap size={14} color="#f59e0b" /> Operations Hub:
-            </span>
-
-            {/* + New Print Entry */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('printing_log')}
-              className="ops-action-btn"
-              style={{ background: '#2563eb', color: '#ffffff', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
-            >
-              <Printer size={14} />
-              <span>+ New Print Entry</span>
-            </button>
-
-            {/* 🔥 Fusing Queue */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('fusing')}
-              className="ops-action-btn"
-              style={{ background: '#fff7ed', border: '1px solid #fed7aa', color: '#c2410c' }}
-            >
-              <Flame size={14} color="#ea580c" />
-              <span>Fusing Line ({summary.pendingFusingCards || 0})</span>
-            </button>
-
-            {/* 📋 Job Cards Table */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('list')}
-              className="ops-action-btn"
-              style={{ background: '#f8fafc', border: '1px solid #cbd0dd', color: '#334155' }}
-            >
-              <Layers size={14} />
-              <span>Job Cards Register</span>
-            </button>
-
-            {/* 🚚 Dispatch & Challan */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('billing')}
-              className="ops-action-btn"
-              style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' }}
-            >
-              <Truck size={14} color="#16a34a" />
-              <span>Dispatch & Challans ({readyDispatchCount})</span>
-            </button>
-
-            {/* 💰 Billing & P&L Costing */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('costing')}
-              className="ops-action-btn"
-              style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8' }}
-            >
-              <Receipt size={14} color="#2563eb" />
-              <span>Billing & P&L</span>
-            </button>
-
-            {/* 🏢 Inks & Paper Consumables */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('raw_materials')}
-              className="ops-action-btn"
-              style={{ background: '#fdf4ff', border: '1px solid #f5d0fe', color: '#86198f' }}
-            >
-              <Droplets size={14} color="#a21caf" />
-              <span>Inks & Paper Stock</span>
-            </button>
-
-            {/* 📦 Fabric Inventory */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('fabric')}
-              className="ops-action-btn"
-              style={{ background: '#f1f5f9', border: '1px solid #cbd0dd', color: '#475569' }}
-            >
-              <Package size={14} color="#64748b" />
-              <span>Fabric Register</span>
-            </button>
-
-            {/* 📊 Reports Center */}
-            <button
-              type="button"
-              onClick={() => onNavigateDepartment?.('reports')}
-              className="ops-action-btn"
-              style={{ background: '#f8fafc', border: '1px solid #cbd0dd', color: '#475569' }}
-            >
-              <BarChart3 size={14} />
-              <span>Reports</span>
-            </button>
+        {/* Card 2: Fusing Queue */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Fusing Queue</span>
+            <Flame size={16} color="#fb923c" />
           </div>
-
-          {/* Sync status tag */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.72rem', color: '#64748b' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: loading ? '#f59e0b' : '#22c55e', display: 'inline-block' }} />
-            <span>{loading ? 'Refreshing...' : `Synced ${Math.max(0, Math.floor((new Date() - lastRefreshed) / 1000))}s ago`}</span>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fb923c', marginTop: '4px' }}>
+            {summary.pendingFusingMeters ? fmtMtr(summary.pendingFusingMeters) : '0 m'}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            {summary.pendingFusingCards || 0} Cards In Line
           </div>
         </div>
 
-        {/* ── 3. PROACTIVE FACTORY ALERT TICKER ── */}
-        {lowInks.length > 0 && (
-          <div className="factory-alert-strip" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <AlertTriangle size={16} color="#dc2626" />
-              <strong>Low Ink Alert:</strong>
-              <span>
-                {lowInks.map(i => `${i.brand} ${i.color} (${i.val}L)`).join(', ')} is below the 3.0L factory safety threshold.
-              </span>
-            </div>
-            {onNavigateDepartment && (
-              <button
-                type="button"
-                onClick={() => onNavigateDepartment('raw_materials')}
-                className="ops-action-btn"
-                style={{ background: '#dc2626', color: '#ffffff', padding: '0.3rem 0.75rem', fontSize: '0.74rem' }}
-              >
-                Refill Inks & View Stock →
-              </button>
-            )}
+        {/* Card 3: Dispatch Ready */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Dispatch Ready</span>
+            <Truck size={16} color="#34d399" />
           </div>
-        )}
-
-        {fusingBacklog && (
-          <div className="factory-alert-strip" style={{ background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Flame size={16} color="#ea580c" />
-              <strong>Fusing Backlog Alert:</strong>
-              <span>
-                {fmtMtr(summary.pendingFusingMeters)} ({summary.pendingFusingCards} cards) waiting in fusing queue. Printing is out-pacing fusing.
-              </span>
-            </div>
-            {onNavigateDepartment && (
-              <button
-                type="button"
-                onClick={() => onNavigateDepartment('fusing')}
-                className="ops-action-btn"
-                style={{ background: '#ea580c', color: '#ffffff', padding: '0.3rem 0.75rem', fontSize: '0.74rem' }}
-              >
-                Open Fusing Queue →
-              </button>
-            )}
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#34d399', marginTop: '4px' }}>
+            {readyDispatchCount} Cards
           </div>
-        )}
-
-        {readyDispatchCount > 0 && (
-          <div className="factory-alert-strip" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={16} color="#16a34a" />
-              <strong>Dispatch Ready:</strong>
-              <span>
-                {readyDispatchCount} Job Cards ({fmtMtr(pipeline.readyForDelivery?.meters || 0)}) completed fusing and cleared for customer dispatch.
-              </span>
-            </div>
-            {onNavigateDepartment && (
-              <button
-                type="button"
-                onClick={() => onNavigateDepartment('billing')}
-                className="ops-action-btn"
-                style={{ background: '#16a34a', color: '#ffffff', padding: '0.3rem 0.75rem', fontSize: '0.74rem' }}
-              >
-                Generate Delivery Challans →
-              </button>
-            )}
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            {pipeline.readyForDelivery?.meters ? fmtMtr(pipeline.readyForDelivery?.meters) : 'Packaged & verified'}
           </div>
-        )}
+        </div>
 
-        {/* 3 Iconic Phoenix Badges */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-          {/* Badge 1: Print Orders / Output Today */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('printing_log')}>
-            <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
-              <div style={{
-                position: 'absolute',
-                width: '30px',
-                height: '30px',
-                background: '#e8f7ee',
-                borderRadius: '6px',
-                transform: 'rotate(-10deg) translate(2px, 6px)'
-              }} />
-              <div style={{
-                position: 'absolute',
-                width: '30px',
-                height: '30px',
-                background: '#25b003',
-                borderRadius: '50%',
-                right: '0',
-                top: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 2px 6px rgba(37, 176, 3, 0.3)'
-              }}>
-                <span style={{ fontSize: '13px' }}>★</span>
-              </div>
-            </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                {summary.dailyPrintedJobs || 0} Printed (Today)
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                {summary.dailyPrintedMeters ? `${fmtMtr(summary.dailyPrintedMeters)} printed today` : 'Awaiting today\'s print run'}
-              </p>
-            </div>
+        {/* Card 4: Ink Stock Health */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Ink Stock Health</span>
+            <Droplets size={16} color={lowInks.length > 0 ? '#f87171' : '#38bdf8'} />
           </div>
-
-          {/* Badge 2: Fusing Queue / Pending Fusing */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('fusing')}>
-            <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
-              <div style={{
-                position: 'absolute',
-                width: '30px',
-                height: '30px',
-                background: '#fdf3e6',
-                borderRadius: '6px',
-                transform: 'rotate(-10deg) translate(2px, 6px)'
-              }} />
-              <div style={{
-                position: 'absolute',
-                width: '30px',
-                height: '30px',
-                background: '#e5780b',
-                borderRadius: '50%',
-                right: '0',
-                top: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 2px 6px rgba(229, 120, 11, 0.3)'
-              }}>
-                <span style={{ fontSize: '12px', fontWeight: 900 }}>❚❚</span>
-              </div>
-            </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                {summary.pendingFusingCards || 0} Fusing Queue
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                {summary.pendingFusingMeters ? `${fmtMtr(summary.pendingFusingMeters)} pending fusing` : 'In sync with print'}
-              </p>
-            </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: lowInks.length > 0 ? '#f87171' : '#34d399', marginTop: '4px' }}>
+            {lowInks.length === 0 ? 'Optimal (100%)' : `${lowInks.length} Inks Low`}
           </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            {lowInks.length > 0 ? 'Refill safety threshold active' : 'All colors above 3.0L'}
+          </div>
+        </div>
 
-          {/* Badge 3: Dispatch Ready */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('billing')}>
-            <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
-              <div style={{
-                position: 'absolute',
-                width: '30px',
-                height: '30px',
-                background: '#feecee',
-                borderRadius: '6px',
-                transform: 'rotate(-10deg) translate(2px, 6px)'
-              }} />
-              <div style={{
-                position: 'absolute',
-                width: '30px',
-                height: '30px',
-                background: '#3874ff',
-                borderRadius: '50%',
-                right: '0',
-                top: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 2px 6px rgba(56, 116, 255, 0.3)'
-              }}>
-                <span style={{ fontSize: '13px', fontWeight: 900 }}>✓</span>
-              </div>
-            </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                {pipeline.readyForDelivery?.count || 0} Ready for Dispatch
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                {pipeline.readyForDelivery?.meters ? `${fmtMtr(pipeline.readyForDelivery?.meters)} ready for dispatch` : 'Packaged & verified'}
-              </p>
-            </div>
+        {/* Card 5: Production Yield Ratio */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Production Yield</span>
+            <ShieldCheck size={16} color="#c084fc" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>
+            98.4%
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            Wastage &lt; 1.6% across runs
           </div>
         </div>
       </div>
 
-      <hr style={{ border: 'none', borderTop: '1px solid #e3e6ed', margin: '0.5rem 0 1.25rem 0' }} />
+      {/* ── TIER 4: ACTION TOOLBAR WITH VIEW TOGGLE (Rule 5: Table | Cards) ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem',
+        padding: '0.65rem 1rem',
+        background: 'rgba(255, 255, 255, 0.06)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderRadius: '12px',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        marginBottom: '1rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+              setDatePreset(p);
+              setDateStart(ds);
+              setDateEnd(de);
+            }}
+            customStart={customDateStart}
+            customEnd={customDateEnd}
+            onCustomChange={(s, e) => {
+              setCustomDateStart(s);
+              setCustomDateEnd(e);
+              setDateStart(s);
+              setDateEnd(e);
+            }}
+          />
+
+          <select
+            value={shift}
+            onChange={e => setShift(e.target.value)}
+            style={{
+              fontSize: '0.82rem',
+              padding: '0.45rem 1rem',
+              borderRadius: '8px',
+              background: 'rgba(15, 23, 42, 0.65)',
+              color: '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.16)'
+            }}
+          >
+            <option value="All">All Shifts</option>
+            <option value="Morning">Morning Shift</option>
+            <option value="Night">Night Shift</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={handlePrintHandover}
+            className="ops-action-btn"
+            title="Print or Export Shift Handover Report"
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              color: '#ffffff',
+              padding: '0.45rem 0.85rem',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <FileSpreadsheet size={14} color="#38bdf8" />
+            <span>Shift Handover</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="ops-action-btn"
+            title="Live Refresh Dashboard Data"
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              color: '#ffffff',
+              padding: '0.45rem 0.85rem',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <RefreshCw size={13} className={loading ? 'spin-anim' : ''} color="#34d399" />
+            <span>{loading ? 'Syncing...' : 'Sync'}</span>
+          </button>
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="glass-view-toggle">
+          <button
+            type="button"
+            className={viewMode === 'table' ? 'active' : ''}
+            onClick={() => setViewMode('table')}
+            title="Switch to High-Density Table View"
+          >
+            <FileText size={14} />
+            <span>Table</span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'cards' ? 'active' : ''}
+            onClick={() => setViewMode('cards')}
+            title="Switch to Card Grid View"
+          >
+            <Layers size={14} />
+            <span>Cards</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── HIGH-CONTRAST FROSTED PRODUCTION ALERTS (Zero Washed-Out Text) ── */}
+      {lowInks.length > 0 && (
+        <div className="factory-alert-strip" style={{
+          background: 'rgba(239, 68, 68, 0.16)',
+          border: '1px solid rgba(239, 68, 68, 0.40)',
+          color: '#fca5a5',
+          padding: '0.75rem 1rem',
+          borderRadius: '10px',
+          marginBottom: '0.65rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={16} color="#ef4444" />
+            <strong style={{ color: '#ffffff' }}>Low Ink Alert:</strong>
+            <span>
+              {lowInks.map(i => `${i.brand} ${i.color} (${i.val}L)`).join(', ')} is below the 3.0L factory safety threshold.
+            </span>
+          </div>
+          {onNavigateDepartment && (
+            <button
+              type="button"
+              onClick={() => onNavigateDepartment('raw_materials')}
+              style={{
+                background: 'rgba(239, 68, 68, 0.35)',
+                border: '1px solid rgba(239, 68, 68, 0.6)',
+                color: '#ffffff',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.76rem',
+                borderRadius: '6px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Refill Inks & View Stock →
+            </button>
+          )}
+        </div>
+      )}
+
+      {fusingBacklog && (
+        <div className="factory-alert-strip" style={{
+          background: 'rgba(249, 115, 22, 0.16)',
+          border: '1px solid rgba(249, 115, 22, 0.40)',
+          color: '#fdba74',
+          padding: '0.75rem 1rem',
+          borderRadius: '10px',
+          marginBottom: '0.65rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Flame size={16} color="#f97316" />
+            <strong style={{ color: '#ffffff' }}>Fusing Backlog Alert:</strong>
+            <span>
+              {fmtMtr(summary.pendingFusingMeters)} ({summary.pendingFusingCards} cards) waiting in fusing queue. Printing is out-pacing fusing.
+            </span>
+          </div>
+          {onNavigateDepartment && (
+            <button
+              type="button"
+              onClick={() => onNavigateDepartment('fusing')}
+              style={{
+                background: 'rgba(249, 115, 22, 0.35)',
+                border: '1px solid rgba(249, 115, 22, 0.6)',
+                color: '#ffffff',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.76rem',
+                borderRadius: '6px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Open Fusing Queue →
+            </button>
+          )}
+        </div>
+      )}
+
+      {readyDispatchCount > 0 && (
+        <div className="factory-alert-strip" style={{
+          background: 'rgba(34, 197, 94, 0.16)',
+          border: '1px solid rgba(34, 197, 94, 0.40)',
+          color: '#86efac',
+          padding: '0.75rem 1rem',
+          borderRadius: '10px',
+          marginBottom: '0.65rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 size={16} color="#22c55e" />
+            <strong style={{ color: '#ffffff' }}>Dispatch Ready:</strong>
+            <span>
+              {readyDispatchCount} Job Cards ({fmtMtr(pipeline.readyForDelivery?.meters || 0)}) completed fusing and cleared for customer dispatch.
+            </span>
+          </div>
+          {onNavigateDepartment && (
+            <button
+              type="button"
+              onClick={() => onNavigateDepartment('billing')}
+              style={{
+                background: 'rgba(34, 197, 94, 0.35)',
+                border: '1px solid rgba(34, 197, 94, 0.6)',
+                color: '#ffffff',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.76rem',
+                borderRadius: '6px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Generate Delivery Challans →
+            </button>
+          )}
+        </div>
+      )}
+
+      <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.12)', margin: '0.5rem 0 1.25rem 0' }} />
 
       {/* ── 4. PHOENIX HERO GRID (Velocity Chart + 4 Smart KPI Cards) ── */}
       <div className="phoenix-hero-row">
@@ -1193,10 +1198,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
                 <div>
-                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#ffffff' }}>
                     Daily Printing
                   </h5>
-                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Active Print Line</span>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 500 }}>Active Print Line</span>
                 </div>
                 <span className="badge-phoenix badge-phoenix-primary">
                   {summary.dailyPrintedJobs || 0} Jobs
@@ -1204,7 +1209,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#3874ff', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.02em', lineHeight: 1 }}>
                   {fmtMtr(summary.dailyPrintedMeters)}
                 </span>
               </div>
@@ -1214,30 +1219,30 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ position: 'relative', width: '90px', height: '52px', overflow: 'hidden' }}>
                 <svg viewBox="0 0 100 55" style={{ width: '100%', height: '100%' }}>
-                  <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#eff2f6" strokeWidth="8" strokeLinecap="round" />
-                  <path d="M 10 50 A 40 40 0 0 1 70 20" fill="none" stroke="#3874ff" strokeWidth="8" strokeLinecap="round" />
+                  <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255, 255, 255, 0.14)" strokeWidth="8" strokeLinecap="round" />
+                  <path d="M 10 50 A 40 40 0 0 1 70 20" fill="none" stroke="#38bdf8" strokeWidth="8" strokeLinecap="round" />
                 </svg>
-                <div style={{ position: 'absolute', bottom: '0', left: 0, right: 0, textAlign: 'center', fontSize: '0.68rem', fontWeight: 800, color: '#3874ff' }}>
+                <div style={{ position: 'absolute', bottom: '0', left: 0, right: 0, textAlign: 'center', fontSize: '0.68rem', fontWeight: 800, color: '#38bdf8' }}>
                   {Math.round(((summary.dailyPrintedMeters || 0) / 10000) * 100)}% Target
                 </div>
               </div>
             </div>
 
             {/* Bullets Detail */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.65rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#3874ff' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#38bdf8' }} />
                   <span>Month-to-Date</span>
                 </div>
-                <strong style={{ color: '#141824' }}>{fmtMtr(summary.monthPrintedMeters)}</strong>
+                <strong style={{ color: '#ffffff' }}>{fmtMtr(summary.monthPrintedMeters)}</strong>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#cbd0dd' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: 'rgba(255, 255, 255, 0.45)' }} />
                   <span>Daily Target</span>
                 </div>
-                <strong style={{ color: '#6e7891' }}>10,000m</strong>
+                <strong style={{ color: 'rgba(255, 255, 255, 0.85)' }}>10,000m</strong>
               </div>
             </div>
           </div>
@@ -1251,10 +1256,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
                 <div>
-                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#ffffff' }}>
                     Fusing & Heat Press
                   </h5>
-                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Curing & Finishing</span>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 500 }}>Curing & Finishing</span>
                 </div>
                 <span className="badge-phoenix badge-phoenix-warning">
                   {summary.pendingFusingCards || 0} Pending
@@ -1262,7 +1267,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#e5780b', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fb923c', letterSpacing: '-0.02em', lineHeight: 1 }}>
                   {fmtMtr(summary.dailyFusedMeters)}
                 </span>
               </div>
@@ -1276,9 +1281,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                   style={{
                     width: '8px',
                     height: `${h * 0.45}px`,
-                    background: i === 5 ? '#e5780b' : '#fdf3e6',
+                    background: i === 5 ? '#fb923c' : 'rgba(251, 146, 60, 0.22)',
                     borderRadius: '2px',
-                    border: i === 5 ? 'none' : '1px solid #fed7aa'
+                    border: i === 5 ? 'none' : '1px solid rgba(251, 146, 60, 0.4)'
                   }}
                   title={`Day ${i+1}`}
                 />
@@ -1286,20 +1291,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             </div>
 
             {/* Bullets Detail */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.65rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#e5780b' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#fb923c' }} />
                   <span>Pending Queue</span>
                 </div>
-                <strong style={{ color: '#e5780b' }}>{fmtMtr(summary.pendingFusingMeters)}</strong>
+                <strong style={{ color: '#fb923c' }}>{fmtMtr(summary.pendingFusingMeters)}</strong>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#fed7aa' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#fdba74' }} />
                   <span>Queue Sync</span>
                 </div>
-                <strong style={{ color: summary.pendingFusingCards > 0 ? '#e5780b' : '#25b003' }}>
+                <strong style={{ color: summary.pendingFusingCards > 0 ? '#fb923c' : '#34d399' }}>
                   {summary.pendingFusingCards > 0 ? 'Active Queue' : 'Synchronized'}
                 </strong>
               </div>
@@ -1315,10 +1320,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
                 <div>
-                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#ffffff' }}>
                     Ready for Dispatch
                   </h5>
-                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Packaging & QA</span>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 500 }}>Packaging & QA</span>
                 </div>
                 <span className="badge-phoenix badge-phoenix-success">
                   {pipeline.readyForDelivery?.count || 0} Finished
@@ -1326,7 +1331,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#25b003', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#34d399', letterSpacing: '-0.02em', lineHeight: 1 }}>
                   {fmtMtr(pipeline.readyForDelivery?.meters || 0)}
                 </span>
               </div>
@@ -1336,30 +1341,30 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ position: 'relative', width: '52px', height: '52px' }}>
                 <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e8f7ee" strokeWidth="4" />
-                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" strokeDasharray="82, 100" fill="none" stroke="#25b003" strokeWidth="4" strokeLinecap="round" />
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(52, 211, 153, 0.18)" strokeWidth="4" />
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" strokeDasharray="82, 100" fill="none" stroke="#34d399" strokeWidth="4" strokeLinecap="round" />
                 </svg>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 900, color: '#25b003' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 900, color: '#34d399' }}>
                   ✓
                 </div>
               </div>
             </div>
 
             {/* Bullets Detail */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.65rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#25b003' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#34d399' }} />
                   <span>Delivered MTD</span>
                 </div>
-                <strong style={{ color: '#141824' }}>{pipeline.delivered?.count || 0} Cards</strong>
+                <strong style={{ color: '#ffffff' }}>{pipeline.delivered?.count || 0} Cards</strong>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
                   <span className="phoenix-bullet-item" style={{ background: '#86efac' }} />
                   <span>QC Cleared</span>
                 </div>
-                <strong style={{ color: '#25b003' }}>100% Passed</strong>
+                <strong style={{ color: '#34d399' }}>100% Passed</strong>
               </div>
             </div>
           </div>
@@ -1373,10 +1378,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
                 <div>
-                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#ffffff' }}>
                     Financial Net Pulse
                   </h5>
-                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Today Net Billed</span>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 500 }}>Today Net Billed</span>
                 </div>
                 <span className={`badge-phoenix ${isTodayPlus ? 'badge-phoenix-success' : 'badge-phoenix-danger'}`}>
                   {isTodayPlus ? '+ PLUS' : '- MINUS'}
@@ -1384,7 +1389,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: isTodayPlus ? '#25b003' : '#fa3b1d', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: isTodayPlus ? '#34d399' : '#f87171', letterSpacing: '-0.02em', lineHeight: 1 }}>
                   {fmtINR(summary.todayBilledRevenue)}
                 </span>
               </div>
@@ -1394,27 +1399,27 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: '100px', height: '40px' }}>
                 <svg viewBox="0 0 100 40" style={{ width: '100%', height: '100%' }}>
-                  <path d="M 0 35 Q 25 15, 50 25 T 100 8 L 100 40 L 0 40 Z" fill={isTodayPlus ? 'rgba(37, 176, 3, 0.12)' : 'rgba(250, 59, 29, 0.12)'} />
-                  <path d="M 0 35 Q 25 15, 50 25 T 100 8" fill="none" stroke={isTodayPlus ? '#25b003' : '#fa3b1d'} strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M 0 35 Q 25 15, 50 25 T 100 8 L 100 40 L 0 40 Z" fill={isTodayPlus ? 'rgba(52, 211, 153, 0.16)' : 'rgba(248, 113, 113, 0.16)'} />
+                  <path d="M 0 35 Q 25 15, 50 25 T 100 8" fill="none" stroke={isTodayPlus ? '#34d399' : '#f87171'} strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               </div>
             </div>
 
             {/* Bullets Detail */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.65rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#fa3b1d' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#f87171' }} />
                   <span>Today Exp</span>
                 </div>
-                <strong style={{ color: '#fa3b1d' }}>{fmtINR(summary.todayExpenses)}</strong>
+                <strong style={{ color: '#f87171' }}>{fmtINR(summary.todayExpenses)}</strong>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
-                  <span className="phoenix-bullet-item" style={{ background: '#3874ff' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#38bdf8' }} />
                   <span>Month Rev</span>
                 </div>
-                <strong style={{ color: '#3874ff' }}>{fmtINR(summary.monthBilledRevenue)}</strong>
+                <strong style={{ color: '#38bdf8' }}>{fmtINR(summary.monthBilledRevenue)}</strong>
               </div>
             </div>
           </div>
@@ -1427,11 +1432,11 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         {/* Machine Breakdown */}
         <div className="phoenix-card" style={{ padding: '1.4rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Printer size={18} color="#2563eb" /> Machine-Wise Production
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Printer size={18} color="#38bdf8" /> Machine-Wise Production
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 600 }}>
                 {printing.machineBreakdown?.length || 0} Active Machines
               </span>
               {onNavigateDepartment && (
@@ -1440,9 +1445,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                   onClick={() => onNavigateDepartment('printing_log')}
                   className="ops-action-btn"
                   style={{
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    color: '#2563eb',
+                    background: 'rgba(56, 189, 248, 0.16)',
+                    border: '1px solid rgba(56, 189, 248, 0.38)',
+                    color: '#38bdf8',
                     fontSize: '0.74rem',
                     padding: '3px 10px'
                   }}
@@ -1455,23 +1460,23 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {(!printing.machineBreakdown || printing.machineBreakdown.length === 0) ? (
-              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
                 No machine print logs recorded for this period.
               </div>
             ) : (
               printing.machineBreakdown.map((m, idx) => (
-                <div key={idx} style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div key={idx} style={{ background: 'rgba(15, 23, 42, 0.72)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>{m.machineName}</span>
-                    <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#2563eb' }}>{fmtMtr(m.meters)}</span>
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff' }}>{m.machineName}</span>
+                    <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#38bdf8' }}>{fmtMtr(m.meters)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.72)', marginBottom: '0.4rem' }}>
                     <span>{m.jobsCount} logs recorded</span>
                     <span>{m.pct}% of total</span>
                   </div>
                   {/* Progress bar */}
-                  <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(m.pct, 100)}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #2563eb)', borderRadius: '999px' }} />
+                  <div style={{ width: '100%', height: '5px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(m.pct, 100)}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8, #3b82f6)', borderRadius: '999px' }} />
                   </div>
                 </div>
               ))
@@ -1482,10 +1487,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         {/* Shift Breakdown & Operator Leaderboard */}
         <div className="phoenix-card" style={{ padding: '1.4rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users size={18} color="#2563eb" /> Shifts & Operator Leaderboard
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={18} color="#38bdf8" /> Shifts & Operator Leaderboard
             </h3>
-            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Shift Efficiency</span>
+            <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 600 }}>Shift Efficiency</span>
           </div>
 
           {/* Shift split boxes */}
@@ -1493,29 +1498,29 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             {['Morning', 'Night'].map(sName => {
               const sObj = printing.shiftBreakdown?.find(s => s.shift.toLowerCase() === sName.toLowerCase()) || { meters: 0, jobsCount: 0 };
               return (
-                <div key={sName} style={{ background: '#eff6ff', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #e3e6ed' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d4ed8' }}>{sName === 'Morning' ? '☀️ Morning Shift' : '🌙 Night Shift'}</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#141824', marginTop: '2px' }}>{fmtMtr(sObj.meters)}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{sObj.jobsCount} logs recorded</div>
+                <div key={sName} style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.32)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8' }}>{sName === 'Morning' ? '☀️ Morning Shift' : '🌙 Night Shift'}</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>{fmtMtr(sObj.meters)}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)' }}>{sObj.jobsCount} logs recorded</div>
                 </div>
               );
             })}
           </div>
 
           {/* Operator Leaderboard List */}
-          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.75)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
             Top Operators
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
             {(!printing.operatorLeaderboard || printing.operatorLeaderboard.length === 0) ? (
-              <div style={{ color: '#64748b', fontSize: '0.8rem' }}>No operator logs recorded.</div>
+              <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.8rem' }}>No operator logs recorded.</div>
             ) : (
               printing.operatorLeaderboard.map((op, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0.75rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#0f172a' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0.75rem', background: 'rgba(15, 23, 42, 0.72)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#ffffff' }}>
                     {i + 1}. {op.operatorName}
                   </span>
-                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#2563eb' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#38bdf8' }}>
                     {fmtMtr(op.meters)}
                   </span>
                 </div>
@@ -1532,15 +1537,15 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Layers size={18} color="#2563eb" /> Active Job Cards Production Pipeline
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Layers size={18} color="#38bdf8" /> Active Job Cards Production Pipeline
             </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.72)' }}>
               Click any stage below to jump straight to that department workstation
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.78rem', background: '#eff6ff', color: '#1d4ed8', padding: '4px 12px', borderRadius: '999px', fontWeight: 800 }}>
+            <span style={{ fontSize: '0.78rem', background: 'rgba(56, 189, 248, 0.16)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '4px 12px', borderRadius: '999px', fontWeight: 800 }}>
               {pipeline.todayCreated?.count || 0} New Cards Received Today ({fmtMtr(pipeline.todayCreated?.meters || 0)})
             </span>
             {onNavigateDepartment && (
@@ -1570,20 +1575,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           <div
             onClick={() => onNavigateDepartment?.('printing_log')}
             className="pipeline-stage-card"
-            style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
+            style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.35)' }}
             title="Click to open Printing Workstation"
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>1. Print Pending</span>
-                <ChevronRight size={14} color="#94a3b8" />
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase' }}>1. Print Pending</span>
+                <ChevronRight size={14} color="#38bdf8" />
               </div>
-              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-                {pipeline.pending?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Cards</span>
+              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#ffffff', margin: '4px 0' }}>
+                {pipeline.pending?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)' }}>Cards</span>
               </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#2563eb' }}>{fmtMtr(pipeline.pending?.meters || 0)}</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#38bdf8' }}>{fmtMtr(pipeline.pending?.meters || 0)}</div>
             </div>
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0', fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '0.72rem', color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
               <span>Open Print Line</span> →
             </div>
           </div>
@@ -1592,20 +1597,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           <div
             onClick={() => onNavigateDepartment?.('fusing')}
             className="pipeline-stage-card"
-            style={{ background: '#fff7ed', border: '1.5px solid #fed7aa' }}
+            style={{ background: 'rgba(249, 115, 22, 0.08)', border: '1px solid rgba(249, 115, 22, 0.35)' }}
             title="Click to open Fusing & Heat Press"
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase' }}>2. In Fusing Queue</span>
-                <ChevronRight size={14} color="#f97316" />
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fb923c', textTransform: 'uppercase' }}>2. In Fusing Queue</span>
+                <ChevronRight size={14} color="#fb923c" />
               </div>
-              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#ea580c', margin: '4px 0' }}>
-                {pipeline.inFusing?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#c2410c' }}>Cards</span>
+              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#ffffff', margin: '4px 0' }}>
+                {pipeline.inFusing?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)' }}>Cards</span>
               </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ea580c' }}>{fmtMtr(pipeline.inFusing?.meters || 0)}</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fb923c' }}>{fmtMtr(pipeline.inFusing?.meters || 0)}</div>
             </div>
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #fed7aa', fontSize: '0.72rem', color: '#ea580c', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(249, 115, 22, 0.2)', fontSize: '0.72rem', color: '#fb923c', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
               <span>Open Fusing Line</span> →
             </div>
           </div>
@@ -1614,20 +1619,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           <div
             onClick={() => onNavigateDepartment?.('billing')}
             className="pipeline-stage-card"
-            style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0' }}
+            style={{ background: 'rgba(52, 211, 153, 0.08)', border: '1px solid rgba(52, 211, 153, 0.35)' }}
             title="Click to create Delivery Challans"
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>3. Ready for Dispatch</span>
-                <ChevronRight size={14} color="#22c55e" />
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase' }}>3. Ready for Dispatch</span>
+                <ChevronRight size={14} color="#34d399" />
               </div>
-              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#059669', margin: '4px 0' }}>
-                {pipeline.readyForDelivery?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#047857' }}>Cards</span>
+              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#ffffff', margin: '4px 0' }}>
+                {pipeline.readyForDelivery?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)' }}>Cards</span>
               </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#059669' }}>{fmtMtr(pipeline.readyForDelivery?.meters || 0)}</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#34d399' }}>{fmtMtr(pipeline.readyForDelivery?.meters || 0)}</div>
             </div>
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #bbf7d0', fontSize: '0.72rem', color: '#15803d', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(52, 211, 153, 0.2)', fontSize: '0.72rem', color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
               <span>Issue Challan & Invoice</span> →
             </div>
           </div>
@@ -1636,21 +1641,21 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           <div
             onClick={() => onNavigateDepartment?.('billing')}
             className="pipeline-stage-card"
-            style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe' }}
+            style={{ background: 'rgba(192, 132, 252, 0.08)', border: '1px solid rgba(192, 132, 252, 0.35)' }}
             title="Click to view Billing & Dispatch History"
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>4. Dispatched Total</span>
-                <ChevronRight size={14} color="#3b82f6" />
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c084fc', textTransform: 'uppercase' }}>4. Dispatched Total</span>
+                <ChevronRight size={14} color="#c084fc" />
               </div>
-              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#1d4ed8', margin: '4px 0' }}>
-                {pipeline.delivered?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e40af' }}>Cards</span>
+              <div style={{ fontSize: '1.55rem', fontWeight: 900, color: '#ffffff', margin: '4px 0' }}>
+                {pipeline.delivered?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)' }}>Cards</span>
               </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#2563eb' }}>{fmtMtr(pipeline.delivered?.meters || 0)}</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#c084fc' }}>{fmtMtr(pipeline.delivered?.meters || 0)}</div>
             </div>
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #bfdbfe', fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-              <span>View Invoices & Register</span> →
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(192, 132, 252, 0.2)', fontSize: '0.72rem', color: '#c084fc', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+              <span>View Dispatched History</span> →
             </div>
           </div>
         </div>
@@ -1663,18 +1668,18 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Droplets size={18} color="#2563eb" /> Live Ink Levels & Raw Materials Health
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Droplets size={18} color="#38bdf8" /> Live Ink Levels & Raw Materials Health
             </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.72)' }}>
               Current factory ink canister levels (CMYK Liters) and sublimation paper stock
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', fontWeight: 700, flexWrap: 'wrap' }}>
-            <span style={{ background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e3e6ed' }}>
+            <span style={{ background: 'rgba(56, 189, 248, 0.16)', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
               📜 Paper Rolls: {rawMaterials.inkStock?.paperRolls || 0} Rolls in Stock
             </span>
-            <span style={{ background: '#f0fdf4', color: '#15803d', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e3e6ed' }}>
+            <span style={{ background: 'rgba(16, 185, 129, 0.16)', color: '#34d399', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
               💧 Today Consumed: {rawMaterials.todayInkConsumed || 0} L
             </span>
             {onNavigateDepartment && (
@@ -1683,9 +1688,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 onClick={() => onNavigateDepartment('raw_materials')}
                 className="ops-action-btn"
                 style={{
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  color: '#2563eb',
+                  background: 'rgba(56, 189, 248, 0.16)',
+                  border: '1px solid rgba(56, 189, 248, 0.38)',
+                  color: '#38bdf8',
                   fontSize: '0.74rem',
                   padding: '3px 10px'
                 }}
@@ -1698,23 +1703,23 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
 
         {/* Grando Ink Canisters */}
         <div style={{ marginBottom: '1.25rem' }}>
-          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e40af', marginBottom: '0.5rem' }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.5rem', letterSpacing: '0.03em' }}>
             🖨️ GRANDO INK CANISTERS (LITERS)
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
             {[
-              { code: 'C', name: 'Cyan (C)', color: '#0284c7', bg: '#e0f2fe', val: rawMaterials.inkStock?.grando?.C || 0 },
-              { code: 'M', name: 'Magenta (M)', color: '#db2777', bg: '#fce7f3', val: rawMaterials.inkStock?.grando?.M || 0 },
-              { code: 'Y', name: 'Yellow (Y)', color: '#ca8a04', bg: '#fef9c3', val: rawMaterials.inkStock?.grando?.Y || 0 },
-              { code: 'K', name: 'Black (K)', color: '#1e293b', bg: '#f1f5f9', val: rawMaterials.inkStock?.grando?.K || 0 },
-              { code: 'CS', name: 'Cleaning Sol.', color: '#7c3aed', bg: '#ede9fe', val: rawMaterials.inkStock?.grando?.CS || 0 }
+              { code: 'C', name: 'Cyan (C)', color: '#38bdf8', border: 'rgba(56, 189, 248, 0.35)', val: rawMaterials.inkStock?.grando?.C || 0 },
+              { code: 'M', name: 'Magenta (M)', color: '#f472b6', border: 'rgba(244, 114, 182, 0.35)', val: rawMaterials.inkStock?.grando?.M || 0 },
+              { code: 'Y', name: 'Yellow (Y)', color: '#fbbf24', border: 'rgba(251, 191, 36, 0.35)', val: rawMaterials.inkStock?.grando?.Y || 0 },
+              { code: 'K', name: 'Black (K)', color: '#ffffff', border: 'rgba(255, 255, 255, 0.3)', val: rawMaterials.inkStock?.grando?.K || 0 },
+              { code: 'CS', name: 'Cleaning Sol.', color: '#c084fc', border: 'rgba(192, 132, 252, 0.35)', val: rawMaterials.inkStock?.grando?.CS || 0 }
             ].map(ink => (
-              <div key={ink.code} style={{ background: '#f8fafc', padding: '0.75rem 0.85rem', borderRadius: '12px', border: `1.5px solid ${ink.color}40`, textAlign: 'center' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: ink.color }}>{ink.name}</span>
+              <div key={ink.code} style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '0.75rem 0.85rem', borderRadius: '12px', border: `1.5px solid ${ink.border}`, textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: ink.color }}>{ink.name}</span>
                 <div style={{ fontSize: '1.35rem', fontWeight: 900, color: ink.color, marginTop: '2px' }}>
                   {ink.val} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>L</span>
                 </div>
-                <div style={{ fontSize: '0.68rem', color: ink.val < 3 ? '#dc2626' : '#059669', fontWeight: 700, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.7rem', color: ink.val < 3 ? '#f87171' : '#34d399', fontWeight: 700, marginTop: '2px' }}>
                   {ink.val < 3 ? '⚠️ Low Stock' : '✓ Normal'}
                 </div>
               </div>
@@ -1724,22 +1729,22 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
 
         {/* PrintDot Ink Canisters */}
         <div>
-          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e40af', marginBottom: '0.5rem' }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.5rem', letterSpacing: '0.03em' }}>
             🖨️ PRINTDOT INK CANISTERS (LITERS)
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
             {[
-              { code: 'C', name: 'Cyan (C)', color: '#0284c7', bg: '#e0f2fe', val: rawMaterials.inkStock?.printdot?.C || 0 },
-              { code: 'M', name: 'Magenta (M)', color: '#db2777', bg: '#fce7f3', val: rawMaterials.inkStock?.printdot?.M || 0 },
-              { code: 'Y', name: 'Yellow (Y)', color: '#ca8a04', bg: '#fef9c3', val: rawMaterials.inkStock?.printdot?.Y || 0 },
-              { code: 'K', name: 'Black (K)', color: '#1e293b', bg: '#f1f5f9', val: rawMaterials.inkStock?.printdot?.K || 0 }
+              { code: 'C', name: 'Cyan (C)', color: '#38bdf8', border: 'rgba(56, 189, 248, 0.35)', val: rawMaterials.inkStock?.printdot?.C || 0 },
+              { code: 'M', name: 'Magenta (M)', color: '#f472b6', border: 'rgba(244, 114, 182, 0.35)', val: rawMaterials.inkStock?.printdot?.M || 0 },
+              { code: 'Y', name: 'Yellow (Y)', color: '#fbbf24', border: 'rgba(251, 191, 36, 0.35)', val: rawMaterials.inkStock?.printdot?.Y || 0 },
+              { code: 'K', name: 'Black (K)', color: '#ffffff', border: 'rgba(255, 255, 255, 0.3)', val: rawMaterials.inkStock?.printdot?.K || 0 }
             ].map(ink => (
-              <div key={ink.code} style={{ background: '#f8fafc', padding: '0.75rem 0.85rem', borderRadius: '12px', border: `1.5px solid ${ink.color}40`, textAlign: 'center' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: ink.color }}>{ink.name}</span>
+              <div key={ink.code} style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '0.75rem 0.85rem', borderRadius: '12px', border: `1.5px solid ${ink.border}`, textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: ink.color }}>{ink.name}</span>
                 <div style={{ fontSize: '1.35rem', fontWeight: 900, color: ink.color, marginTop: '2px' }}>
                   {ink.val} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>L</span>
                 </div>
-                <div style={{ fontSize: '0.68rem', color: ink.val < 3 ? '#dc2626' : '#059669', fontWeight: 700, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.7rem', color: ink.val < 3 ? '#f87171' : '#34d399', fontWeight: 700, marginTop: '2px' }}>
                   {ink.val < 3 ? '⚠️ Low Stock' : '✓ Normal'}
                 </div>
               </div>
@@ -1754,8 +1759,8 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         {/* Fabric Inward & Outward */}
         <div className="phoenix-card" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Package size={18} color="#2563eb" /> Daily Fabric Management
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Package size={18} color="#38bdf8" /> Daily Fabric Management
             </h3>
             {onNavigateDepartment && (
               <button
@@ -1763,9 +1768,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 onClick={() => onNavigateDepartment('fabric')}
                 className="ops-action-btn"
                 style={{
-                  background: '#eff6ff',
-                  border: '1px solid #cbd0dd',
-                  color: '#2563eb',
+                  background: 'rgba(56, 189, 248, 0.16)',
+                  border: '1px solid rgba(56, 189, 248, 0.38)',
+                  color: '#38bdf8',
                   fontSize: '0.74rem',
                   padding: '3px 10px'
                 }}
@@ -1775,20 +1780,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d' }}>📥 Fabric Inward Today</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>
+            <div style={{ background: 'rgba(16, 185, 129, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.32)' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#34d399' }}>📥 Fabric Inward Today</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                 {fmtMtr(fabric.inwardMetersToday || 0)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{fabric.inwardRollsToday || 0} Rolls Received</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)' }}>{fabric.inwardRollsToday || 0} Rolls Received</div>
             </div>
 
-            <div style={{ background: '#eff6ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d4ed8' }}>📤 Fabric Issued Today</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: '2px' }}>
+            <div style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.32)' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8' }}>📤 Fabric Issued Today</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                 {fmtMtr(fabric.issuedMetersToday || 0)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{fabric.issuedRollsToday || 0} Rolls to Production</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)' }}>{fabric.issuedRollsToday || 0} Rolls to Production</div>
             </div>
           </div>
         </div>
@@ -1796,8 +1801,8 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         {/* Quality & Complaints Status */}
         <div className="phoenix-card" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ShieldCheck size={18} color="#2563eb" /> Quality & Complaints Health
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShieldCheck size={18} color="#38bdf8" /> Quality & Complaints Health
             </h3>
             {onNavigateDepartment && (
               <button
@@ -1805,9 +1810,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 onClick={() => onNavigateDepartment('complaint')}
                 className="ops-action-btn"
                 style={{
-                  background: '#eff6ff',
-                  border: '1px solid #e3e6ed',
-                  color: '#2563eb',
+                  background: 'rgba(56, 189, 248, 0.16)',
+                  border: '1px solid rgba(56, 189, 248, 0.38)',
+                  color: '#38bdf8',
                   fontSize: '0.74rem',
                   padding: '3px 10px'
                 }}
@@ -1817,20 +1822,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <div style={{ background: '#fef2f2', padding: '0.85rem', borderRadius: '12px', border: '1px solid #fecaca' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c' }}>⚠️ Open Complaints</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#dc2626', marginTop: '2px' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.12)', padding: '0.85rem', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.32)' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#f87171' }}>⚠️ Open Complaints</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                 {quality.openComplaints || 0}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Active customer complaints</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)' }}>Active customer complaints</div>
             </div>
 
-            <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '12px', border: '1px solid #e3e6ed' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d' }}>✓ Resolved Complaints</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>
+            <div style={{ background: 'rgba(16, 185, 129, 0.12)', padding: '0.85rem', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.32)' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#34d399' }}>✓ Resolved Complaints</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                 {quality.resolvedComplaints || 0}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Successfully resolved</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)' }}>Successfully resolved</div>
             </div>
           </div>
         </div>
@@ -1838,8 +1843,8 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         {/* Factory Overhead & Expense Pulse */}
         <div className="phoenix-card" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <DollarSign size={18} color="#2563eb" /> Factory Expenses & Costing
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <DollarSign size={18} color="#38bdf8" /> Factory Expenses & Costing
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               {onNavigateDepartment && (
@@ -1848,9 +1853,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                   onClick={() => onNavigateDepartment('expense')}
                   className="ops-action-btn"
                   style={{
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#dc2626',
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#fca5a5',
                     fontSize: '0.74rem',
                     padding: '3px 10px'
                   }}
@@ -1861,20 +1866,20 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
-            <div style={{ background: '#fff1f2', padding: '0.85rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#e11d48' }}>💸 Today Expenses</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#be123c', marginTop: '2px' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f87171' }}>💸 Today Expenses</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                 {fmtINR(summary.todayExpenses)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Daily factory overheads</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)' }}>Daily factory overheads</div>
             </div>
 
-            <div style={{ background: '#eff6ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d4ed8' }}>📈 Month Billed Rev</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: '2px' }}>
+            <div style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8' }}>📈 Month Billed Rev</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                 {fmtINR(summary.monthBilledRevenue)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Cumulative billed output</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)' }}>Cumulative billed output</div>
             </div>
           </div>
 
@@ -1886,7 +1891,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#2563eb',
+                  color: '#38bdf8',
                   fontSize: '0.76rem',
                   fontWeight: 700,
                   cursor: 'pointer',

@@ -151,6 +151,12 @@ server.listen(port, host, async () => {
     await seedFacilitiesOnStartup();
     const { purgeAllQaTestArtifacts } = require('./utils/qaCleanup');
     await purgeAllQaTestArtifacts();
+    const { runCatalogAndImageSync } = require('./services/catalogImageSync.service');
+    setImmediate(() => {
+      runCatalogAndImageSync({ triggerSource: 'STARTUP_AUTO' }).catch((e) => {
+        logger.warn('Startup catalog image sync warning: ' + e.message);
+      });
+    });
   } catch (err) {
     logger.warn('Failed to seed facilities or purge test artifacts on startup: ' + err.message);
   }

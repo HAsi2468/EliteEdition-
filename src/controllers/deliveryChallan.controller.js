@@ -196,6 +196,9 @@ const calculateChallanTotals = (data) => {
 const createChallan = async (req, res) => {
   try {
     const body = { ...req.body };
+    const { checkBooksLock } = require('../utils/booksLockGuard');
+    const lockRes = await checkBooksLock(body.challanDate || body.date || new Date(), req.user);
+    if (lockRes.locked) return res.status(403).json({ success: false, code: 'BOOKS_LOCKED', error: lockRes.message });
     const companyEntity = body.companyEntity || 'Sobise';
     const prefix = getCompanyPrefix(companyEntity);
     const isEthno = prefix === 'EWC-';
@@ -320,6 +323,9 @@ const updateChallan = async (req, res) => {
     }
 
     const body = { ...req.body };
+    const { checkBooksLock } = require('../utils/booksLockGuard');
+    const lockRes = await checkBooksLock(body.challanDate || existing.challanDate, req.user);
+    if (lockRes.locked) return res.status(403).json({ success: false, code: 'BOOKS_LOCKED', error: lockRes.message });
     const computed = calculateChallanTotals(body);
     Object.assign(body, computed);
 
@@ -536,7 +542,7 @@ const convertToInvoice = async (req, res) => {
 
 // ── GET /delivery-challans/:id/pdf ────────────────────────────────────────────
 // Generate printable vector PDF for Delivery Challan
-// Page 1: Original in Company Brand Color; Page 2: Duplicate in Black & White
+// Page 1: Original in Company Brand Color; Page 2: Duplicate in 50% Lighter Company Brand Color
 const downloadChallanPdf = async (req, res) => {
   try {
     const challan = await DeliveryChallan.findById(req.params.id).lean();
@@ -544,9 +550,15 @@ const downloadChallanPdf = async (req, res) => {
       return res.status(404).send('Delivery Challan not found');
     }
 
-    const { getCompanyBrandColor } = require('../services/tallyInvoicePdfService');
+    const {
+      getCompanyBrandColor,
+      tintColor,
+      getDuplicateLighterColor,
+      isMeaningfulValue
+    } = require('../utils/departmentThemeHelper');
     const resolvedCompany = challan.companyEntity || 'Sobise';
     const companyBrandColor = getCompanyBrandColor(resolvedCompany);
+    const duplicateBrandColor = getDuplicateLighterColor(companyBrandColor);
 
     const doc = new PDFDocument({ margin: 36, size: 'A4', autoFirstPage: true });
 
@@ -556,66 +568,78 @@ const downloadChallanPdf = async (req, res) => {
     doc.pipe(res);
 
     const renderChallanPage = (isColor) => {
-      // Color definitions
-      const primaryColor = isColor ? companyBrandColor : '#000000';
-      const textColor = '#0f172a';
-      const mutedColor = isColor ? '#64748b' : '#555555';
+      // Original uses 100% department brand color; Duplicate uses exact same department color at 50% lighter
+      const primaryColor = isColor ? companyBrandColor : duplicateBrandColor;
+      const lightTint = isColor ? tintColor(companyBrandColor, 0.92) : tintColor(duplicateBrandColor, 0.95);
+      const borderTint = tintColor(primaryColor, 0.72);
+      const textColor = isColor ? '#0f172a' : '#334155';
+      const mutedColor = isColor ? '#64748b' : '#64748b';
       const copyBadge = isColor ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
 
       // Header Title
       doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text(resolvedCompany.toUpperCase(), 36, 36);
-      doc.fillColor(mutedColor).fontSize(9).font('Helvetica').text('Corporate & Fashion Apparel Delivery Division', 36, 60);
 
       // Copy label & Document Badge
       doc.fillColor(primaryColor).fontSize(7.5).font('Helvetica-Bold').text(copyBadge, 360, 24, { width: 200, align: 'right' });
-      doc.roundedRect(420, 36, 140, 26, 4).fillAndStroke(isColor ? `${primaryColor}15` : '#f1f5f9', primaryColor);
+      doc.roundedRect(420, 36, 140, 26, 4).fillAndStroke(lightTint, primaryColor);
       doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text('DELIVERY CHALLAN', 432, 44);
 
       doc.moveDown(2);
 
       // Challan Meta Box
       const metaY = 82;
-      doc.rect(36, metaY, 523, 78).stroke(isColor ? '#cbd5e1' : '#000000');
+      doc.rect(36, metaY, 523, 78).stroke(borderTint);
 
-      // Left Column: Customer details
+      // Left Column: Customer details (only populated fields)
       doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold').text('CONSIGNEE / DELIVER TO:', 46, metaY + 8);
-      doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(challan.customer?.name || 'Party Name', 46, metaY + 22);
-      if (challan.customer?.businessName) {
-        doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text(challan.customer.businessName, 46, metaY + 34);
+      let leftMetaY = metaY + 22;
+      const custName = challan.customer?.name || challan.customer?.businessName || challan.partyName || '';
+      if (isMeaningfulValue(custName)) {
+        doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(String(custName).trim(), 46, leftMetaY);
+        leftMetaY += 12;
+      }
+      if (isMeaningfulValue(challan.customer?.businessName) && challan.customer.businessName !== custName) {
+        doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text(challan.customer.businessName, 46, leftMetaY);
+        leftMetaY += 12;
       }
       const custAddr = challan.customer?.shippingAddress || challan.customer?.billingAddress || '';
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text(custAddr.slice(0, 50), 46, metaY + 46);
-      if (challan.customer?.gstin) {
-        doc.fillColor(textColor).fontSize(8).font('Helvetica-Bold').text(`GSTIN: ${challan.customer.gstin}`, 46, metaY + 57);
+      if (isMeaningfulValue(custAddr)) {
+        doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text(String(custAddr).slice(0, 65), 46, leftMetaY);
+        leftMetaY += 11;
+      }
+      if (isMeaningfulValue(challan.customer?.gstin)) {
+        doc.fillColor(textColor).fontSize(8).font('Helvetica-Bold').text(`GSTIN: ${challan.customer.gstin}`, 46, leftMetaY);
       }
 
-      // Right Column: Challan & Dispatch Details
+      // Right Column: Challan & Dispatch Details (only populated fields)
       const rightX = 330;
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Challan No:', rightX, metaY + 8);
-      doc.fillColor(textColor).fontSize(9.5).font('Helvetica-Bold').text(challan.challanNo, rightX + 65, metaY + 8);
-
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Date:', rightX, metaY + 21);
-      const dt = challan.challanDate ? new Date(challan.challanDate).toLocaleDateString('en-IN') : '-';
-      doc.fillColor(textColor).fontSize(8.5).font('Helvetica').text(dt, rightX + 65, metaY + 21);
-
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Vehicle No:', rightX, metaY + 34);
-      doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold').text(challan.dispatchDetails?.vehicleNo || 'N/A', rightX + 65, metaY + 34);
-
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Transporter:', rightX, metaY + 47);
-      doc.fillColor(textColor).fontSize(8).font('Helvetica').text(challan.dispatchDetails?.transporter || 'Direct', rightX + 65, metaY + 47);
-
-      const extraDispatch = [
-        challan.dispatchDetails?.lrNo ? `LR: ${challan.dispatchDetails.lrNo}` : '',
-        challan.dispatchDetails?.eWayBillNo ? `E-Way: ${challan.dispatchDetails.eWayBillNo}` : ''
-      ].filter(Boolean).join(' | ');
-
-      if (extraDispatch) {
-        doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(extraDispatch, rightX, metaY + 61);
+      const rightRows = [];
+      if (isMeaningfulValue(challan.challanNo)) rightRows.push({ label: 'Challan No:', value: String(challan.challanNo), bold: true });
+      if (isMeaningfulValue(challan.challanDate)) {
+        rightRows.push({ label: 'Date:', value: new Date(challan.challanDate).toLocaleDateString('en-IN') });
       }
+      if (isMeaningfulValue(challan.dispatchDetails?.vehicleNo)) {
+        rightRows.push({ label: 'Vehicle No:', value: String(challan.dispatchDetails.vehicleNo), bold: true });
+      }
+      if (isMeaningfulValue(challan.dispatchDetails?.transporter)) {
+        rightRows.push({ label: 'Transporter:', value: String(challan.dispatchDetails.transporter) });
+      }
+      const extraDispatch = [
+        isMeaningfulValue(challan.dispatchDetails?.lrNo) ? `LR: ${challan.dispatchDetails.lrNo}` : '',
+        isMeaningfulValue(challan.dispatchDetails?.eWayBillNo) ? `E-Way: ${challan.dispatchDetails.eWayBillNo}` : ''
+      ].filter(Boolean).join(' | ');
+      if (extraDispatch) rightRows.push({ label: 'Ref:', value: extraDispatch });
+
+      let rightMetaY = metaY + 8;
+      rightRows.forEach(r => {
+        doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text(r.label, rightX, rightMetaY);
+        doc.fillColor(textColor).fontSize(r.bold ? 9 : 8.5).font(r.bold ? 'Helvetica-Bold' : 'Helvetica').text(r.value, rightX + 65, rightMetaY);
+        rightMetaY += 13;
+      });
 
       // Line Items Table Header
       const tableY = metaY + 90;
-      doc.rect(36, tableY, 523, 22).fill(isColor ? '#f8fafc' : '#f1f5f9').stroke(isColor ? '#cbd5e1' : '#000000');
+      doc.rect(36, tableY, 523, 22).fill(lightTint).stroke(borderTint);
       doc.fillColor(primaryColor).fontSize(8.5).font('Helvetica-Bold');
       doc.text('#', 44, tableY + 6);
       doc.text('Item Description', 70, tableY + 6);
@@ -627,13 +651,19 @@ const downloadChallanPdf = async (req, res) => {
 
       let rowY = tableY + 22;
       (challan.items || []).forEach((it, idx) => {
-        doc.rect(36, rowY, 523, 20).stroke('#e2e8f0');
+        doc.rect(36, rowY, 523, 20).stroke(tintColor(primaryColor, 0.85));
         doc.fillColor(textColor).fontSize(8.5).font('Helvetica');
         doc.text(String(idx + 1), 44, rowY + 5);
-        doc.text(it.itemName || '', 70, rowY + 5, { width: 180, ellipsis: true });
-        doc.text(it.hsnCode || '-', 260, rowY + 5);
+        if (isMeaningfulValue(it.itemName)) {
+          doc.text(String(it.itemName), 70, rowY + 5, { width: 180, ellipsis: true });
+        }
+        if (isMeaningfulValue(it.hsnCode)) {
+          doc.text(String(it.hsnCode), 260, rowY + 5);
+        }
         doc.text(Number(it.qty || 0).toLocaleString('en-IN'), 330, rowY + 5, { width: 40, align: 'right' });
-        doc.text(it.unit || 'Pcs', 380, rowY + 5);
+        if (isMeaningfulValue(it.unit)) {
+          doc.text(String(it.unit), 380, rowY + 5);
+        }
         doc.text(Number(it.unitPrice || 0).toFixed(2), 420, rowY + 5, { width: 55, align: 'right' });
         doc.text(Number(it.totalAmount || 0).toFixed(2), 485, rowY + 5, { width: 65, align: 'right' });
         rowY += 20;
@@ -641,25 +671,30 @@ const downloadChallanPdf = async (req, res) => {
 
       // Summary Box
       const sumY = Math.max(rowY + 10, 480);
-      doc.rect(36, sumY, 320, 75).stroke(isColor ? '#e2e8f0' : '#000000');
-      doc.fillColor(primaryColor).fontSize(8).font('Helvetica-Bold').text('TERMS & CONDITIONS:', 44, sumY + 8);
-      doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(challan.terms || '1. Goods delivered in good order.\n2. Receiver acknowledgment required.', 44, sumY + 22, { width: 300 });
+      if (isMeaningfulValue(challan.terms || challan.notes)) {
+        doc.rect(36, sumY, 320, 75).stroke(borderTint);
+        doc.fillColor(primaryColor).fontSize(8).font('Helvetica-Bold').text('TERMS / REMARKS:', 44, sumY + 8);
+        doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(String(challan.terms || challan.notes), 44, sumY + 22, { width: 300 });
+      }
 
-      // Totals Box
-      doc.rect(370, sumY, 189, 75).fill(isColor ? '#f8fafc' : '#f1f5f9').stroke(isColor ? '#cbd5e1' : '#000000');
+      // Totals Box (only show Taxes row if taxTotal > 0)
+      const hasTax = Number(challan.taxTotal || 0) > 0;
+      doc.rect(370, sumY, 189, 75).fill(lightTint).stroke(borderTint);
       doc.fillColor(textColor).fontSize(8.5).font('Helvetica');
       doc.text('Total Quantity:', 380, sumY + 12);
-      doc.font('Helvetica-Bold').text(`${challan.totalQty || 0} Pcs/Mtr`, 480, sumY + 12, { align: 'right', width: 70 });
+      doc.font('Helvetica-Bold').text(`${challan.totalQty || 0}`, 480, sumY + 12, { align: 'right', width: 70 });
 
-      doc.font('Helvetica').text('Subtotal:', 380, sumY + 28);
-      doc.font('Helvetica-Bold').text(`₹ ${(challan.subtotal || 0).toFixed(2)}`, 480, sumY + 28, { align: 'right', width: 70 });
+      if (hasTax) {
+        doc.font('Helvetica').text('Subtotal:', 380, sumY + 28);
+        doc.font('Helvetica-Bold').text(`₹ ${(challan.subtotal || 0).toFixed(2)}`, 480, sumY + 28, { align: 'right', width: 70 });
 
-      doc.font('Helvetica').text('Taxes (GST):', 380, sumY + 44);
-      doc.font('Helvetica-Bold').text(`₹ ${(challan.taxTotal || 0).toFixed(2)}`, 480, sumY + 44, { align: 'right', width: 70 });
+        doc.font('Helvetica').text('Taxes (GST):', 380, sumY + 44);
+        doc.font('Helvetica-Bold').text(`₹ ${(challan.taxTotal || 0).toFixed(2)}`, 480, sumY + 44, { align: 'right', width: 70 });
+      }
 
       doc.rect(370, sumY + 58, 189, 17).fill(primaryColor);
       doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold').text('Grand Total:', 380, sumY + 62);
-      doc.text(`₹ ${(challan.grandTotal || 0).toFixed(2)}`, 480, sumY + 62, { align: 'right', width: 70 });
+      doc.text(`₹ ${(challan.grandTotal || challan.subtotal || 0).toFixed(2)}`, 480, sumY + 62, { align: 'right', width: 70 });
 
       // Signatures
       const sigY = sumY + 110;
@@ -669,10 +704,10 @@ const downloadChallanPdf = async (req, res) => {
       doc.fillColor(mutedColor).font('Helvetica').text('Authorized Signatory', 430, sigY + 30);
     };
 
-    // Page 1: Original in Company Brand Color
+    // Page 1: Original in 100% Company Brand Color
     renderChallanPage(true);
 
-    // Page 2: Duplicate in Black & White
+    // Page 2: Duplicate in 50% Lighter Company Brand Color
     doc.addPage({ margin: 36, size: 'A4' });
     renderChallanPage(false);
 

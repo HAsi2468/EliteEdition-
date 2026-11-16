@@ -1543,6 +1543,13 @@ export default function EmojiPickerPopover({
                         src={gif.previewUrl || gif.url}
                         alt={gif.title}
                         loading="lazy"
+                        onError={(e) => {
+                          const raw = gif.previewUrl || gif.url;
+                          if (raw && !e.currentTarget.dataset.retried) {
+                            e.currentTarget.dataset.retried = 'true';
+                            e.currentTarget.src = `/v1/upload/download?url=${encodeURIComponent(raw)}&filename=gif.gif`;
+                          }
+                        }}
                         style={{
                           width: '100%',
                           height: '100%',

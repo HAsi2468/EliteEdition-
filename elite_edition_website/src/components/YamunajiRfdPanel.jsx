@@ -44,6 +44,8 @@ import { api } from '../services/api';
 import EnterpriseEmptyState from './common/EnterpriseEmptyState';
 import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
 import { getDatePresetRange } from './DateRangePicker';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
 
 export const getRfdStorageKey = (comp, key) => {
   const norm = (comp || 'Yamunaji').toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -3319,145 +3321,63 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem' }}>
-      {/* 🌟 Master Header Banner */}
-      <div
-        className="glass-panel"
-        style={{
-          padding: '1.25rem 1.5rem',
-          borderLeft: '5px solid #0ea5e9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.05) 0%, rgba(2, 132, 199, 0.08) 100%)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: '#0ea5e920',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid #0ea5e940',
-              boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)'
-            }}
-          >
-            <Layers size={26} color="#0ea5e9" />
+      {/* ── TIER 1: CLEAN HEADER (No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+            <Layers size={16} color="#ffffff" />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
-                {companyEntity || 'Yamunaji'} — Fabric Process
-              </h2>
-              <span
-                style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: '#0ea5e91a',
-                  color: '#0284c7',
-                  border: '1px solid #0ea5e933'
-                }}
-              >
-                WEAVER TO MILL TO RFD
-              </span>
-            </div>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
-              Weaver Gray Fabric inward with TP Details (Sr No, TP No, TP Mtr) & Mill Delivery Outward Challans.
-            </p>
-          </div>
+          <span className="glass-screen-title">Fabric Process &amp; RFD</span>
+          <EntityBrandBadge entityId={companyEntity || 'Yamunaji'} />
         </div>
 
-        {/* Master Action Controls: Settings + Mode Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-
-          {/* ⚙️ SETTINGS BUTTON */}
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowSettingsModal(true)}
-            className="btn-secondary"
+            className="glass-button"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
               padding: '6px 14px',
               borderRadius: '8px',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#0f172a',
-              fontWeight: 800,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              cursor: 'pointer'
             }}
             title="Configure Weaver Names, Fabric Qualities, Processing Mills & Process Types"
           >
-            <Settings size={15} color="#0284c7" /> Settings
+            <Settings size={14} color="#38bdf8" /> Settings
           </button>
-
-          {/* Primary Screen Mode Switcher: Gray Fabric vs. RFD Fabric */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: '#ffffff',
-              borderRadius: '10px',
-              padding: '4px',
-              border: '1px solid #cbd5e1',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-              gap: '4px'
-            }}
-          >
-            <button
-              onClick={() => setScreenMode('gray')}
-              type="button"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '7px',
-                border: 'none',
-                background: screenMode === 'gray' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
-                color: screenMode === 'gray' ? '#ffffff' : '#475569',
-                fontWeight: screenMode === 'gray' ? 800 : 600,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                boxShadow: screenMode === 'gray' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Boxes size={15} /> Gray Fabric
-            </button>
-
-            <button
-              onClick={() => setScreenMode('rfd')}
-              type="button"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '7px',
-                border: 'none',
-                background: screenMode === 'rfd' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
-                color: screenMode === 'rfd' ? '#ffffff' : '#475569',
-                fontWeight: screenMode === 'rfd' ? 800 : 600,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                boxShadow: screenMode === 'rfd' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Layers size={15} /> RFD Fabric
-            </button>
-          </div>
+          <QuickActionMenu onNavigate={onNavigate} />
         </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Under Header) ── */}
+      <div className="glass-subtabs-bar">
+        <button
+          type="button"
+          onClick={() => { setScreenMode('gray'); setGraySubTab('weaver_inward'); }}
+          className={`glass-subtab-btn ${screenMode === 'gray' && graySubTab === 'weaver_inward' ? 'active' : ''}`}
+        >
+          <span>Weaver Inward &amp; Gray Stock ({grayLots.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setScreenMode('gray'); setGraySubTab('mill_outward'); }}
+          className={`glass-subtab-btn ${screenMode === 'gray' && graySubTab === 'mill_outward' ? 'active' : ''}`}
+        >
+          <span>Mill Outward Challans ({millChallans.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setScreenMode('rfd')}
+          className={`glass-subtab-btn ${screenMode === 'rfd' ? 'active' : ''}`}
+        >
+          <span>RFD Fabric &amp; Processing</span>
+        </button>
       </div>
 
       {/* ======================================================== */}
@@ -3465,150 +3385,68 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       {/* ======================================================== */}
       {screenMode === 'gray' && (
         <>
-          {/* Quick Stats HUD for Gray Fabric */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-              gap: '1rem'
-            }}
-          >
-            {/* Stat 1: In-Stock Gray Meters */}
-            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #0284c7' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  In-Stock Gray Fabric
-                </span>
-                <Boxes size={16} color="#0284c7" />
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0284c7' }}>
-                {grayStats.inStockMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
-              </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                <span style={{ fontWeight: 700, color: '#0284c7' }}>{grayStats.inStockTps} TPs</span> ready in warehouse
-              </div>
+          {/* ── TIER 3: SIDE SCROLLING CALCULATION CARDS TRACK ── */}
+          <div className="glass-scroll-track">
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">In-Stock Gray Fabric</span>
+              <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
+                {grayStats.inStockMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Mtr
+              </span>
+              <span className="glass-calc-sub">{grayStats.inStockTps} TPs ready in warehouse</span>
             </div>
 
-            {/* Stat 2: Sent to Mill for RFD */}
-            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  Sent to Mill (Outward)
-                </span>
-                <Truck size={16} color="#f59e0b" />
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#d97706' }}>
-                {grayStats.atMillMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
-              </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                Currently in processing at dye houses
-              </div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Sent to Mill (Outward)</span>
+              <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
+                {grayStats.atMillMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Mtr
+              </span>
+              <span className="glass-calc-sub">Processing at dye houses</span>
             </div>
 
-            {/* Stat 3: Outward Challans Created */}
-            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  Mill Delivery Challans
-                </span>
-                <ClipboardList size={16} color="#10b981" />
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669' }}>
-                {millChallans.length} <span style={{ fontSize: '0.85rem' }}>Challans</span>
-              </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                Outward to Shree Radhe, Vrundavan, etc.
-              </div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Mill Delivery Challans</span>
+              <span className="glass-calc-value" style={{ color: '#34d399' }}>
+                {millChallans.length} Challans
+              </span>
+              <span className="glass-calc-sub">Outward to processing mills</span>
             </div>
 
-            {/* Stat 4: Gray Stock Valuation */}
-            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #8b5cf6' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  Gray Inventory Value
-                </span>
-                <TrendingUp size={16} color="#8b5cf6" />
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#7c3aed' }}>
-                ₹ {grayStats.totalGrayValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                Purchase rate from weavers
-              </div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Gray Inventory Value</span>
+              <span className="glass-calc-value" style={{ color: '#c084fc' }}>
+                ₹{grayStats.totalGrayValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="glass-calc-sub">Purchase valuation from weavers</span>
             </div>
 
-            {/* Stat 5: Pending Invoices */}
             <div
-              className="glass-panel"
+              className="glass-calc-card"
               onClick={() => setGrayInvoiceFilter(prev => prev === 'pending' ? 'all' : 'pending')}
               style={{
-                padding: '1rem',
-                borderLeft: '4px solid #f59e0b',
                 cursor: 'pointer',
-                background: grayInvoiceFilter === 'pending' ? 'rgba(254, 243, 199, 0.45)' : undefined,
-                boxShadow: grayInvoiceFilter === 'pending' ? '0 0 0 2px #f59e0b' : undefined,
-                transition: 'all 0.2s ease'
+                borderColor: grayInvoiceFilter === 'pending' ? '#f59e0b' : undefined
               }}
               title="Click to filter lots with pending invoices"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: grayInvoiceFilter === 'pending' ? '#b45309' : '#64748b', textTransform: 'uppercase' }}>
-                  Pending Invoices
-                </span>
-                <Clock size={16} color="#f59e0b" />
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#d97706' }}>
-                {grayStats.pendingInvoiceCount} <span style={{ fontSize: '0.85rem' }}>Lots</span>
-              </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+              <span className="glass-calc-title" style={{ color: grayInvoiceFilter === 'pending' ? '#fbbf24' : undefined }}>
+                Pending Invoices
+              </span>
+              <span className="glass-calc-value" style={{ color: '#fb923c' }}>
+                {grayStats.pendingInvoiceCount} Lots
+              </span>
+              <span className="glass-calc-sub">
                 {grayStats.pendingInvoiceMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} Mtr invoice awaited
-                {grayInvoiceFilter === 'pending' && <span style={{ marginLeft: 6, fontWeight: 800, color: '#b45309' }}>• FILTER ACTIVE</span>}
-              </div>
+                {grayInvoiceFilter === 'pending' && ' • ACTIVE'}
+              </span>
             </div>
           </div>
 
-          {/* Sub Navigation Bar for Gray Fabric */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          {/* Action Toolbar for Gray Fabric */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                onClick={() => setGraySubTab('weaver_inward')}
-                className="tab-pill"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: graySubTab === 'weaver_inward' ? 800 : 600,
-                  background: graySubTab === 'weaver_inward' ? '#0ea5e9' : 'transparent',
-                  color: graySubTab === 'weaver_inward' ? '#ffffff' : '#64748b',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <Boxes size={14} /> Weaver Inward & Gray Stock ({grayLots.length} Lots)
-              </button>
-
-              <button
-                onClick={() => setGraySubTab('mill_outward')}
-                className="tab-pill"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: graySubTab === 'mill_outward' ? 800 : 600,
-                  background: graySubTab === 'mill_outward' ? '#0ea5e9' : 'transparent',
-                  color: graySubTab === 'mill_outward' ? '#ffffff' : '#64748b',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <Truck size={14} /> Mill Outward Challans ({millChallans.length})
-              </button>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>
+                {graySubTab === 'weaver_inward' ? `Showing ${grayLots.length} Weaver Gray Lots` : `Showing ${millChallans.length} Mill Outward Challans`}
+              </span>
             </div>
 
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
@@ -3696,16 +3534,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
 
                 {/* Quick Filter Pills: All / Pending Invoices / Invoiced */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '3px 4px', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255, 255, 255, 0.14)', padding: '3px 4px', borderRadius: 8 }}>
                   <button
                     type="button"
                     onClick={() => setGrayInvoiceFilter('all')}
                     style={{
                       border: 'none',
-                      background: grayInvoiceFilter === 'all' ? '#ffffff' : 'transparent',
-                      color: grayInvoiceFilter === 'all' ? '#0f172a' : '#64748b',
+                      background: grayInvoiceFilter === 'all' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                      color: grayInvoiceFilter === 'all' ? '#38bdf8' : 'rgba(255, 255, 255, 0.72)',
                       fontWeight: grayInvoiceFilter === 'all' ? 800 : 600,
-                      boxShadow: grayInvoiceFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                       padding: '4px 10px',
                       borderRadius: 6,
                       fontSize: '0.75rem',
@@ -3719,10 +3556,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     onClick={() => setGrayInvoiceFilter('pending')}
                     style={{
                       border: 'none',
-                      background: grayInvoiceFilter === 'pending' ? '#fef3c7' : 'transparent',
-                      color: grayInvoiceFilter === 'pending' ? '#92400e' : '#64748b',
+                      background: grayInvoiceFilter === 'pending' ? 'rgba(245, 158, 11, 0.22)' : 'transparent',
+                      color: grayInvoiceFilter === 'pending' ? '#fbbf24' : 'rgba(255, 255, 255, 0.72)',
                       fontWeight: grayInvoiceFilter === 'pending' ? 800 : 600,
-                      boxShadow: grayInvoiceFilter === 'pending' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                       padding: '4px 10px',
                       borderRadius: 6,
                       fontSize: '0.75rem',
@@ -3732,7 +3568,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       gap: 4
                     }}
                   >
-                    <Clock size={12} color="#b45309" />
+                    <Clock size={12} color="#fbbf24" />
                     ⏳ Bill Pending ({grayStats.pendingInvoiceCount})
                   </button>
                   <button
@@ -3740,10 +3576,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     onClick={() => setGrayInvoiceFilter('invoiced')}
                     style={{
                       border: 'none',
-                      background: grayInvoiceFilter === 'invoiced' ? '#dcfce7' : 'transparent',
-                      color: grayInvoiceFilter === 'invoiced' ? '#166534' : '#64748b',
+                      background: grayInvoiceFilter === 'invoiced' ? 'rgba(16, 185, 129, 0.22)' : 'transparent',
+                      color: grayInvoiceFilter === 'invoiced' ? '#34d399' : 'rgba(255, 255, 255, 0.72)',
                       fontWeight: grayInvoiceFilter === 'invoiced' ? 800 : 600,
-                      boxShadow: grayInvoiceFilter === 'invoiced' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                       padding: '4px 10px',
                       borderRadius: 6,
                       fontSize: '0.75rem',
@@ -3753,7 +3588,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       gap: 4
                     }}
                   >
-                    <Check size={12} color="#15803d" />
+                    <Check size={12} color="#34d399" />
                     ✓ Invoiced ({grayLots.length - grayStats.pendingInvoiceCount})
                   </button>
                 </div>

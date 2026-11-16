@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { matchSearchQuery } from '../utils/searchUtils';
 import PrintSettings from './PrintSettings';
+import AdminControlCenter from './AdminControlCenter';
 import {
   UserPlus,
   ShieldAlert,
@@ -56,6 +57,8 @@ import AdminClientDetails from './AdminClientDetails';
 import AdminChangeApprovalQueue from './AdminChangeApprovalQueue';
 import AdminUserDataReview from './AdminUserDataReview';
 import InfrastructureBilling from '../pages/InfrastructureBilling';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const INFRASTRUCTURE_SERVICES_KNOWLEDGE = {
   aws: {
@@ -1366,233 +1369,229 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
   return (
     <div style={styles.container}>
-      {/* Page Title Header */}
-      <div className="glass-panel" style={styles.topBar}>
-        <div style={styles.topBarLeft}>
-          <ShieldAlert size={22} color="var(--primary)" />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', marginBottom: '4px' }}>
-              <h2 style={styles.pageTitle}>
-                {isCompanyAdmin ? `${selectedCompany} Admin Panel` : isMasterAdmin ? 'Master Admin Panel' : 'Enterprise Admin Panel'}
-              </h2>
-              {/* 4-Tier Hierarchy Badge */}
-              {isMasterAdmin ? (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  color: '#92400e',
-                  border: '1px solid #f59e0b',
-                  fontWeight: 900,
-                  fontSize: '0.72rem'
-                }}>
-                  👑 MASTER ADMIN (ROOT)
-                </span>
-              ) : isMainAdmin ? (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  background: '#d1fae5',
-                  color: '#065f46',
-                  border: '1px solid #10b981',
-                  fontWeight: 900,
-                  fontSize: '0.72rem'
-                }}>
-                  🌐 MAIN ADMIN (ALL COMPANIES)
-                </span>
-              ) : (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  background: '#eff6ff',
-                  color: '#1e40af',
-                  border: '1px solid #3b82f6',
-                  fontWeight: 900,
-                  fontSize: '0.72rem'
-                }}>
-                  🏢 COMPANY ADMIN
-                </span>
-              )}
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <ShieldAlert size={20} color="#38bdf8" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            {isCompanyAdmin ? `${selectedCompany} Admin Panel` : isMasterAdmin ? 'Master Admin Panel' : 'Enterprise Admin Panel'}
+          </span>
+          <EntityBrandBadge />
+          {/* Hierarchy Badge */}
+          {isMasterAdmin ? (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: 'rgba(245, 158, 11, 0.2)',
+              color: '#fbbf24',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              fontWeight: 800,
+              fontSize: '0.72rem'
+            }}>
+              👑 MASTER ADMIN
+            </span>
+          ) : isMainAdmin ? (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: 'rgba(16, 185, 129, 0.2)',
+              color: '#34d399',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              fontWeight: 800,
+              fontSize: '0.72rem'
+            }}>
+              🌐 MAIN ADMIN
+            </span>
+          ) : null}
 
-              {/* Company Context Selector */}
-              {allowedCompaniesList.length > 1 && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.25rem' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Company:</span>
-                  <select
-                    value={selectedCompany}
-                    onChange={(e) => setSelectedCompany(e.target.value)}
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      border: '1.5px solid #cbd5e1',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      background: '#ffffff',
-                      color: '#0f172a',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {allowedCompaniesList.map((c) => (
-                      <option key={c} value={c}>{c === 'All' ? '🌐 All Companies' : c}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <p style={styles.pageSubtitle}>
-              {activeSubTab === 'users'
-                ? `Manage user accounts and screen privileges for ${selectedCompany === 'All' ? 'all companies' : selectedCompany}.`
-                : activeSubTab === 'approvals'
-                ? `Review, authorize, or reject change requests for ${selectedCompany === 'All' ? 'all companies' : selectedCompany}.`
-                : activeSubTab === 'dataReview'
-                ? `Audit and inspect all data entries entered by users in ${selectedCompany === 'All' ? 'all companies' : selectedCompany}.`
-                : activeSubTab === 'clients'
-                ? 'Manage client user accounts, company codes, credentials, and Cloudflare R2 profile images.'
-                : activeSubTab === 'billing'
-                ? 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'
-                : activeSubTab === 'backup'
-                ? 'Export comprehensive system data filtered by department and custom date ranges.'
-                : activeSubTab === 'signedDocs'
-                ? 'Review and verify customer-signed physical copies of Challans and Invoices stored in Cloudflare R2.'
-                : 'Configure Cash IN categories, Cash OUT categories, and Payment Modes for department expense entry forms.'}
-            </p>
-          </div>
         </div>
 
-        {/* Lock / Unlock System Button (Only for Master & Main Admins) */}
-        <div style={styles.topBarRight}>
+        {/* Header Actions */}
+        <div className="glass-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Company Context Selector */}
+          {allowedCompaniesList.length > 1 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.7)' }}>Company:</span>
+              <select
+                value={selectedCompany}
+                onChange={(e) => setSelectedCompany(e.target.value)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  color: '#ffffff',
+                  cursor: 'pointer'
+                }}
+              >
+                {allowedCompaniesList.map((c) => (
+                  <option key={c} value={c}>{c === 'All' ? '🌐 All Companies' : c}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {(isMasterAdmin || isMainAdmin) && (
             <button
               type="button"
               onClick={handleToggleSystemLock}
               disabled={systemLockLoading}
-              style={isSystemLocked ? styles.systemLockBtnActive : styles.systemLockBtn}
-              title={
-                isSystemLocked
-                  ? 'System is currently LOCKED. Non-admin users see a 404 Not Found error page. Click to Unlock.'
-                  : 'Click to lock the ERP system. Non-admin users will immediately see a 404 Not Found error page.'
-              }
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.55rem 0.95rem',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: isSystemLocked ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
+                background: isSystemLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                color: isSystemLocked ? '#f87171' : '#ffffff'
+              }}
             >
               {systemLockLoading ? (
                 <>
-                  <RotateCw size={16} className="spin-loader" />
+                  <RotateCw size={15} className="spin-loader" />
                   <span>Updating...</span>
                 </>
               ) : isSystemLocked ? (
                 <>
-                  <Unlock size={17} />
-                  <span>System Locked • Click to Unlock</span>
-                  <span style={styles.lockBadgeActive}>404 ACTIVE</span>
+                  <Unlock size={15} />
+                  <span>Unlock System</span>
                 </>
               ) : (
                 <>
-                  <Lock size={17} />
+                  <Lock size={15} />
                   <span>Lock System</span>
                 </>
               )}
             </button>
           )}
+          <QuickActionMenu />
         </div>
       </div>
 
-      {/* Sub Tabs Selection (Scrollable on iOS & Mobile) */}
-      <div className="tab-scroll-container" style={{
-        display: 'flex',
-        gap: '0.5rem',
-        overflowX: 'auto',
-        whiteSpace: 'nowrap',
-        WebkitOverflowScrolling: 'touch',
-        paddingBottom: '8px',
-        maxWidth: '100%',
-        scrollbarWidth: 'thin',
-        flexWrap: 'nowrap',
-        minHeight: '48px',
-        alignItems: 'center'
-      }}>
+      {/* ── TIER 2: SUB-SCREENS BUTTONS ── */}
+      <div className="glass-subtabs-bar" style={{ marginTop: '0.75rem' }}>
         <button
+          type="button"
           onClick={() => { setActiveSubTab('users'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'users' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          className={`glass-subtab-btn ${activeSubTab === 'users' ? 'active' : ''}`}
         >
-          <User size={16} /> User Accounts
+          <User size={15} /> <span>User Accounts</span>
         </button>
         <button
+          type="button"
           onClick={() => { setActiveSubTab('approvals'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'approvals' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', position: 'relative', flexShrink: 0, whiteSpace: 'nowrap' }}
+          className={`glass-subtab-btn ${activeSubTab === 'approvals' ? 'active' : ''}`}
         >
-          <ShieldAlert size={16} /> Review & Approvals
+          <ShieldAlert size={15} /> <span>Review & Approvals</span>
           {pendingApprovalsCount > 0 && (
             <span style={{
-              background: '#2563eb',
-              color: '#ffffff',
+              background: '#38bdf8',
+              color: '#0f172a',
               fontSize: '0.68rem',
               fontWeight: 900,
-              padding: '1px 7px',
-              borderRadius: '10px',
-              marginLeft: '4px',
-              boxShadow: '0 1px 3px rgba(37,99,235,0.3)'
+              padding: '1px 6px',
+              borderRadius: '8px',
+              marginLeft: '4px'
             }}>
               {pendingApprovalsCount}
             </span>
           )}
         </button>
         <button
+          type="button"
           onClick={() => { setActiveSubTab('dataReview'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'dataReview' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          className={`glass-subtab-btn ${activeSubTab === 'dataReview' ? 'active' : ''}`}
         >
-          <FileText size={16} /> Data Entry Review
+          <FileText size={15} /> <span>Data Entry Review</span>
         </button>
         <button
+          type="button"
           onClick={() => { setActiveSubTab('clients'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'clients' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          className={`glass-subtab-btn ${activeSubTab === 'clients' ? 'active' : ''}`}
         >
-          <Users size={16} /> Client Details
+          <Users size={15} /> <span>Client Details</span>
         </button>
         <button
+          type="button"
           onClick={() => { setActiveSubTab('settings'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'settings' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          className={`glass-subtab-btn ${activeSubTab === 'settings' ? 'active' : ''}`}
         >
-          <Settings size={16} /> Expense Settings
+          <Settings size={15} /> <span>Expense Settings</span>
         </button>
         {(isMasterAdmin || isMainAdmin) && (
           <button
+            type="button"
             onClick={() => { setActiveSubTab('billing'); setError(''); setSuccess(''); }}
-            className={activeSubTab === 'billing' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+            className={`glass-subtab-btn ${activeSubTab === 'billing' ? 'active' : ''}`}
           >
-            <CreditCard size={16} /> Infrastructure Billing
+            <CreditCard size={15} /> <span>Infrastructure Billing</span>
           </button>
         )}
         {(isMasterAdmin || isMainAdmin) && (
           <button
+            type="button"
             onClick={() => { setActiveSubTab('backup'); setError(''); setSuccess(''); }}
-            className={activeSubTab === 'backup' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+            className={`glass-subtab-btn ${activeSubTab === 'backup' ? 'active' : ''}`}
           >
-            <Database size={16} /> Data Backup
+            <Database size={15} /> <span>Data Backup</span>
           </button>
         )}
         <button
+          type="button"
           onClick={() => { setActiveSubTab('signedDocs'); setError(''); setSuccess(''); }}
-          className={activeSubTab === 'signedDocs' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+          className={`glass-subtab-btn ${activeSubTab === 'signedDocs' ? 'active' : ''}`}
         >
-          <FileCheck size={16} /> Signed Documents Approval
+          <FileCheck size={15} /> <span>Signed Documents</span>
         </button>
+        {isMasterAdmin && (
+          <button
+            type="button"
+            onClick={() => { setActiveSubTab('controlCenter'); setError(''); setSuccess(''); }}
+            className={`glass-subtab-btn ${activeSubTab === 'controlCenter' ? 'active' : ''}`}
+          >
+            <Sliders size={15} /> <span>Control Center</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+      <div className="glass-scroll-track" style={{ marginTop: '0.85rem' }}>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Registered Users</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{users.length || 0}</span>
+          <span className="glass-calc-sub">Active ERP staff</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Pending Approvals</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{pendingApprovalsCount || 0}</span>
+          <span className="glass-calc-sub">Authorization requests</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Selected Company</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8', fontSize: '1.15rem' }}>{selectedCompany}</span>
+          <span className="glass-calc-sub">Active scope</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">System Status</span>
+          <span className="glass-calc-value" style={{ color: isSystemLocked ? '#f87171' : '#34d399', fontSize: '1.1rem' }}>
+            {isSystemLocked ? 'LOCKED (404)' : 'OPERATIONAL'}
+          </span>
+          <span className="glass-calc-sub">Security policy</span>
+        </div>
       </div>
 
       {error && <div style={styles.errorBox}>{error}</div>}
@@ -1600,64 +1599,27 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
       {activeSubTab === 'users' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Summary Metric Cards Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem', borderLeft: '4px solid #2563eb' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <User size={20} color="#2563eb" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Registered Accounts</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{users.length} Users</div>
-              </div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem', borderLeft: '4px solid #dc2626' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldAlert size={20} color="#dc2626" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Administrator Roles</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#dc2626', marginTop: 2 }}>
-                  {users.filter(u => u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length)).length} Admins
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem', borderLeft: '4px solid #16a34a' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <UserPlus size={20} color="#16a34a" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Standard Accounts</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', marginTop: 2 }}>
-                  {users.filter(u => u.role !== 'admin' && (u.permissions?.length !== AVAILABLE_SCREENS.length)).length} Standard Users
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* 100% Full-Width Users Table Panel */}
           <div className="glass-panel" style={{ ...styles.tablePanel, width: '100%', padding: '1.25rem' }}>
             {/* Header with Title, Stats Badges, and Add Button */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border-light)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{
                   width: 38,
                   height: 38,
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                  border: '1px solid #bfdbfe',
+                  background: 'rgba(59, 130, 246, 0.18)',
+                  border: '1px solid rgba(59, 130, 246, 0.38)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.08)'
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
                 }}>
-                  <Users size={20} color="#2563eb" />
+                  <Users size={20} color="#60a5fa" />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                       Active User Accounts
                     </h3>
                     <span style={{
@@ -1665,15 +1627,15 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       fontWeight: 800,
                       padding: '0.15rem 0.6rem',
                       borderRadius: '999px',
-                      background: '#eff6ff',
-                      color: '#1d4ed8',
-                      border: '1px solid #bfdbfe'
+                      background: 'rgba(59, 130, 246, 0.18)',
+                      color: '#93c5fd',
+                      border: '1px solid rgba(59, 130, 246, 0.35)'
                     }}>
                       {filteredUsers.length}{filteredUsers.length !== users.length ? ` of ${users.length}` : ''}
                     </span>
-                    {loading && <RotateCw size={14} className="spin-loader" style={{ color: '#64748b' }} />}
+                    {loading && <RotateCw size={14} className="spin-loader" style={{ color: '#94a3b8' }} />}
                   </div>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                     Manage access credentials, company entity assignments, and operational permissions
                   </p>
                 </div>
@@ -1681,14 +1643,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {/* Active / Inactive quick count badges */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '0.25rem 0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem', fontWeight: 700 }}>
-                  <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(15, 23, 42, 0.65)', padding: '0.3rem 0.65rem', borderRadius: '8px', border: '1px solid var(--border-light)', fontSize: '0.75rem', fontWeight: 700 }}>
+                  <span style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     ● {users.filter(u => u.status !== 'Inactive').length} Active
                   </span>
                   {users.filter(u => u.status === 'Inactive').length > 0 && (
                     <>
-                      <span style={{ color: '#cbd5e1' }}>|</span>
-                      <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ color: 'rgba(148, 163, 184, 0.4)' }}>|</span>
+                      <span style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         ● {users.filter(u => u.status === 'Inactive').length} Inactive
                       </span>
                     </>
@@ -1707,7 +1669,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     gap: '0.45rem',
                     borderRadius: '8px',
                     fontWeight: 700,
-                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
                     background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     cursor: 'pointer'
                   }}
@@ -1725,14 +1687,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
               gap: '0.6rem',
               marginTop: '0.85rem',
               padding: isMobile ? '0.55rem 0.65rem' : '0.65rem 0.85rem',
-              background: '#f8fafc',
+              background: 'rgba(15, 23, 42, 0.55)',
               borderRadius: '10px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--border-light)',
               flexWrap: 'wrap'
             }}>
               {/* Search input container */}
               <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1 1 240px', minWidth: isMobile ? '100%' : '220px' }}>
-                <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input
                   type="text"
                   placeholder="Search by name, email, department, or role..."
@@ -1741,13 +1703,12 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   style={{
                     width: '100%',
                     padding: '0.55rem 1.8rem 0.55rem 2.2rem',
-                    fontSize: '16px',
-                    minHeight: '44px',
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    color: '#0f172a',
-                    borderRadius: '7px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    fontSize: '14px',
+                    minHeight: '42px',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid var(--border-color)',
+                    color: '#f8fafc',
+                    borderRadius: '8px',
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -1784,18 +1745,16 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   style={{
                     width: '100%',
                     padding: '0.55rem 0.75rem',
-                    fontSize: '16px',
-                    minHeight: '44px',
-                    borderRadius: '7px',
-                    border: selectedCompanyFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
-                    background: selectedCompanyFilter !== 'All' ? '#eff6ff' : '#ffffff',
-                    color: selectedCompanyFilter !== 'All' ? '#1d4ed8' : '#0f172a',
-                    fontWeight: 700,
+                    fontSize: '14px',
+                    minHeight: '42px',
+                    borderRadius: '8px',
+                    border: selectedCompanyFilter !== 'All' ? '1px solid rgba(59, 130, 246, 0.6)' : '1px solid var(--border-color)',
+                    background: selectedCompanyFilter !== 'All' ? 'rgba(37, 99, 235, 0.18)' : 'rgba(15, 23, 42, 0.85)',
+                    color: selectedCompanyFilter !== 'All' ? '#93c5fd' : '#f8fafc',
+                    fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
-                    outline: 'none',
-                    WebkitAppearance: 'none'
+                    outline: 'none'
                   }}
                 >
                   <option value="All">🌐 All Companies ({users.length})</option>
@@ -1818,18 +1777,16 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   style={{
                     width: '100%',
                     padding: '0.55rem 0.75rem',
-                    fontSize: '16px',
-                    minHeight: '44px',
-                    borderRadius: '7px',
-                    border: selectedDeptFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
-                    background: selectedDeptFilter !== 'All' ? '#eff6ff' : '#ffffff',
-                    color: selectedDeptFilter !== 'All' ? '#1d4ed8' : '#0f172a',
-                    fontWeight: 700,
+                    fontSize: '14px',
+                    minHeight: '42px',
+                    borderRadius: '8px',
+                    border: selectedDeptFilter !== 'All' ? '1px solid rgba(59, 130, 246, 0.6)' : '1px solid var(--border-color)',
+                    background: selectedDeptFilter !== 'All' ? 'rgba(37, 99, 235, 0.18)' : 'rgba(15, 23, 42, 0.85)',
+                    color: selectedDeptFilter !== 'All' ? '#93c5fd' : '#f8fafc',
+                    fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
-                    outline: 'none',
-                    WebkitAppearance: 'none'
+                    outline: 'none'
                   }}
                 >
                   <option value="All">🏷️ All Departments</option>
@@ -1847,18 +1804,16 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   style={{
                     width: '100%',
                     padding: '0.55rem 0.75rem',
-                    fontSize: '16px',
-                    minHeight: '44px',
-                    borderRadius: '7px',
-                    border: selectedStatusFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
-                    background: selectedStatusFilter !== 'All' ? '#eff6ff' : '#ffffff',
-                    color: selectedStatusFilter !== 'All' ? '#1d4ed8' : '#0f172a',
-                    fontWeight: 700,
+                    fontSize: '14px',
+                    minHeight: '42px',
+                    borderRadius: '8px',
+                    border: selectedStatusFilter !== 'All' ? '1px solid rgba(59, 130, 246, 0.6)' : '1px solid var(--border-color)',
+                    background: selectedStatusFilter !== 'All' ? 'rgba(37, 99, 235, 0.18)' : 'rgba(15, 23, 42, 0.85)',
+                    color: selectedStatusFilter !== 'All' ? '#93c5fd' : '#f8fafc',
+                    fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
-                    outline: 'none',
-                    WebkitAppearance: 'none'
+                    outline: 'none'
                   }}
                 >
                   <option value="All">⚡ All Statuses</option>
@@ -1881,15 +1836,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     padding: '0.48rem 0.75rem',
                     fontSize: '0.78rem',
                     fontWeight: 700,
-                    color: '#dc2626',
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '7px',
+                    color: '#fca5a5',
+                    background: 'rgba(239, 68, 68, 0.16)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: '8px',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
-                    boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)',
                     width: isMobile ? '100%' : 'auto',
                     justifyContent: 'center'
                   }}
@@ -1915,8 +1869,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
               ) : filteredUsers.length === 0 ? (
                 <div style={{ ...styles.emptyState, padding: '3rem 1rem' }}>
                   <FilterX size={32} color="#94a3b8" />
-                  <h4 style={{ margin: '0.6rem 0 0.2rem 0', color: '#1e293b' }}>No Matching Accounts Found</h4>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                  <h4 style={{ margin: '0.6rem 0 0.2rem 0', color: 'var(--text-primary)' }}>No Matching Accounts Found</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     No users match your search query or selected filter criteria.
                   </p>
                   <button
@@ -1958,15 +1912,15 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         const isInactive = u.status === 'Inactive';
 
                         return (
-                          <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? '#eff6ff' : isInactive ? '#fff1f2' : 'transparent', transition: 'background 0.15s', opacity: isInactive ? 0.75 : 1 }}>
+                          <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? 'rgba(37, 99, 235, 0.14)' : isInactive ? 'rgba(239, 68, 68, 0.08)' : 'transparent', transition: 'background 0.15s', opacity: isInactive ? 0.78 : 1 }}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                                 <div style={styles.avatar(checkAdmin)}>
                                   {u.name ? u.name[0].toUpperCase() : 'U'}
                                 </div>
                                 <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    <span style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.88rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: '700', color: '#f8fafc', fontSize: '0.88rem' }}>
                                       {u.name} {isMain && <span title="Super Master Admin">👑</span>}
                                     </span>
                                     <span style={{
@@ -1974,30 +1928,30 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                       fontWeight: 800,
                                       padding: '1px 6px',
                                       borderRadius: '4px',
-                                      background: isInactive ? '#fee2e2' : '#dcfce7',
-                                      color: isInactive ? '#991b1b' : '#166534',
-                                      border: `1px solid ${isInactive ? '#fca5a5' : '#86efac'}`
+                                      background: isInactive ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.18)',
+                                      color: isInactive ? '#fca5a5' : '#6ee7b7',
+                                      border: `1px solid ${isInactive ? 'rgba(239, 68, 68, 0.38)' : 'rgba(16, 185, 129, 0.38)'}`
                                     }}>
-                                      {isInactive ? '🔴 INACTIVE' : '🟢 ACTIVE'}
+                                      {isInactive ? 'INACTIVE' : 'ACTIVE'}
                                     </span>
                                   </div>
                                   {isCurrentlyEditing && (
-                                    <span style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 800, display: 'block' }}>[Editing Now]</span>
+                                    <span style={{ fontSize: '0.68rem', color: '#60a5fa', fontWeight: 800, display: 'block' }}>[Editing Now]</span>
                                   )}
                                 </div>
                               </div>
                             </td>
                             <td>
-                              <div style={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>{u.email}</div>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+                              <div style={{ color: '#cbd5e1', fontWeight: 600, fontSize: '0.82rem' }}>{u.email}</div>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
                                 <span style={{
                                   fontSize: '0.68rem',
                                   fontWeight: 700,
-                                  color: '#475569',
-                                  background: '#f1f5f9',
+                                  color: '#cbd5e1',
+                                  background: 'rgba(148, 163, 184, 0.14)',
                                   padding: '1px 6px',
                                   borderRadius: '4px',
-                                  border: '1px solid #cbd5e1'
+                                  border: '1px solid rgba(148, 163, 184, 0.25)'
                                 }}>
                                   📁 {u.department || 'General'}
                                 </span>
@@ -2005,11 +1959,11 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                   <span style={{
                                     fontSize: '0.68rem',
                                     fontWeight: 700,
-                                    color: '#1d4ed8',
-                                    background: '#eff6ff',
+                                    color: '#93c5fd',
+                                    background: 'rgba(59, 130, 246, 0.16)',
                                     padding: '1px 6px',
                                     borderRadius: '4px',
-                                    border: '1px solid #bfdbfe'
+                                    border: '1px solid rgba(59, 130, 246, 0.35)'
                                   }}>
                                     🎨 {u.designerName}
                                   </span>
@@ -2023,9 +1977,9 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 padding: '3px 9px',
                                 borderRadius: '6px',
                                 textTransform: 'uppercase',
-                                background: isMain ? '#fef3c7' : checkAdmin ? '#fee2e2' : '#dbeafe',
-                                color: isMain ? '#92400e' : checkAdmin ? '#dc2626' : '#1d4ed8',
-                                border: `1px solid ${isMain ? '#fcd34d' : checkAdmin ? '#fca5a5' : '#93c5fd'}`
+                                background: isMain ? 'rgba(245, 158, 11, 0.18)' : checkAdmin ? 'rgba(239, 68, 68, 0.18)' : 'rgba(59, 130, 246, 0.18)',
+                                color: isMain ? '#fcd34d' : checkAdmin ? '#fca5a5' : '#93c5fd',
+                                border: `1px solid ${isMain ? 'rgba(245, 158, 11, 0.4)' : checkAdmin ? 'rgba(239, 68, 68, 0.38)' : 'rgba(59, 130, 246, 0.38)'}`
                               }}>
                                 {isMain ? '👑 MAIN ADMIN' : checkAdmin ? '🛡️ COMPANY ADMIN' : '👤 USER'}
                               </span>
@@ -2033,11 +1987,11 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             <td>
                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {isMain ? (
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#047857', background: '#d1fae5', padding: '2px 7px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#6ee7b7', background: 'rgba(16, 185, 129, 0.16)', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
                                     🌐 ALL COMPANIES (MASTER)
                                   </span>
                                 ) : userCompanies.map(c => (
-                                  <span key={c} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#334155', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                  <span key={c} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#cbd5e1', background: 'rgba(148, 163, 184, 0.14)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(148, 163, 184, 0.25)' }}>
                                     {c}
                                   </span>
                                 ))}
@@ -2045,19 +1999,19 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                                <span title="Task Assignment Rights" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canManageTasks !== false) ? '#eff6ff' : '#f1f5f9', color: (u.canManageTasks !== false) ? '#2563eb' : '#94a3b8', border: '1px solid #cbd5e1' }}>
+                                <span title="Task Assignment Rights" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canManageTasks !== false) ? 'rgba(59, 130, 246, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canManageTasks !== false) ? '#93c5fd' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
                                   📋 Tasks: {(u.canManageTasks !== false) ? 'YES' : 'NO'}
                                 </span>
-                                <span title="Chat Announcement Broadcasting" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canBroadcastChat !== false) ? '#f0fdf4' : '#f1f5f9', color: (u.canBroadcastChat !== false) ? '#16a34a' : '#94a3b8', border: '1px solid #cbd5e1' }}>
+                                <span title="Chat Announcement Broadcasting" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canBroadcastChat !== false) ? 'rgba(16, 185, 129, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canBroadcastChat !== false) ? '#6ee7b7' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
                                   💬 Chat: {(u.canBroadcastChat !== false) ? 'YES' : 'NO'}
                                 </span>
-                                <span title="Export Excel/PDF" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canExportReports !== false) ? '#faf5ff' : '#f1f5f9', color: (u.canExportReports !== false) ? '#9333ea' : '#94a3b8', border: '1px solid #cbd5e1' }}>
+                                <span title="Export Excel/PDF" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canExportReports !== false) ? 'rgba(168, 85, 247, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canExportReports !== false) ? '#d8b4fe' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
                                   📥 Export: {(u.canExportReports !== false) ? 'YES' : 'NO'}
                                 </span>
-                                <span title="Edit/Delete Master Records" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canDeleteRecords !== false) ? '#fff7ed' : '#f1f5f9', color: (u.canDeleteRecords !== false) ? '#ea580c' : '#94a3b8', border: '1px solid #cbd5e1' }}>
+                                <span title="Edit/Delete Master Records" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canDeleteRecords !== false) ? 'rgba(249, 115, 22, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canDeleteRecords !== false) ? '#fdba74' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
                                   ✏️ Edit/Del: {(u.canDeleteRecords !== false) ? 'YES' : 'NO'}
                                 </span>
-                                <span title="View Purchase Rates & Financial Margins" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canViewFinancials !== false) ? '#fefce8' : '#f1f5f9', color: (u.canViewFinancials !== false) ? '#ca8a04' : '#94a3b8', border: '1px solid #cbd5e1' }}>
+                                <span title="View Purchase Rates & Financial Margins" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canViewFinancials !== false) ? 'rgba(234, 179, 8, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canViewFinancials !== false) ? '#fde047' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
                                   💰 Price: {(u.canViewFinancials !== false) ? 'YES' : 'NO'}
                                 </span>
                               </div>
@@ -2086,9 +2040,9 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                   onClick={() => handleEditClick(u)}
                                   style={{
                                     padding: '0.4rem 0.75rem',
-                                    background: '#eff6ff',
-                                    border: '1px solid #bfdbfe',
-                                    color: '#2563eb',
+                                    background: 'rgba(59, 130, 246, 0.18)',
+                                    border: '1px solid rgba(59, 130, 246, 0.38)',
+                                    color: '#93c5fd',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
                                     fontSize: '0.8rem',
@@ -2111,14 +2065,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                     }}
                                     style={{
                                       padding: '0.4rem 0.5rem',
-                                      background: activeActionMenuUserId === u.id ? '#f1f5f9' : '#ffffff',
-                                      border: '1px solid #e2e8f0',
+                                      background: activeActionMenuUserId === u.id ? 'rgba(148, 163, 184, 0.22)' : 'rgba(15, 23, 42, 0.65)',
+                                      border: '1px solid var(--border-color)',
                                       borderRadius: '6px',
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      color: '#64748b'
+                                      color: '#cbd5e1'
                                     }}
                                     title="More Actions"
                                     aria-label="More user actions"
@@ -2133,10 +2087,11 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                         right: 0,
                                         top: '100%',
                                         marginTop: '4px',
-                                        background: '#ffffff',
-                                        border: '1px solid #e2e8f0',
+                                        background: 'rgba(15, 23, 42, 0.96)',
+                                        backdropFilter: 'blur(16px)',
+                                        border: '1px solid var(--border-color)',
                                         borderRadius: '8px',
-                                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                                        boxShadow: '0 12px 28px -5px rgba(0,0,0,0.45)',
                                         zIndex: 100,
                                         minWidth: '150px',
                                         padding: '4px',
@@ -2155,7 +2110,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                           background: 'transparent',
                                           border: 'none',
                                           borderRadius: '6px',
-                                          color: '#dc2626',
+                                          color: '#f87171',
                                           display: 'flex',
                                           alignItems: 'center',
                                           gap: '8px',
@@ -2164,10 +2119,10 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                           cursor: 'pointer',
                                           textAlign: 'left'
                                         }}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)'}
                                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                                       >
-                                        <Trash2 size={13} color="#dc2626" />
+                                        <Trash2 size={13} color="#f87171" />
                                         <span>Delete User</span>
                                       </button>
                                     </div>
@@ -2203,14 +2158,17 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
               animation: 'fadeIn 0.2s ease-out'
             }}>
               <div style={{
-                background: '#ffffff',
+                background: 'rgba(15, 23, 42, 0.96)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                color: '#f8fafc',
                 width: '100%',
                 maxWidth: isMobile ? '100%' : '860px',
                 height: isMobile ? '100dvh' : 'auto',
                 maxHeight: isMobile ? '100dvh' : '90vh',
                 borderRadius: isMobile ? 0 : '16px',
-                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
-                border: isMobile ? 'none' : '1px solid #cbd5e1',
+                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.65)',
+                border: isMobile ? 'none' : '1px solid rgba(148, 163, 184, 0.24)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden'
@@ -2220,8 +2178,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   padding: isMobile
                     ? 'calc(0.75rem + env(safe-area-inset-top, 0px)) 1rem 0.75rem 1rem'
                     : '1.2rem 1.6rem',
-                  background: 'linear-gradient(to bottom, #f8fafc, #ffffff)',
-                  borderBottom: '1px solid #e2e8f0',
+                  background: 'rgba(30, 41, 59, 0.72)',
+                  borderBottom: '1px solid var(--border-light)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -2237,7 +2195,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
                       color: '#ffffff',
                       flexShrink: 0
                     }}>
@@ -2245,7 +2203,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <h3 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                        <h3 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color: '#f8fafc' }}>
                           {editingUser ? `Edit: ${editingUser.name}` : 'Create User Account'}
                         </h3>
                         {editingUser && (
@@ -2254,15 +2212,15 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             fontWeight: 800,
                             padding: '0.15rem 0.5rem',
                             borderRadius: '999px',
-                            background: formData.status === 'Inactive' ? '#fee2e2' : '#dcfce7',
-                            color: formData.status === 'Inactive' ? '#b91c1c' : '#15803d',
-                            border: `1px solid ${formData.status === 'Inactive' ? '#fca5a5' : '#86efac'}`
+                            background: formData.status === 'Inactive' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                            color: formData.status === 'Inactive' ? '#fca5a5' : '#6ee7b7',
+                            border: `1px solid ${formData.status === 'Inactive' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
                           }}>
                             {formData.status || 'Active'}
                           </span>
                         )}
                       </div>
-                      <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
                         {editingUser
                           ? 'Modify role, company access boundaries, and operational permissions.'
                           : 'Configure credentials, entity rights, and role permissions.'}
@@ -2274,15 +2232,15 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     type="button"
                     onClick={handleCancelEdit}
                     style={{
-                      background: '#f1f5f9',
-                      border: '1px solid #e2e8f0',
+                      background: 'rgba(148, 163, 184, 0.14)',
+                      border: '1px solid rgba(148, 163, 184, 0.24)',
                       borderRadius: '50%',
                       width: 36,
                       height: 36,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#475569',
+                      color: '#cbd5e1',
                       cursor: 'pointer',
                       flexShrink: 0,
                       transition: 'all 0.15s'
@@ -2296,8 +2254,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                 {/* Segmented Navigation Tab Switcher (Scrollable horizontally on iOS) */}
                 <div style={{
                   display: 'flex',
-                  borderBottom: '1px solid #e2e8f0',
-                  background: '#f8fafc',
+                  borderBottom: '1px solid var(--border-light)',
+                  background: 'rgba(15, 23, 42, 0.65)',
                   padding: '0 0.5rem',
                   gap: '0.35rem',
                   overflowX: 'auto',
@@ -2313,8 +2271,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       padding: '0.8rem 1.1rem',
                       border: 'none',
                       background: 'none',
-                      borderBottom: modalTab === 'profile' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                      color: modalTab === 'profile' ? '#1d4ed8' : '#64748b',
+                      borderBottom: modalTab === 'profile' ? '2.5px solid #3b82f6' : '2.5px solid transparent',
+                      color: modalTab === 'profile' ? '#93c5fd' : '#94a3b8',
                       fontWeight: modalTab === 'profile' ? 800 : 600,
                       fontSize: '0.85rem',
                       display: 'inline-flex',
@@ -2335,8 +2293,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       padding: '0.8rem 1.1rem',
                       border: 'none',
                       background: 'none',
-                      borderBottom: modalTab === 'privileges' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                      color: modalTab === 'privileges' ? '#1d4ed8' : '#64748b',
+                      borderBottom: modalTab === 'privileges' ? '2.5px solid #3b82f6' : '2.5px solid transparent',
+                      color: modalTab === 'privileges' ? '#93c5fd' : '#94a3b8',
                       fontWeight: modalTab === 'privileges' ? 800 : 600,
                       fontSize: '0.85rem',
                       display: 'inline-flex',
@@ -2352,8 +2310,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       fontSize: '0.7rem',
                       padding: '0.1rem 0.5rem',
                       borderRadius: 999,
-                      background: modalTab === 'privileges' ? '#bfdbfe' : '#e2e8f0',
-                      color: modalTab === 'privileges' ? '#1e40af' : '#475569',
+                      background: modalTab === 'privileges' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(148, 163, 184, 0.15)',
+                      color: modalTab === 'privileges' ? '#93c5fd' : '#94a3b8',
                       fontWeight: 800
                     }}>
                       {activePrivilegesCount} / {PRIVILEGE_KEYS.length}
@@ -2367,8 +2325,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       padding: isMobile ? '0.65rem 0.85rem' : '0.8rem 1.1rem',
                       border: 'none',
                       background: 'none',
-                      borderBottom: modalTab === 'screens' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                      color: modalTab === 'screens' ? '#1d4ed8' : '#64748b',
+                      borderBottom: modalTab === 'screens' ? '2.5px solid #3b82f6' : '2.5px solid transparent',
+                      color: modalTab === 'screens' ? '#93c5fd' : '#94a3b8',
                       fontWeight: modalTab === 'screens' ? 800 : 600,
                       fontSize: '0.85rem',
                       display: 'inline-flex',
@@ -2386,8 +2344,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       fontSize: '0.7rem',
                       padding: '0.1rem 0.5rem',
                       borderRadius: 999,
-                      background: modalTab === 'screens' ? '#bfdbfe' : '#e2e8f0',
-                      color: modalTab === 'screens' ? '#1e40af' : '#475569',
+                      background: modalTab === 'screens' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(148, 163, 184, 0.15)',
+                      color: modalTab === 'screens' ? '#93c5fd' : '#94a3b8',
                       fontWeight: 800
                     }}>
                       {formData.permissions?.length || 0} / {AVAILABLE_SCREENS.length}
@@ -2411,9 +2369,9 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     {modalError && (
                       <div
                         style={{
-                          background: '#fef2f2',
-                          color: '#b91c1c',
-                          border: '1px solid #fecaca',
+                          background: 'rgba(239, 68, 68, 0.16)',
+                          color: '#fca5a5',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
                           padding: '0.75rem 1rem',
                           borderRadius: '8px',
                           fontSize: '0.85rem',
@@ -2435,32 +2393,32 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         {/* ⚡ 1-Click Role Permission Presets Bar */}
                         <div style={{
-                          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+                          background: 'rgba(37, 99, 235, 0.1)',
                           padding: '0.85rem 1rem',
                           borderRadius: '12px',
-                          border: '1px solid #bfdbfe'
+                          border: '1px solid rgba(59, 130, 246, 0.3)'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Sparkles size={15} color="#2563eb" />
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              <Sparkles size={15} color="#60a5fa" />
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                 Quick 1-Click Role Presets
                               </span>
                             </div>
-                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                               Auto-populates role, department, company access & screens
                             </span>
                           </div>
 
                           <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                             {[
-                              { key: 'full_admin', label: '⚡ Full Admin', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-                              { key: 'executive', label: '👔 Executive', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
-                              { key: 'production_manager', label: '🏭 Production Manager', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
-                              { key: 'stitching_master', label: '✂️ Stitching Master', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
-                              { key: 'ecommerce_manager', label: '🏪 E-Commerce Manager', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
-                              { key: 'billing_clerk', label: '💰 Billing Clerk', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
-                              { key: 'store_keeper', label: '📦 Store Keeper', color: '#334155', bg: '#ffffff', border: '#cbd5e1' }
+                              { key: 'full_admin', label: '⚡ Full Admin', color: '#93c5fd', bg: 'rgba(59, 130, 246, 0.22)', border: 'rgba(59, 130, 246, 0.45)' },
+                              { key: 'executive', label: '👔 Executive', color: '#e2e8f0', bg: 'rgba(30, 41, 59, 0.85)', border: 'rgba(148, 163, 184, 0.28)' },
+                              { key: 'production_manager', label: '🏭 Production Manager', color: '#e2e8f0', bg: 'rgba(30, 41, 59, 0.85)', border: 'rgba(148, 163, 184, 0.28)' },
+                              { key: 'stitching_master', label: '✂️ Stitching Master', color: '#e2e8f0', bg: 'rgba(30, 41, 59, 0.85)', border: 'rgba(148, 163, 184, 0.28)' },
+                              { key: 'ecommerce_manager', label: '🏪 E-Commerce Manager', color: '#e2e8f0', bg: 'rgba(30, 41, 59, 0.85)', border: 'rgba(148, 163, 184, 0.28)' },
+                              { key: 'billing_clerk', label: '💰 Billing Clerk', color: '#e2e8f0', bg: 'rgba(30, 41, 59, 0.85)', border: 'rgba(148, 163, 184, 0.28)' },
+                              { key: 'store_keeper', label: '📦 Store Keeper', color: '#e2e8f0', bg: 'rgba(30, 41, 59, 0.85)', border: 'rgba(148, 163, 184, 0.28)' }
                             ].map(p => (
                               <button
                                 key={p.key}
@@ -2475,7 +2433,6 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                   background: p.bg,
                                   color: p.color,
                                   cursor: 'pointer',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                                   transition: 'all 0.15s'
                                 }}
                               >
@@ -2633,17 +2590,17 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
                         {/* Allocated Companies Section */}
                         <div style={{
-                          background: '#f8fafc',
+                          background: 'rgba(30, 41, 59, 0.55)',
                           padding: '1rem',
                           borderRadius: '12px',
-                          border: '1px solid #cbd5e1'
+                          border: '1px solid var(--border-color)'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                 🏢 Authorized Company Entities
                               </div>
-                              <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                              <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: '2px 0 0 0' }}>
                                 Select which business entities this account can access and switch between in the top bar.
                               </p>
                             </div>
@@ -2686,14 +2643,13 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                     gap: '0.6rem',
                                     padding: '0.6rem 0.8rem',
                                     borderRadius: '8px',
-                                    border: `1.5px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`,
-                                    background: isChecked ? '#eff6ff' : '#ffffff',
+                                    border: `1.5px solid ${isChecked ? 'rgba(59, 130, 246, 0.7)' : 'var(--border-color)'}`,
+                                    background: isChecked ? 'rgba(37, 99, 235, 0.2)' : 'rgba(15, 23, 42, 0.65)',
                                     cursor: formData.isMainAdmin ? 'not-allowed' : 'pointer',
                                     fontSize: '0.82rem',
                                     fontWeight: isChecked ? 700 : 500,
-                                    color: isChecked ? '#1d4ed8' : '#334155',
-                                    transition: 'all 0.15s',
-                                    boxShadow: isChecked ? '0 2px 4px rgba(37,99,235,0.08)' : 'none'
+                                    color: isChecked ? '#93c5fd' : '#e2e8f0',
+                                    transition: 'all 0.15s'
                                   }}
                                 >
                                   <input
@@ -2751,16 +2707,16 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                           justifyContent: 'space-between',
                           flexWrap: 'wrap',
                           gap: '0.6rem',
-                          background: '#f8fafc',
+                          background: 'rgba(30, 41, 59, 0.55)',
                           padding: '0.85rem 1rem',
                           borderRadius: '10px',
-                          border: '1px solid #cbd5e1'
+                          border: '1px solid var(--border-color)'
                         }}>
                           <div>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               ⚙️ Granular Operational & Micro-Level Privileges
                             </div>
-                            <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                            <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: '2px 0 0 0' }}>
                               Configure functional capabilities (Create, Edit, Delete, Stage Advances, Costing & Margins) per user.
                             </p>
                           </div>
@@ -2777,7 +2733,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 canCreateStitchingJobs: true, canIssueStitchingChallans: true, canManageWorkerRates: true
                               }))}
                               className="btn-secondary"
-                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', borderColor: '#bfdbfe' }}
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#93c5fd', background: 'rgba(59, 130, 246, 0.18)', borderColor: 'rgba(59, 130, 246, 0.4)' }}
                             >
                               Enable All
                             </button>
@@ -2793,7 +2749,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 canCreateStitchingJobs: false, canIssueStitchingChallans: false, canManageWorkerRates: false
                               }))}
                               className="btn-secondary"
-                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca' }}
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#fca5a5', background: 'rgba(239, 68, 68, 0.16)', borderColor: 'rgba(239, 68, 68, 0.4)' }}
                             >
                               Disable All
                             </button>
@@ -2801,8 +2757,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         </div>
 
                         {/* Section 1: System & General */}
-                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#e2e8f0', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🌟 System & General Operations</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
@@ -2830,8 +2786,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         </div>
 
                         {/* Section 2: Job Cards & Digital Print */}
-                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#60a5fa', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>📦 Digital Printing & Job Cards</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
@@ -2859,8 +2815,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         </div>
 
                         {/* Section 3: Design Catalogue */}
-                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🎨 Design Catalogue & Assets</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
@@ -2888,8 +2844,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         </div>
 
                         {/* Section 4: Fabric Inventory */}
-                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#34d399', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🧵 Fabric Inventory & Stock Control</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
@@ -2917,8 +2873,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         </div>
 
                         {/* Section 5: Billing & Invoicing */}
-                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#7c3aed', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#c084fc', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🧾 Billing, Invoices & GST Accounts</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
@@ -2942,8 +2898,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         </div>
 
                         {/* Section 6: Stitching */}
-                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea580c', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fb923c', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>✂️ Garment Stitching Department</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
@@ -2976,16 +2932,16 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                           justifyContent: 'space-between',
                           flexWrap: 'wrap',
                           gap: '0.6rem',
-                          background: '#f8fafc',
+                          background: 'rgba(30, 41, 59, 0.55)',
                           padding: '0.85rem 1rem',
                           borderRadius: '10px',
-                          border: '1px solid #cbd5e1'
+                          border: '1px solid var(--border-color)'
                         }}>
                           <div>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               🖥️ Allowed Screen Modules & Navigation
                             </div>
-                            <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                            <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: '2px 0 0 0' }}>
                               Select which operational modules and screens this user is authorized to open in the interface.
                             </p>
                           </div>
@@ -2995,7 +2951,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 type="button"
                                 onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
                                 className="btn-secondary"
-                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', borderColor: '#bfdbfe' }}
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#93c5fd', background: 'rgba(59, 130, 246, 0.18)', borderColor: 'rgba(59, 130, 246, 0.4)' }}
                               >
                                 Select All
                               </button>
@@ -3003,7 +2959,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 type="button"
                                 onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
                                 className="btn-secondary"
-                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca' }}
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#fca5a5', background: 'rgba(239, 68, 68, 0.16)', borderColor: 'rgba(239, 68, 68, 0.4)' }}
                               >
                                 Clear All
                               </button>
@@ -3013,7 +2969,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
                         {/* Real-Time Permission Search Filter */}
                         <div style={{ position: 'relative' }}>
-                          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                           <input
                             type="text"
                             placeholder="Search screens & buttons (e.g. 'sample design', 'catalog', 'inward')..."
@@ -3023,13 +2979,13 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                               width: '100%',
                               padding: '0.55rem 2.2rem 0.55rem 2.4rem',
                               borderRadius: '8px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '16px',
-                              minHeight: '44px',
+                              border: '1px solid var(--border-color)',
+                              fontSize: '14px',
+                              minHeight: '42px',
                               boxSizing: 'border-box',
-                              background: '#ffffff',
-                              outline: 'none',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                              background: 'rgba(15, 23, 42, 0.85)',
+                              color: '#f8fafc',
+                              outline: 'none'
                             }}
                           />
                           {permissionSearchTerm && (
@@ -3068,7 +3024,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
                           if (categories.length === 0) {
                             return (
-                              <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                              <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', background: 'rgba(30, 41, 59, 0.45)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
                                 No screens found matching "{permissionSearchTerm}".
                               </div>
                             );
@@ -3088,9 +3044,9 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                              cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
 
                             return (
-                              <div key={cat} style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                              <div key={cat} style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                     {catTitle} ({catScreens.filter(s => formData.permissions.includes(s.id)).length} / {catScreens.length})
                                   </span>
                                   {formData.role !== 'admin' && (
@@ -3106,7 +3062,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                           return { ...prev, permissions: updated };
                                         });
                                       }}
-                                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
+                                      style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
                                     >
                                       {allChecked ? 'Deselect Category' : 'Select Category'}
                                     </button>
@@ -3122,9 +3078,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                         key={screen.id}
                                         style={{
                                           ...styles.checkboxLabel,
-                                          background: isChecked ? '#eff6ff' : isSample ? '#fffbeb' : '#ffffff',
-                                          borderColor: isChecked ? '#2563eb' : isSample ? '#f59e0b' : '#cbd5e1',
-                                          boxShadow: isChecked ? '0 1px 3px rgba(37,99,235,0.08)' : 'none',
+                                          background: isChecked ? 'rgba(37, 99, 235, 0.2)' : isSample ? 'rgba(245, 158, 11, 0.14)' : 'rgba(15, 23, 42, 0.65)',
+                                          borderColor: isChecked ? 'rgba(59, 130, 246, 0.65)' : isSample ? 'rgba(245, 158, 11, 0.5)' : 'var(--border-color)',
                                           ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
                                         }}
                                       >
@@ -3135,7 +3090,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                           onChange={() => handlePermissionCheckbox(screen.id)}
                                           style={styles.checkbox}
                                         />
-                                        <span style={{ fontSize: '0.82rem', fontWeight: isChecked || isSample ? 700 : 500, color: isChecked ? '#1d4ed8' : isSample ? '#92400e' : '#334155' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: isChecked || isSample ? 700 : 500, color: isChecked ? '#93c5fd' : isSample ? '#fcd34d' : '#cbd5e1' }}>
                                           {screen.label}
                                         </span>
                                       </label>
@@ -3155,8 +3110,8 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     padding: isMobile
                       ? '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px)) 1rem'
                       : '1.1rem 1.6rem',
-                    background: '#f8fafc',
-                    borderTop: '1px solid #e2e8f0',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    borderTop: '1px solid var(--border-light)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -3264,18 +3219,18 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
             {/* Card 1: Daily Automated Cron */}
             <div className="glass-panel" style={{ padding: '1.25rem', borderRadius: '12px', borderLeft: '4px solid #10b981', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Clock size={22} color="#059669" />
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(16, 185, 129, 0.18)', border: '1px solid rgba(16, 185, 129, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={22} color="#34d399" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Daily Backup Cron
                 </div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: 2, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc', marginTop: 2, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>12:00 AM Midnight IST</span>
-                  <span style={{ fontSize: '0.65rem', background: '#d1fae5', color: '#065f46', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>Active</span>
+                  <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>Active</span>
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>
                   Full MongoDB snapshot + all 900+ uploaded images (<code>uploads/</code>) with 30-day rolling local disk retention on EC2.
                 </div>
               </div>
@@ -3283,37 +3238,37 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
 
             {/* Card 2: Multi-Cloud Offsite Vault */}
             <div className="glass-panel" style={{ padding: '1.25rem', borderRadius: '12px', borderLeft: '4px solid #3b82f6', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Cloud size={22} color="#2563eb" />
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(59, 130, 246, 0.18)', border: '1px solid rgba(59, 130, 246, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Cloud size={22} color="#60a5fa" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Multi-Cloud Replication
                 </div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>
                   AWS S3 & Cloudflare R2
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
-                  DB &amp; images replicated to <code style={{ fontSize: '0.72rem', background: '#f1f5f9', padding: '1px 4px', borderRadius: '3px' }}>elite-edition-backups</code> (Mumbai) + S3 Glacier (&gt;90d).
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>
+                  DB &amp; images replicated to <code style={{ fontSize: '0.72rem', background: 'rgba(148, 163, 184, 0.16)', color: '#cbd5e1', padding: '1px 5px', borderRadius: '3px' }}>elite-edition-backups</code> (Mumbai) + S3 Glacier (&gt;90d).
                 </div>
               </div>
             </div>
 
             {/* Card 3: Automated Daily Email Delivery */}
             <div className="glass-panel" style={{ padding: '1.25rem', borderRadius: '12px', borderLeft: '4px solid #8b5cf6', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Mail size={22} color="#7c3aed" />
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(139, 92, 246, 0.18)', border: '1px solid rgba(139, 92, 246, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Mail size={22} color="#c084fc" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#5b21b6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#d8b4fe', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Auto Mail Daily at 12 Midnight
                 </div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    • <code style={{ fontSize: '0.76rem', color: '#4338ca' }}>parth6070@gmail.com</code>
+                    • <code style={{ fontSize: '0.76rem', color: '#c4b5fd' }}>parth6070@gmail.com</code>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    • <code style={{ fontSize: '0.76rem', color: '#4338ca' }}>harshtsidapara2468@gmail.com</code>
+                    • <code style={{ fontSize: '0.76rem', color: '#c4b5fd' }}>harshtsidapara2468@gmail.com</code>
                   </span>
                 </div>
                 <button
@@ -3501,31 +3456,31 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
                               }}
                             >
-                              <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#0f172a' }}>
+                              <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#f8fafc' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Calendar size={14} color="#64748b" />
+                                  <Calendar size={14} color="#94a3b8" />
                                   <span>{dateFormatted}</span>
                                 </div>
                               </td>
                               <td style={{ padding: '0.85rem 1rem' }}>
-                                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: '#f1f5f9', color: '#1e293b', padding: '3px 8px', borderRadius: '5px', fontWeight: 600 }}>
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(148, 163, 184, 0.14)', color: '#e2e8f0', border: '1px solid rgba(148, 163, 184, 0.25)', padding: '3px 8px', borderRadius: '5px', fontWeight: 600 }}>
                                   {backup.fileName}
                                 </span>
                               </td>
                               <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                                <span style={{ fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '3px 8px', borderRadius: '12px', fontSize: '0.78rem' }}>
+                                <span style={{ fontWeight: 700, color: '#38bdf8', background: 'rgba(14, 165, 233, 0.16)', border: '1px solid rgba(14, 165, 233, 0.35)', padding: '3px 8px', borderRadius: '12px', fontSize: '0.78rem' }}>
                                   {backup.sizeMB ? `${backup.sizeMB} MB` : `${(backup.sizeBytes / 1024 / 1024).toFixed(2)} MB`}
                                 </span>
                               </td>
                               <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(16, 185, 129, 0.16)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
                                     Local Disk
                                   </span>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(59, 130, 246, 0.16)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
                                     AWS S3
                                   </span>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#ffedd5', color: '#c2410c', padding: '2px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(249, 115, 22, 0.16)', color: '#fdba74', border: '1px solid rgba(249, 115, 22, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
                                     Cloudflare R2
                                   </span>
                                 </div>
@@ -3560,9 +3515,9 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                     disabled={sendingBackupEmail}
                                     title="Send this specific archive to parth6070@gmail.com &amp; harshtsidapara2468@gmail.com"
                                     style={{
-                                      background: '#f8fafc',
-                                      color: '#475569',
-                                      border: '1px solid #cbd5e1',
+                                      background: 'rgba(30, 41, 59, 0.8)',
+                                      color: '#cbd5e1',
+                                      border: '1px solid var(--border-color)',
                                       borderRadius: '6px',
                                       padding: '6px 10px',
                                       fontSize: '0.78rem',
@@ -3601,12 +3556,12 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
-                      <tr style={{ background: 'var(--bg-surface-elevated, #f8fafc)', borderBottom: '2px solid var(--border-color)' }}>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Date &amp; Time (IST)</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Images Archive File</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Archive Size</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Storage Vaults</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Actions</th>
+                      <tr style={{ background: 'rgba(15, 23, 42, 0.72)', borderBottom: '1px solid var(--border-color)' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#cbd5e1' }}>Date &amp; Time (IST)</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#cbd5e1' }}>Images Archive File</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#cbd5e1' }}>Archive Size</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#cbd5e1' }}>Storage Vaults</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#cbd5e1' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3631,35 +3586,35 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             <tr
                               key={backup.fileName || idx}
                               style={{
-                                borderBottom: '1px solid var(--border-color)',
-                                background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
+                                borderBottom: '1px solid var(--border-light)',
+                                background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'
                               }}
                             >
-                              <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#0f172a' }}>
+                              <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#f8fafc' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Calendar size={14} color="#64748b" />
+                                  <Calendar size={14} color="#94a3b8" />
                                   <span>{dateFormatted}</span>
                                 </div>
                               </td>
                               <td style={{ padding: '0.85rem 1rem' }}>
-                                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: '#ffedd5', color: '#9a3412', padding: '3px 8px', borderRadius: '5px', fontWeight: 600 }}>
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(249, 115, 22, 0.16)', color: '#fdba74', border: '1px solid rgba(249, 115, 22, 0.35)', padding: '3px 8px', borderRadius: '5px', fontWeight: 600 }}>
                                   {backup.fileName}
                                 </span>
                               </td>
                               <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                                <span style={{ fontWeight: 700, color: '#c2410c', background: '#ffedd5', padding: '3px 8px', borderRadius: '12px', fontSize: '0.78rem' }}>
+                                <span style={{ fontWeight: 700, color: '#fdba74', background: 'rgba(249, 115, 22, 0.16)', border: '1px solid rgba(249, 115, 22, 0.35)', padding: '3px 8px', borderRadius: '12px', fontSize: '0.78rem' }}>
                                   {backup.sizeMB ? `${backup.sizeMB} MB` : `${(backup.sizeBytes / 1024 / 1024).toFixed(2)} MB`}
                                 </span>
                               </td>
                               <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(16, 185, 129, 0.16)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
                                     Local NVMe
                                   </span>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(59, 130, 246, 0.16)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
                                     AWS S3
                                   </span>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#ffedd5', color: '#c2410c', padding: '2px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(249, 115, 22, 0.16)', color: '#fdba74', border: '1px solid rgba(249, 115, 22, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
                                     Cloudflare R2
                                   </span>
                                 </div>
@@ -3815,6 +3770,10 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
         <AdminClientDetails companyEntity={selectedCompany} />
       )}
 
+      {activeSubTab === 'controlCenter' && isMasterAdmin && (
+        <AdminControlCenter users={users} onRefreshUsers={fetchUsers} />
+      )}
+
     </div>
   );
 }
@@ -3959,17 +3918,17 @@ const styles = {
   permissionBadge: {
     fontSize: '0.7rem',
     fontWeight: 600,
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    color: '#1d4ed8',
+    background: 'rgba(59, 130, 246, 0.16)',
+    border: '1px solid rgba(59, 130, 246, 0.32)',
+    color: '#93c5fd',
     padding: '0.15rem 0.45rem',
     borderRadius: '4px'
   },
   adminAllBadge: {
     fontSize: '0.72rem',
-    background: '#fee2e2',
-    border: '1px solid #fca5a5',
-    color: '#dc2626',
+    background: 'rgba(239, 68, 68, 0.18)',
+    border: '1px solid rgba(239, 68, 68, 0.38)',
+    color: '#fca5a5',
     padding: '0.15rem 0.55rem',
     borderRadius: '4px',
     fontWeight: '800',
@@ -3977,9 +3936,9 @@ const styles = {
   },
   noScreensBadge: {
     fontSize: '0.7rem',
-    background: '#f1f5f9',
-    border: '1px solid #cbd5e1',
-    color: '#64748b',
+    background: 'rgba(148, 163, 184, 0.14)',
+    border: '1px solid rgba(148, 163, 184, 0.28)',
+    color: '#94a3b8',
     padding: '0.15rem 0.45rem',
     borderRadius: '4px',
     fontWeight: 600
@@ -3990,9 +3949,9 @@ const styles = {
     justifyContent: 'center'
   },
   trashBtn: {
-    color: '#dc2626',
-    borderColor: '#fecaca',
-    background: '#fef2f2'
+    color: '#f87171',
+    borderColor: 'rgba(239, 68, 68, 0.38)',
+    background: 'rgba(239, 68, 68, 0.14)'
   },
   emptyState: {
     display: 'flex',
@@ -4015,7 +3974,7 @@ const styles = {
   label: {
     fontSize: '0.82rem',
     fontWeight: '700',
-    color: '#1e293b',
+    color: '#cbd5e1',
     marginLeft: '2px'
   },
   inputWrapper: {
@@ -4026,42 +3985,44 @@ const styles = {
   inputIcon: {
     position: 'absolute',
     left: '0.75rem',
-    color: '#64748b'
+    color: '#94a3b8'
   },
   formInput: {
     width: '100%',
     paddingLeft: '2.2rem',
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    color: '#0f172a',
-    borderRadius: '6px',
-    fontSize: '16px',
-    minHeight: '44px'
+    background: 'rgba(15, 23, 42, 0.85)',
+    border: '1px solid var(--border-color)',
+    color: '#f8fafc',
+    borderRadius: '8px',
+    fontSize: '14px',
+    minHeight: '42px',
+    outline: 'none'
   },
   formInputWithoutIcon: {
     width: '100%',
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    color: '#0f172a',
-    borderRadius: '6px',
-    fontSize: '16px',
-    minHeight: '44px'
+    background: 'rgba(15, 23, 42, 0.85)',
+    border: '1px solid var(--border-color)',
+    color: '#f8fafc',
+    borderRadius: '8px',
+    fontSize: '14px',
+    minHeight: '42px',
+    outline: 'none'
   },
   selectInput: {
     width: '100%',
-    padding: '0.65rem 0.75rem',
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    color: '#0f172a',
-    borderRadius: '6px',
-    fontSize: '16px',
-    minHeight: '44px',
+    padding: '0.6rem 0.75rem',
+    background: 'rgba(15, 23, 42, 0.85)',
+    border: '1px solid var(--border-color)',
+    color: '#f8fafc',
+    borderRadius: '8px',
+    fontSize: '14px',
+    minHeight: '42px',
     fontWeight: 600,
     outline: 'none',
   },
   helpText: {
     fontSize: '0.72rem',
-    color: '#64748b',
+    color: '#94a3b8',
     margin: '0 0 0.25rem 2px',
     fontWeight: 500
   },
@@ -4069,14 +4030,14 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.45rem',
-    background: checked ? '#f0f9ff' : '#ffffff',
-    padding: '0.4rem 0.55rem',
-    borderRadius: '6px',
-    border: checked ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+    background: checked ? 'rgba(37, 99, 235, 0.2)' : 'rgba(15, 23, 42, 0.65)',
+    padding: '0.45rem 0.6rem',
+    borderRadius: '7px',
+    border: checked ? '1px solid rgba(59, 130, 246, 0.6)' : '1px solid var(--border-light)',
     fontSize: '0.74rem',
     cursor: 'pointer',
     fontWeight: checked ? 700 : 500,
-    color: checked ? '#1e40af' : '#334155',
+    color: checked ? '#93c5fd' : '#cbd5e1',
     transition: 'all 0.15s ease'
   }),
   checkboxGrid: {
@@ -4091,7 +4052,7 @@ const styles = {
     cursor: 'pointer',
     padding: '0.45rem 0.6rem',
     borderRadius: '6px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--border-light)',
     transition: 'all 0.15s ease',
     userSelect: 'none'
   },
@@ -4101,7 +4062,7 @@ const styles = {
   },
   checkbox: {
     cursor: 'pointer',
-    accentColor: '#2563eb',
+    accentColor: '#3b82f6',
     width: '15px',
     height: '15px'
   },
@@ -4125,20 +4086,20 @@ const styles = {
     justifyContent: 'center'
   },
   errorBox: {
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    borderRadius: '6px',
+    background: 'rgba(239, 68, 68, 0.16)',
+    border: '1px solid rgba(239, 68, 68, 0.38)',
+    borderRadius: '8px',
     padding: '0.65rem 0.75rem',
-    color: '#dc2626',
+    color: '#fca5a5',
     fontWeight: 700,
     fontSize: '0.82rem'
   },
   successBox: {
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    borderRadius: '6px',
+    background: 'rgba(16, 185, 129, 0.16)',
+    border: '1px solid rgba(16, 185, 129, 0.38)',
+    borderRadius: '8px',
     padding: '0.65rem 0.75rem',
-    color: '#16a34a',
+    color: '#6ee7b7',
     fontWeight: 700,
     fontSize: '0.82rem'
   }

@@ -16,6 +16,11 @@ import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import { generateCode128Svg, resolveItemSize, resolveBarcodeTitle, resolveBarcodeSkuAndSize } from '../utils/barcodeHelper';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
+import { extractApiProductImage } from '../utils/imageUrlHelper';
+import { extractBaseSku } from '../utils/skuHelper';
+import DesignImage from './DesignImage';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -40,6 +45,22 @@ function convertDriveUrl(link) {
     if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
   }
 
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const parsed = new URL(trimmed);
+      const host = (parsed.hostname || '').toLowerCase();
+      const isInternal =
+        host === '3.7.174.180' ||
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.endsWith('eliteedition.in') ||
+        host.endsWith('.r2.dev');
+      if (!isInternal) {
+        return trimmed.startsWith('http://') ? trimmed.replace(/^http:\/\//i, 'https://') : trimmed;
+      }
+    } catch (e) {}
+  }
+
   if (trimmed.includes('/designs/')) {
     const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
     return `${R2_PUBLIC_BASE}/designs/${filename}`;
@@ -49,7 +70,7 @@ function convertDriveUrl(link) {
     return `${R2_PUBLIC_BASE}/uploads/${filename}`;
   }
 
-  if (trimmed.startsWith('https://')) return encodeURI(trimmed);
+  if (trimmed.startsWith('https://')) return trimmed;
 
   if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
     const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
@@ -57,7 +78,7 @@ function convertDriveUrl(link) {
       const sub = clean.startsWith('/') ? clean.substring(1) : clean;
       return `${R2_PUBLIC_BASE}/${sub}`;
     }
-    return encodeURI(trimmed.replace('http://', 'https://'));
+    return trimmed.replace('http://', 'https://');
   }
 
   if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
@@ -65,7 +86,7 @@ function convertDriveUrl(link) {
     return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
   }
 
-  return encodeURI(trimmed);
+  return trimmed;
 }
 
 export default function InventoryGrid({ 
@@ -79,21 +100,86 @@ export default function InventoryGrid({
   onBulkInward, 
   onQuickStockUpdate,
   onSyncCatalog,
-  initialSubTab = 'overview'
+  initialSubTab = 'overview',
+  entityId = 'Elite Online'
 }) {
   const safeItems = Array.isArray(items) ? items : [];
 
+  // Shared cross-lookup map for product images & descriptions by exact SKU, base SKU, and brandCodes
+  const { sharedImageMap, enrichedCatalogItems } = useMemo(() => {
+    const imgMap = new Map();
+    const descMap = new Map();
+    const register = (record) => {
+      if (!record) return;
+      const sku = (record.skuCode || record.sku || record.itemName || '').trim();
+      const fullK = sku.toUpperCase();
+      const baseK = extractBaseSku(sku).trim().toUpperCase();
+      const img = extractApiProductImage(record);
+      if (img) {
+        const cleanImg = convertDriveUrl(img);
+        if (fullK && !imgMap.has(fullK)) imgMap.set(fullK, cleanImg);
+        if (baseK && !imgMap.has(baseK)) imgMap.set(baseK, cleanImg);
+      }
+      const desc = (record.description || record.itemName || '').trim();
+      if (desc && !/^(unnamed product|uniware sku|product|sku|n\/a|-)$/i.test(desc) && desc.toUpperCase() !== fullK) {
+        if (fullK && !descMap.has(fullK)) descMap.set(fullK, desc);
+        if (baseK && !descMap.has(baseK)) descMap.set(baseK, desc);
+      }
+      if (Array.isArray(record.brandCodes)) {
+        record.brandCodes.forEach((bc) => {
+          const code = typeof bc === 'string' ? bc : bc?.code;
+          if (code) {
+            const ck = String(code).trim().toUpperCase();
+            if (img && !imgMap.has(ck)) imgMap.set(ck, convertDriveUrl(img));
+          }
+        });
+      }
+    };
+
+    (catalogItems || []).forEach(register);
+    (safeItems || []).forEach(register);
+
+    const enrichedCat = (catalogItems || []).map((c) => {
+      const sku = (c.skuCode || '').trim();
+      const fullK = sku.toUpperCase();
+      const baseK = extractBaseSku(sku).trim().toUpperCase();
+      const resolvedImg = convertDriveUrl(extractApiProductImage(c)) || imgMap.get(fullK) || imgMap.get(baseK) || '';
+      const rawDesc = (c.description || '').trim();
+      const isBad = !rawDesc || /^(unnamed product|uniware sku|product|sku|n\/a|-)$/i.test(rawDesc);
+      const resolvedDesc = !isBad ? rawDesc : (descMap.get(fullK) || descMap.get(baseK) || rawDesc);
+      return {
+        ...c,
+        imageUrl: resolvedImg || c.imageUrl || '',
+        description: resolvedDesc || c.description,
+      };
+    });
+
+    return { sharedImageMap: imgMap, enrichedCatalogItems: enrichedCat };
+  }, [catalogItems, safeItems]);
+
   // Helper to resolve product image from item or catalogItems fallback
-  const resolveItemImage = (item) => {
+  const resolveItemImage = useCallback((item) => {
     if (!item) return '';
-    if (item.imageUrl) return item.imageUrl;
-    const cleanSku = (item.skuCode || item.sku || '').trim().toLowerCase();
-    if (!cleanSku) return '';
-    const inCat = (catalogItems || []).find(c => (c.skuCode || '').trim().toLowerCase() === cleanSku);
-    if (inCat?.imageUrl) return inCat.imageUrl;
-    const inInv = (safeItems || []).find(it => (it.skuCode || '').trim().toLowerCase() === cleanSku);
-    return inInv?.imageUrl || '';
-  };
+    const direct = extractApiProductImage(item);
+    if (direct) return convertDriveUrl(direct);
+    const cleanSku = (item.skuCode || item.sku || item.itemName || '').trim();
+    if (cleanSku) {
+      const fullK = cleanSku.toUpperCase();
+      const baseK = extractBaseSku(cleanSku).trim().toUpperCase();
+      const hit = sharedImageMap.get(fullK) || sharedImageMap.get(baseK);
+      if (hit) return hit;
+    }
+    if (Array.isArray(item.brandCodes)) {
+      for (const bc of item.brandCodes) {
+        const code = typeof bc === 'string' ? bc : bc?.code;
+        if (code) {
+          const hit = sharedImageMap.get(String(code).trim().toUpperCase());
+          if (hit) return hit;
+        }
+      }
+    }
+    return '';
+  }, [sharedImageMap]);
 
   // 4 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock), 'catalog' (Product Catalog)
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
@@ -1591,350 +1677,276 @@ export default function InventoryGrid({
     <div style={styles.container}>
       
       {/* ========================================================================= */}
-      {/* MAIN TOP NAVIGATION SUB-TAB BAR (3 Dedicated Screens)                      */}
+      {/* TIER 1: GLASS SCREEN HEADER                                               */}
       {/* ========================================================================= */}
-      <div className="inv-sub-tab-bar-container" style={styles.subTabBarContainer}>
-        <div className="inv-sub-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Inventory Primary Sub-Tabs" style={styles.subTabBar}>
-          {/* Tab 1: Stock Overview */}
-          <button
-            role="tab"
-            aria-selected={activeSubTab === 'overview'}
-            onClick={() => setActiveSubTab('overview')}
-            style={styles.subTabButton(activeSubTab === 'overview', 'overview')}
-          >
-            <Package size={17} />
-            <span>Stock Overview</span>
-            <span style={styles.tabBadge(activeSubTab === 'overview', '#3b82f6')}>
-              {totalSkus}
-            </span>
-          </button>
-
-          {/* Tab 2: Inward Stock */}
-          <button
-            role="tab"
-            aria-selected={activeSubTab === 'inward'}
-            onClick={() => setActiveSubTab('inward')}
-            style={styles.subTabButton(activeSubTab === 'inward', 'inward')}
-          >
-            <ArrowDownRight size={17} />
-            <span>Inward Stock</span>
-            <span style={styles.tabBadge(activeSubTab === 'inward', '#10b981')}>
-              {totalInwardCount !== null ? totalInwardCount : (inwardData.items?.length || 0)}
-            </span>
-          </button>
-
-          {/* Tab 3: Outward Stock */}
-          <button
-            onClick={() => setActiveSubTab('outward')}
-            style={styles.subTabButton(activeSubTab === 'outward', 'outward')}
-          >
-            <ArrowUpRight size={17} />
-            <span>Outward Stock</span>
-            <span style={styles.tabBadge(activeSubTab === 'outward', '#f59e0b')}>
-              {totalOutwardCount !== null ? totalOutwardCount : (outwardData.items?.length || 0)}
-            </span>
-          </button>
-
-          {/* Tab 4: Product Catalog */}
-          <button
-            onClick={() => setActiveSubTab('catalog')}
-            style={styles.subTabButton(activeSubTab === 'catalog', 'catalog')}
-          >
-            <BookOpen size={17} />
-            <span>Product Catalog</span>
-            <span style={styles.tabBadge(activeSubTab === 'catalog', '#8b5cf6')}>
-              {catalogItems.length}
-            </span>
-          </button>
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <span className="glass-title-icon">📦</span>
+          <h1>Inventory & Product Catalog</h1>
+          <EntityBrandBadge entityId={entityId} size="sm" />
         </div>
 
-        {/* Right side Settings & Dynamic Value Setters Button */}
-        <div style={{ position: 'relative', flexShrink: 0 }} ref={settingsMenuRef}>
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.52rem 0.95rem',
-              borderRadius: '9px',
-              background: isSettingsOpen ? '#eff6ff' : '#ffffff',
-              border: isSettingsOpen ? '1.5px solid #2563eb' : '1.5px solid #cbd5e1',
-              color: isSettingsOpen ? '#1d4ed8' : '#1e293b',
-              fontWeight: 800,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: isSettingsOpen ? '0 0 0 3px rgba(37, 99, 235, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
-              transition: 'all 0.15s ease',
-            }}
-            title="Configure Dynamic Dropdown Values (Facilities, Brands, Categories, Vendors, Parties)"
-          >
-            <Settings size={16} color="#2563eb" style={{ transition: 'transform 0.3s ease', transform: isSettingsOpen ? 'rotate(45deg)' : 'none' }} />
-            <span>Settings</span>
-            <ChevronDown size={14} color="#64748b" style={{ transition: 'transform 0.2s ease', transform: isSettingsOpen ? 'rotate(180deg)' : 'none' }} />
-          </button>
-
-          {/* Settings Dropdown Menu */}
-          {isSettingsOpen && (
-            <div
+        <div className="glass-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Right side Settings & Dynamic Value Setters Button */}
+          <div style={{ position: 'relative', flexShrink: 0 }} ref={settingsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
               style={{
-                position: 'absolute',
-                right: 0,
-                top: 'calc(100% + 8px)',
-                width: '275px',
-                background: '#ffffff',
-                borderRadius: '14px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                padding: '0.5rem',
-                zIndex: 1000,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '3px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.52rem 0.95rem',
+                borderRadius: '10px',
+                background: isSettingsOpen ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                border: isSettingsOpen ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.16)',
+                color: isSettingsOpen ? '#38bdf8' : '#ffffff',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
               }}
+              title="Configure Dynamic Dropdown Values (Facilities, Brands, Categories, Vendors, Parties)"
             >
-              <div style={{ padding: '0.4rem 0.65rem', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #f1f5f9', marginBottom: '3px' }}>
-                Dynamic Dropdown Value Setters
-              </div>
+              <Settings size={16} color="#38bdf8" style={{ transition: 'transform 0.3s ease', transform: isSettingsOpen ? 'rotate(45deg)' : 'none' }} />
+              <span>Settings</span>
+              <ChevronDown size={14} color="rgba(255,255,255,0.72)" style={{ transition: 'transform 0.2s ease', transform: isSettingsOpen ? 'rotate(180deg)' : 'none' }} />
+            </button>
 
-              <button
-                type="button"
-                onClick={() => handleOpenDynamicManager('facilities')}
+            {/* Settings Dropdown Menu */}
+            {isSettingsOpen && (
+              <div
                 style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 'calc(100% + 8px)',
+                  width: '275px',
+                  background: 'rgba(15, 23, 42, 0.96)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  boxShadow: '0 20px 45px rgba(0, 0, 0, 0.65)',
+                  padding: '0.5rem',
+                  zIndex: 1000,
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'background 0.15s ease',
-                  width: '100%',
+                  flexDirection: 'column',
+                  gap: '3px',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
-                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Warehouse size={15} color="#0284c7" />
+                <div style={{ padding: '0.4rem 0.65rem', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '3px' }}>
+                  Dynamic Dropdown Value Setters
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Storage Facilities</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Pankhudi, Warehouse A, Godowns</div>
-                </div>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => handleOpenDynamicManager('brands')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'background 0.15s ease',
-                  width: '100%',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Tag size={15} color="#2563eb" />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Catalog Brands</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>ANOUK, ELITE EDITION, HERA...</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenDynamicManager('categories')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'background 0.15s ease',
-                  width: '100%',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#ecfdf5'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <SlidersHorizontal size={15} color="#059669" />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Product Categories</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Kurta Set, Dress, Saree, Lehenga...</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenDynamicManager('vendors')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'background 0.15s ease',
-                  width: '100%',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#f5f3ff'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Building2 size={15} color="#7c3aed" />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Vendors & Suppliers</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Fabric & Material Suppliers</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenDynamicManager('parties')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'background 0.15s ease',
-                  width: '100%',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#fff7ed'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Users size={15} color="#ea580c" />
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Client Parties</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Customer Accounts & Receivers</div>
-                </div>
-              </button>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '4px', paddingTop: '4px' }}>
                 <button
                   type="button"
                   onClick={() => handleOpenDynamicManager('facilities')}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem',
+                    gap: '0.65rem',
                     padding: '0.55rem 0.75rem',
                     borderRadius: '8px',
                     border: 'none',
-                    background: '#eff6ff',
-                    color: '#1d4ed8',
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
+                    background: 'transparent',
                     cursor: 'pointer',
+                    textAlign: 'left',
                     width: '100%',
-                    transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                 >
-                  <Settings size={14} />
-                  <span>Open Full Manager Panel →</span>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(56, 189, 248, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Warehouse size={15} color="#38bdf8" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff' }}>Storage Facilities</div>
+                    <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)' }}>Pankhudi, Warehouse A, Godowns</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenDynamicManager('brands')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(96, 165, 250, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Tag size={15} color="#60a5fa" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff' }}>Catalog Brands</div>
+                    <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)' }}>ANOUK, ELITE EDITION, HERA...</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenDynamicManager('categories')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(52, 211, 153, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <SlidersHorizontal size={15} color="#34d399" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff' }}>Product Categories</div>
+                    <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)' }}>Kurta Set, Dress, Saree, Lehenga...</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenDynamicManager('vendors')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(192, 132, 252, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Building2 size={15} color="#c084fc" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff' }}>Vendors & Suppliers</div>
+                    <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)' }}>Fabric & Material Suppliers</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenDynamicManager('parties')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(251, 191, 36, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Users size={15} color="#fbbf24" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff' }}>Client Parties</div>
+                    <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)' }}>Customer Accounts & Receivers</div>
+                  </div>
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          <QuickActionMenu
+            actions={[
+              { label: 'Inward Stock Entry', icon: '📥', onClick: () => setActiveSubTab('inward') },
+              { label: 'Outward Stock Entry', icon: '📤', onClick: () => setActiveSubTab('outward') },
+              { label: 'Product Catalog', icon: '📚', onClick: () => setActiveSubTab('catalog') },
+              { label: 'Configure Dropdowns', icon: '⚙️', onClick: () => handleOpenDynamicManager('facilities') },
+            ]}
+          />
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* TIER 2: MAIN TOP NAVIGATION SUB-TAB BAR                                   */}
+      {/* ========================================================================= */}
+      <div className="glass-subtabs-bar" data-screen-subtabs="primary" role="tablist" aria-label="Inventory Primary Sub-Tabs">
+        <button
+          role="tab"
+          aria-selected={activeSubTab === 'overview'}
+          onClick={() => setActiveSubTab('overview')}
+          className={`glass-subtab-btn ${activeSubTab === 'overview' ? 'active' : ''}`}
+        >
+          Stock Overview ({totalSkus})
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeSubTab === 'inward'}
+          onClick={() => setActiveSubTab('inward')}
+          className={`glass-subtab-btn ${activeSubTab === 'inward' ? 'active' : ''}`}
+        >
+          Inward Stock ({totalInwardCount !== null ? totalInwardCount : (inwardData.items?.length || 0)})
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeSubTab === 'outward'}
+          onClick={() => setActiveSubTab('outward')}
+          className={`glass-subtab-btn ${activeSubTab === 'outward' ? 'active' : ''}`}
+        >
+          Outward Stock ({totalOutwardCount !== null ? totalOutwardCount : (outwardData.items?.length || 0)})
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeSubTab === 'catalog'}
+          onClick={() => setActiveSubTab('catalog')}
+          className={`glass-subtab-btn ${activeSubTab === 'catalog' ? 'active' : ''}`}
+        >
+          Product Catalog ({catalogItems.length})
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TIER 3: SIDE-SCROLLING CALCULATION CARDS TRACK                            */}
+      {/* ========================================================================= */}
+      <div className="glass-scroll-track">
+        <div className="glass-calc-card" onClick={() => setStockStatusFilter('all')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">TOTAL SKUS / PRODUCTS</span>
+          <span className="glass-calc-value">{totalSkus}</span>
+          <span className="glass-calc-sub">Active catalog items</span>
+        </div>
+        <div className="glass-calc-card" onClick={() => setStockStatusFilter('instock')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">TOTAL AVAILABLE STOCK</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{totalAvailableStock.toLocaleString()}</span>
+          <span className="glass-calc-sub">Ready units in warehouse</span>
+        </div>
+        <div className="glass-calc-card" onClick={() => setStockStatusFilter('lowstock')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">LOW STOCK ALERT (≤ 5)</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{lowStockCount}</span>
+          <span className="glass-calc-sub">SKUs needing restock</span>
+        </div>
+        <div className="glass-calc-card" onClick={() => setStockStatusFilter('outofstock')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">OUT OF STOCK</span>
+          <span className="glass-calc-value" style={{ color: '#f87171' }}>{outOfStockCount}</span>
+          <span className="glass-calc-sub">Depleted SKUs</span>
+        </div>
+      </div>
 
       {/* ========================================================================= */}
       {/* SCREEN 1: STOCK OVERVIEW                                                   */}
       {/* ========================================================================= */}
       {activeSubTab === 'overview' && (
         <>
-          {/* Summary Metric Cards */}
-          <div className="inv-stats-grid" style={styles.statsGrid}>
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
-              <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
-                <Package size={22} color="#3b82f6" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>TOTAL SKUS / PRODUCTS</div>
-                <div style={{ ...styles.statVal, color: '#1e293b' }}>
-                  {totalSkus} <span style={styles.statSubText}>items</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #6366f1' }}>
-              <div style={styles.statIconWrap('#6366f1', '#eef2ff')}>
-                <CheckCircle2 size={22} color="#6366f1" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>TOTAL AVAILABLE STOCK</div>
-                <div style={{ ...styles.statVal, color: '#1e293b' }}>
-                  {totalAvailableStock.toLocaleString()} <span style={styles.statSubText}>units</span>
-                </div>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => setStockStatusFilter('lowstock')}
-              style={{ ...styles.statCard, borderLeft: '4px solid #f59e0b', cursor: 'pointer' }}
-              title="Click to filter Low Stock items"
-            >
-              <div style={styles.statIconWrap('#f59e0b', '#fffbeb')}>
-                <AlertTriangle size={22} color="#f59e0b" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>LOW STOCK ALERT (≤ 5)</div>
-                <div style={{ ...styles.statVal, color: '#d97706' }}>
-                  {lowStockCount} <span style={styles.statSubText}>SKUs</span>
-                </div>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => setStockStatusFilter('outofstock')}
-              style={{ ...styles.statCard, borderLeft: '4px solid #ef4444', cursor: 'pointer' }}
-              title="Click to filter Out of Stock items"
-            >
-              <div style={styles.statIconWrap('#ef4444', '#fef2f2')}>
-                <XCircle size={22} color="#ef4444" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>OUT OF STOCK</div>
-                <div style={{ ...styles.statVal, color: '#dc2626' }}>
-                  {outOfStockCount} <span style={styles.statSubText}>SKUs</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Search, Filters & Action Toolbar */}
           <div className="inv-control-header" style={{
@@ -2014,7 +2026,7 @@ export default function InventoryGrid({
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try adjusting your search query or filters.</p>
                 </div>
               ) : (
-                <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', background: '#ffffff' }}>
+                <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', background: 'transparent' }}>
                   <thead>
                     <tr>
                       <MasterCheckboxTh
@@ -2037,20 +2049,20 @@ export default function InventoryGrid({
                     {paginatedOverviewItems.map((item, idx) => {
                       const stock = Number(item.currentlyAvailableStock) || 0;
 
-                      let stockBadgeBg = '#ecfdf5';
-                      let stockBadgeColor = '#059669';
-                      let stockBadgeBorder = '#a7f3d0';
+                      let stockBadgeBg = 'rgba(16, 185, 129, 0.2)';
+                      let stockBadgeColor = '#6ee7b7';
+                      let stockBadgeBorder = 'rgba(52, 211, 153, 0.45)';
                       let stockLabel = `${stock} Units`;
 
                       if (stock === 0) {
-                        stockBadgeBg = '#fef2f2';
-                        stockBadgeColor = '#dc2626';
-                        stockBadgeBorder = '#fecaca';
+                        stockBadgeBg = 'rgba(239, 68, 68, 0.22)';
+                        stockBadgeColor = '#fca5a5';
+                        stockBadgeBorder = 'rgba(248, 113, 113, 0.5)';
                         stockLabel = 'Out of Stock';
                       } else if (stock <= 5) {
-                        stockBadgeBg = '#fffbeb';
-                        stockBadgeColor = '#d97706';
-                        stockBadgeBorder = '#fde68a';
+                        stockBadgeBg = 'rgba(245, 158, 11, 0.22)';
+                        stockBadgeColor = '#fcd34d';
+                        stockBadgeBorder = 'rgba(251, 191, 36, 0.5)';
                         stockLabel = `${stock} Units (Low)`;
                       }
 
@@ -2058,7 +2070,7 @@ export default function InventoryGrid({
                       const isSelected = selectedOverviewIds.includes(itemId);
 
                       return (
-                        <tr key={item._id} style={{ borderBottom: '1px solid #e2e8f0', background: getRowHighlightStyle(isSelected, idx % 2 === 0 ? '#ffffff' : '#f8fafc') }}>
+                        <tr key={item._id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: getRowHighlightStyle(isSelected, idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)') }}>
                           <RowCheckboxTd
                             checked={isSelected}
                             onChange={() => handleToggleSelectOverview(itemId)}
@@ -2066,17 +2078,33 @@ export default function InventoryGrid({
                           <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.itemCell}>
                               <div style={styles.itemImgWrapper}>
-                                {item.imageUrl ? (
-                                  <img 
-                                    src={item.imageUrl} 
-                                    alt={item.itemName} 
-                                    style={styles.itemImg}
-                                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                  />
-                                ) : null}
-                                <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex' }}>
+                                <div style={{ ...styles.imgPlaceholder, position: 'absolute', inset: 0, zIndex: 1 }}>
                                   {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
                                 </div>
+                                {(() => {
+                                  const explicitImg = resolveItemImage(item);
+                                  if (!explicitImg) return null;
+                                  return (
+                                    <img
+                                      key={explicitImg}
+                                      src={explicitImg}
+                                      alt={item.itemName || item.skuCode || 'Item'}
+                                      loading="lazy"
+                                      decoding="async"
+                                      referrerPolicy="no-referrer"
+                                      style={{ ...styles.itemImg, position: 'relative', zIndex: 2 }}
+                                      onError={(e) => {
+                                        const el = e.currentTarget;
+                                        if (!el.dataset.proxyTried && /^https?:\/\//i.test(explicitImg)) {
+                                          el.dataset.proxyTried = '1';
+                                          el.src = `/v1/upload/preview?url=${encodeURIComponent(explicitImg)}&w=120`;
+                                          return;
+                                        }
+                                        el.style.display = 'none';
+                                      }}
+                                    />
+                                  );
+                                })()}
                               </div>
                               <div>
                                 <div style={styles.itemName}>{item.itemName}</div>
@@ -2089,7 +2117,7 @@ export default function InventoryGrid({
                             {Array.isArray(item.brandCodes) && item.brandCodes.length > 0 && (
                               <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginTop: '4px' }}>
                                 {item.brandCodes.map((bc, bIdx) => (
-                                  <span key={bIdx} style={{ fontSize: '0.68rem', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', fontWeight: 600 }}>
+                                  <span key={bIdx} style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.08)', color: 'rgba(255, 255, 255, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', padding: '1px 5px', fontWeight: 600 }}>
                                     {typeof bc === 'string' ? bc : `${bc.brand ? bc.brand + ': ' : ''}${bc.code}`}
                                   </span>
                                 ))}
@@ -2101,25 +2129,25 @@ export default function InventoryGrid({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.35rem',
-                              background: '#f0f9ff',
-                              color: '#0369a1',
-                              border: '1px solid #bae6fd',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              color: '#38bdf8',
+                              border: '1px solid rgba(56, 189, 248, 0.28)',
                               padding: '0.22rem 0.6rem',
                               borderRadius: '6px',
                               fontSize: '0.78rem',
                               fontWeight: 700
                             }}>
-                              <Warehouse size={12} color="#0284c7" />
+                              <Warehouse size={12} color="#38bdf8" />
                               <span>{item.facility || 'Pankhudi'}</span>
                             </span>
                           </td>
-                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#ffffff', fontWeight: 600 }}>
                             {item.party}
                           </td>
                           <td style={{ padding: '0.85rem 1rem' }}>
                             <span style={styles.sizeBadge}>{item.size}</span>
                           </td>
-                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8' }}>
                             ₹ {Number(item.purchasePrice || 0).toFixed(2)}
                           </td>
 
@@ -2375,7 +2403,7 @@ export default function InventoryGrid({
               ) : (
                 <>
                   <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
-                  <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
+                  <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: 'transparent', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
                         <th style={{ width: '45px', padding: '0.65rem 0.4rem', textAlign: 'center', color: 'var(--text-muted, #64748b)', fontWeight: 800 }}>#</th>
@@ -2525,12 +2553,15 @@ export default function InventoryGrid({
                               <td style={{ padding: '0.6rem 0.5rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   {ch.sampleImage && (
-                                    <img
-                                      src={convertDriveUrl(ch.sampleImage, visibleSkus[0] || ch.items?.[0]?.skuCode)}
-                                      alt="preview"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
-                                    />
+                                      <img
+                                        src={convertDriveUrl(ch.sampleImage, visibleSkus[0] || ch.items?.[0]?.skuCode)}
+                                        alt="preview"
+                                        loading="lazy"
+                                        decoding="async"
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                                      />
                                   )}
                                   {visibleSkus.map((sku, sIdx) => (
                                     <span key={sIdx} style={{
@@ -2724,7 +2755,7 @@ export default function InventoryGrid({
                                               <td style={{ padding: '0.45rem 0.6rem' }}>
                                                 <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                   {subItem.imageUrl ? (
-                                                    <img src={subItem.imageUrl} alt={subItem.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    <img src={subItem.imageUrl} alt={subItem.sku} loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                   ) : (
                                                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>{subItem.itemName ? subItem.itemName[0] : 'E'}</span>
                                                   )}
@@ -2905,15 +2936,18 @@ export default function InventoryGrid({
                             </td>
                             <td style={{ padding: '0.55rem 0.5rem' }}>
                               <div style={{ ...styles.itemImgWrapper, width: '36px', height: '36px', borderRadius: '8px' }}>
-                                {item.imageUrl ? (
+                                {resolveItemImage(item) ? (
                                   <img 
-                                    src={item.imageUrl} 
+                                    src={resolveItemImage(item)} 
                                     alt={item.sku} 
+                                    loading="lazy"
+                                    decoding="async"
+                                    referrerPolicy="no-referrer"
                                     style={styles.itemImg}
                                     onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                                   />
                                 ) : null}
-                                <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex', fontSize: '0.85rem' }}>
+                                <div style={{ ...styles.imgPlaceholder, display: resolveItemImage(item) ? 'none' : 'flex', fontSize: '0.85rem' }}>
                                   {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
                                 </div>
                               </div>
@@ -3269,7 +3303,7 @@ export default function InventoryGrid({
               ) : (
                 <>
                   <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
-                  <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
+                  <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: 'transparent', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
                         <th style={{ width: '45px', padding: '0.65rem 0.4rem', textAlign: 'center', color: 'var(--text-muted, #64748b)', fontWeight: 800 }}>#</th>
@@ -3427,12 +3461,15 @@ export default function InventoryGrid({
                               <td style={{ padding: '0.6rem 0.5rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   {ch.sampleImage && (
-                                    <img
-                                      src={convertDriveUrl(ch.sampleImage, visibleSkus[0] || ch.items?.[0]?.skuCode)}
-                                      alt="preview"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
-                                    />
+                                      <img
+                                        src={convertDriveUrl(ch.sampleImage, visibleSkus[0] || ch.items?.[0]?.skuCode)}
+                                        alt="preview"
+                                        loading="lazy"
+                                        decoding="async"
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                                      />
                                   )}
                                   {visibleSkus.map((sku, sIdx) => (
                                     <span key={sIdx} style={{
@@ -3617,7 +3654,7 @@ export default function InventoryGrid({
                                               <td style={{ padding: '0.45rem 0.6rem' }}>
                                                 <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                   {subItem.imageUrl ? (
-                                                    <img src={subItem.imageUrl} alt={subItem.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    <img src={subItem.imageUrl} alt={subItem.sku} loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                   ) : (
                                                     <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8' }}>{subItem.itemName ? subItem.itemName[0] : 'E'}</span>
                                                   )}
@@ -3806,15 +3843,18 @@ export default function InventoryGrid({
                           </td>
                           <td style={{ padding: '0.55rem 0.5rem' }}>
                             <div style={{ ...styles.itemImgWrapper, width: '36px', height: '36px', borderRadius: '8px' }}>
-                              {item.imageUrl ? (
+                              {resolveItemImage(item) ? (
                                 <img 
-                                  src={item.imageUrl} 
+                                  src={resolveItemImage(item)} 
                                   alt={item.sku} 
+                                  loading="lazy"
+                                  decoding="async"
+                                  referrerPolicy="no-referrer"
                                   style={styles.itemImg}
                                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                                 />
                               ) : null}
-                              <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex', fontSize: '0.85rem' }}>
+                              <div style={{ ...styles.imgPlaceholder, display: resolveItemImage(item) ? 'none' : 'flex', fontSize: '0.85rem' }}>
                                 {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
                               </div>
                             </div>
@@ -3893,7 +3933,7 @@ export default function InventoryGrid({
       {/* ========================================================================= */}
       {activeSubTab === 'catalog' && (
         <ProductCatalogGrid
-          items={catalogItems}
+          items={enrichedCatalogItems}
           onAdd={() => onAdd && onAdd('catalog')}
           onEdit={onEdit}
           onDelete={onDelete}
@@ -4155,8 +4195,8 @@ export default function InventoryGrid({
                         <td style={{ padding: '0.6rem 0.75rem', color: '#64748b' }}>{idx + 1}</td>
                         <td style={{ padding: '0.6rem 0.75rem' }}>
                           <div style={{ width: '36px', height: '36px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {resolveItemImage(item) ? (
+                              <img src={resolveItemImage(item)} alt={item.sku} loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{item.itemName ? item.itemName[0] : 'E'}</span>
                             )}
@@ -4379,8 +4419,8 @@ export default function InventoryGrid({
                         <td style={{ padding: '0.6rem 0.75rem', color: '#64748b' }}>{idx + 1}</td>
                         <td style={{ padding: '0.6rem 0.75rem' }}>
                           <div style={{ width: '36px', height: '36px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {resolveItemImage(item) ? (
+                              <img src={resolveItemImage(item)} alt={item.sku} loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{item.itemName ? item.itemName[0] : 'E'}</span>
                             )}
@@ -4970,11 +5010,13 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '0.75rem',
-    background: '#ffffff',
+    background: 'rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
     padding: '0.55rem 0.85rem',
     borderRadius: '16px',
-    border: '1px solid #e2e8f0',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
     flexWrap: 'nowrap',
     width: '100%',
     boxSizing: 'border-box',
@@ -4983,10 +5025,10 @@ const styles = {
     display: 'flex',
     gap: '0.35rem',
     alignItems: 'center',
-    background: '#f1f5f9',
+    background: 'rgba(255, 255, 255, 0.06)',
     padding: '4px',
     borderRadius: '12px',
-    border: '1px solid #cbd5e1',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
     flexShrink: 0,
   },
   subTabButton: (active, type) => {
@@ -5013,7 +5055,7 @@ const styles = {
       borderRadius: '8px',
       border: 'none',
       background: active ? activeBg : 'transparent',
-      color: active ? activeColor : '#475569',
+      color: active ? activeColor : 'rgba(255, 255, 255, 0.75)',
       fontSize: '0.8rem',
       fontWeight: active ? 800 : 600,
       cursor: 'pointer',
@@ -5027,8 +5069,8 @@ const styles = {
     fontWeight: 800,
     padding: '2px 8px',
     borderRadius: '12px',
-    background: active ? 'rgba(255, 255, 255, 0.25)' : '#e2e8f0',
-    color: active ? '#ffffff' : color,
+    background: active ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.12)',
+    color: active ? '#ffffff' : (color || '#38bdf8'),
     lineHeight: 1.3,
   }),
 
@@ -5082,44 +5124,46 @@ const styles = {
     gap: '1rem',
   },
   statCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
+    background: 'rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
     borderRadius: '14px',
     padding: '1.15rem 1.3rem',
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
     transition: 'all 0.2s ease',
   },
   statIconWrap: (color, bg) => ({
     width: '46px',
     height: '46px',
     borderRadius: '12px',
-    background: bg || `${color}15`,
-    border: `1px solid ${color}30`,
+    background: 'rgba(255, 255, 255, 0.12)',
+    border: `1px solid rgba(255, 255, 255, 0.2)`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    boxShadow: `0 4px 10px ${color}15`,
+    boxShadow: `0 4px 10px rgba(0,0,0,0.2)`,
   }),
   statLabel: {
     fontSize: '0.7rem',
     fontWeight: 800,
-    color: '#64748b',
+    color: 'rgba(255, 255, 255, 0.72)',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
   },
   statSubText: {
     fontSize: '0.8rem',
-    color: '#94a3b8',
+    color: 'rgba(255, 255, 255, 0.55)',
     fontWeight: 500,
   },
   statVal: {
     fontSize: '1.4rem',
     fontWeight: 900,
-    color: '#0f172a',
+    color: '#ffffff',
     marginTop: '3px',
   },
 
@@ -5133,9 +5177,11 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '0.5rem',
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+    background: 'rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
     overflowX: 'auto',
     whiteSpace: 'nowrap',
   },
@@ -5160,8 +5206,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.6rem',
-    background: '#f8fafc',
-    border: '1px solid #cbd5e1',
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
     borderRadius: '9px',
     padding: '0.6rem 0.9rem',
     minWidth: '260px',
@@ -5171,7 +5217,7 @@ const styles = {
   searchInput: {
     border: 'none',
     background: 'none',
-    color: '#0f172a',
+    color: '#ffffff',
     fontSize: '0.85rem',
     outline: 'none',
     width: '100%',
@@ -5181,10 +5227,10 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    background: '#f1f5f9',
+    background: 'rgba(255, 255, 255, 0.05)',
     padding: '4px',
     borderRadius: '10px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
     overflowX: 'auto',
     WebkitOverflowScrolling: 'touch',
     flexWrap: 'nowrap',
@@ -5193,7 +5239,7 @@ const styles = {
   },
   statusPill: (active, type) => {
     let activeBg = '#4f46e5';
-    if (type === 'lowstock') activeBg = '#f59e0b';
+    if (type === 'lowstock') activeBg = '#d97706';
     if (type === 'outofstock') activeBg = '#ef4444';
     if (type === 'instock') activeBg = '#10b981';
 
@@ -5202,7 +5248,7 @@ const styles = {
       borderRadius: '8px',
       border: 'none',
       background: active ? activeBg : 'transparent',
-      color: active ? '#ffffff' : '#475569',
+      color: active ? '#ffffff' : 'rgba(255, 255, 255, 0.72)',
       fontSize: '0.78rem',
       fontWeight: active ? 800 : 600,
       cursor: 'pointer',
@@ -5217,8 +5263,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    background: '#f8fafc',
-    border: '1px solid #cbd5e1',
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
     padding: '0 0.65rem',
     borderRadius: '9px',
   },
@@ -5227,7 +5273,7 @@ const styles = {
     background: 'none',
     padding: '0.6rem 0.4rem',
     fontSize: '0.82rem',
-    color: '#0f172a',
+    color: '#ffffff',
     outline: 'none',
     cursor: 'pointer',
     fontWeight: 600,
@@ -5238,33 +5284,32 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.65rem',
-    background: '#f8fafc',
-    border: '1px solid #cbd5e1',
+    background: 'rgba(15, 23, 42, 0.72)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
     borderRadius: '12px',
     padding: '0.45rem 0.85rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
     flexWrap: 'wrap',
   },
   dateInput: {
-    border: '1px solid #cbd5e1',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
     borderRadius: '8px',
     padding: '0.4rem 0.65rem',
     fontSize: '0.83rem',
-    color: '#0f172a',
+    color: '#ffffff',
     fontWeight: 600,
     outline: 'none',
-    background: '#ffffff',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+    background: 'rgba(255, 255, 255, 0.08)',
     cursor: 'pointer',
   },
   presetGroup: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    background: '#eef2ff',
+    background: 'rgba(255, 255, 255, 0.06)',
     padding: '4px',
     borderRadius: '10px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
     marginLeft: '0.4rem',
   },
   presetBtn: (active) => ({
@@ -5273,10 +5318,9 @@ const styles = {
     fontWeight: active ? 800 : 700,
     borderRadius: '8px',
     border: 'none',
-    background: active ? '#ffffff' : 'transparent',
-    color: active ? '#1e293b' : '#475569',
+    background: active ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+    color: active ? '#38bdf8' : 'rgba(255, 255, 255, 0.72)',
     cursor: 'pointer',
-    boxShadow: active ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
     transition: 'all 0.15s ease',
   }),
 
@@ -5290,9 +5334,9 @@ const styles = {
     gap: '0.4rem',
     borderRadius: '9px',
     cursor: 'pointer',
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    color: '#475569',
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
+    color: '#ffffff',
   },
   exportBtn: {
     padding: '0.6rem 1.15rem',
@@ -5303,9 +5347,9 @@ const styles = {
     gap: '0.4rem',
     borderRadius: '9px',
     cursor: 'pointer',
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    color: '#334155',
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
+    color: '#ffffff',
   },
   vendorBtn: {
     padding: '0.6rem 1.15rem',
@@ -5316,10 +5360,9 @@ const styles = {
     gap: '0.4rem',
     borderRadius: '9px',
     cursor: 'pointer',
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-    color: '#047857',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    background: 'rgba(16, 185, 129, 0.16)',
+    border: '1px solid rgba(16, 185, 129, 0.35)',
+    color: '#34d399',
   },
   partyBtn: {
     padding: '0.6rem 1.15rem',
@@ -5330,10 +5373,9 @@ const styles = {
     gap: '0.4rem',
     borderRadius: '9px',
     cursor: 'pointer',
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    color: '#1d4ed8',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    background: 'rgba(56, 189, 248, 0.16)',
+    border: '1px solid rgba(56, 189, 248, 0.35)',
+    color: '#38bdf8',
   },
   pdfBtn: {
     padding: '0.6rem 1.15rem',
@@ -5344,9 +5386,9 @@ const styles = {
     gap: '0.4rem',
     borderRadius: '9px',
     cursor: 'pointer',
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    color: '#1d4ed8',
+    background: 'rgba(56, 189, 248, 0.16)',
+    border: '1px solid rgba(56, 189, 248, 0.35)',
+    color: '#38bdf8',
   },
   addInwardStockBtn: {
     padding: '0.6rem 1.15rem',
@@ -5360,7 +5402,7 @@ const styles = {
     background: '#10b981',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
   },
   outwardBtn: {
     padding: '0.6rem 1.15rem',
@@ -5371,9 +5413,9 @@ const styles = {
     gap: '0.4rem',
     borderRadius: '9px',
     cursor: 'pointer',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#dc2626',
+    background: 'rgba(239, 68, 68, 0.18)',
+    border: '1px solid rgba(239, 68, 68, 0.4)',
+    color: '#f87171',
   },
   bulkInwardBtn: {
     padding: '0.6rem 1.15rem',
@@ -5387,7 +5429,7 @@ const styles = {
     background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
+    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
   },
   addSkuBtn: {
     padding: '0.6rem 1.15rem',
@@ -5401,14 +5443,14 @@ const styles = {
     background: '#10b981',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
   },
   moreBtn: {
     padding: '0.6rem 0.8rem',
     borderRadius: '9px',
-    border: '1px solid #cbd5e1',
-    background: '#ffffff',
-    color: '#475569',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
+    background: 'rgba(255, 255, 255, 0.08)',
+    color: '#ffffff',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -5418,14 +5460,16 @@ const styles = {
   tablePanel: {
     borderRadius: '14px',
     overflow: 'hidden',
-    border: '1px solid #e2e8f0',
-    background: '#ffffff',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.14)',
+    background: 'rgba(15, 23, 42, 0.72)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
   },
   tableHeaderRow: {
-    background: 'var(--bg-th, #f1f5f9)',
-    color: 'var(--text-primary, #1e293b)',
-    borderBottom: '2px solid var(--border-light, #cbd5e1)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    color: '#ffffff',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.14)',
   },
   emptyState: {
     padding: '4rem 1rem',
@@ -5442,8 +5486,8 @@ const styles = {
   errorBox: {
     padding: '2rem',
     textAlign: 'center',
-    background: '#fef2f2',
-    color: '#dc2626',
+    background: 'rgba(239, 68, 68, 0.16)',
+    color: '#f87171',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -5468,7 +5512,7 @@ const styles = {
     letterSpacing: '0.04em',
     cursor: 'pointer',
     userSelect: 'none',
-    color: 'var(--text-primary, #1e293b)',
+    color: 'rgba(255, 255, 255, 0.78)',
   },
   thStatic: {
     padding: '0.9rem 1rem',
@@ -5476,7 +5520,7 @@ const styles = {
     fontSize: '0.75rem',
     fontWeight: 800,
     letterSpacing: '0.04em',
-    color: 'var(--text-primary, #1e293b)',
+    color: 'rgba(255, 255, 255, 0.78)',
   },
   itemCell: {
     display: 'flex',
@@ -5488,11 +5532,10 @@ const styles = {
     height: '44px',
     borderRadius: '10px',
     overflow: 'hidden',
-    background: '#f8fafc',
-    border: '1px solid #cbd5e1',
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
     flexShrink: 0,
     position: 'relative',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
   },
   itemImg: {
     width: '100%',
@@ -5502,57 +5545,60 @@ const styles = {
   imgPlaceholder: {
     width: '100%',
     height: '100%',
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '1rem',
     fontWeight: 800,
-    color: '#0284c7',
-    background: '#f0f9ff',
+    color: '#38bdf8',
+    background: 'rgba(56, 189, 248, 0.15)',
+    border: '1px solid rgba(56, 189, 248, 0.3)',
+    borderRadius: '6px',
   },
   itemName: {
     fontWeight: 700,
-    color: '#0f172a',
+    color: '#ffffff',
     fontSize: '0.88rem',
   },
   itemMeta: {
     fontSize: '0.7rem',
-    color: '#64748b',
+    color: 'rgba(255, 255, 255, 0.65)',
     marginTop: '2px',
   },
   skuText: {
     fontFamily: 'monospace',
     fontSize: '0.82rem',
-    color: '#0284c7',
-    background: '#f0f9ff',
+    color: '#38bdf8',
+    background: 'rgba(56, 189, 248, 0.16)',
     padding: '0.25rem 0.6rem',
     borderRadius: '6px',
-    border: '1px solid #bae6fd',
+    border: '1px solid rgba(56, 189, 248, 0.35)',
     fontWeight: 700,
   },
   sizeBadge: {
     fontSize: '0.8rem',
     fontWeight: 700,
-    color: '#334155',
-    background: '#f8fafc',
+    color: '#ffffff',
+    background: 'rgba(255, 255, 255, 0.10)',
     padding: '0.25rem 0.6rem',
     borderRadius: '6px',
-    border: '1px solid #cbd5e1',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
   },
   sizeTagBadge: {
     fontSize: '0.75rem',
-    fontWeight: 500,
-    color: '#047857',
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
+    fontWeight: 600,
+    color: '#34d399',
+    background: 'rgba(16, 185, 129, 0.16)',
+    border: '1px solid rgba(16, 185, 129, 0.35)',
     padding: '3px 9px',
     borderRadius: '12px',
   },
   sizeTagBadgeOutward: {
     fontSize: '0.75rem',
-    fontWeight: 500,
-    color: '#b45309',
-    background: '#fffbeb',
-    border: '1px solid #fde68a',
+    fontWeight: 600,
+    color: '#fbbf24',
+    background: 'rgba(245, 158, 11, 0.16)',
+    border: '1px solid rgba(245, 158, 11, 0.35)',
     padding: '3px 9px',
     borderRadius: '12px',
   },
@@ -5562,9 +5608,9 @@ const styles = {
     borderRadius: '20px',
     fontSize: '0.82rem',
     fontWeight: 800,
-    backgroundColor: '#ecfdf5',
-    color: '#059669',
-    border: '1.5px solid #a7f3d0',
+    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    color: '#34d399',
+    border: '1.5px solid rgba(16, 185, 129, 0.35)',
   },
   qtyOutwardBadge: {
     display: 'inline-block',
@@ -5572,9 +5618,9 @@ const styles = {
     borderRadius: '20px',
     fontSize: '0.82rem',
     fontWeight: 800,
-    backgroundColor: '#fef2f2',
-    color: '#dc2626',
-    border: '1.5px solid #fecaca',
+    backgroundColor: 'rgba(239, 68, 68, 0.16)',
+    color: '#f87171',
+    border: '1.5px solid rgba(239, 68, 68, 0.35)',
   },
   actionsCell: {
     display: 'flex',

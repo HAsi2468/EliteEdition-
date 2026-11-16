@@ -150,6 +150,12 @@ const createInventory = async (req, res) => {
 };
 
 
+// Cache Uniware API image lookups (skuUpper -> { imageUrl, ts })
+const uniwareImageCache = new Map();
+const UNIWARE_IMG_HIT_TTL_MS = 12 * 60 * 60 * 1000;
+const UNIWARE_IMG_MISS_TTL_MS = 30 * 60 * 1000;
+let isBgUniwareSyncRunning = false;
+
 const getInventory = async (req, res) => {
   try {
     const { search, excludeUniware, facility, limit, page } = req.query;
@@ -196,7 +202,197 @@ const getInventory = async (req, res) => {
     }
 
     const items = await query;
-    const mapped = items.map(item => ({ ...item, id: item._id.toString() }));
+    const { normalizeImageUrl, extractApiImageUrl } = require('../utils/imageUrlHelper');
+
+    // Enrich missing imageUrl & itemName from InventoryProduct, Product, and Design
+    const needEnrichBaseSkus = new Set();
+    const imgByBase = new Map();
+    const descByBase = new Map();
+
+    const extractDesignCandidates = (skuStr) => {
+      const base = extractBaseSku(skuStr || '').trim();
+      if (!base) return [];
+      return [base.toUpperCase()];
+    };
+
+    items.forEach((it) => {
+      const sku = (it.skuCode || it.itemName || '').trim();
+      if (!sku) return;
+      const baseK = extractBaseSku(sku).trim().toUpperCase();
+      const fullK = sku.toUpperCase();
+      const cleanImg = normalizeImageUrl(extractApiImageUrl(it) || it.imageUrl);
+      if (cleanImg) {
+        if (!imgByBase.has(fullK)) imgByBase.set(fullK, cleanImg);
+        if (baseK && !imgByBase.has(baseK)) imgByBase.set(baseK, cleanImg);
+      } else if (baseK) {
+        needEnrichBaseSkus.add(extractBaseSku(sku).trim());
+      }
+    });
+
+    if (needEnrichBaseSkus.size > 0) {
+      const baseArr = Array.from(needEnrichBaseSkus).slice(0, 300);
+      const regexes = baseArr.map((s) => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+      const designCandidates = Array.from(new Set(baseArr.flatMap(extractDesignCandidates)));
+      const [catProds, masterProds] = await Promise.all([
+        db.InventoryProduct.find(
+          { $or: [{ skuCode: { $in: regexes } }, { 'brandCodes.code': { $in: regexes } }] },
+          { skuCode: 1, imageUrl: 1, description: 1, brandCodes: 1, customFieldValues: 1, itemDetailFieldDTOList: 1 }
+        ).lean().catch(() => []),
+        db.Product ? db.Product.find(
+          { $or: [{ skuCode: { $in: [...baseArr, ...regexes] } }, { 'brandCodes.code': { $in: regexes } }] },
+          { skuCode: 1, imageUrl: 1, description: 1, brandCodes: 1, customFieldValues: 1, itemDetailFieldDTOList: 1 }
+        ).lean().catch(() => []) : Promise.resolve([]),
+      ]);
+
+      [...catProds, ...masterProds].forEach((cp) => {
+        if (!cp) return;
+        const cleanImg = normalizeImageUrl(extractApiImageUrl(cp) || cp.imageUrl);
+        if (cp.skuCode) {
+          const fullK = cp.skuCode.trim().toUpperCase();
+          const baseK = extractBaseSku(cp.skuCode).trim().toUpperCase();
+          if (cleanImg) {
+            if (!imgByBase.has(fullK)) imgByBase.set(fullK, cleanImg);
+            if (baseK && !imgByBase.has(baseK)) imgByBase.set(baseK, cleanImg);
+          }
+          if (cp.description && !/^(unnamed product|uniware sku)$/i.test(cp.description.trim())) {
+            if (!descByBase.has(fullK)) descByBase.set(fullK, cp.description.trim());
+            if (baseK && !descByBase.has(baseK)) descByBase.set(baseK, cp.description.trim());
+          }
+        }
+        if (cleanImg && Array.isArray(cp.brandCodes)) {
+          cp.brandCodes.forEach((bc) => {
+            const code = typeof bc === 'string' ? bc : (bc?.code || bc?.brandCode);
+            if (code) {
+              const ck = String(code).trim().toUpperCase();
+              const cb = extractBaseSku(ck).trim().toUpperCase();
+              if (!imgByBase.has(ck)) imgByBase.set(ck, cleanImg);
+              if (cb && !imgByBase.has(cb)) imgByBase.set(cb, cleanImg);
+            }
+          });
+        }
+      });
+    }
+
+    const mapped = items.map((item) => {
+      const sku = (item.skuCode || item.itemName || '').trim();
+      const fullK = sku.toUpperCase();
+      const baseK = extractBaseSku(sku).trim().toUpperCase();
+      const designKeys = extractDesignCandidates(sku);
+      let resolvedImg =
+        normalizeImageUrl(extractApiImageUrl(item) || item.imageUrl) ||
+        imgByBase.get(fullK) ||
+        imgByBase.get(baseK) ||
+        '';
+      if (!resolvedImg) {
+        for (const dk of designKeys) {
+          if (imgByBase.has(dk)) {
+            resolvedImg = imgByBase.get(dk);
+            break;
+          }
+        }
+      }
+      return {
+        ...item,
+        id: item._id.toString(),
+        imageUrl: resolvedImg,
+        productImage: resolvedImg,
+      };
+    });
+
+    // Non-blocking throttled background Uniware image lookup (newest-first, single-flight, avoids 429)
+    const nowTs = Date.now();
+    const missingSkus = [];
+    const missingBaseSet = new Set();
+    const mappedNewestFirst = [...mapped].sort(
+      (a, b) => new Date(b.created_date_time || b.createdAt || 0) - new Date(a.created_date_time || a.createdAt || 0)
+    );
+    logger.info(`[INVENTORY] Top3 newest: ${mappedNewestFirst.slice(0, 3).map(m => `${m.skuCode}=${m.imageUrl ? 'HAS_IMG' : 'EMPTY'}`).join(', ')}`);
+    for (const m of mappedNewestFirst) {
+      if (m.imageUrl) continue;
+      const skuKey = String(m.skuCode || m.itemName || '').trim();
+      if (!skuKey) continue;
+      const upperKey = skuKey.toUpperCase();
+      const baseKey = (extractBaseSku(skuKey) || skuKey).trim().toUpperCase();
+      const cached = uniwareImageCache.get(upperKey) || uniwareImageCache.get(baseKey);
+      if (cached) {
+        const ttl = cached.imageUrl ? UNIWARE_IMG_HIT_TTL_MS : UNIWARE_IMG_MISS_TTL_MS;
+        if (nowTs - cached.ts < ttl) {
+          if (cached.imageUrl) {
+            m.imageUrl = cached.imageUrl;
+            m.productImage = cached.imageUrl;
+          }
+          continue;
+        }
+      }
+      if (!missingBaseSet.has(baseKey) && missingSkus.length < 120) {
+        missingBaseSet.add(baseKey);
+        missingSkus.push(skuKey);
+      }
+    }
+
+    if (missingSkus.length > 0 && !isBgUniwareSyncRunning) {
+      isBgUniwareSyncRunning = true;
+      logger.info(`[INVENTORY] BgUniware queued ${missingSkus.length} SKUs (sample: ${missingSkus.slice(0, 6).join(', ')})`);
+      setImmediate(async () => {
+        try {
+          const { getAccessToken, fetchProductData } = require('../services/api.service');
+          const token = await getAccessToken();
+          if (!token) return;
+          const fetchedByBase = new Map();
+          // Process 2 at a time with 350ms spacing so Uniware never returns 429
+          for (let i = 0; i < missingSkus.length; i += 2) {
+            const batch = missingSkus.slice(i, i + 2);
+            await Promise.allSettled(
+              batch.map(async (sku) => {
+                const baseKey = (extractBaseSku(sku) || sku).trim().toUpperCase();
+                try {
+                  const uwRes = await fetchProductData(sku, token);
+                  const elements = Array.isArray(uwRes?.elements) ? uwRes.elements : [];
+                  const hit = elements.find((el) => el && el.imageUrl);
+                  const cleanUrl = hit ? normalizeImageUrl(hit.imageUrl) : '';
+                  uniwareImageCache.set(sku.toUpperCase(), { imageUrl: cleanUrl || '', ts: Date.now() });
+                  if (baseKey) uniwareImageCache.set(baseKey, { imageUrl: cleanUrl || '', ts: Date.now() });
+                  if (cleanUrl) {
+                    fetchedByBase.set(sku.toUpperCase(), cleanUrl);
+                    if (baseKey) fetchedByBase.set(baseKey, cleanUrl);
+                  }
+                } catch {
+                  uniwareImageCache.set(sku.toUpperCase(), { imageUrl: '', ts: Date.now() });
+                  if (baseKey) uniwareImageCache.set(baseKey, { imageUrl: '', ts: Date.now() });
+                }
+              })
+            );
+            if (i + 2 < missingSkus.length) {
+              await new Promise((r) => setTimeout(r, 350));
+            }
+          }
+
+          if (fetchedByBase.size > 0) {
+            await Promise.allSettled(
+              Array.from(fetchedByBase.entries()).flatMap(([skuUp, imgUrl]) => {
+                const skuRegex = new RegExp(`^${skuUp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([-_]|$)`, 'i');
+                const emptyImgCond = { $or: [{ imageUrl: { $exists: false } }, { imageUrl: '' }, { imageUrl: null }] };
+                const ops = [
+                  db.Inventory.updateMany({ skuCode: skuRegex, ...emptyImgCond }, { $set: { imageUrl: imgUrl } }),
+                ];
+                if (db.InventoryProduct) {
+                  ops.push(db.InventoryProduct.updateMany({ skuCode: skuRegex, ...emptyImgCond }, { $set: { imageUrl: imgUrl } }));
+                }
+                if (db.Product) {
+                  ops.push(db.Product.updateMany({ skuCode: skuRegex, ...emptyImgCond }, { $set: { imageUrl: imgUrl } }));
+                }
+                return ops;
+              })
+            );
+            inventoryDefaultCache = null;
+          }
+        } catch (uwErr) {
+          logger.warn(`[INVENTORY] Background Uniware image sync skipped: ${uwErr.message}`);
+        } finally {
+          isBgUniwareSyncRunning = false;
+        }
+      });
+    }
 
     if (isDefaultQuery) {
       inventoryDefaultCache = mapped;

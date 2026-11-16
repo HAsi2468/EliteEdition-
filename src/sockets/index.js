@@ -187,6 +187,10 @@ const setupSockets = (io) => {
     }
   });
 
+  try {
+    require('../controllers/communicationAdvanced.controller').startChatBackgroundWorkers(io);
+  } catch (e) {}
+
   io.on('connection', (socket) => {
     const { id, companyId } = socket.data?.user || { id: socket.userId, companyId: 'digital_print' };
     console.log(`User connected to socket: ${socket.id} (user: ${id})`);

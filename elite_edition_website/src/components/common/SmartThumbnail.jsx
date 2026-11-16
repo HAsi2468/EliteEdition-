@@ -91,7 +91,8 @@ export function SmartThumbnail({
       thumbnail: true,
       width: 120,
       sku,
-      identifiers
+      identifiers,
+      category
     });
     for (const u of resolved) {
       if (u && !list.includes(u)) {
@@ -99,7 +100,7 @@ export function SmartThumbnail({
       }
     }
     return list;
-  }, [sourceUrl, itemTitle, sku, identifiers]);
+  }, [sourceUrl, itemTitle, sku, identifiers, category]);
 
   const [candidateIdx, setCandidateIdx] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -238,16 +239,25 @@ export function SmartThumbnail({
 
   // Initials and silhouette fallback category
   const itemInitials = useMemo(() => {
-    const clean = itemTitle.trim().replace(/^JOB NO\.?-?\s*/i, '').replace(/^(ORD|INV|FAB)-/i, '');
+    const preferred = (sku || itemTitle || alt || '').trim();
+    const clean = preferred
+      .replace(/^JOB NO\.?-?\s*/i, '')
+      .replace(/^(ORD|INV|FAB)-/i, '')
+      .replace(/^(UNNAMED PRODUCT|UNIWARE SKU|PRODUCT|ITEM)$/i, '');
+    if (sku && sku.trim()) {
+      return sku.trim().slice(0, 6).toUpperCase();
+    }
     const parts = clean.split(/[\s_-]+/).filter(Boolean);
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return clean.slice(0, 2).toUpperCase() || 'IT';
-  }, [itemTitle]);
+    return clean.slice(0, 4).toUpperCase() || 'SKU';
+  }, [sku, itemTitle, alt]);
 
   const CategoryIcon = useMemo(() => {
     switch (category) {
+      case 'catalog':
+      case 'inventory':
       case 'fabric':
         return Package;
       case 'invoice':
@@ -294,6 +304,7 @@ export function SmartThumbnail({
             height={heightPx}
             loading="lazy"
             decoding="async"
+            referrerPolicy="no-referrer"
             tabIndex={-1}
             onError={handleImageError}
             onLoad={handleImageLoad}
@@ -301,8 +312,8 @@ export function SmartThumbnail({
           />
         ) : (
           /* Resilient Silhouette / Initials Badge */
-          <div className={`smart-thumb-fallback category-${category}`} title={itemTitle}>
-            <CategoryIcon size={Math.round(widthPx * 0.42)} className="smart-fallback-icon" />
+          <div className={`smart-thumb-fallback category-${category}`} title={itemTitle || sku}>
+            <CategoryIcon size={Math.round(widthPx * 0.38)} className="smart-fallback-icon" />
             <span className="smart-fallback-initials tabular-nums">{itemInitials}</span>
           </div>
         )}
@@ -327,6 +338,7 @@ export function SmartThumbnail({
               alt={itemTitle}
               loading="eager"
               decoding="async"
+              referrerPolicy="no-referrer"
               className="smart-peek-hd-img"
             />
             <span className="smart-peek-category-badge">{category.toUpperCase()}</span>
@@ -401,6 +413,7 @@ export function SmartThumbnail({
                 alt={itemTitle}
                 loading="eager"
                 decoding="async"
+                referrerPolicy="no-referrer"
                 className="smart-lightbox-img"
                 style={{
                   transform: `scale(${lightboxZoom})`,

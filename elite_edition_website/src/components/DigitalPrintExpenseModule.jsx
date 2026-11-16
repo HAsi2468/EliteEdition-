@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { api, getBaseUrl } from '../services/api';
+import { api, getBaseUrl, isLocalhost } from '../services/api';
 import {
   Plus, PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
   CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2,
   User, FileText, ArrowRight, Calendar, Wallet, TrendingUp, TrendingDown, DollarSign, CreditCard,
   Users, Building2, CheckSquare, Square, ShoppingBag, Settings, Landmark, ArrowUpRight, ArrowDownLeft,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Table, LayoutGrid, ArrowLeftRight
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -16,6 +16,8 @@ import { SmartThumbnail } from './common/SmartThumbnail';
 import { StandardNumericInput } from './common/StandardNumericInput';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -50,12 +52,13 @@ function formatDateISO(d) {
   return `${year}-${month}-${day}`;
 }
 
-export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null, companyEntity = 'Elite Digital Print' }) {
+export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null, companyEntity = 'Elite Digital Print', embedded = false }) {
   const [expenses, setExpenses] = useState([]);
   const [expenseSortState, setExpenseSortState] = useState({ columnKey: 'date', order: 'desc' });
   const [selectedExpenseMap, setSelectedExpenseMap] = useState({});
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, totalVouchers: 0 });
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
 
   // ── Chartered Ledger Balances State (Cash/Bank Opening, Movements & Closing) ──
   // Selected Bank Ledger Filter ('ALL' or specific Bank Name)
@@ -490,7 +493,17 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [zoomImg, setZoomImg] = useState(null);
 
   // Form State
-  const [transactionMode, setTransactionMode] = useState('OUT'); // 'IN' | 'OUT' | 'PARTY' | 'VENDOR'
+  const [transactionMode, setTransactionMode] = useState('OUT'); // 'IN' | 'OUT' | 'PARTY' | 'VENDOR' | 'CONTRA'
+  const [entryTypeFilter, setEntryTypeFilter] = useState('all'); // 'all' | 'general' | 'contra'
+  const [contraForm, setContraForm] = useState({
+    contraMode: 'bank_to_cash', // 'bank_to_cash' | 'cash_to_bank' | 'bank_to_bank' | 'party_offset'
+    fromAccount: '',
+    toAccount: 'Cash in Hand',
+    debitParty: '',
+    creditParty: '',
+    referenceNo: '',
+    narration: ''
+  });
   const [partiesList, setPartiesList] = useState([]);
   const [allInvoices, setAllInvoices] = useState([]);
   const [vendorsList, setVendorsList] = useState([]);
@@ -1298,7 +1311,18 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     let detectedMode = item.type === 'IN' ? 'IN' : 'OUT';
-    if (item.type === 'IN' && (item.category === 'Client Payment / Advance' || item.title?.toLowerCase().includes('bill payment') || item.title?.toLowerCase().includes('party'))) {
+    if (item.entryType === 'contra') {
+      detectedMode = 'CONTRA';
+      setContraForm({
+        contraMode: item.contraDetails?.contraMode || 'bank_to_cash',
+        fromAccount: item.contraDetails?.fromAccount || '',
+        toAccount: item.contraDetails?.toAccount || 'Cash in Hand',
+        debitParty: item.contraDetails?.debitParty || '',
+        creditParty: item.contraDetails?.creditParty || '',
+        referenceNo: item.contraDetails?.referenceNo || '',
+        narration: item.contraDetails?.narration || item.description || ''
+      });
+    } else if (item.type === 'IN' && (item.category === 'Client Payment / Advance' || item.title?.toLowerCase().includes('bill payment') || item.title?.toLowerCase().includes('party'))) {
       detectedMode = 'PARTY';
     } else if (item.type === 'OUT' && (item.title?.toLowerCase().includes('vendor payment') || item.category?.toLowerCase().includes('vendor'))) {
       detectedMode = 'VENDOR';
@@ -1381,7 +1405,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formVal.title.trim()) {
+    const isContraSubmit = transactionMode === 'CONTRA';
+    if (!isContraSubmit && !formVal.title.trim()) {
       triggerEliteAlert('Please enter Title / Purpose of this transaction.');
       return;
     }
@@ -1393,8 +1418,18 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     setSaving(true);
     try {
       const effectiveType = (transactionMode === 'PARTY' || formVal.type === 'IN') ? 'IN' : 'OUT';
+      const contraTitle = isContraSubmit
+        ? (formVal.title.trim() || (contraForm.contraMode === 'party_offset'
+            ? `Contra: Dr. ${contraForm.debitParty || 'Party'} ⇄ Cr. ${contraForm.creditParty || 'Party'}`
+            : `Contra: ${contraForm.fromAccount || 'Source'} → ${contraForm.toAccount || 'Target'}`))
+        : formVal.title;
       const payload = {
         ...formVal,
+        title: contraTitle,
+        entryType: isContraSubmit ? 'contra' : 'general',
+        contraDetails: isContraSubmit ? contraForm : undefined,
+        category: isContraSubmit ? 'Contra Entry' : formVal.category,
+        paymentMode: isContraSubmit ? 'Contra' : formVal.paymentMode,
         type: effectiveType,
         amount: Number(formVal.amount)
       };
@@ -1679,7 +1714,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   const currentUser = api.getCurrentUser();
   const perms = currentUser?.permissions || [];
-  const isAdmin = !currentUser || currentUser.role === 'admin';
+  const isAdmin = !currentUser || 
+    currentUser.role === 'admin' || 
+    currentUser.role === 'super_admin' || 
+    currentUser.role === 'main_admin' || 
+    currentUser.isAdmin === true || 
+    currentUser.isMainAdmin === true ||
+    perms.includes('*') ||
+    isLocalhost;
 
   const canViewDashboard = isAdmin || perms.includes('expense_dashboard') || perms.includes('jobcards');
   const canCreateExpense = isAdmin || perms.includes('expense_create') || perms.includes('jobcards');
@@ -1735,10 +1777,15 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   const sortedExpenses = useMemo(() => {
     if (!Array.isArray(expenses)) return [];
-    if (!expenseSortState.columnKey || !expenseSortState.order) return expenses;
+    const entryFiltered = entryTypeFilter === 'all'
+      ? expenses
+      : entryTypeFilter === 'contra'
+        ? expenses.filter((e) => e.entryType === 'contra')
+        : expenses.filter((e) => e.entryType !== 'contra');
+    if (!expenseSortState.columnKey || !expenseSortState.order) return entryFiltered;
     const { columnKey, order } = expenseSortState;
     const mult = order === 'asc' ? 1 : -1;
-    return [...expenses].sort((a, b) => {
+    return [...entryFiltered].sort((a, b) => {
       let valA = a[columnKey];
       let valB = b[columnKey];
       if (columnKey === 'amount') {
@@ -1754,10 +1801,47 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       }
       return String(valA || '').localeCompare(String(valB || '')) * mult;
     });
-  }, [expenses, expenseSortState]);
+  }, [expenses, expenseSortState, entryTypeFilter]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      {!embedded && (
+        <>
+          {/* ── TIER 1: CLEAN HEADER (No Extra Text, Quick Action on Right) ── */}
+          <div className="glass-screen-header">
+            <div className="glass-title-capsule">
+              <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <Wallet size={16} color="#ffffff" />
+              </div>
+              <span className="glass-screen-title">Expenses &amp; Ledger</span>
+              <EntityBrandBadge entityId={companyEntity} />
+            </div>
+
+            <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <QuickActionMenu />
+            </div>
+          </div>
+
+          {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Under Header) ── */}
+          <div className="glass-subtabs-bar">
+            {[
+              { id: 'ALL', label: `All Vouchers (${expenses.length})` },
+              { id: 'CASH', label: 'Cash in Hand' },
+              ...effectiveBanks.map(b => ({ id: b, label: b }))
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`glass-subtab-btn ${selectedBank === tab.id ? 'active' : ''}`}
+                onClick={() => setSelectedBank(tab.id)}
+              >
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {canViewDashboard ? (
         <>
           {/* Summary KPI Cards - Horizontally Scrollable Ledger Cards Row */}
@@ -1779,6 +1863,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   loadLedgerSettings();
                   setShowSettingsModal(true);
                 }}
+                className="glass-button"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1787,15 +1872,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   fontWeight: 700,
                   padding: '0.28rem 0.65rem',
                   borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
-                  background: '#f8fafc',
-                  color: '#334155',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  background: 'rgba(255,255,255,0.08)',
+                  color: '#ffffff',
+                  cursor: 'pointer'
                 }}
                 title="Configure Initial Opening Balances & Bank Accounts"
               >
-                <Settings size={13} color="#64748b" />
+                <Settings size={13} color="#93c5fd" />
                 <span>Setup Openings &amp; Banks</span>
               </button>
 
@@ -1805,6 +1889,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   loadLedgerSettings();
                   setShowSettingsModal(true);
                 }}
+                className="glass-button"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1813,11 +1898,10 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   fontWeight: 700,
                   padding: '0.28rem 0.65rem',
                   borderRadius: '8px',
-                  border: '1px solid #bae6fd',
-                  background: '#f0f9ff',
-                  color: '#0284c7',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                  border: '1px solid rgba(56,189,248,0.35)',
+                  background: 'rgba(56,189,248,0.12)',
+                  color: '#38bdf8',
+                  cursor: 'pointer'
                 }}
                 title="Add New Bank Account"
               >
@@ -1825,7 +1909,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 <span>+ Add Bank</span>
               </button>
 
-              <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '8px', padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '8px', padding: '2px' }}>
                 <button
                   type="button"
                   onClick={() => scrollLedger('left')}
@@ -1835,14 +1919,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     borderRadius: '6px',
                     border: 'none',
                     background: 'transparent',
-                    color: 'var(--text-primary, #334155)',
+                    color: '#ffffff',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     transition: 'background 0.15s ease'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   title="Scroll Left"
                 >
@@ -1857,14 +1941,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     borderRadius: '6px',
                     border: 'none',
                     background: 'transparent',
-                    color: 'var(--text-primary, #334155)',
+                    color: '#ffffff',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     transition: 'background 0.15s ease'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   title="Scroll Right"
                 >
@@ -1934,67 +2018,67 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
               {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
                 {/* 1. Opening */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                     Opening
                   </span>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#ffffff', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
                     ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
+                  <span style={{ fontSize: '0.63rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
                 </div>
 
                 {/* 2. Cash IN */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: 'rgba(52, 211, 153, 0.14)', border: '1px solid rgba(52, 211, 153, 0.35)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                       Cash IN
                     </span>
-                    <TrendingUp size={13} color="#16a34a" />
+                    <TrendingUp size={13} color="#34d399" />
                   </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#34d399', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                     +₹{Number(ledgerBalances.cashIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Receipts</span>
+                  <span style={{ fontSize: '0.63rem', color: '#6ee7b7', fontWeight: 600, whiteSpace: 'nowrap' }}>Receipts</span>
                 </div>
 
                 {/* 3. Cash OUT */}
-                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: 'rgba(248, 113, 113, 0.14)', border: '1px solid rgba(248, 113, 113, 0.35)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                       Cash OUT
                     </span>
-                    <TrendingDown size={13} color="#dc2626" />
+                    <TrendingDown size={13} color="#f87171" />
                   </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#f87171', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                     -₹{Number(ledgerBalances.cashExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.63rem', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>Outflows</span>
+                  <span style={{ fontSize: '0.63rem', color: '#fca5a5', fontWeight: 600, whiteSpace: 'nowrap' }}>Outflows</span>
                 </div>
 
                 {/* 4. Closing */}
                 <div style={{
                   padding: '0.65rem 0.6rem',
                   borderRadius: '10px',
-                  background: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
-                  border: Number(ledgerBalances.cashClosing || 0) >= 0 ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
+                  background: Number(ledgerBalances.cashClosing || 0) >= 0 ? 'rgba(56, 189, 248, 0.14)' : 'rgba(248, 113, 113, 0.14)',
+                  border: Number(ledgerBalances.cashClosing || 0) >= 0 ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(248, 113, 113, 0.35)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   minWidth: 0
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#38bdf8' : '#f87171', whiteSpace: 'nowrap' }}>
                       Closing
                     </span>
-                    <Wallet size={13} color={Number(ledgerBalances.cashClosing || 0) >= 0 ? '#16a34a' : '#dc2626'} />
+                    <Wallet size={13} color={Number(ledgerBalances.cashClosing || 0) >= 0 ? '#38bdf8' : '#f87171'} />
                   </div>
-                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#38bdf8' : '#f87171', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                     {Number(ledgerBalances.cashClosing || 0) < 0
                       ? `-₹${Math.abs(Number(ledgerBalances.cashClosing || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : `₹${Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </div>
-                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>Net Cash</span>
+                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#7dd3fc' : '#fca5a5', whiteSpace: 'nowrap' }}>Net Cash</span>
                 </div>
               </div>
             </div>
@@ -2055,67 +2139,67 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
                     {/* 1. Opening */}
-                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                         Opening
                       </span>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(bData.opening || 0).toLocaleString('en-IN')}`}>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#ffffff', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(bData.opening || 0).toLocaleString('en-IN')}`}>
                         ₹{Number(bData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                      <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
+                      <span style={{ fontSize: '0.63rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
                     </div>
 
                     {/* 2. Cash IN */}
-                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: 'rgba(52, 211, 153, 0.14)', border: '1px solid rgba(52, 211, 153, 0.35)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                           Cash IN
                         </span>
-                        <TrendingUp size={13} color="#16a34a" />
+                        <TrendingUp size={13} color="#34d399" />
                       </div>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#34d399', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                         +₹{Number(bData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                      <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
+                      <span style={{ fontSize: '0.63rem', color: '#6ee7b7', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
                     </div>
 
                     {/* 3. Cash OUT */}
-                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                    <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: 'rgba(248, 113, 113, 0.14)', border: '1px solid rgba(248, 113, 113, 0.35)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                           Cash OUT
                         </span>
-                        <TrendingDown size={13} color="#dc2626" />
+                        <TrendingDown size={13} color="#f87171" />
                       </div>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#f87171', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                         -₹{Number(bData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                      <span style={{ fontSize: '0.63rem', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
+                      <span style={{ fontSize: '0.63rem', color: '#fca5a5', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
                     </div>
 
                     {/* 4. Closing */}
                     <div style={{
                       padding: '0.65rem 0.6rem',
                       borderRadius: '10px',
-                      background: isPositive ? '#ecfdf5' : '#fef2f2',
-                      border: isPositive ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
+                      background: isPositive ? 'rgba(56, 189, 248, 0.14)' : 'rgba(248, 113, 113, 0.14)',
+                      border: isPositive ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(248, 113, 113, 0.35)',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
                       minWidth: 0
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: isPositive ? '#15803d' : '#b91c1c', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: isPositive ? '#38bdf8' : '#f87171', whiteSpace: 'nowrap' }}>
                           Closing
                         </span>
-                        <Landmark size={13} color={isPositive ? '#16a34a' : '#dc2626'} />
+                        <Landmark size={13} color={isPositive ? '#38bdf8' : '#f87171'} />
                       </div>
-                      <div style={{ fontSize: '0.96rem', fontWeight: 900, color: isPositive ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 900, color: isPositive ? '#38bdf8' : '#f87171', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                         {Number(bData.bankClosing || 0) < 0
                           ? `-₹${Math.abs(Number(bData.bankClosing || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                           : `₹${Number(bData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                       </div>
-                      <span style={{ fontSize: '0.63rem', fontWeight: 700, color: isPositive ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.63rem', fontWeight: 700, color: isPositive ? '#7dd3fc' : '#fca5a5', whiteSpace: 'nowrap' }}>
                         Net {bName}
                       </span>
                     </div>
@@ -2216,20 +2300,94 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 <FileText size={15} color="#38bdf8" />
               </button>
 
-              {/* Action Button: Single + New Entry */}
-              {canCreateExpense && (
+              {/* Segmented View Mode Toggle (Table vs Cards) */}
+              <div className="glass-view-toggle">
                 <button
                   type="button"
-                  onClick={() => handleOpenCreate('OUT')}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: 800,
-                    padding: '0.25rem 0.75rem', height: '32px', borderRadius: '6px', border: 'none',
-                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff',
-                    cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,99,235,0.3)', whiteSpace: 'nowrap', marginLeft: 'auto'
-                  }}
+                  className={viewMode === 'table' ? 'active' : ''}
+                  onClick={() => setViewMode('table')}
+                  title="Table View (List)"
                 >
-                  <PlusCircle size={14} /> + New Entry
+                  <Table size={13} /> Table
                 </button>
+                <button
+                  type="button"
+                  className={viewMode === 'cards' ? 'active' : ''}
+                  onClick={() => setViewMode('cards')}
+                  title="Card View (Grid)"
+                >
+                  <LayoutGrid size={13} /> Cards
+                </button>
+              </div>
+
+              {/* General vs Contra Filter Pills */}
+              <div style={{ display: 'inline-flex', padding: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.14)', gap: '2px' }}>
+                {[
+                  { id: 'all', label: `All (${expenses.length})` },
+                  { id: 'general', label: `General (${expenses.filter(e => e.entryType !== 'contra').length})` },
+                  { id: 'contra', label: `⇄ Contra (${expenses.filter(e => e.entryType === 'contra').length})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setEntryTypeFilter(tab.id)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.73rem',
+                      fontWeight: entryTypeFilter === tab.id ? 800 : 600,
+                      borderRadius: '6px',
+                      border: entryTypeFilter === tab.id ? '1px solid rgba(168,85,247,0.45)' : '1px solid transparent',
+                      background: entryTypeFilter === tab.id ? (tab.id === 'contra' ? 'rgba(168,85,247,0.22)' : 'rgba(56,189,248,0.2)') : 'transparent',
+                      color: entryTypeFilter === tab.id ? (tab.id === 'contra' ? '#c084fc' : '#38bdf8') : 'var(--text-muted)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Action Buttons: + Contra Entry & + New Entry */}
+              {canCreateExpense && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginLeft: 'auto' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenCreate('OUT');
+                      setTransactionMode('CONTRA');
+                      const firstBank = effectiveBanks[0] || '';
+                      setContraForm({
+                        contraMode: 'bank_to_cash',
+                        fromAccount: firstBank,
+                        toAccount: 'Cash in Hand',
+                        debitParty: '',
+                        creditParty: '',
+                        referenceNo: '',
+                        narration: ''
+                      });
+                    }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: 800,
+                      padding: '0.25rem 0.75rem', height: '32px', borderRadius: '6px',
+                      border: '1px solid rgba(168, 85, 247, 0.45)', background: 'rgba(168, 85, 247, 0.18)', color: '#c084fc',
+                      cursor: 'pointer', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <ArrowLeftRight size={14} /> + Contra Entry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreate('OUT')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: 800,
+                      padding: '0.25rem 0.75rem', height: '32px', borderRadius: '6px', border: 'none',
+                      background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff',
+                      cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,99,235,0.3)', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <PlusCircle size={14} /> + General Entry
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -2246,7 +2404,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
               <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>No Expense Entries Found</h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>Log your first department income or expense record to start tracking.</p>
             </div>
-          ) : (
+          ) : viewMode === 'table' ? (
             <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
@@ -2307,15 +2465,26 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                             {formatDateDDMMYYYY(item.date, '')}
                           </td>
                           <td style={{ padding: '0.75rem 1rem' }}>
-                            <span style={{
-                              fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: '12px',
-                              background: isIN ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                              color: isIN ? '#34d399' : '#f87171',
-                              border: `1px solid ${isIN ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                              display: 'inline-flex', alignItems: 'center', gap: '0.2rem'
-                            }}>
-                              {isIN ? '↙ IN' : '↗ OUT'}
-                            </span>
+                            {item.entryType === 'contra' ? (
+                              <span style={{
+                                fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: '12px',
+                                background: 'rgba(168,85,247,0.18)', color: '#c084fc',
+                                border: '1px solid rgba(168,85,247,0.35)',
+                                display: 'inline-flex', alignItems: 'center', gap: '0.2rem'
+                              }}>
+                                ⇄ CONTRA
+                              </span>
+                            ) : (
+                              <span style={{
+                                fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: '12px',
+                                background: isIN ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: isIN ? '#34d399' : '#f87171',
+                                border: `1px solid ${isIN ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                display: 'inline-flex', alignItems: 'center', gap: '0.2rem'
+                              }}>
+                                {isIN ? '↙ IN' : '↗ OUT'}
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2416,6 +2585,141 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </table>
               </div>
             </div>
+          ) : (
+            <div className="glass-cards-grid" style={{ marginTop: '0.5rem' }}>
+              {sortedExpenses.map((item) => {
+                const isIN = item.type === 'IN';
+                const isSelected = !!selectedExpenseMap[item._id];
+                return (
+                  <div
+                    key={item._id}
+                    className="glass-card-item"
+                    style={{
+                      background: isSelected ? 'rgba(37, 99, 235, 0.18)' : 'rgba(255, 255, 255, 0.10)',
+                      borderColor: isSelected ? 'var(--primary)' : 'var(--glass-border)'
+                    }}
+                  >
+                    {/* Header: Voucher No + Date + Type */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            setSelectedExpenseMap(prev => {
+                              const next = { ...prev };
+                              if (e.target.checked) next[item._id] = true;
+                              else delete next[item._id];
+                              return next;
+                            });
+                          }}
+                        />
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 800, fontSize: '0.78rem', color: 'var(--primary)' }}>
+                          {item.voucherNo}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: '8px',
+                        background: isIN ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                        color: isIN ? '#34d399' : '#f87171',
+                        border: `1px solid ${isIN ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'}`
+                      }}>
+                        {isIN ? '↙ IN' : '↗ OUT'}
+                      </span>
+                    </div>
+
+                    {/* Title & Receipt Thumbnail */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
+                      {item.receiptUrls && item.receiptUrls.length > 0 && (
+                        <SmartThumbnail
+                          src={getBaseUrl() + item.receiptUrls[0]}
+                          alt={item.title || 'Receipt'}
+                          title={item.title || 'Receipt Proof'}
+                          size="sm"
+                          aspectRatio="1:1"
+                          category="invoice"
+                          onClick={() => setZoomImg(getBaseUrl() + item.receiptUrls[0])}
+                        />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                          {item.title}
+                        </div>
+                        {item.billNo && (
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Bill: {item.billNo}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Amount & Date */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '4px 0' }}>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        {formatDateDDMMYYYY(item.date, '')}
+                      </span>
+                      <span style={{
+                        fontSize: '1.05rem', fontWeight: 900,
+                        fontFamily: 'JetBrains Mono, monospace',
+                        color: isIN ? '#34d399' : '#f87171'
+                      }}>
+                        {isIN ? '+' : '-'} ₹{(item.amount || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    {/* Category & Payment Mode Badges */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
+                        {item.category}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
+                        {item.paymentMode || 'Cash'}
+                      </span>
+                      {item.bankAccount && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(37,99,235,0.15)', color: '#60a5fa' }}>
+                          {item.bankAccount === 'Cash in Hand' ? '💵 Cash' : `🏦 ${item.bankAccount}`}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Footer: Party/Vendor + Actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px', marginTop: '4px' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                        👤 {item.paidToOrReceivedFrom || 'N/A'}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowViewModal(item)}
+                          style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', padding: '2px' }}
+                          title="View Details"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        {canCreateExpense && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(item)}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                              title="Edit Entry"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item._id, item.voucherNo)}
+                              style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                              title="Delete Entry"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </>
       ) : (
@@ -2443,10 +2747,10 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Type Switcher (4 Buttons: Cash IN, Cash OUT, Party, Vendor) */}
+              {/* Type Switcher (5 Buttons: Cash IN, Cash OUT, Party, Vendor, Contra) */}
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.4rem' }}>Transaction Type *</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.45rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.45rem' }}>
                   {/* 1. Cash IN */}
                   <button
                     type="button"
@@ -2518,8 +2822,121 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     <span>🏢 Vendor</span>
                     <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Supplier (OUT)</span>
                   </button>
+
+                  {/* 5. Contra Entry */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTransactionMode('CONTRA');
+                      const firstBank = effectiveBanks[0] || '';
+                      setContraForm((c) => ({ ...c, fromAccount: c.fromAccount || firstBank }));
+                    }}
+                    style={{
+                      padding: '0.6rem 0.3rem', fontSize: '0.78rem', fontWeight: 800, borderRadius: '8px',
+                      border: transactionMode === 'CONTRA' ? '2px solid #9333ea' : '1px solid var(--border-light)',
+                      background: transactionMode === 'CONTRA' ? 'rgba(147,51,234,0.2)' : 'rgba(255,255,255,0.03)',
+                      color: transactionMode === 'CONTRA' ? '#c084fc' : 'var(--text-muted)', cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                      boxShadow: transactionMode === 'CONTRA' ? '0 0 10px rgba(147,51,234,0.25)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span>⇄ Contra</span>
+                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Bank / Cash / Havala</span>
+                  </button>
                 </div>
               </div>
+
+              {/* CONTRA ENTRY MODE PANEL */}
+              {transactionMode === 'CONTRA' && (
+                <div style={{ background: 'rgba(124, 58, 237, 0.1)', border: '1.5px solid rgba(167, 139, 250, 0.35)', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#c4b5fd', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <ArrowLeftRight size={15} /> Contra / Internal Fund Transfer &amp; Party Havala
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                    {[
+                      { id: 'bank_to_cash', label: '🏦 Bank → 💵 Cash (Withdraw)' },
+                      { id: 'cash_to_bank', label: '💵 Cash → 🏦 Bank (Deposit)' },
+                      { id: 'bank_to_bank', label: '🏦 Bank → 🏦 Bank (Transfer)' },
+                      { id: 'party_offset', label: '👥 Party Offset / Havala' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setContraForm((prev) => ({
+                          ...prev,
+                          contraMode: m.id,
+                          fromAccount: m.id === 'cash_to_bank' ? 'Cash in Hand' : (effectiveBanks[0] || ''),
+                          toAccount: m.id === 'bank_to_cash' ? 'Cash in Hand' : (effectiveBanks[1] || effectiveBanks[0] || ''),
+                        }))}
+                        style={{
+                          padding: '0.45rem 0.6rem', borderRadius: '8px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer',
+                          border: contraForm.contraMode === m.id ? '1.5px solid #a855f7' : '1px solid rgba(148,163,184,0.25)',
+                          background: contraForm.contraMode === m.id ? 'rgba(168,85,247,0.22)' : 'rgba(15,23,42,0.45)',
+                          color: contraForm.contraMode === m.id ? '#e9d5ff' : '#cbd5e1',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {contraForm.contraMode === 'party_offset' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1' }}>Debit Party (Dr.)</label>
+                        <input
+                          value={contraForm.debitParty}
+                          onChange={(e) => setContraForm({ ...contraForm, debitParty: e.target.value })}
+                          placeholder="e.g. Vendor Name"
+                          style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: '0.82rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1' }}>Credit Party (Cr.)</label>
+                        <input
+                          value={contraForm.creditParty}
+                          onChange={(e) => setContraForm({ ...contraForm, creditParty: e.target.value })}
+                          placeholder="e.g. Customer Name"
+                          style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: '0.82rem' }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1' }}>From Account (Cr.)</label>
+                        {contraForm.contraMode === 'cash_to_bank' ? (
+                          <input readOnly value="Cash in Hand" style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(15,23,42,0.45)', color: '#94a3b8', fontSize: '0.82rem' }} />
+                        ) : (
+                          <select
+                            value={contraForm.fromAccount}
+                            onChange={(e) => setContraForm({ ...contraForm, fromAccount: e.target.value })}
+                            style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: '0.82rem' }}
+                          >
+                            {effectiveBanks.map((b) => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                        )}
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1' }}>To Account (Dr.)</label>
+                        {contraForm.contraMode === 'bank_to_cash' ? (
+                          <input readOnly value="Cash in Hand" style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(15,23,42,0.45)', color: '#94a3b8', fontSize: '0.82rem' }} />
+                        ) : (
+                          <select
+                            value={contraForm.toAccount}
+                            onChange={(e) => setContraForm({ ...contraForm, toAccount: e.target.value })}
+                            style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: '0.82rem' }}
+                          >
+                            {effectiveBanks.map((b) => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* PARTY MODE: PARTY SELECTOR & INVOICE PAYMENT PICKER (WHITE & BLUE THEME) */}
               {transactionMode === 'PARTY' && (

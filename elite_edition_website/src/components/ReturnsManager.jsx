@@ -16,6 +16,8 @@ import {
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { getDatePresetRange } from './DateRangePicker';
 import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
+import EntityBrandBadge from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
 
 export default function ReturnsManager() {
   const [activeTab, setActiveTab] = useState('process');
@@ -767,17 +769,17 @@ export default function ReturnsManager() {
           setHistoryFilters({});
         }}
         rightContent={
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>
             Showing <strong>{filteredHistory.length}</strong> of {history.length}
           </span>
         }
       />
 
-      <div className="table-responsive-wrapper" style={{ marginTop: '0.75rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div className="table-responsive-wrapper" style={{ marginTop: '0.75rem', background: 'rgba(15, 23, 42, 0.72)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.14)', overflow: 'hidden' }}>
         <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
+          <table className="glass-table" style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.14)' }}>
                 <th style={{ width: '38px', textAlign: 'center', padding: '10px 8px' }}>
                   <input
                     type="checkbox"
@@ -789,23 +791,23 @@ export default function ReturnsManager() {
                         setSelectedHistoryIds(filteredHistory.map(item => item._id));
                       }
                     }}
-                    style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                    style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: '#38bdf8' }}
                   />
                 </th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Date</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>AWB / Reference</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Display Order ID</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>SKU</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Type</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Condition</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Status</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Notes</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>Date</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>AWB / Reference</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>Display Order ID</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>SKU</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>Type</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>Condition</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>Status</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>Notes</th>
               </tr>
             </thead>
             <tbody>
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ padding: '3rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                  <td colSpan="9" style={{ padding: '3rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.65)', fontSize: '0.85rem' }}>
                     No returns matching your search criteria or date filters.
                   </td>
                 </tr>
@@ -820,8 +822,8 @@ export default function ReturnsManager() {
                     <tr 
                       key={item._id} 
                       style={{ 
-                        background: isSelected ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
-                        borderBottom: '1px solid #f1f5f9'
+                        background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'transparent',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)'
                       }}
                     >
                       <td style={{ textAlign: 'center', padding: '10px 8px' }}>
@@ -829,19 +831,19 @@ export default function ReturnsManager() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleSelectHistory(item._id)}
-                          style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                          style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: '#38bdf8' }}
                         />
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>
+                      <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.85)', fontWeight: 600, fontSize: '0.82rem' }}>
                         {formatDateTimeDDMMYYYY(item.createdAt)}
                       </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#ffffff', fontFamily: 'monospace', fontSize: '0.82rem' }}>
                         {item.referenceId}
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#2563eb', fontWeight: 700, fontSize: '0.82rem' }}>
+                      <td style={{ padding: '10px 12px', color: '#38bdf8', fontWeight: 700, fontSize: '0.82rem' }}>
                         {item.displayOrderId || '-'}
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#0f172a', fontWeight: 600, fontSize: '0.82rem' }}>
+                      <td style={{ padding: '10px 12px', color: '#ffffff', fontWeight: 600, fontSize: '0.82rem' }}>
                         {item.sku}
                       </td>
                       <td style={{ padding: '10px 12px' }}>
@@ -850,14 +852,14 @@ export default function ReturnsManager() {
                           fontWeight: 700,
                           padding: '3px 8px', 
                           borderRadius: '6px', 
-                          background: isRTO ? '#eff6ff' : '#fef3c7', 
-                          color: isRTO ? '#1d4ed8' : '#b45309',
-                          border: `1px solid ${isRTO ? '#bfdbfe' : '#fcd34d'}`
+                          background: isRTO ? 'rgba(56, 189, 248, 0.16)' : 'rgba(245, 158, 11, 0.16)', 
+                          color: isRTO ? '#38bdf8' : '#fbbf24',
+                          border: `1px solid ${isRTO ? 'rgba(56, 189, 248, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`
                         }}>
                           {item.returnType}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#334155', fontSize: '0.82rem', fontWeight: 500 }}>
+                      <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.8)', fontSize: '0.82rem', fontWeight: 500 }}>
                         {item.condition}
                       </td>
                       <td style={{ padding: '10px 12px' }}>
@@ -866,14 +868,14 @@ export default function ReturnsManager() {
                           fontWeight: 800, 
                           padding: '3px 8px', 
                           borderRadius: '6px', 
-                          background: isStockedIn ? '#ecfdf5' : isDisputed ? '#fef2f2' : '#f5f3ff', 
-                          color: isStockedIn ? '#15803d' : isDisputed ? '#b91c1c' : '#6d28d9',
-                          border: `1px solid ${isStockedIn ? '#a7f3d0' : isDisputed ? '#fecaca' : '#ddd6fe'}`
+                          background: isStockedIn ? 'rgba(16, 185, 129, 0.16)' : isDisputed ? 'rgba(239, 68, 68, 0.16)' : 'rgba(192, 132, 252, 0.16)', 
+                          color: isStockedIn ? '#34d399' : isDisputed ? '#f87171' : '#c084fc',
+                          border: `1px solid ${isStockedIn ? 'rgba(16, 185, 129, 0.35)' : isDisputed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(192, 132, 252, 0.35)'}`
                         }}>
                           {(item.status || '').replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 12px', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b', fontSize: '0.8rem' }}>
+                      <td style={{ padding: '10px 12px', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.65)', fontSize: '0.8rem' }}>
                         {item.notes || '-'}
                       </td>
                     </tr>
@@ -888,39 +890,80 @@ export default function ReturnsManager() {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
-      
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <RotateCcw size={24} color="#e11d48" />
-        <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>Returns & RTO Manager</h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Process incoming returns, manage the refinishing queue, and track disputed claims.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
+      {/* TIER 1: GLASS SCREEN HEADER */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <span className="glass-title-icon">↩️</span>
+          <h1>Returns & RTO Manager</h1>
+          <EntityBrandBadge entityCode="EE" size="sm" />
+        </div>
+        <div className="glass-header-actions">
+          <QuickActionMenu
+            actions={[
+              { label: 'Process Returns', icon: '⚡', onClick: () => setActiveTab('process') },
+              { label: 'Refinishing Queue', icon: '🛠️', onClick: () => setActiveTab('refinish') },
+              { label: 'Returns History', icon: '📜', onClick: () => setActiveTab('history') },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* TIER 2: SUB-SCREEN BUTTONS */}
+      <div className="glass-subtabs-bar" data-screen-subtabs="primary" role="tablist">
+        <button
+          type="button"
+          onClick={() => setActiveTab('process')}
+          className={`glass-subtab-btn ${activeTab === 'process' ? 'active' : ''}`}
+        >
+          Process Returns
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('refinish')}
+          className={`glass-subtab-btn ${activeTab === 'refinish' ? 'active' : ''}`}
+        >
+          Refinishing Queue ({refinishQueue.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={`glass-subtab-btn ${activeTab === 'history' ? 'active' : ''}`}
+        >
+          Returns History ({history.length})
+        </button>
+      </div>
+
+      {/* TIER 3: SIDE-SCROLLING CALCULATION CARDS */}
+      <div className="glass-scroll-track">
+        <div className="glass-calc-card" onClick={() => setActiveTab('process')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">PENDING BATCH STACK</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{stack.length}</span>
+          <span className="glass-calc-sub">Items staged for inward</span>
+        </div>
+        <div className="glass-calc-card" onClick={() => setActiveTab('refinish')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">REFINISHING QUEUE</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{refinishQueue.length}</span>
+          <span className="glass-calc-sub">Awaiting QC & repack</span>
+        </div>
+        <div className="glass-calc-card" onClick={() => setActiveTab('history')} style={{ cursor: 'pointer' }}>
+          <span className="glass-calc-title">TOTAL RETURNS LOGGED</span>
+          <span className="glass-calc-value" style={{ color: '#34d399' }}>{history.length}</span>
+          <span className="glass-calc-sub">Processed RTO & Customer Returns</span>
         </div>
       </div>
 
       {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ background: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.35)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <AlertCircle size={16} /> <span>{error}</span>
         </div>
       )}
       
       {success && (
-        <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ background: 'rgba(16, 185, 129, 0.16)', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <CheckCircle2 size={16} /> <span>{success}</span>
         </div>
       )}
-
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-        <button onClick={() => setActiveTab('process')} style={activeTab === 'process' ? styles.tabActive : styles.tab}>
-          <Zap size={14} /> <span>Process Returns</span>
-        </button>
-        <button onClick={() => setActiveTab('refinish')} style={activeTab === 'refinish' ? styles.tabActive : styles.tab}>
-          <ListTodo size={14} /> <span>Refinishing Queue</span>
-        </button>
-        <button onClick={() => setActiveTab('history')} style={activeTab === 'history' ? styles.tabActive : styles.tab}>
-          <History size={14} /> <span>Returns History</span>
-        </button>
-      </div>
 
       <div style={{ minHeight: '400px' }}>
         {activeTab === 'process' && renderProcessForm()}

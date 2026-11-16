@@ -21,6 +21,8 @@ import '../styles/fabricEnterprise.css';
 import { SmartActionGroup } from './common/SmartActionGroup';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 import { StandardNumericInput } from './common/StandardNumericInput';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 
@@ -336,6 +338,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     const result = Array.from(map.values());
     return result.length > 0 ? result : stock;
   }, [stock, transactions, stockDateStart, stockDateEnd]);
+
+  const fabricStats = React.useMemo(() => {
+    const totalInward = (displayStock || []).reduce((a, i) => a + (i.totalInward || 0), 0);
+    const totalOutward = (displayStock || []).reduce((a, i) => a + (i.totalOutward || 0), 0);
+    const netAvailable = (displayStock || []).reduce((a, i) => a + (i.currentStock || 0), 0);
+    const lowStockCount = (displayStock || []).filter(i => i.currentStock > 0 && i.currentStock <= 50).length;
+    const outOfStockCount = (displayStock || []).filter(i => i.currentStock <= 0).length;
+    return { totalInward, totalOutward, netAvailable, lowStockCount, outOfStockCount, totalKinds: (displayStock || []).length };
+  }, [displayStock]);
 
   // Download PDF Report for Stock & Fabric Consumption with Advance Print Settings
   const handleDownloadStockPDF = async () => {
@@ -2937,51 +2948,63 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   return (
     <div className="fabric-container">
-      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
       {!onlyChallan && (
-        <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
-            <div className="ent-header-title-wrap">
-              <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#0284c7,#2563eb)' }}>
-                <Database size={18} color="#fff" />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <h2 className="ent-header-title">
-                  {department === 'stitching' ? 'Elite Stitching Fabric' : 'Fabric Management'}
-                </h2>
-                <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
-              </div>
+        <>
+          <div className="glass-screen-header">
+            <div className="glass-title-capsule">
+              <Database size={20} color="#38bdf8" />
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                {department === 'stitching' ? 'Elite Stitching Fabric' : 'Fabric Management'}
+              </span>
+              <EntityBrandBadge />
             </div>
 
-            {/* Header Action Buttons */}
-            <div className="ent-header-actions">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
+                type="button"
                 onClick={() => setIsInwardOpen(true)}
-                className="ent-btn ent-btn-primary"
+                className="glass-btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.9), rgba(37, 99, 235, 0.85))',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  padding: '0.55rem 1.1rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  cursor: 'pointer'
+                }}
               >
-                <PlusCircle size={14} /> Inward Fabric
+                <PlusCircle size={15} /> Inward Fabric
               </button>
               <button
+                type="button"
                 onClick={() => setIsCombinedModalOpen(true)}
-                className="ent-btn ent-btn-secondary"
+                className="glass-subtab-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.9rem', fontSize: '0.84rem' }}
               >
-                <FileDown size={14} /> PDF Report
+                <FileDown size={14} color="#38bdf8" /> PDF Report
               </button>
+              <QuickActionMenu />
             </div>
           </div>
 
-          {/* Sub-Tabs Bar */}
-          <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Fabric Inventory Sub-Tabs">
+          {/* ── TIER 2: SUB-SCREENS BUTTONS ── */}
+          <div className="glass-subtabs-bar" style={{ marginTop: '0.75rem' }}>
             {tabs.map(tab => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  role="tab"
-                  aria-selected={isActive}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`ent-tab-btn ${isActive ? 'active' : ''}`}
+                  className={`glass-subtab-btn ${isActive ? 'active' : ''}`}
                 >
                   {TabIcon && <TabIcon size={14} />}
                   <span>{tab.label}</span>
@@ -2989,7 +3012,56 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               );
             })}
           </div>
-        </div>
+
+          {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+          <div className="glass-scroll-track" style={{ marginTop: '0.85rem' }}>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Total Fabrics</span>
+              <span className="glass-calc-value" style={{ color: '#ffffff' }}>{fabricStats.totalKinds}</span>
+              <span className="glass-calc-sub">Active fabric qualities</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Total Received</span>
+              <span className="glass-calc-value" style={{ color: '#34d399' }}>
+                {fabricStats.totalInward.toFixed(1)} M
+              </span>
+              <span className="glass-calc-sub">Inward volume</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Total Dispatched</span>
+              <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
+                {fabricStats.totalOutward.toFixed(1)} M
+              </span>
+              <span className="glass-calc-sub">Delivered volume</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Available Stock</span>
+              <span className="glass-calc-value" style={{ color: '#ffffff' }}>
+                {fabricStats.netAvailable.toFixed(1)} M
+              </span>
+              <span className="glass-calc-sub">Current godown balance</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Low Stock (&le;50M)</span>
+              <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
+                {fabricStats.lowStockCount}
+              </span>
+              <span className="glass-calc-sub">Requires replenishment</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Out of Stock</span>
+              <span className="glass-calc-value" style={{ color: '#f87171' }}>
+                {fabricStats.outOfStockCount}
+              </span>
+              <span className="glass-calc-sub">Zero meter balance</span>
+            </div>
+          </div>
+        </>
       )}
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
@@ -3036,8 +3108,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <Download size={15} /> Download PDF
                 </button>
 
-                <div className="fabric-sort-group" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f1f5f9', padding: '3px 6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap', paddingRight: '2px' }}>Sort:</span>
+                <div className="fabric-sort-group" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255, 255, 255, 0.06)', padding: '3px 6px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 700, whiteSpace: 'nowrap', paddingRight: '2px' }}>Sort:</span>
                   <button
                     type="button"
                     onClick={() => setStockSortOrder('highToLow')}
@@ -3046,11 +3118,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       borderRadius: '6px',
-                      border: 'none',
+                      border: stockSortOrder === 'highToLow' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
                       cursor: 'pointer',
-                      background: stockSortOrder === 'highToLow' ? '#0284c7' : 'transparent',
-                      color: stockSortOrder === 'highToLow' ? '#ffffff' : '#475569',
-                      boxShadow: stockSortOrder === 'highToLow' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      background: stockSortOrder === 'highToLow' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                      color: stockSortOrder === 'highToLow' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                      boxShadow: stockSortOrder === 'highToLow' ? '0 2px 6px rgba(56, 189, 248, 0.25)' : 'none',
                       transition: 'all 0.15s'
                     }}
                   >
@@ -3064,11 +3136,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       borderRadius: '6px',
-                      border: 'none',
+                      border: stockSortOrder === 'lowToHigh' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
                       cursor: 'pointer',
-                      background: stockSortOrder === 'lowToHigh' ? '#0284c7' : 'transparent',
-                      color: stockSortOrder === 'lowToHigh' ? '#ffffff' : '#475569',
-                      boxShadow: stockSortOrder === 'lowToHigh' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      background: stockSortOrder === 'lowToHigh' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                      color: stockSortOrder === 'lowToHigh' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                      boxShadow: stockSortOrder === 'lowToHigh' ? '0 2px 6px rgba(56, 189, 248, 0.25)' : 'none',
                       transition: 'all 0.15s'
                     }}
                   >
@@ -3082,11 +3154,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       borderRadius: '6px',
-                      border: 'none',
+                      border: stockSortOrder === 'nameAsc' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
                       cursor: 'pointer',
-                      background: stockSortOrder === 'nameAsc' ? '#0284c7' : 'transparent',
-                      color: stockSortOrder === 'nameAsc' ? '#ffffff' : '#475569',
-                      boxShadow: stockSortOrder === 'nameAsc' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      background: stockSortOrder === 'nameAsc' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                      color: stockSortOrder === 'nameAsc' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                      boxShadow: stockSortOrder === 'nameAsc' ? '0 2px 6px rgba(56, 189, 248, 0.25)' : 'none',
                       transition: 'all 0.15s'
                     }}
                   >
@@ -3109,46 +3181,48 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                   <div style={{
                     padding: '1rem',
-                    background: '#ffffff',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
                     borderRadius: '12px',
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
                     gap: '0.75rem',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)'
                   }}>
-                    <div style={{ padding: '0.65rem 0.85rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #edf2f7' }}>
-                      <span style={{ color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Fabrics</span>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '3px' }}>{displayStock.length}</div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.72)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Fabrics</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffffff', marginTop: '3px' }}>{displayStock.length}</div>
                     </div>
-                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #dcfce7' }}>
-                      <span style={{ color: '#166534', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Received</span>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#15803d', marginTop: '3px' }}>{totalInward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(52, 211, 153, 0.14)', borderRadius: '10px', border: '1px solid rgba(52, 211, 153, 0.35)' }}>
+                      <span style={{ color: '#34d399', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Received</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', marginTop: '3px' }}>{totalInward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
                     </div>
-                    <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fee2e2' }}>
-                      <span style={{ color: '#991b1b', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Used</span>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#b91c1c', marginTop: '3px' }}>{totalOutward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(248, 113, 113, 0.14)', borderRadius: '10px', border: '1px solid rgba(248, 113, 113, 0.35)' }}>
+                      <span style={{ color: '#f87171', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Used</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f87171', marginTop: '3px' }}>{totalOutward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
                     </div>
-                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0f9ff', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
-                      <span style={{ color: '#0369a1', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Net Available</span>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0284c7', marginTop: '3px' }}>{netAvailable.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(56, 189, 248, 0.14)', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+                      <span style={{ color: '#38bdf8', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Net Available</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#38bdf8', marginTop: '3px' }}>{netAvailable.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
                     </div>
-                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0fdfa', borderRadius: '10px', border: '1px solid #ccfbf1' }}>
-                      <span style={{ color: '#0f766e', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Dispatched Yield</span>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0d9488', marginTop: '3px' }}>{deliveryYieldPct}%</div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(45, 212, 191, 0.14)', borderRadius: '10px', border: '1px solid rgba(45, 212, 191, 0.35)' }}>
+                      <span style={{ color: '#2dd4bf', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Dispatched Yield</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#2dd4bf', marginTop: '3px' }}>{deliveryYieldPct}%</div>
                     </div>
-                    <div style={{ padding: '0.65rem 0.85rem', background: lowStockItems.length + outOfStockItems.length > 0 ? '#fff1f2' : '#f0fdf4', borderRadius: '10px', border: `1px solid ${lowStockItems.length + outOfStockItems.length > 0 ? '#ffe4e6' : '#dcfce7'}` }}>
-                      <span style={{ color: lowStockItems.length + outOfStockItems.length > 0 ? '#be123c' : '#166534', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Low Stock Alert</span>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: lowStockItems.length + outOfStockItems.length > 0 ? '#e11d48' : '#15803d', marginTop: '3px' }}>{lowStockItems.length + outOfStockItems.length} Qualities</div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: lowStockItems.length + outOfStockItems.length > 0 ? 'rgba(244, 63, 94, 0.14)' : 'rgba(52, 211, 153, 0.14)', borderRadius: '10px', border: `1px solid ${lowStockItems.length + outOfStockItems.length > 0 ? 'rgba(244, 63, 94, 0.35)' : 'rgba(52, 211, 153, 0.35)'}` }}>
+                      <span style={{ color: lowStockItems.length + outOfStockItems.length > 0 ? '#fb7185' : '#34d399', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Low Stock Alert</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: lowStockItems.length + outOfStockItems.length > 0 ? '#fb7185' : '#34d399', marginTop: '3px' }}>{lowStockItems.length + outOfStockItems.length} Qualities</div>
                     </div>
                   </div>
 
                   {/* Critical Low Stock Warning Banner */}
                   {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-                    <div style={{ padding: '0.85rem 1.1rem', borderRadius: '10px', background: '#fff5f5', border: '1px solid #fed7d7', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', boxShadow: '0 1px 3px rgba(239,68,68,0.06)' }}>
-                      <AlertTriangle size={18} color="#e53e3e" style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <div style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', color: '#9b2c2c', lineHeight: 1.5 }}>
-                        <strong style={{ color: '#c53030' }}>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey fabric for upcoming job cards.</span>}
+                    <div style={{ padding: '0.85rem 1.1rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.18)', border: '1px solid rgba(239, 68, 68, 0.38)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+                      <AlertTriangle size={18} color="#f87171" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', color: '#fca5a5', lineHeight: 1.5 }}>
+                        <strong style={{ color: '#ffffff' }}>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey fabric for upcoming job cards.</span>}
                       </div>
                     </div>
                   )}
@@ -5695,7 +5769,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
 
-      {/* ── Challan Form Modal (Responsive 2-Column Desktop + Mobile Tabbed Flow — WHITE THEME) ── */}
+      {/* ── Challan Form Modal (Responsive 2-Column Desktop + Mobile Tabbed Flow — DARK GLASS THEME) ── */}
       {isChallanOpen && (
         <div className="challan-modal-overlay">
           <div className="challan-modal-box">
@@ -5703,22 +5777,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             {/* Modal Header Bar */}
             <div className="challan-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.1)', border: '1px solid rgba(2, 132, 199, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a', lineHeight: 1.2 }}>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#ffffff', lineHeight: 1.2 }}>
                     {editingChallan ? `Edit Fabric Challan EDP-${editingChallan.challanNo}` : 'New Fabric Challan Dispatch'}
                   </h2>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Enter challan metadata &amp; TP meter values</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closeChallanModal}
-                style={{ background: '#e2e8f0', border: 'none', color: '#475569', borderRadius: '50%', width: '32px', height: '32px', minWidth: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', color: '#ffffff', borderRadius: '8px', width: '32px', height: '32px', minWidth: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', fontSize: '1.1rem', fontWeight: 700, padding: 0 }}
               >
-                <X size={18} />
+                ✕
               </button>
             </div>
 
@@ -5756,12 +5829,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Section Header: Basic & Party */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 120px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Date</label>
-                    <input type="date" required value={challanForm.date} onChange={e => setChallanForm({ ...challanForm, date: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} />
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Date</label>
+                    <input type="date" required value={challanForm.date} onChange={e => setChallanForm({ ...challanForm, date: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }} />
                   </div>
                   <div style={{ flex: '1.8 1 180px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Party Name</label>
-                    <input type="text" list="challan-parties" value={challanForm.partyName} onChange={e => setChallanForm({ ...challanForm, partyName: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Select or type party..." />
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Party Name</label>
+                    <input type="text" list="challan-parties" value={challanForm.partyName} onChange={e => setChallanForm({ ...challanForm, partyName: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Select or type party..." />
                     <datalist id="challan-parties">
                       {partiesList.map((p, i) => <option key={i} value={typeof p === 'string' ? p : p.name} />)}
                     </datalist>
@@ -5771,12 +5844,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Job Selection & Interactive Pills */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
-                      Job No(s) <span style={{ color: '#64748b', fontSize: '0.7rem' }}>(select multiple or type)</span>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Job No(s)
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {challanForm.partyName && (
-                        <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 700 }}>
                           Party: {challanForm.partyName}
                         </span>
                       )}
@@ -5785,14 +5858,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           type="button"
                           onClick={handleResyncChallanFromJobCard}
                           style={{
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '4px',
-                            color: '#1d4ed8',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            borderRadius: '6px',
+                            color: '#38bdf8',
                             fontSize: '0.68rem',
                             fontWeight: 700,
                             cursor: 'pointer',
-                            padding: '2px 7px',
+                            padding: '3px 8px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
@@ -5804,7 +5877,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       )}
                     </div>
                   </div>
-                  <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="e.g. JOB-2252, JOB-2253..." />
+                  <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }} placeholder="e.g. JOB-2252, JOB-2253..." />
                   <datalist id="challan-jobs">
                     {inProgressJobCards
                       .filter(j => {
@@ -5840,7 +5913,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                       if (fusedJobs.length === 0) {
                         return (
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.2rem 0.3rem' }}>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', padding: '0.2rem 0.3rem' }}>
                             {challanForm.partyName
                               ? `No Fusing-completed job cards found for ${challanForm.partyName}.`
                               : 'No Fusing-completed job cards available.'}
@@ -5864,9 +5937,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               padding: '0.22rem 0.55rem',
                               fontSize: '0.72rem',
                               borderRadius: '10px',
-                              border: `1px solid ${isSelected ? '#0284c7' : '#86efac'}`,
-                              background: isSelected ? '#0284c7' : '#f0fdf4',
-                              color: isSelected ? '#ffffff' : '#166534',
+                              border: `1px solid ${isSelected ? '#38bdf8' : 'rgba(16, 185, 129, 0.4)'}`,
+                              background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(16, 185, 129, 0.14)',
+                              color: isSelected ? '#ffffff' : '#34d399',
                               cursor: 'pointer',
                               fontWeight: 700,
                               display: 'inline-flex',
@@ -5876,7 +5949,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             }}
                           >
                             <span>{isSelected ? '✓ ' : '+ '} {j.jobNo}</span>
-                            <span style={{ fontSize: '0.62rem', opacity: isSelected ? 0.9 : 0.85, fontWeight: 800 }}>
+                            <span style={{ fontSize: '0.62rem', opacity: isSelected ? 0.95 : 0.9, fontWeight: 800 }}>
                               🔥 {fMtr > 0 ? `${fMtr.toFixed(0)}m` : 'Done'}
                             </span>
                           </button>
@@ -5889,38 +5962,38 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Design Name/No, Colour & Panna */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '2 1 180px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Design No / Name
                     </label>
                     <input
                       type="text"
                       value={challanForm.designNo}
                       onChange={e => setChallanForm({ ...challanForm, designNo: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                       placeholder="e.g. ED-709, Floral Design..."
                     />
                   </div>
                   <div style={{ flex: '1.2 1 120px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Colour / Matching
                     </label>
                     <input
                       type="text"
                       value={challanForm.colour}
                       onChange={e => setChallanForm({ ...challanForm, colour: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                       placeholder="e.g. Red, Blue, Matching 1..."
                     />
                   </div>
                   <div style={{ flex: '0 0 85px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Panna
                     </label>
                     <input
                       type="text"
                       value={challanForm.panna}
                       onChange={e => setChallanForm({ ...challanForm, panna: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box', textAlign: 'center' }}
+                      style={{ width: '100%', padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box', textAlign: 'center' }}
                       placeholder='58"'
                     />
                   </div>
@@ -5929,11 +6002,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Bill To & Ship To */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 140px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Bill To</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Bill To</label>
                     <select
                       value={challanForm.billTo}
                       onChange={e => setChallanForm({ ...challanForm, billTo: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                     >
                       <option value="">-- Select Bill To --</option>
                       {billToOptions.map((opt, i) => (
@@ -5942,11 +6015,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     </select>
                   </div>
                   <div style={{ flex: '1 1 140px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Ship To</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Ship To</label>
                     <select
                       value={challanForm.shipTo}
                       onChange={e => setChallanForm({ ...challanForm, shipTo: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                     >
                       <option value="">-- Select Ship To --</option>
                       {shipToOptions.map((opt, i) => (
@@ -5958,13 +6031,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                 {/* Lot No & Available Lot Chips */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Lot No {challanLotLoading && <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Loading…</span>}</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Lot No {challanLotLoading && <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Loading…</span>}</label>
                   <input
                     type="text"
                     list="challan-lot-options"
                     value={challanForm.lotNo}
                     onChange={e => handleChallanLotChange(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                     placeholder="Select or type e.g. 252, 280, 291..."
                   />
                   <datalist id="challan-lot-options">
@@ -6014,9 +6087,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 padding: '0.18rem 0.5rem',
                                 fontSize: '0.7rem',
                                 borderRadius: '10px',
-                                border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                                background: isSelected ? '#0284c7' : '#ffffff',
-                                color: isSelected ? '#ffffff' : '#475569',
+                                border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.14)',
+                                background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(11, 17, 32, 0.85)',
+                                color: isSelected ? '#ffffff' : '#cbd5e1',
                                 cursor: 'pointer',
                                 fontWeight: 700,
                                 transition: 'all 0.15s ease'
@@ -6041,10 +6114,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <div style={{
                       marginTop: '0.65rem',
                       padding: '0.75rem 0.9rem',
-                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                      border: challanTotalMtr > selectedLotsTotalStock ? '1px solid #fca5a5' : '1px solid #cbd5e1',
+                      background: 'rgba(11, 17, 32, 0.82)',
+                      border: challanTotalMtr > selectedLotsTotalStock ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '10px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
                     }}>
                       {/* Mathematical Progress Calculations (Including Shortage) */}
                       {(() => {
@@ -6090,7 +6163,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '4px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '1rem' }}>📊</span>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff' }}>
                                   Lot Stock Fulfillment ({selectedLotsList.length} {selectedLotsList.length === 1 ? 'Lot' : 'Lots'})
                                 </span>
                                 <span style={{
@@ -6098,18 +6171,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   fontWeight: 700,
                                   padding: '1px 6px',
                                   borderRadius: '10px',
-                                  background: '#e2e8f0',
-                                  color: '#334155'
+                                  background: 'rgba(255, 255, 255, 0.1)',
+                                  color: '#cbd5e1'
                                 }}>
                                   {selectedLotsList.length <= 3 ? `#${selectedLotsList.join(', #')}` : `#${selectedLotsList.slice(0, 3).join(', #')} +${selectedLotsList.length - 3} more`}
                                 </span>
                               </div>
 
                               <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                                <span style={{ color: isOver ? '#dc2626' : '#0284c7' }}>
+                                <span style={{ color: isOver ? '#f87171' : '#38bdf8' }}>
                                   {effectiveTakenMtr.toFixed(2)}m taken in Outward
                                 </span>
-                                <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
+                                <span style={{ color: '#94a3b8' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
                               </div>
                             </div>
 
@@ -6117,11 +6190,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             <div style={{
                               width: '100%',
                               height: '12px',
-                              background: '#e2e8f0',
+                              background: 'rgba(255, 255, 255, 0.08)',
                               borderRadius: '8px',
                               overflow: 'hidden',
                               position: 'relative',
-                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)'
                             }}>
                               <div style={{
                                 width: `${fillWidth}%`,
@@ -6134,7 +6207,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                             {/* Status Footer Metrics */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700, flexWrap: 'wrap', gap: '4px' }}>
-                              <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: isOver ? '#f87171' : isNearFull ? '#fbbf24' : '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {isOver ? (
                                   <>⚠️ <span>{realPct}% Allocated — EXCEEDED AVAILABLE STOCK!</span></>
                                 ) : (
@@ -6145,9 +6218,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               <span style={{
                                 padding: '2px 8px',
                                 borderRadius: '6px',
-                                background: isOver ? '#fee2e2' : '#dcfce7',
-                                color: isOver ? '#991b1b' : '#166534',
-                                border: isOver ? '1px solid #fca5a5' : '1px solid #86efac'
+                                background: isOver ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.16)',
+                                color: isOver ? '#fca5a5' : '#34d399',
+                                border: isOver ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.35)'
                               }}>
                                 {isOver ? `Deficit: ${Math.abs(balance).toFixed(2)} mtr` : `Remaining: ${Math.abs(balance) < 0.01 ? '0.00' : balance.toFixed(2)} mtr`}
                               </span>
@@ -6162,17 +6235,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Vendor Challan, Delivery By, PCS */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1.2 1 120px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Vendor Challan</label>
-                    <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Vendor Challan #" />
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Vendor Challan</label>
+                    <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Vendor Challan #" />
                   </div>
                   <div style={{ flex: '1.2 1 120px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Delivery By</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Delivery By</label>
                     <input
                       type="text"
                       list="delivery-by-options"
                       value={challanForm.deliveryBy}
                       onChange={e => setChallanForm({ ...challanForm, deliveryBy: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                       placeholder="Driver/person..."
                     />
                     <datalist id="delivery-by-options">
@@ -6181,7 +6254,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       ))}
                     </datalist>
                   </div>
-                  <div style={{ flex: '0.8 1 70px' }}>
+                  <div style={{ flex: '0.8 1 80px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Pcs</label>
                     <StandardNumericInput
                       mode="integer"
                       decimals={0}
@@ -6198,7 +6272,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Fabric Name & Shortage */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '2 1 180px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Fabric Quality</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Fabric Quality</label>
                     <input
                       type="text"
                       list="challan-fabrics"
@@ -6213,7 +6287,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           setChallanForm(prev => ({ ...prev, fabricName: normFab, panna: autoP }));
                         }
                       }}
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }}
                       placeholder="Fabric quality..."
                     />
                     <datalist id="challan-fabrics">
@@ -6221,7 +6295,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     </datalist>
                   </div>
                   <div style={{ flex: '1.2 1 150px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Shortage ({challanForm.shortageMode === 'mtr' ? 'Meters' : '%'})
                     </label>
                     <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', width: '100%' }}>
@@ -6244,10 +6318,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           width: '100%',
                           padding: '0.5rem 0.6rem',
                           fontSize: '0.85rem',
-                          background: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          color: '#0f172a',
+                          background: 'rgba(11, 17, 32, 0.85)',
+                          border: '1px solid rgba(255, 255, 255, 0.14)',
+                          borderRadius: '8px',
+                          color: '#ffffff',
                           fontWeight: 700,
                           boxSizing: 'border-box'
                         }}
@@ -6267,10 +6341,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           height: '38px',
                           padding: '0.4rem 0.25rem',
                           fontSize: '0.85rem',
-                          background: '#f1f5f9',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          color: '#0f172a',
+                          background: 'rgba(15, 23, 42, 0.9)',
+                          border: '1px solid rgba(255, 255, 255, 0.16)',
+                          borderRadius: '8px',
+                          color: '#38bdf8',
                           fontWeight: 800,
                           cursor: 'pointer',
                           boxSizing: 'border-box',
@@ -6286,8 +6360,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                 {/* Optional Notes */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Notes</label>
-                  <input type="text" value={challanForm.notes} onChange={e => setChallanForm({ ...challanForm, notes: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Optional challan notes…" />
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Notes</label>
+                  <input type="text" value={challanForm.notes} onChange={e => setChallanForm({ ...challanForm, notes: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#ffffff', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Optional challan notes…" />
                 </div>
 
                 {/* Mobile Tab 1 Navigation Bar (Next: TP Meters) */}
@@ -6301,9 +6375,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       padding: '0.65rem 0.75rem',
                       fontSize: '0.85rem',
                       fontWeight: 700,
-                      background: '#e2e8f0',
-                      color: '#334155',
-                      border: '1px solid #cbd5e1',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      color: '#cbd5e1',
+                      border: '1px solid rgba(255, 255, 255, 0.14)',
                       borderRadius: '8px'
                     }}
                   >
@@ -6342,10 +6416,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* Right Top Header: TP Section Title & Summary Banner */}
                 <div className="challan-tp-header">
                   <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
-                    <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>Manual Lot No &amp; TP meters entry per row</div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
                   </div>
-                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={addTpRow} disabled={(challanForm.tpDetails?.length || 0) >= 30}>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }} onClick={addTpRow} disabled={(challanForm.tpDetails?.length || 0) >= 30}>
                     <PlusCircle size={14} /> Add TP Row
                   </button>
                 </div>
@@ -6353,45 +6426,45 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 {/* ── FUSING DEPARTMENT METRICS DISPLAY ── */}
                 <div style={{
                   margin: '0.5rem 0.75rem 0.35rem 0.75rem',
-                  padding: '0.6rem 0.85rem',
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 40%, #eff6ff 100%)',
-                  border: '1.5px solid #86efac',
+                  padding: '0.65rem 0.85rem',
+                  background: 'rgba(11, 17, 32, 0.82)',
+                  border: '1px solid rgba(16, 185, 129, 0.32)',
                   borderRadius: '10px',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.03)'
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '4px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         🔥 Fusing Department Output {challanFusingStats?.jobLabels ? `(${challanFusingStats.jobLabels})` : ''}
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '1px 8px', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '2px 8px', borderRadius: '12px' }}>
                       Fusing Reference
                     </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', textAlign: 'center' }}>
-                    <div style={{ background: '#ffffff', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '1.5px solid #bbf7d0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Fresh Fused</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#047857', marginTop: '1px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.45rem', textAlign: 'center' }}>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '0.45rem 0.35rem', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Fresh Fused</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#34d399', marginTop: '2px' }}>
                         {challanFusingStats ? challanFusingStats.freshMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
-                    <div style={{ background: '#ffffff', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '1.5px solid #fde68a', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.02em' }}>West Mtr</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#b45309', marginTop: '1px' }}>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '0.45rem 0.35rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.02em' }}>West Mtr</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fbbf24', marginTop: '2px' }}>
                         {challanFusingStats ? challanFusingStats.westMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
-                    <div style={{ background: '#ffffff', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '1.5px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Delivered</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#334155', marginTop: '1px' }}>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '0.45rem 0.35rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Delivered</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
                         {challanFusingStats ? challanFusingStats.deliveredMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
-                    <div style={{ background: '#ecfdf5', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '2px solid #10b981', boxShadow: '0 1px 4px rgba(16,185,129,0.15)' }}>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Available</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#059669', marginTop: '1px' }}>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.14)', padding: '0.45rem 0.35rem', borderRadius: '8px', border: '1.5px solid rgba(16, 185, 129, 0.45)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Available</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#34d399', marginTop: '2px' }}>
                         {challanFusingStats ? challanFusingStats.availableMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
@@ -6419,7 +6492,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       const isCustom = row.isCustomLot;
                       return (
                         <div key={idx} className="challan-tp-row">
-                          <div className="challan-tp-badge" style={{ padding: '0.5rem 0.3rem', fontSize: '0.82rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div className="challan-tp-badge" style={{ padding: '0.5rem 0.3rem', fontSize: '0.8rem', background: 'rgba(56, 189, 248, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#38bdf8', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             TP {idx + 1}
                           </div>
                           <div className="challan-tp-lot-container" style={{ position: 'relative', width: '100%' }}>
@@ -6436,12 +6509,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 }}
                                 style={{
                                   width: '100%',
-                                  padding: '0.5rem 0.3rem',
+                                  padding: '0.5rem 0.4rem',
                                   fontSize: '0.82rem',
                                   fontWeight: 800,
-                                  color: '#0f172a',
-                                  background: '#ffffff',
-                                  border: '1.5px solid #0284c7',
+                                  color: '#ffffff',
+                                  background: 'rgba(11, 17, 32, 0.85)',
+                                  border: '1px solid rgba(56, 189, 248, 0.4)',
                                   borderRadius: '6px',
                                   cursor: 'pointer',
                                   boxSizing: 'border-box'
@@ -6497,9 +6570,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                     padding: '0.5rem 0.3rem',
                                     fontSize: '0.82rem',
                                     fontWeight: 800,
-                                    color: '#0f172a',
-                                    background: '#ffffff',
-                                    border: '1.5px solid #0284c7',
+                                    color: '#ffffff',
+                                    background: 'rgba(11, 17, 32, 0.85)',
+                                    border: '1px solid #38bdf8',
                                     borderRadius: '6px',
                                     textAlign: 'center',
                                     boxSizing: 'border-box'
@@ -6513,9 +6586,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                     updateTpRow(idx, 'lotNo', currentLots[0] || '');
                                   }}
                                   style={{
-                                    border: '1px solid #cbd5e1',
-                                    background: '#f8fafc',
-                                    color: '#64748b',
+                                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    color: '#94a3b8',
                                     borderRadius: '4px',
                                     padding: '0.45rem 0.3rem',
                                     cursor: 'pointer',
@@ -6542,9 +6615,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   padding: '0.5rem 0.35rem',
                                   fontSize: '0.82rem',
                                   fontWeight: 800,
-                                  color: '#0f172a',
-                                  background: '#ffffff',
-                                  border: '1.5px solid #6366f1',
+                                  color: '#ffffff',
+                                  background: 'rgba(11, 17, 32, 0.85)',
+                                  border: '1px solid rgba(168, 85, 247, 0.45)',
                                   borderRadius: '6px',
                                   cursor: 'pointer',
                                   boxSizing: 'border-box'
@@ -6564,9 +6637,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   padding: '0.5rem 0.35rem',
                                   fontSize: '0.82rem',
                                   fontWeight: 800,
-                                  color: '#4338ca',
-                                  background: '#e0e7ff',
-                                  border: '1.5px solid #c7d2fe',
+                                  color: '#c084fc',
+                                  background: 'rgba(168, 85, 247, 0.16)',
+                                  border: '1px solid rgba(168, 85, 247, 0.38)',
                                   borderRadius: '6px',
                                   textAlign: 'center',
                                   boxSizing: 'border-box',
@@ -6589,9 +6662,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   padding: '0.5rem 0.4rem',
                                   fontSize: '0.82rem',
                                   fontWeight: 700,
-                                  color: '#0f172a',
-                                  background: '#ffffff',
-                                  border: '1px solid #cbd5e1',
+                                  color: '#ffffff',
+                                  background: 'rgba(11, 17, 32, 0.85)',
+                                  border: '1px solid rgba(255, 255, 255, 0.14)',
                                   borderRadius: '6px',
                                   boxSizing: 'border-box',
                                   textAlign: 'center'
@@ -6614,9 +6687,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 padding: '0.5rem 0.45rem',
                                 fontSize: '0.92rem',
                                 fontWeight: 900,
-                                color: '#0f172a',
-                                background: '#ffffff',
-                                border: '2px solid #0284c7',
+                                color: '#38bdf8',
+                                background: 'rgba(11, 17, 32, 0.9)',
+                                border: '1.5px solid rgba(56, 189, 248, 0.5)',
                                 borderRadius: '6px',
                                 boxSizing: 'border-box',
                                 textAlign: 'right'
@@ -6626,7 +6699,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             />
                           </div>
 
-                          <button type="button" className="challan-tp-remove-btn" onClick={() => removeTpRow(idx)} style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', height: '36px', width: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
+                          <button type="button" className="challan-tp-remove-btn" onClick={() => removeTpRow(idx)} style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', cursor: 'pointer', color: '#fca5a5', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
                             <X size={16} />
                           </button>
                         </div>
@@ -6639,20 +6712,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <div className="challan-tp-footer">
 
                   {/* Total Summary Row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                     <div>
-                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total TPs</span>
-                      <div style={{ fontWeight: 900, fontSize: '1rem', color: '#0284c7' }}>{challanTotalTp} Rolls</div>
+                      <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total TPs</span>
+                      <div style={{ fontWeight: 900, fontSize: '1rem', color: '#38bdf8' }}>{challanTotalTp} Rolls</div>
                     </div>
                     {challanFusingStats && challanFusingStats.totalMtr > 0 && (
-                      <div style={{ textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', padding: '0 0.75rem' }}>
-                        <span style={{ fontSize: '0.65rem', color: '#059669', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Fusing Fresh</span>
-                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#059669' }}>{challanFusingStats.freshMtr.toFixed(2)}m</div>
+                      <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255, 255, 255, 0.1)', borderRight: '1px solid rgba(255, 255, 255, 0.1)', padding: '0 0.75rem' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#34d399', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Fusing Fresh</span>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#34d399' }}>{challanFusingStats.freshMtr.toFixed(2)}m</div>
                       </div>
                     )}
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.65rem', color: '#0f172a', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total Dispatched Mtr</span>
-                      <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#0284c7' }}>{challanTotalMtr.toFixed(2)}m</div>
+                      <span style={{ fontSize: '0.65rem', color: '#cbd5e1', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total Dispatched Mtr</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#38bdf8' }}>{challanTotalMtr.toFixed(2)}m</div>
                     </div>
                   </div>
 
@@ -6660,10 +6733,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   {challanStockFulfillment?.isOver && (
                     <div style={{
                       padding: '0.65rem 0.85rem',
-                      background: '#fef2f2',
-                      border: '1.5px solid #ef4444',
+                      background: 'rgba(239, 68, 68, 0.14)',
+                      border: '1.5px solid rgba(239, 68, 68, 0.45)',
                       borderRadius: '8px',
-                      color: '#991b1b',
+                      color: '#fca5a5',
                       fontSize: '0.78rem',
                       fontWeight: 700,
                       display: 'flex',
@@ -6685,9 +6758,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         padding: '0.65rem 0.85rem',
                         fontSize: '0.85rem',
                         fontWeight: 700,
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        border: '1px solid #cbd5e1',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        color: '#cbd5e1',
+                        border: '1px solid rgba(255, 255, 255, 0.14)',
                         borderRadius: '8px',
                         alignItems: 'center',
                         gap: '4px'
@@ -6696,7 +6769,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     >
                       ⬅ Info
                     </button>
-                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px' }} onClick={closeChallanModal}>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700, background: 'rgba(255, 255, 255, 0.08)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px' }} onClick={closeChallanModal}>
                       Cancel
                     </button>
                     <button
@@ -6708,13 +6781,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         padding: '0.65rem 1rem',
                         fontSize: '0.95rem',
                         fontWeight: 900,
-                        background: challanStockFulfillment?.isOver ? '#94a3b8' : 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                        background: challanStockFulfillment?.isOver ? 'rgba(148, 163, 184, 0.3)' : 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '8px',
                         boxShadow: challanStockFulfillment?.isOver ? 'none' : '0 4px 14px rgba(37, 99, 235, 0.35)',
                         cursor: challanStockFulfillment?.isOver ? 'not-allowed' : 'pointer',
-                        opacity: challanStockFulfillment?.isOver ? 0.75 : 1
+                        opacity: challanStockFulfillment?.isOver ? 0.65 : 1
                       }}
                     >
                       {editingChallan ? '💾 Save Changes' : '🚀 Save Challan'}
@@ -6905,67 +6978,64 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               {/* Header */}
               <div className="inward-tp-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Layers size={20} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
                       Lot #{inwardTpModalTransaction.lotNo} — TP Details (Rolls)
                     </h3>
-                    <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                      Add or edit roll-wise meter breakdown for this inward lot
-                    </div>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={closeInwardTpModal}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px', borderRadius: '6px' }}
+                  style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', cursor: 'pointer', color: '#cbd5e1', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
               {/* Meta Banner */}
               <div className="inward-tp-meta-banner">
                 <div>
-                  <span style={{ color: '#64748b' }}>Quality: </span>
-                  <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.fabricQuality}</strong>
+                  <span style={{ color: '#94a3b8' }}>Quality: </span>
+                  <strong style={{ color: '#ffffff' }}>{inwardTpModalTransaction.fabricQuality}</strong>
                 </div>
                 {inwardTpModalTransaction.panna && (
                   <div>
-                    <span style={{ color: '#64748b' }}>Panna: </span>
-                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.panna}"</strong>
+                    <span style={{ color: '#94a3b8' }}>Panna: </span>
+                    <strong style={{ color: '#ffffff' }}>{inwardTpModalTransaction.panna}"</strong>
                   </div>
                 )}
                 {inwardTpModalTransaction.challanNo && (
                   <div>
-                    <span style={{ color: '#64748b' }}>Challan: </span>
-                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.challanNo}</strong>
+                    <span style={{ color: '#94a3b8' }}>Challan: </span>
+                    <strong style={{ color: '#ffffff' }}>{inwardTpModalTransaction.challanNo}</strong>
                   </div>
                 )}
                 {inwardTpModalTransaction.vendorName && (
                   <div>
-                    <span style={{ color: '#64748b' }}>Vendor: </span>
-                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.vendorName}</strong>
+                    <span style={{ color: '#94a3b8' }}>Vendor: </span>
+                    <strong style={{ color: '#ffffff' }}>{inwardTpModalTransaction.vendorName}</strong>
                   </div>
                 )}
                 <div>
-                  <span style={{ color: '#64748b' }}>Inward Qty: </span>
-                  <strong style={{ color: '#16a34a' }}>{lotQty.toFixed(2)} Mtr</strong>
+                  <span style={{ color: '#94a3b8' }}>Inward Qty: </span>
+                  <strong style={{ color: '#34d399' }}>{lotQty.toFixed(2)} Mtr</strong>
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#64748b' }}>TP Total:</span>
-                  <strong style={{ color: '#0284c7', fontSize: '0.9rem' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
+                  <span style={{ color: '#94a3b8' }}>TP Total:</span>
+                  <strong style={{ color: '#38bdf8', fontSize: '0.9rem' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
                   {validTps.length > 0 && (
                     <span style={{
                       fontSize: '0.72rem',
                       fontWeight: 700,
                       padding: '2px 7px',
                       borderRadius: '12px',
-                      background: isBalanced ? '#dcfce7' : (diffMtr > 0 ? '#fef9c3' : '#fee2e2'),
-                      color: isBalanced ? '#15803d' : (diffMtr > 0 ? '#a16207' : '#b91c1c'),
-                      border: `1px solid ${isBalanced ? '#bbf7d0' : (diffMtr > 0 ? '#fde047' : '#fecaca')}`
+                      background: isBalanced ? 'rgba(16, 185, 129, 0.16)' : (diffMtr > 0 ? 'rgba(245, 158, 11, 0.16)' : 'rgba(239, 68, 68, 0.16)'),
+                      color: isBalanced ? '#34d399' : (diffMtr > 0 ? '#fbbf24' : '#fca5a5'),
+                      border: `1px solid ${isBalanced ? 'rgba(16, 185, 129, 0.35)' : (diffMtr > 0 ? 'rgba(245, 158, 11, 0.35)' : 'rgba(239, 68, 68, 0.35)')}`
                     }}>
                       {isBalanced ? '✓ Balanced' : `Diff: ${diffMtr > 0 ? '+' : ''}${diffMtr.toFixed(2)}m`}
                     </span>
@@ -6979,28 +7049,28 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <button
                     type="button"
                     onClick={() => addInwardTpRows(1)}
-                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', padding: '5px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, color: '#e2e8f0', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   >
                     <Plus size={13} /> +1 TP
                   </button>
                   <button
                     type="button"
                     onClick={() => addInwardTpRows(5)}
-                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                    style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', padding: '5px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, color: '#e2e8f0', cursor: 'pointer' }}
                   >
                     +5 TPs
                   </button>
                   <button
                     type="button"
                     onClick={() => addInwardTpRows(10)}
-                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                    style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', padding: '5px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, color: '#e2e8f0', cursor: 'pointer' }}
                   >
                     +10 TPs
                   </button>
                   <button
                     type="button"
                     onClick={() => setInwardBulkPasteOpen(!inwardBulkPasteOpen)}
-                    style={{ background: inwardBulkPasteOpen ? '#e0f2fe' : '#f0fdf4', border: `1px solid ${inwardBulkPasteOpen ? '#7dd3fc' : '#86efac'}`, color: inwardBulkPasteOpen ? '#0369a1' : '#15803d', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: inwardBulkPasteOpen ? 'rgba(56, 189, 248, 0.2)' : 'rgba(16, 185, 129, 0.15)', border: `1px solid ${inwardBulkPasteOpen ? 'rgba(56, 189, 248, 0.45)' : 'rgba(16, 185, 129, 0.35)'}`, color: inwardBulkPasteOpen ? '#38bdf8' : '#34d399', padding: '5px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     ⚡ Bulk Paste
                   </button>
@@ -7008,10 +7078,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     type="button"
                     onClick={() => setShowRollRemarks(!showRollRemarks)}
                     style={{
-                      background: showRollRemarks ? '#e0f2fe' : '#f8fafc',
-                      border: `1px solid ${showRollRemarks ? '#7dd3fc' : '#cbd5e1'}`,
-                      color: showRollRemarks ? '#0369a1' : '#334155',
-                      padding: '4px 10px',
+                      background: showRollRemarks ? 'rgba(56, 189, 248, 0.2)' : 'rgba(15, 23, 42, 0.85)',
+                      border: `1px solid ${showRollRemarks ? 'rgba(56, 189, 248, 0.45)' : 'rgba(255, 255, 255, 0.14)'}`,
+                      color: showRollRemarks ? '#38bdf8' : '#cbd5e1',
+                      padding: '5px 10px',
                       borderRadius: '6px',
                       fontSize: '0.76rem',
                       fontWeight: 600,
@@ -7026,7 +7096,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                     {validTps.length} entered ({inwardTpRows.length} rows)
                   </span>
                   {inwardTpRows.length > 0 && (
@@ -7043,8 +7113,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               {/* Bulk Paste Box (Collapsible) */}
               {inwardBulkPasteOpen && (
-                <div style={{ padding: '0.75rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                <div style={{ padding: '0.75rem 1.25rem', background: 'rgba(11, 17, 32, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>
                     Paste roll meter numbers separated by commas, spaces, or lines (e.g., 95.5, 102.3, 88.0):
                   </div>
                   <textarea
@@ -7052,20 +7122,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     value={inwardBulkPasteText}
                     onChange={e => setInwardBulkPasteText(e.target.value)}
                     placeholder="98.50, 104.20, 89.00, 112.50..."
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace' }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.16)', fontSize: '0.82rem', fontFamily: 'monospace' }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                     <button
                       type="button"
                       onClick={() => { setInwardBulkPasteOpen(false); setInwardBulkPasteText(''); }}
-                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 12px', fontSize: '0.76rem', cursor: 'pointer' }}
+                      style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '6px', padding: '4px 12px', fontSize: '0.76rem', cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={applyInwardBulkPaste}
-                      style={{ background: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '4px 14px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '4px 14px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Apply Values
                     </button>
@@ -7149,19 +7219,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               {/* Footer */}
               <div className="inward-tp-footer">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: '#334155', cursor: 'pointer', userSelect: 'none' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: '#cbd5e1', cursor: 'pointer', userSelect: 'none' }}>
                     <input
                       type="checkbox"
                       checked={syncInwardQty}
                       onChange={e => setSyncInwardQty(e.target.checked)}
-                      style={{ width: '16px', height: '16px', accentColor: '#0284c7' }}
+                      style={{ width: '16px', height: '16px', accentColor: '#38bdf8' }}
                     />
                     <span>
                       Sync Lot Inward Quantity to match sum of TP meters (<strong>{totalTpMeters.toFixed(2)} Mtr</strong>)
                     </span>
                   </label>
-                  <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                    Valid TPs: <strong style={{ color: '#0f172a' }}>{validTps.length}</strong> | Total: <strong style={{ color: '#0284c7' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    Valid TPs: <strong style={{ color: '#ffffff' }}>{validTps.length}</strong> | Total: <strong style={{ color: '#38bdf8' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
                   </div>
                 </div>
 
@@ -7436,33 +7506,29 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         />
       )}
 
-      {/* COMBINED / INDIVIDUAL DEPARTMENT PDF REPORT MODAL (WHITE & BLUE THEME) */}
+      {/* COMBINED / INDIVIDUAL DEPARTMENT PDF REPORT MODAL (DARK GLASS THEME) */}
       {isCombinedModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-          <div style={{ background: '#ffffff', width: '100%', maxWidth: '560px', borderRadius: '16px', padding: '1.5rem', border: '1px solid #bfdbfe', color: '#0f172a', boxShadow: '0 25px 50px -12px rgba(30, 58, 138, 0.25), 0 0 0 1px rgba(191, 219, 254, 0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+          <div style={{ background: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(24px)', width: '100%', maxWidth: '560px', borderRadius: '16px', padding: '1.5rem', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.65)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ background: '#eff6ff', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bfdbfe' }}>
-                  <FileText size={20} color="#2563eb" />
+                <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+                  <FileText size={20} color="#38bdf8" />
                 </div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#1e3a8a' }}>Download PDF Reports (Elite Digital Prints)</h3>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>Download PDF Reports</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCombinedModalOpen(false)}
-                style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'pointer', padding: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#cbd5e1', cursor: 'pointer', padding: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '1rem', lineHeight: '1.4' }}>
-              Select the date period and choose individual department reports or combine them into a single report PDF.
-            </p>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Quick Date Range</label>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', marginBottom: '0.35rem' }}>Quick Date Range</label>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
                   {[
                     { id: 'today', label: 'Today' },
@@ -7480,13 +7546,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         setCombinedDateEnd(dateEnd || '');
                       }}
                       style={{
-                        padding: '0.25rem 0.6rem',
+                        padding: '0.28rem 0.65rem',
                         fontSize: '0.75rem',
-                        fontWeight: 600,
+                        fontWeight: 700,
                         borderRadius: '6px',
-                        border: '1px solid #bfdbfe',
-                        background: '#eff6ff',
-                        color: '#1d4ed8',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        background: 'rgba(56, 189, 248, 0.14)',
+                        color: '#38bdf8',
                         cursor: 'pointer'
                       }}
                     >
@@ -7496,21 +7562,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>Date Start</label>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.25rem' }}>Date Start</label>
                     <input
                       type="date"
                       value={combinedDateStart}
                       onChange={e => setCombinedDateStart(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)', background: 'rgba(11, 17, 32, 0.85)', color: '#ffffff', fontSize: '0.85rem', fontWeight: 600, boxSizing: 'border-box' }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>Date End</label>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.25rem' }}>Date End</label>
                     <input
                       type="date"
                       value={combinedDateEnd}
                       onChange={e => setCombinedDateEnd(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)', background: 'rgba(11, 17, 32, 0.85)', color: '#ffffff', fontSize: '0.85rem', fontWeight: 600, boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -7518,12 +7584,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e3a8a', margin: 0 }}>Select Department Reports:</label>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1', margin: 0 }}>Select Department Reports:</label>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     <button
                       type="button"
                       onClick={() => setSelectedCombinedReports(['stock', 'inward', 'lotwise', 'lotTransfer', 'stockAdjustment', 'requirement', 'challan'])}
-                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
                     >
                       Select All
                     </button>
@@ -7541,14 +7607,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         const targetRep = tabToReport[activeTab] || 'stock';
                         setSelectedCombinedReports([targetRep]);
                       }}
-                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: '#eff6ff', border: '1px solid #93c5fd', color: '#0284c7', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
                     >
                       Active Tab Only
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid #e2e8f0', maxHeight: '240px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', background: 'rgba(11, 17, 32, 0.85)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', maxHeight: '240px', overflowY: 'auto' }}>
                   {[
                     { id: 'stock', label: 'Stock Overview', desc: 'Fabric quality stock levels, inward/outward totals & net available stock' },
                     { id: 'inward', label: 'Inward Register', desc: 'Supplier inward receipts, lot numbers, vendor names & inward meters' },
@@ -7570,10 +7636,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           gap: '0.65rem',
                           cursor: 'pointer',
                           fontSize: '0.83rem',
-                          padding: '0.4rem 0.5rem',
-                          borderRadius: '6px',
-                          background: isSelected ? '#eff6ff' : 'transparent',
-                          border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                          padding: '0.45rem 0.6rem',
+                          borderRadius: '8px',
+                          background: isSelected ? 'rgba(56, 189, 248, 0.14)' : 'transparent',
+                          border: isSelected ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid transparent',
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -7591,11 +7657,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               setSelectedCombinedReports(selectedCombinedReports.filter(r => r !== rep.id));
                             }
                           }}
-                          style={{ marginTop: '0.15rem', accentColor: '#2563eb', cursor: 'pointer' }}
+                          style={{ marginTop: '0.15rem', accentColor: '#38bdf8', cursor: 'pointer' }}
                         />
                         <div>
-                          <strong style={{ color: isSelected ? '#1e40af' : '#1e293b' }}>{rep.label}</strong>
-                          <div style={{ fontSize: '0.73rem', color: isSelected ? '#3b82f6' : '#64748b' }}>{rep.desc}</div>
+                          <strong style={{ color: isSelected ? '#38bdf8' : '#ffffff' }}>{rep.label}</strong>
+                          <div style={{ fontSize: '0.73rem', color: isSelected ? '#bae6fd' : '#94a3b8' }}>{rep.desc}</div>
                         </div>
                       </label>
                     );
@@ -7611,9 +7677,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 style={{
                   padding: '0.55rem 1.2rem',
                   fontSize: '0.85rem',
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  color: '#334155',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.14)',
+                  color: '#cbd5e1',
                   borderRadius: '8px',
                   fontWeight: 600,
                   cursor: 'pointer'
@@ -7657,28 +7723,29 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
 
-      {/* Lot Transfer Modal - Crisp White & Blue Theme */}
+      {/* Lot Transfer Modal - Dark Frosted Glass Theme */}
       {isTransferFormOpen && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000, padding: '1rem'
         }}>
           <div style={{
             width: '100%', maxWidth: '580px',
-            background: '#ffffff',
-            border: '1px solid #bfdbfe',
+            background: 'rgba(15, 23, 42, 0.96)',
+            backdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
             borderRadius: '16px',
-            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(37, 99, 235, 0.08)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.65)',
             overflow: 'hidden'
           }}>
-            {/* Header: White & Soft Blue gradient */}
+            {/* Header: Dark Frosted Glass */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '1.2rem 1.5rem',
-              background: 'linear-gradient(135deg, #f0f7ff 0%, #e0edfe 100%)',
-              borderBottom: '1px solid #dbeafe'
+              padding: '1.15rem 1.5rem',
+              background: 'rgba(11, 17, 32, 0.85)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{
@@ -7690,53 +7757,30 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <ArrowRightLeft size={20} color="#ffffff" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
                     Perform Fabric Lot Transfer
                   </h3>
-                  <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 500, marginTop: '2px' }}>
-                    Rebalance batch stock & clear negative deficit lots
-                  </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsTransferFormOpen(false)}
                 style={{
-                  background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px',
                   padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#64748b', transition: 'all 0.15s'
+                  color: '#cbd5e1', transition: 'all 0.15s'
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#94a3b8'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Form Body */}
-            <form onSubmit={handleTransferSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.15rem', background: '#ffffff' }}>
-              {/* Informational hint banner */}
-              <div style={{
-                padding: '0.75rem 1rem',
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                fontSize: '0.8rem',
-                color: '#1e40af'
-              }}>
-                <AlertCircle size={18} color="#2563eb" style={{ flexShrink: 0 }} />
-                <span>
-                  Transfers stock in meters between batches. <strong>Source Lot</strong> stock will decrease and <strong>Destination Lot</strong> will increase.
-                </span>
-              </div>
-
+            <form onSubmit={handleTransferSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.1rem', background: 'transparent' }}>
               {/* Date & Fabric Quality */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
                     Date
                   </label>
                   <input
@@ -7746,15 +7790,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     onChange={e => setTransferForm({ ...transferForm, date: e.target.value })}
                     style={{
                       width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
-                      background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                      background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#ffffff',
                       fontSize: '0.88rem', outline: 'none'
                     }}
-                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
-                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
                     Fabric Quality
                   </label>
                   <select
@@ -7774,11 +7816,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     }}
                     style={{
                       width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
-                      background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
-                      fontSize: '0.88rem', outline: 'none', fontWeight: 500
+                      background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#ffffff',
+                      fontSize: '0.88rem', outline: 'none', fontWeight: 600
                     }}
-                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
-                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                   >
                     <option value="">All Fabric Qualities</option>
                     {availableTransferFabrics.map(f => (
@@ -7793,10 +7833,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <div>
                   <label style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    fontSize: '0.82rem', color: '#b91c1c', marginBottom: '0.35rem', fontWeight: 700
+                    fontSize: '0.76rem', color: '#fca5a5', marginBottom: '0.35rem', fontWeight: 700
                   }}>
                     <span>Source Lot (From)</span>
-                    <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>- Decreases</span>
+                    <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>- Decreases</span>
                   </label>
                   <select
                     required
@@ -7820,11 +7860,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     }}
                     style={{
                       width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
-                      background: '#fff5f5', border: '1.5px solid #fca5a5', color: '#991b1b',
-                      fontSize: '0.85rem', outline: 'none', fontWeight: 600
+                      background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5',
+                      fontSize: '0.85rem', outline: 'none', fontWeight: 700
                     }}
-                    onFocus={e => { e.target.style.borderColor = '#dc2626'; e.target.style.boxShadow = '0 0 0 3px rgba(220, 38, 38, 0.15)'; }}
-                    onBlur={e => { e.target.style.borderColor = '#fca5a5'; e.target.style.boxShadow = 'none'; }}
                   >
                     <option value="">Select Source Lot</option>
                     {sourceLotOptions.map(l => (
@@ -7841,10 +7879,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <div>
                   <label style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    fontSize: '0.82rem', color: '#1d4ed8', marginBottom: '0.35rem', fontWeight: 700
+                    fontSize: '0.76rem', color: '#38bdf8', marginBottom: '0.35rem', fontWeight: 700
                   }}>
                     <span>Destination Lot (To)</span>
-                    <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>+ Increases</span>
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 600 }}>+ Increases</span>
                   </label>
                   <select
                     required
@@ -7873,11 +7911,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     }}
                     style={{
                       width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
-                      background: '#eff6ff', border: '1.5px solid #93c5fd', color: '#1e40af',
-                      fontSize: '0.85rem', outline: 'none', fontWeight: 600
+                      background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8',
+                      fontSize: '0.85rem', outline: 'none', fontWeight: 700
                     }}
-                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
-                    onBlur={e => { e.target.style.borderColor = '#93c5fd'; e.target.style.boxShadow = 'none'; }}
                   >
                     <option value="">Select Destination Lot</option>
                     {destLotOptions.map(l => (
@@ -7894,8 +7930,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               {/* Party / Client Name for Clearness */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
-                  Party Name (For Reconciliation & Statement Clearness)
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                  Party Name
                 </label>
                 <input
                   type="text"
@@ -7905,11 +7941,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onChange={e => setTransferForm({ ...transferForm, partyName: e.target.value })}
                   style={{
                     width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
-                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
-                    fontSize: '0.88rem', outline: 'none', fontWeight: 500
+                    background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#ffffff',
+                    fontSize: '0.88rem', outline: 'none', fontWeight: 600
                   }}
-                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
-                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                 />
                 <datalist id="transfer-parties">
                   {Array.from(new Set([...partiesList, ...vendorsList.map(v => v.vendorName || v)])).filter(Boolean).sort().map((p, idx) => (
@@ -7921,7 +7955,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               {/* Quantity */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
                     Transfer Quantity (Meters)
                   </label>
                   {transferForm.destLotNo && (() => {
@@ -7933,9 +7967,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           type="button"
                           onClick={() => setTransferForm(prev => ({ ...prev, qty: String(defVal.toFixed(2)) }))}
                           style={{
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            color: '#2563eb',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            color: '#38bdf8',
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             padding: '2px 8px',
@@ -7963,17 +7997,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onChange={e => setTransferForm({ ...transferForm, qty: e.target.value })}
                   style={{
                     width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px',
-                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
-                    fontWeight: 700, fontSize: '1rem', outline: 'none'
+                    background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#38bdf8',
+                    fontWeight: 800, fontSize: '1rem', outline: 'none'
                   }}
-                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
-                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
                   Notes / Reason (Optional)
                 </label>
                 <input
@@ -7983,29 +8015,25 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onChange={e => setTransferForm({ ...transferForm, notes: e.target.value })}
                   style={{
                     width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
-                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#ffffff',
                     fontSize: '0.88rem', outline: 'none'
                   }}
-                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
-                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                 />
               </div>
 
               {/* Action Buttons */}
               <div style={{
                 display: 'flex', justifyContent: 'flex-end', gap: '0.75rem',
-                marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'
+                marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
                 <button
                   type="button"
                   onClick={() => setIsTransferFormOpen(false)}
                   style={{
                     padding: '0.6rem 1.25rem', fontSize: '0.88rem', fontWeight: 600,
-                    background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#475569',
+                    background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#cbd5e1',
                     borderRadius: '8px', cursor: 'pointer', transition: 'all 0.15s'
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#1e293b'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
                 >
                   Cancel
                 </button>
@@ -8035,39 +8063,36 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       {selectedChallanHistory && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 99999,
-          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            width: '100%', maxWidth: '600px', background: '#ffffff', border: '1px solid #e2e8f0',
-            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+            width: '100%', maxWidth: '600px', background: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', boxShadow: '0 25px 50px rgba(0,0,0,0.65)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Clock size={18} /> Delivery Challan #{selectedChallanHistory.challanNo || selectedChallanHistory.jobNo} — Staff Audit Log
                 </h3>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Staff attribution for this fabric dispatch / delivery transaction.
-                </p>
               </div>
-              <button className="btn-icon" onClick={() => setSelectedChallanHistory(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
-                <X size={20} />
+              <button className="btn-icon" onClick={() => setSelectedChallanHistory(null)} style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', color: '#cbd5e1', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ padding: '1.25rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Logged By (Staff):</span>
-                <span style={{ padding: '3px 10px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 800, fontSize: '0.85rem', border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' }}>Logged By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 800, fontSize: '0.85rem', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
                   {selectedChallanHistory.createdByName || selectedChallanHistory.createdBy || 'HASI'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
-                <div>Party: <strong style={{ color: '#0f172a' }}>{selectedChallanHistory.partyName || 'Client'}</strong></div>
-                <div>Fabric: <strong style={{ color: '#0f172a' }}>{selectedChallanHistory.fabricQuality} ({selectedChallanHistory.qty} mtr)</strong></div>
-                <div>Date Logged: <strong style={{ color: '#0f172a' }}>{formatDateDDMMYYYY(selectedChallanHistory.date)}</strong></div>
-                {selectedChallanHistory.notes && <div>Notes: <strong style={{ color: '#0f172a' }}>{selectedChallanHistory.notes}</strong></div>}
+              <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Party: <strong style={{ color: '#ffffff' }}>{selectedChallanHistory.partyName || 'Client'}</strong></div>
+                <div>Fabric: <strong style={{ color: '#ffffff' }}>{selectedChallanHistory.fabricQuality} ({selectedChallanHistory.qty} mtr)</strong></div>
+                <div>Date Logged: <strong style={{ color: '#ffffff' }}>{formatDateDDMMYYYY(selectedChallanHistory.date)}</strong></div>
+                {selectedChallanHistory.notes && <div>Notes: <strong style={{ color: '#ffffff' }}>{selectedChallanHistory.notes}</strong></div>}
               </div>
             </div>
           </div>

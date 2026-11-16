@@ -332,6 +332,7 @@ const getGroupMessages = async (req, res) => {
       }
     }
 
+    query.isScheduled = { $ne: true };
     const messagesPromise = ChatMessage.find(query)
       .populate({ path: 'senderId', select: 'name username email role', options: { strictPopulate: false } })
       .populate({ path: 'mentions', select: 'name username email', options: { strictPopulate: false } })
@@ -582,13 +583,13 @@ const postGroupMessage = async (req, res) => {
       }
     }
 
-    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds, clientMsgId: inClientMsgId } = req.body;
+    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds, clientMsgId: inClientMsgId, viewOnce, locationMeta, contactMeta, transcript, eventMeta, callLinkMeta, isEncrypted, encryptedPayload } = req.body;
     const clientMsgId = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || inClientMsgId || null;
 
     const rawContent = typeof content === 'string' ? content : (content != null ? String(content) : '');
     const trimmedContent = rawContent.trim();
 
-    if (!trimmedContent && !attachment && type !== 'poll') {
+    if (!trimmedContent && !attachment && type !== 'poll' && type !== 'location' && type !== 'contact' && type !== 'event' && type !== 'call-link') {
       return res.status(400).json({ success: false, message: 'Message content cannot be empty' });
     }
 
@@ -745,6 +746,10 @@ const postGroupMessage = async (req, res) => {
 
     const messageContent = (sanitizedContent || '').trim() || (pollMeta ? pollMeta.question : (attachment?.fileName ? attachment.fileName : 'Message'));
 
+    const expiresAt = updatedRoom?.disappearAfterSec > 0
+      ? new Date(Date.now() + updatedRoom.disappearAfterSec * 1000)
+      : null;
+
     const newMessage = await ChatMessage.create({
       roomId: groupId,
       senderId: senderObjId,
@@ -761,6 +766,15 @@ const postGroupMessage = async (req, res) => {
       recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
       mentions: mentionObjectIds,
       readBy: [senderObjId],
+      expiresAt,
+      viewOnce: Boolean(viewOnce),
+      locationMeta: locationMeta || undefined,
+      contactMeta: contactMeta || undefined,
+      transcript: transcript ? String(transcript).slice(0, 5000) : '',
+      eventMeta: eventMeta || undefined,
+      callLinkMeta: callLinkMeta || undefined,
+      isEncrypted: Boolean(isEncrypted),
+      encryptedPayload: encryptedPayload || undefined,
       createdAt: new Date(),
       roomSeq
     });
@@ -1470,7 +1484,9 @@ const createGroup = async (req, res) => {
     const room = await ChatRoom.create({
       name: sanitizedName,
       description: sanitizedDesc,
-      type: 'group',
+      type: ['broadcast', 'community'].includes(req.body.type) ? req.body.type : 'group',
+      communityId: req.body.communityId || null,
+      isAnnouncementChannel: Boolean(req.body.isAnnouncementChannel),
       department: department.trim(),
       companyEntity: companyEntity.trim(),
       permissionScope: permissionScope.trim(),
@@ -1998,13 +2014,26 @@ const markGroupAsRead = async (req, res) => {
 
     const userObjId = mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : rawUserId;
 
-    const result = await ChatMessage.updateMany(
-      { roomId: groupId, senderId: { $ne: userObjId }, readBy: { $ne: userObjId } },
-      { $addToSet: { readBy: userObjId, deliveredTo: userObjId } }
-    );
+    // Clear manual mark-as-unread flag
+    await ChatRoom.updateOne({ _id: groupId }, { $pull: { unreadBy: userObjId } });
+
+    // Respect user's Read Receipts privacy preference
+    const { ChatUserPreference } = require('../db/models/chat.model');
+    const userPref = await ChatUserPreference.findOne({ userId: userObjId }).select('privacy').lean();
+    const sendReadReceipts = userPref?.privacy?.readReceipts !== false;
+
+    const result = sendReadReceipts
+      ? await ChatMessage.updateMany(
+          { roomId: groupId, senderId: { $ne: userObjId }, readBy: { $ne: userObjId } },
+          { $addToSet: { readBy: userObjId, deliveredTo: userObjId } }
+        )
+      : await ChatMessage.updateMany(
+          { roomId: groupId, senderId: { $ne: userObjId }, deliveredTo: { $ne: userObjId } },
+          { $addToSet: { deliveredTo: userObjId } }
+        );
 
     const io = req.app.get('io') || req.app.get('socketio') || global.io;
-    if (io) {
+    if (io && sendReadReceipts) {
       let broadcast = io.to(String(groupId));
       const targetRoom = await ChatRoom.findById(groupId).select('members');
       if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {

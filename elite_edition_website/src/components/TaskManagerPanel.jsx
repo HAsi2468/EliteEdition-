@@ -2039,10 +2039,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                     top: 'calc(100% + 5px)',
                     right: 0,
                     minWidth: '200px',
-                    background: '#ffffff',
+                    background: 'rgba(15, 23, 42, 0.96)',
+                    backdropFilter: 'blur(20px)',
                     borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    border: '1px solid rgba(148, 163, 184, 0.25)',
+                    boxShadow: '0 16px 36px rgba(2, 6, 23, 0.65)',
                     zIndex: 1100,
                     padding: '6px',
                     display: 'flex',
@@ -2072,23 +2073,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                           gap: '8px',
                           padding: '6px 8px',
                           borderRadius: '6px',
-                          background: isActive ? '#eff6ff' : 'transparent',
+                          background: isActive ? 'rgba(37, 99, 235, 0.25)' : 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          color: isActive ? '#1d4ed8' : '#334155',
+                          color: isActive ? '#38bdf8' : '#e2e8f0',
                           fontSize: '0.76rem',
                           fontWeight: isActive ? 800 : 600,
                           textAlign: 'left',
                           transition: 'background 0.12s'
                         }}
-                        onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
                         onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                          <IconComp size={13} color={isActive ? '#2563eb' : '#64748b'} />
+                          <IconComp size={13} color={isActive ? '#38bdf8' : '#94a3b8'} />
                           <span>{v.label}</span>
                         </div>
-                        {isActive && <Check size={13} color="#2563eb" style={{ flexShrink: 0 }} />}
+                        {isActive && <Check size={13} color="#38bdf8" style={{ flexShrink: 0 }} />}
                       </button>
                     );
                   })}

@@ -4,6 +4,7 @@ import { silentAuth } from './authInterceptor';
 
 // API Base URL management
 const DEFAULT_URL = '/v1';
+export const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 export const getBaseUrl = () => {
   localStorage.removeItem('elite_api_base_url');
@@ -135,7 +136,7 @@ const getBackoffDelay = (attempt) => {
 const request = async (path, options = {}) => {
   const method = (options.method || 'GET').toUpperCase();
   const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-  
+
   // Resolve or generate Idempotency-Key for mutating requests
   let idempotencyKey =
     options.headers?.['Idempotency-Key'] ||
@@ -159,11 +160,11 @@ const request = async (path, options = {}) => {
 
     // Note: Do not prematurely block on navigator.onLine if retrying; browsers frequently report
     // false negatives on wake-from-sleep or WiFi reconnect handoffs. Let fetch attempt or retry handle it.
-    
+
     const userStr = localStorage.getItem('elite_user');
     let currUser = null;
     if (userStr) {
-      try { currUser = JSON.parse(userStr); } catch (e) {}
+      try { currUser = JSON.parse(userStr); } catch (e) { }
     }
     const uId = currUser?.id || currUser?._id || '';
     const uName = currUser?.name || currUser?.fullName || currUser?.username || '';
@@ -189,7 +190,7 @@ const request = async (path, options = {}) => {
       'Pragma': 'no-cache',
       ...options.headers,
     };
-    
+
     const timeoutMs = options.timeout || 120000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -276,7 +277,7 @@ const request = async (path, options = {}) => {
           await fetchCsrfToken();
           return request(path, { ...options, _csrfRetried: true, headers: { ...options.headers, 'Idempotency-Key': idempotencyKey } });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Auto-refresh expired JWT via SilentAuthInterceptor on 401 Unauthorized
@@ -297,7 +298,7 @@ const request = async (path, options = {}) => {
         throw new Error('Your session has expired. Please log in again.');
       }
     }
-    
+
     // If server is reloading during deployment, status code is 502, 503, or 504
     if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt <= maxRetries && canRetry) {
       const delay = getBackoffDelay(attempt);
@@ -321,10 +322,10 @@ const request = async (path, options = {}) => {
             errMsg = text.replace(/<[^>]*>/g, '').trim() || errMsg;
           }
         }
-      } catch (e) {}
+      } catch (e) { }
       throw new Error(errMsg);
     }
-    
+
     const json = await response.json();
     if (json && json.requiresApproval) {
       if (typeof window !== 'undefined') {
@@ -337,7 +338,7 @@ const request = async (path, options = {}) => {
           json.message || 'Your changes have been submitted to the Admin Review & Approvals Queue.',
           'info'
         );
-      }).catch(() => {});
+      }).catch(() => { });
     }
     return json;
   }
@@ -426,33 +427,33 @@ export const api = {
         if (
           k &&
           (k.startsWith('elite_') ||
-           k.startsWith('QA-TEST') ||
-           k.includes('material') ||
-           k.includes('chat') ||
-           k.includes('token') ||
-           k.includes('user') ||
-           k.includes('auth'))
+            k.startsWith('QA-TEST') ||
+            k.includes('material') ||
+            k.includes('chat') ||
+            k.includes('token') ||
+            k.includes('user') ||
+            k.includes('auth'))
         ) {
           keysToRemove.push(k);
         }
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       sessionStorage.clear();
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (typeof window !== 'undefined' && 'caches' in window) {
-        caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => {});
+        caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => { });
       }
-    } catch (_) {}
+    } catch (_) { }
 
-    request('/auth/logout', { method: 'POST' }).catch(() => {});
+    request('/auth/logout', { method: 'POST' }).catch(() => { });
     try {
       import('../utils/crossTabSync').then((m) => m.broadcastCrossTab('AUTH_LOGOUT'));
-    } catch (_) {}
+    } catch (_) { }
   },
 
   getCurrentUser() {
@@ -797,7 +798,7 @@ export const api = {
       try {
         const errJson = await response.json();
         errMsg = errJson.message || errJson.error || errMsg;
-      } catch (_) {}
+      } catch (_) { }
       throw new Error(errMsg);
     }
 
@@ -806,7 +807,7 @@ export const api = {
       let jobData = {};
       try {
         jobData = await response.json();
-      } catch (_) {}
+      } catch (_) { }
       const jobId = jobData.jobId;
 
       triggerPushNotification(
@@ -1213,2390 +1214,2655 @@ export const api = {
     return request(`/designs/categories${qs}`);
   },
   async getNextDesignNumber(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/designs/next-number${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/designs/next-number${qs}`);
+    },
   async importPKDOrders(items) {
-    return request('/designs/import-pkd-orders', { method: 'POST', body: JSON.stringify({ items }) });
-  },
+      return request('/designs/import-pkd-orders', { method: 'POST', body: JSON.stringify({ items }) });
+    },
 
   // ─── Complaints Module ──────────────────────────────────────────────────────
   async getComplaints(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/complaints${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/complaints${qs}`);
+    },
   async getNextComplaintNumber(companyEntity) {
-    const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
-    return request(`/complaints/next-number${qs}`);
-  },
+      const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
+      return request(`/complaints/next-number${qs}`);
+    },
   async getComplaintAnalytics(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/complaints/analytics${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/complaints/analytics${qs}`);
+    },
   async createComplaint(payload) {
-    return request('/complaints', { method: 'POST', body: JSON.stringify(payload) });
-  },
+      return request('/complaints', { method: 'POST', body: JSON.stringify(payload) });
+    },
   async updateComplaint(id, payload) {
-    return request(`/complaints/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-  },
+      return request(`/complaints/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    },
   async deleteComplaint(id) {
-    return request(`/complaints/${id}`, { method: 'DELETE' });
-  },
+      return request(`/complaints/${id}`, { method: 'DELETE' });
+    },
   async clearAllComplaints() {
-    return request('/complaints/clear-all', { method: 'DELETE' });
-  },
+      return request('/complaints/clear-all', { method: 'DELETE' });
+    },
   async getComplaintById(id) {
-    return request(`/complaints/${id}`);
-  },
+      return request(`/complaints/${id}`);
+    },
   async lookupOrderDetails(searchTerm) {
-    return request(`/complaints/lookup-order?query=${encodeURIComponent(searchTerm)}`);
-  },
+      return request(`/complaints/lookup-order?query=${encodeURIComponent(searchTerm)}`);
+    },
   async addComplaintComment(id, payload) {
-    return request(`/complaints/${id}/comments`, { method: 'POST', body: JSON.stringify(payload) });
-  },
+      return request(`/complaints/${id}/comments`, { method: 'POST', body: JSON.stringify(payload) });
+    },
 
   // ─── Department Expense Module ──────────────────────────────────────────────
   async getExpenses(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/expenses${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/expenses${qs}`);
+    },
   async getExpenseAnalytics(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/expenses/analytics${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/expenses/analytics${qs}`);
+    },
   async getLedgerSummary(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/expenses/ledger-summary${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/expenses/ledger-summary${qs}`);
+    },
   async getLedgerSettings(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/expenses/ledger-settings${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/expenses/ledger-settings${qs}`);
+    },
   async saveLedgerSettings(payload) {
-    return request('/expenses/ledger-settings', { method: 'POST', body: JSON.stringify(payload) });
-  },
+      return request('/expenses/ledger-settings', { method: 'POST', body: JSON.stringify(payload) });
+    },
   async getNextExpenseVoucherNo(companyEntity) {
-    const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
-    return request(`/expenses/next-number${qs}`);
-  },
+      const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
+      return request(`/expenses/next-number${qs}`);
+    },
   async createExpense(payload) {
-    return request('/expenses', { method: 'POST', body: JSON.stringify(payload) });
-  },
+      return request('/expenses', { method: 'POST', body: JSON.stringify(payload) });
+    },
   async updateExpense(id, payload) {
-    return request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-  },
+      return request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    },
   async deleteExpense(id) {
-    return request(`/expenses/${id}`, { method: 'DELETE' });
-  },
+      return request(`/expenses/${id}`, { method: 'DELETE' });
+    },
 
   // ─── Statutory GST Compliance & Freight GTA RCM ─────────────────────────────
   async getGstTable12(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/gst/table12${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/gst/table12${qs}`);
+    },
   async getFreightRcm(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/gst/freight-rcm${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/gst/freight-rcm${qs}`);
+    },
   async createFreightBill(payload) {
-    return request('/gst/freight-rcm', { method: 'POST', body: JSON.stringify(payload) });
-  },
+      return request('/gst/freight-rcm', { method: 'POST', body: JSON.stringify(payload) });
+    },
   async updateFreightBill(id, payload) {
-    return request(`/gst/freight-rcm/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-  },
+      return request(`/gst/freight-rcm/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    },
   async deleteFreightBill(id) {
-    return request(`/gst/freight-rcm/${id}`, { method: 'DELETE' });
-  },
+      return request(`/gst/freight-rcm/${id}`, { method: 'DELETE' });
+    },
   async generateSelfInvoices(payload = {}) {
-    return request('/gst/freight-rcm/generate-self-invoices', { method: 'POST', body: JSON.stringify(payload) });
-  },
-  getGstTable12ExcelUrl(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return `${getBaseUrl()}/gst/table12/export-excel${qs}`;
-  },
-  getFreightRcmExcelUrl(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return `${getBaseUrl()}/gst/freight-rcm/export-excel${qs}`;
-  },
+      return request('/gst/freight-rcm/generate-self-invoices', { method: 'POST', body: JSON.stringify(payload) });
+    },
+    getGstTable12ExcelUrl(params = {}) {
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return `${getBaseUrl()}/gst/table12/export-excel${qs}`;
+    },
+    getFreightRcmExcelUrl(params = {}) {
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return `${getBaseUrl()}/gst/freight-rcm/export-excel${qs}`;
+    },
 
   // ─── Monthly Costing & P&L Module ───────────────────────────────────────────
   async getMonthlyCostingReport(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/costing/monthly-report${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/costing/monthly-report${qs}`);
+    },
   async saveMonthlyCostingOverheads(payload) {
-    return request('/costing/monthly-overheads', { method: 'POST', body: JSON.stringify(payload) });
-  },
+      return request('/costing/monthly-overheads', { method: 'POST', body: JSON.stringify(payload) });
+    },
 
   // ─── Elite Digital Prints Master Operations Dashboard ────────────────────────
   async getDigitalPrintDashboard(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/digital-print/dashboard${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/digital-print/dashboard${qs}`);
+    },
 
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/analytics/variant${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/analytics/variant${qs}`);
+    },
   async getDemographicsAnalytics(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/analytics/demographics${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/analytics/demographics${qs}`);
+    },
   async getTimeHeatmapData(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/analytics/heatmap${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/analytics/heatmap${qs}`);
+    },
   async getDeadStockReport(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/analytics/dead-stock${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/analytics/dead-stock${qs}`);
+    },
   async getLostRevenueEstimate(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/analytics/lost-revenue${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/analytics/lost-revenue${qs}`);
+    },
   async getReturnsBrandReport(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/analytics/returns-brand${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/analytics/returns-brand${qs}`);
+    },
   // MYNTRA PPMP 6-STAGE LIFECYCLE API HELPERS
   async getMyntraConfig() {
-    return request('/myntra/config');
-  },
+      return request('/myntra/config');
+    },
 
   async saveMyntraConfig(payload) {
-    const body = typeof payload === 'object' && payload.merchantId ? payload : { merchantId: arguments[0], secretKey: arguments[1] };
-    return request('/myntra/config', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-  },
+      const body = typeof payload === 'object' && payload.merchantId ? payload : { merchantId: arguments[0], secretKey: arguments[1] };
+      return request('/myntra/config', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+    },
 
   async refreshMyntraToken() {
-    return request('/myntra/authorization/refresh_token', {
-      method: 'POST'
-    });
-  },
+      return request('/myntra/authorization/refresh_token', {
+        method: 'POST'
+      });
+    },
 
   async getMyntraOrders() {
-    return request('/myntra/orders');
-  },
+      return request('/myntra/orders');
+    },
 
   async acceptMyntraOrder(id) {
-    return request(`/myntra/order/${id}/accept`, {
-      method: 'POST'
-    });
-  },
+      return request(`/myntra/order/${id}/accept`, {
+        method: 'POST'
+      });
+    },
 
   async bulkAcceptMyntraOrders(orderIds) {
-    return request('/myntra/orders/accept', {
-      method: 'POST',
-      body: JSON.stringify({ orderIds })
-    });
-  },
+      return request('/myntra/orders/accept', {
+        method: 'POST',
+        body: JSON.stringify({ orderIds })
+      });
+    },
 
   async readyToDispatchMyntra(payload) {
-    return request('/myntra/order/readyToDispatch', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/myntra/order/readyToDispatch', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async readyToShipMyntra(barcodeOrPacketId) {
-    return request('/myntra/order/readyToShip', {
-      method: 'POST',
-      body: JSON.stringify({ barcode: barcodeOrPacketId, packetId: barcodeOrPacketId })
-    });
-  },
+      return request('/myntra/order/readyToShip', {
+        method: 'POST',
+        body: JSON.stringify({ barcode: barcodeOrPacketId, packetId: barcodeOrPacketId })
+      });
+    },
 
-  getMyntraShippingLabelUrl(packetId) {
-    const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
-    return `${base}/api/v1/myntra/packet/${packetId}/shippingLabel`;
-  },
+    getMyntraShippingLabelUrl(packetId) {
+      const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
+      return `${base}/api/v1/myntra/packet/${packetId}/shippingLabel`;
+    },
 
-  getMyntraInvoiceUrl(packetId) {
-    const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
-    return `${base}/api/v1/myntra/packet/${packetId}/getDocument?type=invoice`;
-  },
+    getMyntraInvoiceUrl(packetId) {
+      const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
+      return `${base}/api/v1/myntra/packet/${packetId}/getDocument?type=invoice`;
+    },
 
   async getMyntraCatalog() {
-    return request('/myntra/catalog');
-  },
+      return request('/myntra/catalog');
+    },
 
   async addMyntraSku(data) {
-    return request('/myntra/sku', {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
+      return request('/myntra/sku', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
 
   async mapMyntraWarehouse(data) {
-    return request('/myntra/warehouse', {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
+      return request('/myntra/warehouse', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
 
   async syncMyntraInventory(data) {
-    return request('/myntra/inventory/update', {
-      method: 'PUT',
-      body: JSON.stringify(data || {})
-    });
-  },
+      return request('/myntra/inventory/update', {
+        method: 'PUT',
+        body: JSON.stringify(data || {})
+      });
+    },
 
   async applyMyntraDiscount(data) {
-    return request('/myntra/discount/override', {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
+      return request('/myntra/discount/override', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
 
   async getMyntraShipments() {
-    return request('/myntra/shipments');
-  },
+      return request('/myntra/shipments');
+    },
 
   async markMyntraShipped(packetId) {
-    return request(`/myntra/mock/packet/${packetId}/shipped`, {
-      method: 'POST'
-    });
-  },
+      return request(`/myntra/mock/packet/${packetId}/shipped`, {
+        method: 'POST'
+      });
+    },
 
   async markShipped(packetId) {
-    return this.markMyntraShipped(packetId);
-  },
+      return this.markMyntraShipped(packetId);
+    },
 
   async markMyntraDelivered(packetId) {
-    return request(`/myntra/mock/packet/${packetId}/delivered`, {
-      method: 'POST'
-    });
-  },
+      return request(`/myntra/mock/packet/${packetId}/delivered`, {
+        method: 'POST'
+      });
+    },
 
   async markDelivered(packetId) {
-    return this.markMyntraDelivered(packetId);
-  },
+      return this.markMyntraDelivered(packetId);
+    },
 
   async getMyntraReturns() {
-    return request('/myntra/returns');
-  },
+      return request('/myntra/returns');
+    },
 
   async lookupMyntraReturn(packetId) {
-    return request(`/myntra/mock/return/${encodeURIComponent(packetId)}`);
-  },
+      return request(`/myntra/mock/return/${encodeURIComponent(packetId)}`);
+    },
 
   async updateMyntraReturn(returnId, data) {
-    return request(`/myntra/mock/return/${returnId}/update`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
+      return request(`/myntra/mock/return/${returnId}/update`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
 
   async injectMockMyntraOrder(data) {
-    return request('/myntra/mock/order', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
+      return request('/myntra/mock/order', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
 
   async simulateMyntraCancellation(orderId) {
-    return request(`/myntra/mock/order/${orderId}/itemCancellation`, {
-      method: 'POST'
-    });
-  },
+      return request(`/myntra/mock/order/${orderId}/itemCancellation`, {
+        method: 'POST'
+      });
+    },
 
   async simulateMyntraHold(orderId) {
-    return request(`/myntra/mock/order/${orderId}/onhold`, {
-      method: 'POST'
-    });
-  },
+      return request(`/myntra/mock/order/${orderId}/onhold`, {
+        method: 'POST'
+      });
+    },
 
   async simulateMyntraUnhold(orderId) {
-    return request(`/myntra/mock/order/${orderId}/unhold`, {
-      method: 'POST'
-    });
-  },
+      return request(`/myntra/mock/order/${orderId}/unhold`, {
+        method: 'POST'
+      });
+    },
 
   async getMyntraWebhookEvents() {
-    return request('/myntra/webhook/events');
-  },
+      return request('/myntra/webhook/events');
+    },
 
   async clearMyntraWebhookEvents() {
-    return request('/myntra/webhook/events', {
-      method: 'DELETE'
-    });
-  },
+      return request('/myntra/webhook/events', {
+        method: 'DELETE'
+      });
+    },
 
   async dispatchMyntraOrder(orderId) {
-    return request(`/myntra/order/${orderId}/dispatch`, {
-      method: 'POST',
-    });
-  },
+      return request(`/myntra/order/${orderId}/dispatch`, {
+        method: 'POST',
+      });
+    },
 
   // --- Returns Engine ---
   async lookupUniwareOrder(data) {
-    return request('/returns/lookup-order', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/returns/lookup-order', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async processReturn(data) {
-    return request('/returns/process', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/returns/process', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async getReturns(status) {
-    const query = status ? `?status=${status}` : '';
-    return request(`/returns${query}`);
-  },
+      const query = status ? `?status=${status}` : '';
+      return request(`/returns${query}`);
+    },
 
   async markRefinished(returnId) {
-    return request(`/returns/${returnId}/refinish`, {
-      method: 'POST',
-    });
-  },
+      return request(`/returns/${returnId}/refinish`, {
+        method: 'POST',
+      });
+    },
 
   // --- Print Settings Engine ---
   async getPrintConfig() {
-    return request('/print-config');
-  },
+      return request('/print-config');
+    },
 
   async updatePrintConfig(data) {
-    return request('/print-config/update', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/print-config/update', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async getSystemLockStatus() {
-    return request('/print-config/system-lock');
-  },
+      return request('/print-config/system-lock');
+    },
 
   async setSystemLockStatus(isSystemLocked, message = '') {
-    return request('/print-config/system-lock', {
-      method: 'POST',
-      body: JSON.stringify({ isSystemLocked, message }),
-    });
-  },
+      return request('/print-config/system-lock', {
+        method: 'POST',
+        body: JSON.stringify({ isSystemLocked, message }),
+      });
+    },
 
   // --- Stitching Settings Engine ---
   async getStitchingConfig() {
-    return request('/stitching-config');
-  },
+      return request('/stitching-config');
+    },
 
   async updateStitchingConfig(data) {
-    return request('/stitching-config/update', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/stitching-config/update', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   // --- Workspace (Chat & Task) backwards compatibility with communication groups ---
   async getRooms(userId) {
-    return this.getCommunicationGroups();
-  },
+      return this.getCommunicationGroups();
+    },
   
   async createRoom(data) {
-    return this.createCommunicationGroup(data);
-  },
+      return this.createCommunicationGroup(data);
+    },
 
   async broadcastTodayData() {
-    return request('/workspace/broadcast-today-data', {
-      method: 'POST'
-    });
-  },
+      return request('/workspace/broadcast-today-data', {
+        method: 'POST'
+      });
+    },
 
   async getRoomMessages(roomId, before = '') {
-    return this.getCommunicationMessages(roomId);
-  },
+      return this.getCommunicationMessages(roomId);
+    },
 
   async sendRoomMessage(roomId, data) {
-    return this.sendCommunicationMessage(roomId, data);
-  },
+      return this.sendCommunicationMessage(roomId, data);
+    },
 
   async getWorkspaceTasks() {
-    return request('/workspace/tasks');
-  },
+      return request('/workspace/tasks');
+    },
 
   async getPresignedUrl(fileType) {
-    return request('/workspace/presign', {
-      method: 'POST',
-      body: JSON.stringify({ fileType }),
-    });
-  },
+      return request('/workspace/presign', {
+        method: 'POST',
+        body: JSON.stringify({ fileType }),
+      });
+    },
 
   async uploadChatFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    return request('/workspace/upload', {
-      method: 'POST',
-      body: formData,
-    }, true);
-  },
+      const formData = new FormData();
+      formData.append('file', file);
+      return request('/workspace/upload', {
+        method: 'POST',
+        body: formData,
+      }, true);
+    },
 
   async uploadChatImage(file) {
-    return this.uploadChatFile(file);
-  },
+      return this.uploadChatFile(file);
+    },
 
   // Fabric Inventory
   async getFabricTransactions(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/fabric/transactions${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/fabric/transactions${qs}`);
+    },
   
   async getFabricStock(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/fabric/stock${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/fabric/stock${qs}`);
+    },
   
   async createFabricInward(payload) {
-    return request('/fabric/inward', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/fabric/inward', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
   
   async createFabricOutward(payload) {
-    return request('/fabric/outward', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/fabric/outward', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
   
   async getFabricLotStock(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/fabric/lot-stock${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/fabric/lot-stock${qs}`);
+    },
 
   // White Fabric QA Inspection Logs
   async getWhiteFabricLogs(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/fabric/white-qa-logs${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/fabric/white-qa-logs${qs}`);
+    },
   async createWhiteFabricLog(data, options = {}) {
-    const rawKey = options.idempotencyKey || `WFQA-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    return request('/fabric/white-qa-logs', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      headers: {
-        'Idempotency-Key': rawKey,
-        ...(options.headers || {})
-      }
-    });
-  },
+      const rawKey = options.idempotencyKey || `WFQA-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      return request('/fabric/white-qa-logs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: {
+          'Idempotency-Key': rawKey,
+          ...(options.headers || {})
+        }
+      });
+    },
   async deleteWhiteFabricLog(id) {
-    return request(`/fabric/white-qa-logs/${id}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/fabric/white-qa-logs/${id}`, {
+        method: 'DELETE'
+      });
+    },
 
   async getFabricStockByPanna(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/fabric/stock-panna${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/fabric/stock-panna${qs}`);
+    },
 
   async downloadFabricLotWisePdf(dateStart = '', dateEnd = '', fileName = 'Fabric_LotWise_Stock_Report.pdf') {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (dateStart) query.append('dateStart', dateStart);
-    if (dateEnd) query.append('dateEnd', dateEnd);
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await authFetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`);
-    if (!response.ok) throw new Error('Failed to generate lot-wise fabric PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Stock Report' });
-  },
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (dateStart) query.append('dateStart', dateStart);
+      if (dateEnd) query.append('dateEnd', dateEnd);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const response = await authFetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`);
+      if (!response.ok) throw new Error('Failed to generate lot-wise fabric PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Stock Report' });
+    },
 
   async downloadSingleLotPdf(lotNo, fileName) {
-    const baseUrl = getBaseUrl();
-    const safeLotNo = encodeURIComponent(String(lotNo || '').trim());
-    const response = await authFetch(`${baseUrl}/fabric/report/lot-statement-pdf/${safeLotNo}`);
-    if (!response.ok) throw new Error('Failed to generate lot statement PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName || `Fabric_Lot_${lotNo}_Statement.pdf`, { title: `Fabric Lot ${lotNo} Statement` });
-  },
+      const baseUrl = getBaseUrl();
+      const safeLotNo = encodeURIComponent(String(lotNo || '').trim());
+      const response = await authFetch(`${baseUrl}/fabric/report/lot-statement-pdf/${safeLotNo}`);
+      if (!response.ok) throw new Error('Failed to generate lot statement PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName || `Fabric_Lot_${lotNo}_Statement.pdf`, { title: `Fabric Lot ${lotNo} Statement` });
+    },
 
   async getFabricRequirement(params = {}) {
-    const qs = new URLSearchParams(params).toString();
-    return request(`/fabric/requirement${qs ? `?${qs}` : ''}`);
-  },
+      const qs = new URLSearchParams(params).toString();
+      return request(`/fabric/requirement${qs ? `?${qs}` : ''}`);
+    },
 
   async deleteFabricTransaction(id) {
-    return request(`/fabric/${id}`, { method: 'DELETE' });
-  },
+      return request(`/fabric/${id}`, { method: 'DELETE' });
+    },
 
   async updateFabricTransaction(id, payload) {
-    return request(`/fabric/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/fabric/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async downloadFabricLedgerPdf(params = {}) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (params.dateStart) query.append('dateStart', params.dateStart);
-    if (params.dateEnd) query.append('dateEnd', params.dateEnd);
-    if (params.fabricQuality && params.fabricQuality !== 'All') query.append('fabricQuality', params.fabricQuality);
-    const qs = query.toString() ? `?${query.toString()}` : '';
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (params.dateStart) query.append('dateStart', params.dateStart);
+      if (params.dateEnd) query.append('dateEnd', params.dateEnd);
+      if (params.fabricQuality && params.fabricQuality !== 'All') query.append('fabricQuality', params.fabricQuality);
+      const qs = query.toString() ? `?${query.toString()}` : '';
 
-    const response = await authFetch(`${baseUrl}/fabric/report/pdf${qs}`);
-    if (!response.ok) {
-      let errText = 'Failed to generate Fabric Ledger PDF';
-      try {
-        const errJson = await response.json();
-        if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
-      } catch (e) {}
-      throw new Error(errText);
-    }
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, `fabric-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`, { title: 'Fabric Ledger' });
-  },
+      const response = await authFetch(`${baseUrl}/fabric/report/pdf${qs}`);
+      if (!response.ok) {
+        let errText = 'Failed to generate Fabric Ledger PDF';
+        try {
+          const errJson = await response.json();
+          if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
+        } catch (e) { }
+        throw new Error(errText);
+      }
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, `fabric-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`, { title: 'Fabric Ledger' });
+    },
 
   // Raw Materials Inventory
   async getRawMaterialTransactions(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return request(`/raw-materials/transactions${query ? `?${query}` : ''}`);
-  },
+      const query = new URLSearchParams(params).toString();
+      return request(`/raw-materials/transactions${query ? `?${query}` : ''}`);
+    },
 
   async getRawMaterialStock(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return request(`/raw-materials/stock${query ? `?${query}` : ''}`);
-  },
+      const query = new URLSearchParams(params).toString();
+      return request(`/raw-materials/stock${query ? `?${query}` : ''}`);
+    },
 
   async createRawMaterialInward(payload) {
-    return request('/raw-materials/inward', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
+      return request('/raw-materials/inward', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
 
   async createRawMaterialOutward(payload) {
-    return request('/raw-materials/outward', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
+      return request('/raw-materials/outward', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
 
   async deleteRawMaterialTransaction(id) {
-    return request(`/raw-materials/${id}`, { method: 'DELETE' });
-  },
+      return request(`/raw-materials/${id}`, { method: 'DELETE' });
+    },
 
   async deleteRawMaterial(materialName, companyEntity) {
-    const qs = new URLSearchParams({ materialName, companyEntity: companyEntity || '' }).toString();
-    return request(`/raw-materials/material?${qs}`, { method: 'DELETE' });
-  },
+      const qs = new URLSearchParams({ materialName, companyEntity: companyEntity || '' }).toString();
+      return request(`/raw-materials/material?${qs}`, { method: 'DELETE' });
+    },
 
   async updateRawMaterialTransaction(id, payload) {
-    return request(`/raw-materials/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/raw-materials/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async getSisterTransfers(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return request(`/raw-materials/sister-transfers${query ? `?${query}` : ''}`);
-  },
+      const query = new URLSearchParams(params).toString();
+      return request(`/raw-materials/sister-transfers${query ? `?${query}` : ''}`);
+    },
 
   async verifySisterTransfer(id, payload) {
-    return request(`/raw-materials/sister-transfers/${id}/verify`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/raw-materials/sister-transfers/${id}/verify`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async downloadRawMaterialLedgerPdf(params = {}) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (params.dateStart) query.append('dateStart', params.dateStart);
-    if (params.dateEnd) query.append('dateEnd', params.dateEnd);
-    if (params.materialName && params.materialName !== 'All') query.append('materialName', params.materialName);
-    if (params.type && params.type !== 'All') query.append('type', params.type);
-    if (params.search) query.append('search', params.search);
-    if (params.companyEntity) query.append('companyEntity', params.companyEntity);
-    const qs = query.toString() ? `?${query.toString()}` : '';
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (params.dateStart) query.append('dateStart', params.dateStart);
+      if (params.dateEnd) query.append('dateEnd', params.dateEnd);
+      if (params.materialName && params.materialName !== 'All') query.append('materialName', params.materialName);
+      if (params.type && params.type !== 'All') query.append('type', params.type);
+      if (params.search) query.append('search', params.search);
+      if (params.companyEntity) query.append('companyEntity', params.companyEntity);
+      const qs = query.toString() ? `?${query.toString()}` : '';
 
-    const response = await authFetch(`${baseUrl}/raw-materials/report/pdf${qs}`);
-    if (!response.ok) {
-      let errText = 'Failed to generate Raw Materials Ledger PDF';
-      try {
-        const errJson = await response.json();
-        if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
-      } catch (e) {}
-      throw new Error(errText);
-    }
-    const blob = await response.blob();
-    const typeTag = params.type && params.type !== 'All' ? `-${params.type.toLowerCase()}` : '';
-    const fileName = `raw-materials${typeTag}-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`;
-    downloadOrPreviewPdf(blob, fileName, { title: 'Raw Materials Ledger' });
-  },
+      const response = await authFetch(`${baseUrl}/raw-materials/report/pdf${qs}`);
+      if (!response.ok) {
+        let errText = 'Failed to generate Raw Materials Ledger PDF';
+        try {
+          const errJson = await response.json();
+          if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
+        } catch (e) { }
+        throw new Error(errText);
+      }
+      const blob = await response.blob();
+      const typeTag = params.type && params.type !== 'All' ? `-${params.type.toLowerCase()}` : '';
+      const fileName = `raw-materials${typeTag}-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`;
+      downloadOrPreviewPdf(blob, fileName, { title: 'Raw Materials Ledger' });
+    },
 
   async importRawMaterialStock(rows) {
-    return request('/raw-materials/import-stock', {
-      method: 'POST',
-      body: JSON.stringify(rows),
-    });
-  },
+      return request('/raw-materials/import-stock', {
+        method: 'POST',
+        body: JSON.stringify(rows),
+      });
+    },
 
   async importFabricStock(rows) {
-    return request('/fabric/import-stock', {
-      method: 'POST',
-      body: JSON.stringify(rows),
-    });
-  },
+      return request('/fabric/import-stock', {
+        method: 'POST',
+        body: JSON.stringify(rows),
+      });
+    },
 
   async getFabricInwardReportData(dateStart, dateEnd) {
-    const q = new URLSearchParams();
-    if (dateStart) q.append('dateStart', dateStart);
-    if (dateEnd) q.append('dateEnd', dateEnd);
-    const qs = q.toString() ? `?${q.toString()}` : '';
-    return request(`/fabric/report/inward-data${qs}`);
-  },
+      const q = new URLSearchParams();
+      if (dateStart) q.append('dateStart', dateStart);
+      if (dateEnd) q.append('dateEnd', dateEnd);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return request(`/fabric/report/inward-data${qs}`);
+    },
 
   async getFabricOutwardReportData(dateStart, dateEnd) {
-    const q = new URLSearchParams();
-    if (dateStart) q.append('dateStart', dateStart);
-    if (dateEnd) q.append('dateEnd', dateEnd);
-    const qs = q.toString() ? `?${q.toString()}` : '';
-    return request(`/fabric/report/outward-data${qs}`);
-  },
+      const q = new URLSearchParams();
+      if (dateStart) q.append('dateStart', dateStart);
+      if (dateEnd) q.append('dateEnd', dateEnd);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return request(`/fabric/report/outward-data${qs}`);
+    },
 
   async getFabricLotWiseReportData(dateStart, dateEnd) {
-    const q = new URLSearchParams();
-    if (dateStart) q.append('dateStart', dateStart);
-    if (dateEnd) q.append('dateEnd', dateEnd);
-    const qs = q.toString() ? `?${q.toString()}` : '';
-    return request(`/fabric/report/lotwise-data${qs}`);
-  },
+      const q = new URLSearchParams();
+      if (dateStart) q.append('dateStart', dateStart);
+      if (dateEnd) q.append('dateEnd', dateEnd);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return request(`/fabric/report/lotwise-data${qs}`);
+    },
 
   async downloadFabricInwardReportPdf(dateStart, dateEnd, fileName) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (dateStart) query.append('dateStart', dateStart);
-    if (dateEnd) query.append('dateEnd', dateEnd);
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await authFetch(`${baseUrl}/fabric/report/inward-pdf${qs}`);
-    if (!response.ok) throw new Error('Failed to generate Fabric Inward PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Inward Report' });
-  },
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (dateStart) query.append('dateStart', dateStart);
+      if (dateEnd) query.append('dateEnd', dateEnd);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const response = await authFetch(`${baseUrl}/fabric/report/inward-pdf${qs}`);
+      if (!response.ok) throw new Error('Failed to generate Fabric Inward PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Inward Report' });
+    },
 
   async downloadFabricOutwardReportPdf(dateStart, dateEnd, fileName) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (dateStart) query.append('dateStart', dateStart);
-    if (dateEnd) query.append('dateEnd', dateEnd);
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await authFetch(`${baseUrl}/fabric/report/outward-pdf${qs}`);
-    if (!response.ok) throw new Error('Failed to generate Fabric Outward PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Outward Report' });
-  },
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (dateStart) query.append('dateStart', dateStart);
+      if (dateEnd) query.append('dateEnd', dateEnd);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const response = await authFetch(`${baseUrl}/fabric/report/outward-pdf${qs}`);
+      if (!response.ok) throw new Error('Failed to generate Fabric Outward PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Outward Report' });
+    },
 
   async downloadFabricLotWiseReportPdf(dateStart, dateEnd, fileName) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (dateStart) query.append('dateStart', dateStart);
-    if (dateEnd) query.append('dateEnd', dateEnd);
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await authFetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`);
-    if (!response.ok) throw new Error('Failed to generate Lot-Wise Fabric PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Report' });
-  },
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (dateStart) query.append('dateStart', dateStart);
+      if (dateEnd) query.append('dateEnd', dateEnd);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const response = await authFetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`);
+      if (!response.ok) throw new Error('Failed to generate Lot-Wise Fabric PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Report' });
+    },
 
   async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName, filters = {}, options = {}) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (dateStart) query.append('dateStart', dateStart);
-    if (dateEnd) query.append('dateEnd', dateEnd);
-    if (reportsArray && reportsArray.length > 0) query.append('reports', reportsArray.join(','));
-    if (filters.machineName) query.append('machineName', filters.machineName);
-    if (filters.shift) query.append('shift', filters.shift);
-    if (filters.operatorName || filters.operator) query.append('operator', filters.operatorName || filters.operator);
-    if (filters.pass) query.append('pass', filters.pass);
-    if (filters.startTime) query.append('startTime', filters.startTime);
-    if (filters.stopTime) query.append('stopTime', filters.stopTime);
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (dateStart) query.append('dateStart', dateStart);
+      if (dateEnd) query.append('dateEnd', dateEnd);
+      if (reportsArray && reportsArray.length > 0) query.append('reports', reportsArray.join(','));
+      if (filters.machineName) query.append('machineName', filters.machineName);
+      if (filters.shift) query.append('shift', filters.shift);
+      if (filters.operatorName || filters.operator) query.append('operator', filters.operatorName || filters.operator);
+      if (filters.pass) query.append('pass', filters.pass);
+      if (filters.startTime) query.append('startTime', filters.startTime);
+      if (filters.stopTime) query.append('stopTime', filters.stopTime);
 
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await authFetch(`${baseUrl}/fabric/report/combined-pdf${qs}`);
-    if (!response.ok) {
-      let errText = 'Failed to generate Combined Multi-Report PDF';
-      try {
-        const errJson = await response.json();
-        if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
-      } catch (e) {}
-      throw new Error(errText);
-    }
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName || 'Elite_Digital_Prints_Combined_Report.pdf', { title: 'Digital Prints Combined Report', ...options });
-  },
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const response = await authFetch(`${baseUrl}/fabric/report/combined-pdf${qs}`);
+      if (!response.ok) {
+        let errText = 'Failed to generate Combined Multi-Report PDF';
+        try {
+          const errJson = await response.json();
+          if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
+        } catch (e) { }
+        throw new Error(errText);
+      }
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName || 'Elite_Digital_Prints_Combined_Report.pdf', { title: 'Digital Prints Combined Report', ...options });
+    },
 
   async getInfraBills() {
-    return request('/infra-bills', { method: 'GET' });
-  },
+      return request('/infra-bills', { method: 'GET' });
+    },
 
   async createInfraBill(payload) {
-    return request('/infra-bills', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
+      return request('/infra-bills', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
 
   async updateInfraBill(id, payload) {
-    return request(`/infra-bills/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  },
+      return request(`/infra-bills/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+    },
 
   async deleteInfraBill(id) {
-    return request(`/infra-bills/${id}`, { method: 'DELETE' });
-  },
+      return request(`/infra-bills/${id}`, { method: 'DELETE' });
+    },
 
   async getAwsLiveCost(params = {}) {
-    const q = new URLSearchParams();
-    if (params.startDate) q.append('startDate', params.startDate);
-    if (params.endDate) q.append('endDate', params.endDate);
-    if (params.exchangeRate) q.append('exchangeRate', params.exchangeRate);
-    const qs = q.toString() ? `?${q.toString()}` : '';
-    return request(`/infra-bills/aws-live${qs}`, { method: 'GET' });
-  },
+      const q = new URLSearchParams();
+      if (params.startDate) q.append('startDate', params.startDate);
+      if (params.endDate) q.append('endDate', params.endDate);
+      if (params.exchangeRate) q.append('exchangeRate', params.exchangeRate);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return request(`/infra-bills/aws-live${qs}`, { method: 'GET' });
+    },
 
   async syncAwsCosts(payload = {}) {
-    return request('/infra-bills/aws-sync', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
+      return request('/infra-bills/aws-sync', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
 
   async downloadInfraBillInvoicePdf(id, month) {
-    const baseUrl = getBaseUrl();
-    const url = `${baseUrl}/infra-bills/${id}/invoice-pdf`;
-    const response = await authFetch(url);
-    if (!response.ok) throw new Error('Failed to download Infrastructure Invoice PDF');
-    const blob = await response.blob();
-    const safeMonth = (month || 'Bill').replace(/\s+/g, '_');
-    const fileName = `Infrastructure_Invoice_${safeMonth}.pdf`;
-    downloadOrPreviewPdf(blob, fileName, { title: `Infrastructure Invoice - ${month || ''}` });
-  },
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/infra-bills/${id}/invoice-pdf`;
+      const response = await authFetch(url);
+      if (!response.ok) throw new Error('Failed to download Infrastructure Invoice PDF');
+      const blob = await response.blob();
+      const safeMonth = (month || 'Bill').replace(/\s+/g, '_');
+      const fileName = `Infrastructure_Invoice_${safeMonth}.pdf`;
+      downloadOrPreviewPdf(blob, fileName, { title: `Infrastructure Invoice - ${month || ''}` });
+    },
 
   async recordInfraBillPayment(id, payload) {
-    return request(`/infra-bills/${id}/pay`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
+      return request(`/infra-bills/${id}/pay`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
 
 
   // ── Fabric Challan ─────────────────────────────────────────────────────
   async getFabricChallans(params = {}) {
-    const q = new URLSearchParams();
-    if (params.dateStart) q.append('dateStart', params.dateStart);
-    if (params.dateEnd) q.append('dateEnd', params.dateEnd);
-    if (params.search) q.append('search', params.search);
-    if (params.status && params.status !== 'All') q.append('status', params.status);
-    const qs = q.toString() ? `?${q.toString()}` : '';
-    return request(`/fabric-challan${qs}`);
-  },
+      const q = new URLSearchParams();
+      if (params.dateStart) q.append('dateStart', params.dateStart);
+      if (params.dateEnd) q.append('dateEnd', params.dateEnd);
+      if (params.search) q.append('search', params.search);
+      if (params.status && params.status !== 'All') q.append('status', params.status);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return request(`/fabric-challan${qs}`);
+    },
 
   async createFabricChallan(data) {
-    return request('/fabric-challan', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/fabric-challan', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateFabricChallan(id, data) {
-    return request(`/fabric-challan/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/fabric-challan/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteFabricChallan(id) {
-    return request(`/fabric-challan/${id}`, { method: 'DELETE' });
-  },
+      return request(`/fabric-challan/${id}`, { method: 'DELETE' });
+    },
 
   async downloadFabricChallanPdf(id, challanNo) {
-    if (!id) throw new Error('Invalid challan ID');
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/fabric-challan/${id}/pdf`);
-    if (!response.ok) {
-      let errMsg = 'Failed to generate challan PDF';
-      try {
-        const text = await response.text();
-        if (text) {
-          try {
-            const j = JSON.parse(text);
-            errMsg = j.message || j.error || errMsg;
-          } catch (_) {
-            if (text.length < 200) errMsg = text;
+      if (!id) throw new Error('Invalid challan ID');
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/fabric-challan/${id}/pdf`);
+      if (!response.ok) {
+        let errMsg = 'Failed to generate challan PDF';
+        try {
+          const text = await response.text();
+          if (text) {
+            try {
+              const j = JSON.parse(text);
+              errMsg = j.message || j.error || errMsg;
+            } catch (_) {
+              if (text.length < 200) errMsg = text;
+            }
           }
+        } catch (_) { }
+        if (response.status === 401) {
+          errMsg = 'Session expired. Please refresh your browser or sign in again.';
         }
-      } catch (_) {}
-      if (response.status === 401) {
-        errMsg = 'Session expired. Please refresh your browser or sign in again.';
+        throw new Error(errMsg);
       }
-      throw new Error(errMsg);
-    }
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, `Challan_${challanNo || 'preview'}.pdf`, { title: `Fabric Challan #${challanNo || id}` });
-  },
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, `Challan_${challanNo || 'preview'}.pdf`, { title: `Fabric Challan #${challanNo || id}` });
+    },
 
   async downloadBulkFabricChallanPdf(ids = [], fileName = 'Combined_Fabric_Challans.pdf') {
-    if (!ids || ids.length === 0) return;
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/fabric-challan/bulk-pdf?ids=${ids.join(',')}`);
-    if (!response.ok) {
-      let errMsg = 'Failed to generate combined Fabric Challans PDF';
-      try {
-        const text = await response.text();
-        if (text) {
-          try {
-            const j = JSON.parse(text);
-            errMsg = j.message || j.error || errMsg;
-          } catch (_) {
-            if (text.length < 200) errMsg = text;
+      if (!ids || ids.length === 0) return;
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/fabric-challan/bulk-pdf?ids=${ids.join(',')}`);
+      if (!response.ok) {
+        let errMsg = 'Failed to generate combined Fabric Challans PDF';
+        try {
+          const text = await response.text();
+          if (text) {
+            try {
+              const j = JSON.parse(text);
+              errMsg = j.message || j.error || errMsg;
+            } catch (_) {
+              if (text.length < 200) errMsg = text;
+            }
           }
-        }
-      } catch (_) {}
-      throw new Error(errMsg);
-    }
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Fabric Challans' });
-  },
+        } catch (_) { }
+        throw new Error(errMsg);
+      }
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Combined Fabric Challans' });
+    },
 
   async downloadChallanReportPdf(dateStart, dateEnd, search, fileName) {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams();
-    if (dateStart) query.append('dateStart', dateStart);
-    if (dateEnd) query.append('dateEnd', dateEnd);
-    if (search) query.append('search', search);
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await authFetch(`${baseUrl}/fabric-challan/report/pdf${qs}`);
-    if (!response.ok) throw new Error('Failed to generate Fabric Challan report PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Challan Report' });
-  },
+      const baseUrl = getBaseUrl();
+      const query = new URLSearchParams();
+      if (dateStart) query.append('dateStart', dateStart);
+      if (dateEnd) query.append('dateEnd', dateEnd);
+      if (search) query.append('search', search);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const response = await authFetch(`${baseUrl}/fabric-challan/report/pdf${qs}`);
+      if (!response.ok) throw new Error('Failed to generate Fabric Challan report PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Challan Report' });
+    },
 
   async getNextChallanNo() {
-    return request('/fabric-challan/next-no');
-  },
+      return request('/fabric-challan/next-no');
+    },
 
   async getFabricLotInfo(lotNo) {
-    return request(`/fabric-challan/lot-info/${lotNo}`);
-  },
+      return request(`/fabric-challan/lot-info/${lotNo}`);
+    },
 
   async reconcileFabricChallans() {
-    return request('/fabric-challan/reconcile-outward', { method: 'POST' });
-  },
+      return request('/fabric-challan/reconcile-outward', { method: 'POST' });
+    },
 
   // ── Stitching Challan (PCH-1) ──────────────────────────────────────────────
   async getStitchingChallans(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
-    const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/stitching-challan${qs}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      return request(`/stitching-challan${qs}`);
+    },
   async createStitchingChallan(data) {
-    return request('/stitching-challan', { method: 'POST', body: JSON.stringify(data) });
-  },
+      return request('/stitching-challan', { method: 'POST', body: JSON.stringify(data) });
+    },
   async updateStitchingChallan(id, data) {
-    return request(`/stitching-challan/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-  },
+      return request(`/stitching-challan/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    },
   async deleteStitchingChallan(id) {
-    return request(`/stitching-challan/${id}`, { method: 'DELETE' });
-  },
+      return request(`/stitching-challan/${id}`, { method: 'DELETE' });
+    },
   async getNextStitchingChallanNo() {
-    return request('/stitching-challan/next-no');
-  },
+      return request('/stitching-challan/next-no');
+    },
   async downloadStitchingChallanPdf(id, challanNo) {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/stitching-challan/${id}/pdf`);
-    if (!response.ok) throw new Error('Failed to generate Stitching Challan PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, `Stitching_Challan_${challanNo || 'PCH'}.pdf`, { title: `Stitching Challan #${challanNo || 'PCH'}` });
-  },
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/stitching-challan/${id}/pdf`);
+      if (!response.ok) throw new Error('Failed to generate Stitching Challan PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, `Stitching_Challan_${challanNo || 'PCH'}.pdf`, { title: `Stitching Challan #${challanNo || 'PCH'}` });
+    },
 
   async downloadBulkStitchingChallanPdf(ids = [], fileName = 'Combined_Stitching_Challans.pdf') {
-    if (!ids || ids.length === 0) return;
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/stitching-challan/bulk-pdf?ids=${ids.join(',')}`);
-    if (!response.ok) throw new Error('Failed to generate combined Stitching Challans PDF');
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Stitching Challans' });
-  },
+      if (!ids || ids.length === 0) return;
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/stitching-challan/bulk-pdf?ids=${ids.join(',')}`);
+      if (!response.ok) throw new Error('Failed to generate combined Stitching Challans PDF');
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Combined Stitching Challans' });
+    },
 
   // ── Stock Adjustment (SA) ──────────────────────────────────────────────
   async getStockAdjustments() {
-    return request('/fabric/stock-adjustment');
-  },
+      return request('/fabric/stock-adjustment');
+    },
 
   async createStockAdjustment(data) {
-    return request('/fabric/stock-adjustment', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/fabric/stock-adjustment', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateStockAdjustment(id, data) {
-    return request(`/fabric/stock-adjustment/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/fabric/stock-adjustment/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteStockAdjustment(id) {
-    return request(`/fabric/stock-adjustment/${id}`, { method: 'DELETE' });
-  },
+      return request(`/fabric/stock-adjustment/${id}`, { method: 'DELETE' });
+    },
 
   async downloadStockAdjustmentPdf(id, saNo) {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/fabric/stock-adjustment/${id}/pdf`);
-    if (!response.ok) throw new Error('Failed to generate Stock Adjustment PDF');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Stock_Adjustment_${saNo || 'Voucher'}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-  },
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/fabric/stock-adjustment/${id}/pdf`);
+      if (!response.ok) throw new Error('Failed to generate Stock Adjustment PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Stock_Adjustment_${saNo || 'Voucher'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    },
 
   // ── Lot Transfer ───────────────────────────────────────────────────────
   async getLotTransfers() {
-    return request('/fabric/lot-transfer');
-  },
+      return request('/fabric/lot-transfer');
+    },
 
   async createLotTransfer(data) {
-    return request('/fabric/lot-transfer', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/fabric/lot-transfer', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async autoLotTransfer() {
-    return request('/fabric/auto-lot-transfer', {
-      method: 'POST',
-    });
-  },
+      return request('/fabric/auto-lot-transfer', {
+        method: 'POST',
+      });
+    },
 
   async deleteLotTransfer(refId) {
-    return request(`/fabric/lot-transfer/${encodeURIComponent(refId)}`, {
-      method: 'DELETE',
-    });
-  },
+      return request(`/fabric/lot-transfer/${encodeURIComponent(refId)}`, {
+        method: 'DELETE',
+      });
+    },
 
   // ── Billing & Invoicing Department ───────────────────────────────────────
   async getBillingDashboardStats(companyEntity = 'Elite Online') {
-    const entity = typeof companyEntity === 'object' && companyEntity !== null
-      ? (companyEntity.companyEntity || 'Elite Online')
-      : companyEntity;
-    return request(`/billing/dashboard-stats?companyEntity=${encodeURIComponent(entity || 'Elite Online')}`);
-  },
+      const entity = typeof companyEntity === 'object' && companyEntity !== null
+        ? (companyEntity.companyEntity || 'Elite Online')
+        : companyEntity;
+      return request(`/billing/dashboard-stats?companyEntity=${encodeURIComponent(entity || 'Elite Online')}`);
+    },
 
   async getBillingInvoices(params = {}) {
-    const query = new URLSearchParams(params);
-    return request(`/billing/invoices?${query.toString()}`);
-  },
+      const query = new URLSearchParams(params);
+      return request(`/billing/invoices?${query.toString()}`);
+    },
 
   async getGstr1Table12Summary(params = {}) {
-    const query = new URLSearchParams(params);
-    return request(`/billing/reports/gstr1-table12?${query.toString()}`);
-  },
+      const query = new URLSearchParams(params);
+      return request(`/billing/reports/gstr1-table12?${query.toString()}`);
+    },
 
   async getNextInvoiceNo(companyEntity = 'Elite Digital Print') {
-    return request(`/billing/invoices/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/billing/invoices/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async getBillingInvoiceById(id) {
-    return request(`/billing/invoices/${id}`);
-  },
+      return request(`/billing/invoices/${id}`);
+    },
 
   async createBillingInvoice(data) {
-    return request('/billing/invoices', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/billing/invoices', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async mergeChallansToInvoice(challanIds) {
-    return request('/billing/merge-challans', {
-      method: 'POST',
-      body: JSON.stringify({ challanIds }),
-    });
-  },
+      return request('/billing/merge-challans', {
+        method: 'POST',
+        body: JSON.stringify({ challanIds }),
+      });
+    },
 
   async updateBillingInvoice(id, data) {
-    return request(`/billing/invoices/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/billing/invoices/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteBillingInvoice(id) {
-    return request(`/billing/invoices/${id}`, { method: 'DELETE' });
-  },
+      return request(`/billing/invoices/${id}`, { method: 'DELETE' });
+    },
 
   async recordInvoicePayment(id, data) {
-    return request(`/billing/invoices/${id}/payment`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/billing/invoices/${id}/payment`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   // ── Delivery Challans (Corporate & Fashion entities: Sobise, EE, EF) ─────
   async getDeliveryChallans(params = {}) {
-    const query = new URLSearchParams(params);
-    return request(`/delivery-challans?${query.toString()}`);
-  },
+      const query = new URLSearchParams(params);
+      return request(`/delivery-challans?${query.toString()}`);
+    },
 
   async getNextDeliveryChallanNo(companyEntity = 'Sobise') {
-    return request(`/delivery-challans/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/delivery-challans/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async getDeliveryChallanById(id) {
-    return request(`/delivery-challans/${id}`);
-  },
+      return request(`/delivery-challans/${id}`);
+    },
 
   async createDeliveryChallan(data) {
-    return request('/delivery-challans', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/delivery-challans', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateDeliveryChallan(id, data) {
-    return request(`/delivery-challans/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/delivery-challans/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteDeliveryChallan(id) {
-    return request(`/delivery-challans/${id}`, {
-      method: 'DELETE',
-    });
-  },
+      return request(`/delivery-challans/${id}`, {
+        method: 'DELETE',
+      });
+    },
 
   async convertDeliveryChallanToInvoice(id) {
-    return request(`/delivery-challans/${id}/convert-to-invoice`, {
-      method: 'POST',
-    });
-  },
+      return request(`/delivery-challans/${id}/convert-to-invoice`, {
+        method: 'POST',
+      });
+    },
 
   async downloadDeliveryChallanPdf(id, challanNo) {
-    const baseUrl = getBaseUrl();
-    const url = `${baseUrl}/delivery-challans/${id}/pdf`;
-    const response = await authFetch(url);
-    if (!response.ok) throw new Error('Failed to generate Delivery Challan PDF');
-    const blob = await response.blob();
-    const pdfName = `Delivery_Challan_${challanNo || 'Draft'}.pdf`;
-    downloadOrPreviewPdf(blob, pdfName, { title: `Delivery Challan #${challanNo || 'Draft'}` });
-  },
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/delivery-challans/${id}/pdf`;
+      const response = await authFetch(url);
+      if (!response.ok) throw new Error('Failed to generate Delivery Challan PDF');
+      const blob = await response.blob();
+      const pdfName = `Delivery_Challan_${challanNo || 'Draft'}.pdf`;
+      downloadOrPreviewPdf(blob, pdfName, { title: `Delivery Challan #${challanNo || 'Draft'}` });
+    },
 
   // ── Scan & Pack Station (AWB Logistics, Deliveries & Returns) ───────────
   async lookupAwb(code) {
-    return request(`/scan-pack/lookup?code=${encodeURIComponent(code)}`);
-  },
+      return request(`/scan-pack/lookup?code=${encodeURIComponent(code)}`);
+    },
 
   async packAwbOrder(data) {
-    return request('/scan-pack/pack', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/scan-pack/pack', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async markAwbDelivered(data) {
-    return request('/scan-pack/deliver', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/scan-pack/deliver', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async processAwbReturn(data) {
-    return request('/scan-pack/return', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/scan-pack/return', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async getScanPackHistory({ limit, page, mode, search, startDate, endDate, courier, channel, status } = {}) {
-    const params = new URLSearchParams();
-    if (limit) params.append('limit', limit);
-    if (page) params.append('page', page);
-    if (mode && mode !== 'ALL') params.append('mode', mode);
-    if (search) params.append('search', search);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (courier && courier !== 'ALL') params.append('courier', courier);
-    if (channel && channel !== 'ALL') params.append('channel', channel);
-    if (status && status !== 'ALL') params.append('status', status);
-    const qs = params.toString();
-    return request(`/scan-pack/history${qs ? `?${qs}` : ''}`);
-  },
+      const params = new URLSearchParams();
+      if (limit) params.append('limit', limit);
+      if (page) params.append('page', page);
+      if (mode && mode !== 'ALL') params.append('mode', mode);
+      if (search) params.append('search', search);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (courier && courier !== 'ALL') params.append('courier', courier);
+      if (channel && channel !== 'ALL') params.append('channel', channel);
+      if (status && status !== 'ALL') params.append('status', status);
+      const qs = params.toString();
+      return request(`/scan-pack/history${qs ? `?${qs}` : ''}`);
+    },
 
   async exportScanPackHistory({ mode, search, startDate, endDate, courier, channel, status } = {}) {
-    const params = new URLSearchParams();
-    params.append('export', 'true');
-    if (mode && mode !== 'ALL') params.append('mode', mode);
-    if (search) params.append('search', search);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (courier && courier !== 'ALL') params.append('courier', courier);
-    if (channel && channel !== 'ALL') params.append('channel', channel);
-    if (status && status !== 'ALL') params.append('status', status);
-    const qs = params.toString();
-    const res = await authFetch(`${getBaseUrl()}/scan-pack/history?${qs}`);
-    if (!res.ok) throw new Error('Failed to download full dispatch history');
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ScanPack_Dispatch_History_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  },
+      const params = new URLSearchParams();
+      params.append('export', 'true');
+      if (mode && mode !== 'ALL') params.append('mode', mode);
+      if (search) params.append('search', search);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (courier && courier !== 'ALL') params.append('courier', courier);
+      if (channel && channel !== 'ALL') params.append('channel', channel);
+      if (status && status !== 'ALL') params.append('status', status);
+      const qs = params.toString();
+      const res = await authFetch(`${getBaseUrl()}/scan-pack/history?${qs}`);
+      if (!res.ok) throw new Error('Failed to download full dispatch history');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ScanPack_Dispatch_History_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
 
   async logScan(data) {
-    return request('/scan-pack/log-scan', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/scan-pack/log-scan', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async clearScanHistory(daysOld = 0) {
-    return request('/scan-pack/history/clear', {
-      method: 'DELETE',
-      body: JSON.stringify({ daysOld }),
-    });
-  },
+      return request('/scan-pack/history/clear', {
+        method: 'DELETE',
+        body: JSON.stringify({ daysOld }),
+      });
+    },
 
   async updateReturnClaim(id, data) {
-    return request(`/scan-pack/return-claim/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/scan-pack/return-claim/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async getManifestPending({ date, startDate, endDate, courier, channel } = {}) {
-    const params = new URLSearchParams();
-    if (date) params.append('date', date);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (courier && courier !== 'ALL') params.append('courier', courier);
-    if (channel && channel !== 'ALL') params.append('channel', channel);
-    return request(`/scan-pack/manifest/pending?${params.toString()}`);
-  },
+      const params = new URLSearchParams();
+      if (date) params.append('date', date);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (courier && courier !== 'ALL') params.append('courier', courier);
+      if (channel && channel !== 'ALL') params.append('channel', channel);
+      return request(`/scan-pack/manifest/pending?${params.toString()}`);
+    },
 
   async generateManifest(data) {
-    return request('/scan-pack/manifest/generate', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/scan-pack/manifest/generate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async getManifestList(params = {}) {
-    const qs = new URLSearchParams(params).toString();
-    return request(`/scan-pack/manifest/list${qs ? `?${qs}` : ''}`);
-  },
+      const qs = new URLSearchParams(params).toString();
+      return request(`/scan-pack/manifest/list${qs ? `?${qs}` : ''}`);
+    },
 
   async getManifestById(manifestId) {
-    return request(`/scan-pack/manifest/${manifestId}`);
-  },
+      return request(`/scan-pack/manifest/${manifestId}`);
+    },
 
   async bulkMarkAwbDelivered(data) {
-    return request('/scan-pack/bulk-deliver', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/scan-pack/bulk-deliver', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async getCourierAnalytics({ startDate, endDate, courier, channel } = {}) {
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (courier && courier !== 'ALL') params.append('courier', courier);
-    if (channel && channel !== 'ALL') params.append('channel', channel);
-    const qs = params.toString();
-    return request(`/scan-pack/analytics${qs ? `?${qs}` : ''}`);
-  },
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (courier && courier !== 'ALL') params.append('courier', courier);
+      if (channel && channel !== 'ALL') params.append('channel', channel);
+      const qs = params.toString();
+      return request(`/scan-pack/analytics${qs ? `?${qs}` : ''}`);
+    },
 
-  async downloadInvoicePdf(id, invoiceNo, duplicate = false, options = {}) {
-    const t0 = performance.now();
-    const baseUrl = getBaseUrl();
-    const templateParam = options.template ? `&template=${options.template}` : '';
-    const url = `${baseUrl}/billing/invoices/${id}/pdf?nocache=true&t=${Date.now()}${duplicate ? '&duplicate=true' : ''}${templateParam}`;
-    const response = await authFetch(url);
-    if (!response.ok) {
-      let errMsg = 'Failed to generate Invoice PDF';
-      try {
-        const text = await response.text();
-        if (text) {
-          try {
-            const j = JSON.parse(text);
-            errMsg = j.message || j.error || text;
-          } catch (_) {
-            if (text.length < 150) errMsg = text;
+  async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
+      const t0 = performance.now();
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/billing/invoices/${id}/pdf?nocache=true&t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
+      const response = await authFetch(url);
+      if (!response.ok) {
+        let errMsg = 'Failed to generate Invoice PDF';
+        try {
+          const text = await response.text();
+          if (text) {
+            try {
+              const j = JSON.parse(text);
+              errMsg = j.message || j.error || text;
+            } catch (_) {
+              if (text.length < 150) errMsg = text;
+            }
           }
-        }
-      } catch (_) {}
-      throw new Error(errMsg);
-    }
-    const blob = await response.blob();
-    const pdfName = `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`;
-    downloadOrPreviewPdf(blob, pdfName, { title: `Tax Invoice #${invoiceNo || 'Draft'}` });
-    console.log(`[PDF Download] Generated & downloaded in ${(performance.now() - t0).toFixed(0)}ms`);
-  },
-
-  getInvoiceHtmlUrl(id, copyType = 'ORIGINAL FOR RECIPIENT') {
-    const baseUrl = getBaseUrl();
-    return `${baseUrl}/billing/invoices/${id}/html?copyType=${encodeURIComponent(copyType)}&t=${Date.now()}`;
-  },
+        } catch (_) { }
+        throw new Error(errMsg);
+      }
+      const blob = await response.blob();
+      const pdfName = `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`;
+      downloadOrPreviewPdf(blob, pdfName, { title: `Tax Invoice #${invoiceNo || 'Draft'}` });
+      console.log(`[PDF Download] Generated & downloaded in ${(performance.now() - t0).toFixed(0)}ms`);
+    },
 
   async downloadBulkInvoicesPdf(ids = [], fileName = 'Combined_Invoices.pdf') {
-    if (!ids || ids.length === 0) return;
-    const t0 = performance.now();
-    const baseUrl = getBaseUrl();
-    const url = `${baseUrl}/billing/invoices-bulk-pdf?nocache=true&t=${Date.now()}&ids=${ids.join(',')}`;
-    const response = await authFetch(url);
-    if (!response.ok) {
-      let errMsg = 'Failed to generate combined Invoices PDF';
-      try {
-        const text = await response.text();
-        if (text) {
-          try {
-            const j = JSON.parse(text);
-            errMsg = j.message || j.error || text;
-          } catch (_) {
-            if (text.length < 150) errMsg = text;
+      if (!ids || ids.length === 0) return;
+      const t0 = performance.now();
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/billing/invoices-bulk-pdf?nocache=true&t=${Date.now()}&ids=${ids.join(',')}`;
+      const response = await authFetch(url);
+      if (!response.ok) {
+        let errMsg = 'Failed to generate combined Invoices PDF';
+        try {
+          const text = await response.text();
+          if (text) {
+            try {
+              const j = JSON.parse(text);
+              errMsg = j.message || j.error || text;
+            } catch (_) {
+              if (text.length < 150) errMsg = text;
+            }
           }
-        }
-      } catch (_) {}
-      throw new Error(errMsg);
-    }
-    const blob = await response.blob();
-    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Invoices' });
-    console.log(`[Bulk PDF Download] Generated & downloaded combined PDF in ${(performance.now() - t0).toFixed(0)}ms`);
-  },
+        } catch (_) { }
+        throw new Error(errMsg);
+      }
+      const blob = await response.blob();
+      downloadOrPreviewPdf(blob, fileName, { title: 'Combined Invoices' });
+      console.log(`[Bulk PDF Download] Generated & downloaded combined PDF in ${(performance.now() - t0).toFixed(0)}ms`);
+    },
 
   // Billing Customers
   async getBillingCustomers(companyEntity = 'Elite Online') {
-    return request(`/billing/customers?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/billing/customers?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async createBillingCustomer(data) {
-    return request('/billing/customers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/billing/customers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateBillingCustomer(id, data) {
-    return request(`/billing/customers/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/billing/customers/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteBillingCustomer(id) {
-    return request(`/billing/customers/${id}`, { method: 'DELETE' });
-  },
+      return request(`/billing/customers/${id}`, { method: 'DELETE' });
+    },
 
   // Billing Vendors
   async getBillingVendors(companyEntity = 'Elite Digital Prints') {
-    return request(`/billing/vendors?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/billing/vendors?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async createBillingVendor(data) {
-    return request('/billing/vendors', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/billing/vendors', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateBillingVendor(id, data) {
-    return request(`/billing/vendors/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/billing/vendors/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteBillingVendor(id) {
-    return request(`/billing/vendors/${id}`, { method: 'DELETE' });
-  },
+      return request(`/billing/vendors/${id}`, { method: 'DELETE' });
+    },
 
   // Billing Items
   async getBillingItems(companyEntity = 'Elite Online') {
-    return request(`/billing/items?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/billing/items?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async createBillingItem(data) {
-    return request('/billing/items', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/billing/items', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateBillingItem(id, data) {
-    return request(`/billing/items/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/billing/items/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteBillingItem(id) {
-    return request(`/billing/items/${id}`, { method: 'DELETE' });
-  },
+      return request(`/billing/items/${id}`, { method: 'DELETE' });
+    },
 
   // Company Settings
   async getCompanySettings(companyEntity = 'Elite Online') {
-    return request(`/billing/company-settings?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/billing/company-settings?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async updateCompanySettings(data) {
-    return request('/billing/company-settings', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/billing/company-settings', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async lookupPincode(pincode) {
-    return request(`/billing/lookup-pincode/${encodeURIComponent(pincode)}`);
-  },
+      return request(`/billing/lookup-pincode/${encodeURIComponent(pincode)}`);
+    },
 
   async lookupLocation(query) {
-    return request(`/billing/lookup-location?query=${encodeURIComponent(query)}`);
-  },
+      return request(`/billing/lookup-location?query=${encodeURIComponent(query)}`);
+    },
 
   // Purchases CRUD
   async getNextPurchaseNo(companyEntity = 'Elite Digital Prints') {
-    return request(`/billing/purchases/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
-  },
+      return request(`/billing/purchases/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
+    },
 
   async getBillingPurchases(companyEntity = '', search = '') {
-    const query = new URLSearchParams();
-    if (companyEntity) query.append('companyEntity', companyEntity);
-    if (search) query.append('search', search);
-    return request(`/billing/purchases?${query.toString()}`);
-  },
+      const query = new URLSearchParams();
+      if (companyEntity) query.append('companyEntity', companyEntity);
+      if (search) query.append('search', search);
+      return request(`/billing/purchases?${query.toString()}`);
+    },
 
   async createBillingPurchase(data) {
-    return request('/billing/purchases', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/billing/purchases', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async bulkSyncBillingPurchases(purchases) {
-    return request('/billing/purchases/bulk-sync', {
-      method: 'POST',
-      body: JSON.stringify({ purchases }),
-    });
-  },
+      return request('/billing/purchases/bulk-sync', {
+        method: 'POST',
+        body: JSON.stringify({ purchases }),
+      });
+    },
 
   async updateBillingPurchase(id, data) {
-    return request(`/billing/purchases/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/billing/purchases/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteBillingPurchase(id, params = {}) {
-    const q = new URLSearchParams();
-    if (params.purchaseNo) q.append('purchaseNo', params.purchaseNo);
-    if (params.vendorName) q.append('vendorName', params.vendorName);
-    const qs = q.toString() ? `?${q.toString()}` : '';
-    return request(`/billing/purchases/${id}${qs}`, { method: 'DELETE' });
-  },
+      const q = new URLSearchParams();
+      if (params.purchaseNo) q.append('purchaseNo', params.purchaseNo);
+      if (params.vendorName) q.append('vendorName', params.vendorName);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return request(`/billing/purchases/${id}${qs}`, { method: 'DELETE' });
+    },
 
   // Data Backup
   async downloadDataBackup({ startDate, endDate, department, format = 'json' }) {
-    const baseUrl = getBaseUrl();
-    const params = new URLSearchParams({
-      ...(startDate ? { startDate } : {}),
-      ...(endDate ? { endDate } : {}),
-      ...(department ? { department } : {}),
-      format
-    });
-    const res = await authFetch(`${baseUrl}/backup/download?${params.toString()}`);
-    if (!res.ok) {
-      throw new Error('Failed to generate data backup');
-    }
-    const blob = await res.blob();
-    const filename = `Elite_Edition_Backup_${department || 'All'}_${startDate || 'Start'}_to_${endDate || 'End'}.${format === 'csv' ? 'csv' : 'json'}`;
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-    }, 2000);
-  },
+      const baseUrl = getBaseUrl();
+      const params = new URLSearchParams({
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {}),
+        ...(department ? { department } : {}),
+        format
+      });
+      const res = await authFetch(`${baseUrl}/backup/download?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error('Failed to generate data backup');
+      }
+      const blob = await res.blob();
+      const filename = `Elite_Edition_Backup_${department || 'All'}_${startDate || 'Start'}_to_${endDate || 'End'}.${format === 'csv' ? 'csv' : 'json'}`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 2000);
+    },
 
   async getDailyBackupHistory() {
-    return request('/backup/history');
-  },
+      return request('/backup/history');
+    },
 
   async downloadDailyBackupArchive(fileName) {
-    const baseUrl = getBaseUrl();
-    const res = await authFetch(`${baseUrl}/backup/download-archive/${encodeURIComponent(fileName)}`);
-    if (!res.ok) {
-      throw new Error(`Failed to download backup archive: ${res.statusText}`);
-    }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-    }, 2000);
-  },
+      const baseUrl = getBaseUrl();
+      const res = await authFetch(`${baseUrl}/backup/download-archive/${encodeURIComponent(fileName)}`);
+      if (!res.ok) {
+        throw new Error(`Failed to download backup archive: ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 2000);
+    },
 
   async sendBackupEmail({ fileName, recipients } = {}) {
-    return request('/backup/send-email', {
-      method: 'POST',
-      body: JSON.stringify({ fileName, recipients }),
-    });
-  },
+      return request('/backup/send-email', {
+        method: 'POST',
+        body: JSON.stringify({ fileName, recipients }),
+      });
+    },
 
   async getImagesBackupHistory() {
-    return request('/backup/images-history');
-  },
+      return request('/backup/images-history');
+    },
 
   async downloadImagesBackupArchive(fileName) {
-    const baseUrl = getBaseUrl();
-    const res = await authFetch(`${baseUrl}/backup/download-images-archive/${encodeURIComponent(fileName)}`);
-    if (!res.ok) {
-      throw new Error(`Failed to download images archive: ${res.statusText}`);
-    }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-    }, 2000);
-  },
+      const baseUrl = getBaseUrl();
+      const res = await authFetch(`${baseUrl}/backup/download-images-archive/${encodeURIComponent(fileName)}`);
+      if (!res.ok) {
+        throw new Error(`Failed to download images archive: ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 2000);
+    },
 
   async triggerR2Backup() {
-    return request('/backup/trigger-r2', { method: 'POST' });
-  },
+      return request('/backup/trigger-r2', { method: 'POST' });
+    },
 
   async listR2Backups() {
-    return request('/backup/list-r2');
-  },
+      return request('/backup/list-r2');
+    },
 
   // ── Authority-Based Inter-Department Communication ───────────────────────
 
   async getCommunicationGroups(userId) {
-    const user = this.getCurrentUser();
-    const uId = userId || (user ? (user._id || user.id) : '');
-    const qs = uId ? `?userId=${uId}` : '';
-    return request(`/communication/groups${qs}`);
-  },
+      const user = this.getCurrentUser();
+      const uId = userId || (user ? (user._id || user.id) : '');
+      const qs = uId ? `?userId=${uId}` : '';
+      return request(`/communication/groups${qs}`);
+    },
 
   async getCommunicationMessages(groupId, params = {}) {
-    const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') queryParams.append(k, v); });
-    const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    return request(`/communication/groups/${groupId}/messages${qs}`);
-  },
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') queryParams.append(k, v); });
+      const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return request(`/communication/groups/${groupId}/messages${qs}`);
+    },
 
   async sendCommunicationMessage(groupId, data, options = {}) {
-    const idempotencyKey = data?.clientMsgId || options.idempotencyKey;
-    return request(`/communication/groups/${groupId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-      idempotencyKey,
-      ...options,
-    });
-  },
+      const idempotencyKey = data?.clientMsgId || options.idempotencyKey;
+      return request(`/communication/groups/${groupId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+        idempotencyKey,
+        ...options,
+      });
+    },
 
   async votePollMessage(messageId, optionId) {
-    return request(`/communication/messages/${messageId}/poll-vote`, {
-      method: 'POST',
-      body: JSON.stringify({ optionId }),
-    });
-  },
+      return request(`/communication/messages/${messageId}/poll-vote`, {
+        method: 'POST',
+        body: JSON.stringify({ optionId }),
+      });
+    },
 
   async forwardMessage(messageId, targetRoomId) {
-    return request(`/communication/messages/${messageId}/forward`, {
-      method: 'POST',
-      body: JSON.stringify({ targetRoomId }),
-    });
-  },
+      return request(`/communication/messages/${messageId}/forward`, {
+        method: 'POST',
+        body: JSON.stringify({ targetRoomId }),
+      });
+    },
+
+  async toggleMuteChatRoom(groupId, muted = true, durationMinutes = null) {
+      return request(`/communication/groups/${groupId}/mute`, {
+        method: 'POST',
+        body: JSON.stringify({ muted, durationMinutes }),
+      });
+    },
+
+  async toggleArchiveChatRoom(groupId, archived = true) {
+      return request(`/communication/groups/${groupId}/archive`, {
+        method: 'POST',
+        body: JSON.stringify({ archived }),
+      });
+    },
+
+  async updateChatDisappearTimer(groupId, disappearAfterSec = 0) {
+      return request(`/communication/groups/${groupId}/disappear`, {
+        method: 'POST',
+        body: JSON.stringify({ disappearAfterSec }),
+      });
+    },
+
+  async toggleStarChatMessage(messageId) {
+      return request(`/communication/messages/${messageId}/star`, { method: 'POST' });
+    },
+
+  async getStarredChatMessages() {
+      return request('/communication/messages/starred');
+    },
+
+  async getChatThreadMessages(messageId) {
+      return request(`/communication/messages/${messageId}/thread`);
+    },
+
+  async getChatMessageInfo(messageId) {
+      return request(`/communication/messages/${messageId}/info`);
+    },
+
+  async bulkChatMessageAction(action, messageIds, targetRoomId = null) {
+      return request('/communication/messages/bulk', {
+        method: 'POST',
+        body: JSON.stringify({ action, messageIds, targetRoomId }),
+      });
+    },
+
+  async scheduleChatMessage(groupId, content, scheduledAt) {
+      return request(`/communication/groups/${groupId}/schedule`, {
+        method: 'POST',
+        body: JSON.stringify({ content, scheduledAt }),
+      });
+    },
+
+  async getScheduledChatMessages(groupId) {
+      return request(`/communication/groups/${groupId}/scheduled`);
+    },
+
+  async cancelScheduledChatMessage(messageId) {
+      return request(`/communication/messages/scheduled/${messageId}`, { method: 'DELETE' });
+    },
+
+  async getChatLinkPreview(url) {
+      return request(`/communication/link-preview?url=${encodeURIComponent(url)}`);
+    },
+
+  async togglePinChatRoom(groupId) {
+      return request(`/communication/groups/${groupId}/pin-room`, { method: 'POST' });
+    },
+
+  async toggleMarkChatUnread(groupId, unread) {
+      return request(`/communication/groups/${groupId}/mark-unread`, {
+        method: 'POST',
+        body: JSON.stringify(typeof unread === 'boolean' ? { unread } : {}),
+      });
+    },
+
+  async setChatRoomLock(groupId, pin, lock = true) {
+      return request(`/communication/groups/${groupId}/lock`, {
+        method: 'POST',
+        body: JSON.stringify({ pin, lock }),
+      });
+    },
+
+  async verifyChatRoomLock(groupId, pin) {
+      return request(`/communication/groups/${groupId}/unlock`, {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      });
+    },
+
+  async getGroupInviteInfo(groupId) {
+      return request(`/communication/groups/${groupId}/invite`);
+    },
+
+  async resetGroupInviteLink(groupId) {
+      return request(`/communication/groups/${groupId}/invite/reset`, { method: 'POST' });
+    },
+
+  async updateGroupInviteSettings(groupId, requireJoinApproval) {
+      return request(`/communication/groups/${groupId}/invite/settings`, {
+        method: 'PATCH',
+        body: JSON.stringify({ requireJoinApproval }),
+      });
+    },
+
+  async handleGroupJoinRequest(groupId, targetUserId, action = 'approve') {
+      return request(`/communication/groups/${groupId}/join-requests/${targetUserId}`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
+    },
+
+  async joinGroupByInviteToken(token) {
+      return request(`/communication/invite/${encodeURIComponent(token)}/join`, { method: 'POST' });
+    },
+
+  async sendBroadcastMessage(groupId, payload) {
+      return request(`/communication/broadcasts/${groupId}/send`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async markViewOnceOpened(messageId) {
+      return request(`/communication/messages/${messageId}/view-once`, { method: 'POST' });
+    },
+
+  async saveVoiceMessageTranscript(messageId, transcript) {
+      return request(`/communication/messages/${messageId}/transcript`, {
+        method: 'PATCH',
+        body: JSON.stringify({ transcript }),
+      });
+    },
+
+  async getChatPreferences() {
+      return request('/communication/preferences');
+    },
+
+  async updateChatPreferences(payload) {
+      return request('/communication/preferences', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async getChatStorageUsage() {
+      return request('/communication/storage');
+    },
+
+  async rsvpChatEvent(messageId, status) {
+      return request(`/communication/messages/${messageId}/rsvp`, {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      });
+    },
+
+  async createChatCallLink(groupId, payload) {
+      return request(`/communication/groups/${groupId}/call-link`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async toggleRoomE2EE(groupId, enabled) {
+      return request(`/communication/groups/${groupId}/e2ee`, {
+        method: 'POST',
+        body: JSON.stringify(typeof enabled === 'boolean' ? { enabled } : {}),
+      });
+    },
+
+  async createChatCommunity(payload) {
+      return request('/communication/communities', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async linkChatCommunityGroups(communityId, subGroupIds) {
+      return request(`/communication/communities/${communityId}/groups`, {
+        method: 'POST',
+        body: JSON.stringify({ subGroupIds }),
+      });
+    },
+
+  async getSavedMessagesRoom() {
+      return request('/communication/saved-messages', {
+        method: 'POST',
+      });
+    },
+
+  async createMessageReminder(messageId, payload) {
+      return request(`/communication/messages/${messageId}/remind`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async getMyChatReminders() {
+      return request('/communication/reminders');
+    },
+
+  async deleteChatReminder(reminderId) {
+      return request(`/communication/reminders/${reminderId}`, {
+        method: 'DELETE',
+      });
+    },
+
+  async getAdminControlOverview() {
+      return request('/admin-control/overview');
+    },
+
+  async approveAdminSampleDesign(taskId, designName) {
+      return request(`/admin-control/sample-approve/${taskId}`, {
+        method: 'POST',
+        body: JSON.stringify(designName ? { designName } : {}),
+      });
+    },
+
+  async rejectAdminSampleDesign(taskId, reason) {
+      return request(`/admin-control/sample-reject/${taskId}`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || '' }),
+      });
+    },
+
+  async triggerAdminSync() {
+      return request('/admin-control/trigger-sync', {
+        method: 'POST',
+      });
+    },
+
+  async saveAdminBooksLock(payload) {
+      return request('/admin-control/books-lock', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async sendAdminBroadcast(payload) {
+      return request('/admin-control/broadcast', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async applyAdminRoleTemplate(userId, templateName) {
+      return request('/admin-control/apply-role-template', {
+        method: 'POST',
+        body: JSON.stringify({ userId, templateName }),
+      });
+    },
+
+  async getAdminCompanyFinancials() {
+      return request('/admin-control/company-financials');
+    },
+
+  async forceLogoutAdminUser(userId) {
+      return request(`/admin-control/force-logout/${userId}`, {
+        method: 'POST',
+      });
+    },
+
+  async getAdminChatStorage() {
+      return request('/admin-control/chat-storage');
+    },
+
+  async cleanupAdminChatStorage(days = 90) {
+      return request('/admin-control/chat-storage/cleanup', {
+        method: 'POST',
+        body: JSON.stringify({ days }),
+      });
+    },
 
   async deleteCommunicationMessage(messageId) {
-    return request(`/communication/messages/${messageId}`, {
-      method: 'DELETE',
-    });
-  },
+      return request(`/communication/messages/${messageId}`, {
+        method: 'DELETE',
+      });
+    },
 
   async editCommunicationMessage(messageId, content) {
-    return request(`/communication/messages/${messageId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ content }),
-    });
-  },
+      return request(`/communication/messages/${messageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      });
+    },
 
   async searchCommunicationMessages(query, limit = 20, page = 1, before = null) {
-    let url = `/communication/search?q=${encodeURIComponent(query)}&limit=${limit}&page=${page}`;
-    if (before) url += `&before=${encodeURIComponent(before)}`;
-    return request(url);
-  },
+      let url = `/communication/search?q=${encodeURIComponent(query)}&limit=${limit}&page=${page}`;
+      if (before) url += `&before=${encodeURIComponent(before)}`;
+      return request(url);
+    },
 
   async getCommunicationMembers(groupId) {
-    return request(`/communication/groups/${groupId}/members`);
-  },
+      return request(`/communication/groups/${groupId}/members`);
+    },
 
   async updateGroupMembers(groupId, memberIds) {
-    return request(`/communication/groups/${groupId}/members`, {
-      method: 'POST',
-      body: JSON.stringify({ memberIds }),
-    });
-  },
+      return request(`/communication/groups/${groupId}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ memberIds }),
+      });
+    },
 
   async syncCommunicationGroups() {
-    return request('/communication/groups/sync', { method: 'POST' });
-  },
+      return request('/communication/groups/sync', { method: 'POST' });
+    },
 
   async clearAllCommunicationData() {
-    return request('/communication/clear-all', { method: 'POST' });
-  },
+      return request('/communication/clear-all', { method: 'POST' });
+    },
 
   async postActivityEvent(data) {
-    return request('/communication/activity', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/communication/activity', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async acknowledgeCommunicationMessage(messageId, action = 'acknowledged', userData = {}) {
-    return request(`/communication/messages/${messageId}/acknowledge`, {
-      method: 'POST',
-      body: JSON.stringify({ action, ...userData }),
-    });
-  },
+      return request(`/communication/messages/${messageId}/acknowledge`, {
+        method: 'POST',
+        body: JSON.stringify({ action, ...userData }),
+      });
+    },
 
   async getCommunicationUsers(userId) {
-    const user = this.getCurrentUser();
-    const uId = userId || (user ? (user._id || user.id) : '');
-    const qs = uId ? `?userId=${uId}` : '';
-    return request(`/communication/users${qs}`);
-  },
+      const user = this.getCurrentUser();
+      const uId = userId || (user ? (user._id || user.id) : '');
+      const qs = uId ? `?userId=${uId}` : '';
+      return request(`/communication/users${qs}`);
+    },
 
   async createOrGetDirectRoom(targetUserId, currentUserId) {
-    const user = this.getCurrentUser();
-    const uId = currentUserId || (user ? (user._id || user.id) : '');
-    return request('/communication/direct', {
-      method: 'POST',
-      body: JSON.stringify({ targetUserId, userId: uId }),
-    });
-  },
+      const user = this.getCurrentUser();
+      const uId = currentUserId || (user ? (user._id || user.id) : '');
+      return request('/communication/direct', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId, userId: uId }),
+      });
+    },
 
   async createCommunicationGroup(data) {
-    return request('/communication/groups', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/communication/groups', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateCommunicationGroup(groupId, updates) {
-    return request(`/communication/groups/${groupId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
-  },
+      return request(`/communication/groups/${groupId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+    },
 
   async updateCurrentUserProfile(updates) {
-    return request('/users/me', {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
-  },
+      return request('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+    },
 
   async deleteCommunicationGroup(groupId) {
-    return request(`/communication/groups/${groupId}`, {
-      method: 'DELETE',
-    });
-  },
+      return request(`/communication/groups/${groupId}`, {
+        method: 'DELETE',
+      });
+    },
 
   async clearCommunicationMessages(groupId) {
-    return request(`/communication/groups/${groupId}/clear`, {
-      method: 'POST',
-    });
-  },
+      return request(`/communication/groups/${groupId}/clear`, {
+        method: 'POST',
+      });
+    },
 
   async forceReloadAllUsers() {
-    return request('/communication/force-reload-all', {
-      method: 'POST',
-    });
-  },
+      return request('/communication/force-reload-all', {
+        method: 'POST',
+      });
+    },
 
   // CRM Lead Management
   async getLeads(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return request(`/leads${query ? `?${query}` : ''}`);
-  },
+      const query = new URLSearchParams(params).toString();
+      return request(`/leads${query ? `?${query}` : ''}`);
+    },
 
   async createLead(payload) {
-    return request('/leads', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/leads', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async updateLead(id, payload) {
-    return request(`/leads/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/leads/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async deleteLead(id) {
-    return request(`/leads/${id}`, { method: 'DELETE' });
-  },
+      return request(`/leads/${id}`, { method: 'DELETE' });
+    },
 
   // Customer Profiles Management (CRM Person & Business Directory)
   async getCustomerProfiles(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return request(`/customer-profiles${query ? `?${query}` : ''}`);
-  },
+      const query = new URLSearchParams(params).toString();
+      return request(`/customer-profiles${query ? `?${query}` : ''}`);
+    },
 
   async getCustomerProfileById(id) {
-    return request(`/customer-profiles/${id}`);
-  },
+      return request(`/customer-profiles/${id}`);
+    },
 
   async createCustomerProfile(payload) {
-    return request('/customer-profiles', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/customer-profiles', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async updateCustomerProfile(id, payload) {
-    return request(`/customer-profiles/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/customer-profiles/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async addCustomerProfileInteraction(id, payload) {
-    return request(`/customer-profiles/${id}/interactions`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/customer-profiles/${id}/interactions`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async deleteCustomerProfile(id) {
-    return request(`/customer-profiles/${id}`, { method: 'DELETE' });
-  },
+      return request(`/customer-profiles/${id}`, { method: 'DELETE' });
+    },
 
   async syncAllCustomerProfiles() {
-    return request('/customer-profiles/sync-all', { method: 'POST' });
-  },
+      return request('/customer-profiles/sync-all', { method: 'POST' });
+    },
 
   // Business Connections (Master AI Agent & Directory)
   async parseBusinessConnectionAI(rawText) {
-    return request('/business-connections/parse-ai', {
-      method: 'POST',
-      body: JSON.stringify({ raw_text: rawText })
-    });
-  },
+      return request('/business-connections/parse-ai', {
+        method: 'POST',
+        body: JSON.stringify({ raw_text: rawText })
+      });
+    },
 
   async getBusinessConnections(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return request(`/business-connections${query ? `?${query}` : ''}`);
-  },
+      const query = new URLSearchParams(params).toString();
+      return request(`/business-connections${query ? `?${query}` : ''}`);
+    },
 
   async createBusinessConnection(payload) {
-    return request('/business-connections', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/business-connections', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async updateBusinessConnection(id, payload) {
-    return request(`/business-connections/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/business-connections/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async deleteBusinessConnection(id) {
-    return request(`/business-connections/${id}`, { method: 'DELETE' });
-  },
+      return request(`/business-connections/${id}`, { method: 'DELETE' });
+    },
 
   async addBusinessConnectionNote(id, noteData) {
-    return request(`/business-connections/${id}/notes`, {
-      method: 'POST',
-      body: JSON.stringify(noteData)
-    });
-  },
+      return request(`/business-connections/${id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify(noteData)
+      });
+    },
 
   // Centralized Master AI Processing Agent
   async processMasterAiInput(payload) {
-    return request('/ai/master-agent', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ai/master-agent', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async upsertMasterAiRecord(recordData) {
-    return request('/ai/upsert-record', {
-      method: 'POST',
-      body: JSON.stringify(recordData)
-    });
-  },
+      return request('/ai/upsert-record', {
+        method: 'POST',
+        body: JSON.stringify(recordData)
+      });
+    },
 
   // AI Production Measurement Calculation Agent
   async calculateAiMeasurement(payload) {
-    return request('/ai/calculate-measurement', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ai/calculate-measurement', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   // ERP-Core Orchestrator Autonomous Agent
   async sendOrchestratorPrompt(payload) {
-    return request('/ai/orchestrator', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ai/orchestrator', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async confirmOrchestratorAction(payload) {
-    return request('/ai/orchestrator/confirm', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ai/orchestrator/confirm', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   // ── Task Management Module (TaskOPad) Endpoints ──
   async getTasks(params = {}) {
-    const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') queryParams.append(k, v);
-    });
-    const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    return request(`/tasks${qs}`);
-  },
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') queryParams.append(k, v);
+      });
+      const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return request(`/tasks${qs}`);
+    },
 
   async getTaskById(id) {
-    return request(`/tasks/${id}`);
-  },
+      return request(`/tasks/${id}`);
+    },
 
   async createTask(taskData) {
-    return request('/tasks', {
-      method: 'POST',
-      body: JSON.stringify(taskData)
-    });
-  },
+      return request('/tasks', {
+        method: 'POST',
+        body: JSON.stringify(taskData)
+      });
+    },
 
   async updateTask(id, taskData) {
-    return request(`/tasks/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(taskData)
-    });
-  },
+      return request(`/tasks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(taskData)
+      });
+    },
 
   async deleteTask(id) {
-    return request(`/tasks/${id}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/tasks/${id}`, {
+        method: 'DELETE'
+      });
+    },
 
   async startTaskTimer(id, userId) {
-    return request(`/tasks/${id}/timer/start`, {
-      method: 'POST',
-      body: JSON.stringify({ userId })
-    });
-  },
+      return request(`/tasks/${id}/timer/start`, {
+        method: 'POST',
+        body: JSON.stringify({ userId })
+      });
+    },
 
   async stopTaskTimer(id, payload = {}) {
-    return request(`/tasks/${id}/timer/stop`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request(`/tasks/${id}/timer/stop`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async addTaskTimeLog(id, logData) {
-    return request(`/tasks/${id}/timelogs`, {
-      method: 'POST',
-      body: JSON.stringify(logData)
-    });
-  },
+      return request(`/tasks/${id}/timelogs`, {
+        method: 'POST',
+        body: JSON.stringify(logData)
+      });
+    },
 
   async addTaskChecklistItem(id, itemData) {
-    return request(`/tasks/${id}/checklist`, {
-      method: 'POST',
-      body: JSON.stringify(itemData)
-    });
-  },
+      return request(`/tasks/${id}/checklist`, {
+        method: 'POST',
+        body: JSON.stringify(itemData)
+      });
+    },
 
   async toggleTaskChecklistItem(id, itemId, completed) {
-    return request(`/tasks/${id}/checklist/${itemId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ completed })
-    });
-  },
+      return request(`/tasks/${id}/checklist/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ completed })
+      });
+    },
 
   async deleteTaskChecklistItem(id, itemId) {
-    return request(`/tasks/${id}/checklist/${itemId}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/tasks/${id}/checklist/${itemId}`, {
+        method: 'DELETE'
+      });
+    },
 
   async addTaskComment(id, commentData) {
-    return request(`/tasks/${id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify(commentData)
-    });
-  },
+      return request(`/tasks/${id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify(commentData)
+      });
+    },
 
   async editTaskComment(id, commentId, commentData) {
-    return request(`/tasks/${id}/comments/${commentId}`, {
-      method: 'PUT',
-      body: JSON.stringify(commentData)
-    });
-  },
+      return request(`/tasks/${id}/comments/${commentId}`, {
+        method: 'PUT',
+        body: JSON.stringify(commentData)
+      });
+    },
 
   async deleteTaskComment(id, commentId) {
-    return request(`/tasks/${id}/comments/${commentId}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/tasks/${id}/comments/${commentId}`, {
+        method: 'DELETE'
+      });
+    },
 
   async uploadTaskAttachment(file) {
-    return this.uploadImage(file, 'tasks/attachments');
-  },
+      return this.uploadImage(file, 'tasks/attachments');
+    },
 
   async addTaskAttachment(id, attachmentData) {
-    return request(`/tasks/${id}/attachments`, {
-      method: 'POST',
-      body: JSON.stringify(attachmentData)
-    });
-  },
+      return request(`/tasks/${id}/attachments`, {
+        method: 'POST',
+        body: JSON.stringify(attachmentData)
+      });
+    },
 
   async deleteTaskAttachment(id, attachmentId) {
-    return request(`/tasks/${id}/attachments/${attachmentId}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/tasks/${id}/attachments/${attachmentId}`, {
+        method: 'DELETE'
+      });
+    },
 
 
   // ─── Signed Documents (Challan & Invoice) Verification & Approval ───
   async uploadSignedDocumentImage(file, docType = 'challan') {
-    const folder = `signed_documents/${docType}s`;
-    return this.uploadImage(file, folder);
-  },
+      const folder = `signed_documents/${docType}s`;
+      return this.uploadImage(file, folder);
+    },
 
   async uploadSignedDocument({ docType, docId, images }) {
-    return request('/signed-documents/upload', {
-      method: 'POST',
-      body: JSON.stringify({ docType, docId, images })
-    });
-  },
+      return request('/signed-documents/upload', {
+        method: 'POST',
+        body: JSON.stringify({ docType, docId, images })
+      });
+    },
 
   async getSignedDocumentApprovals(params = {}) {
-    const qs = new URLSearchParams();
-    if (params.status) qs.set('status', params.status);
-    if (params.docType) qs.set('docType', params.docType);
-    if (params.search) qs.set('search', params.search);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/signed-documents/approvals${query}`);
-  },
+      const qs = new URLSearchParams();
+      if (params.status) qs.set('status', params.status);
+      if (params.docType) qs.set('docType', params.docType);
+      if (params.search) qs.set('search', params.search);
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/signed-documents/approvals${query}`);
+    },
 
   async updateSignedDocumentApproval(docType, id, { action, rejectionReason = '' }) {
-    return request(`/signed-documents/${docType}/${id}/approval`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action, rejectionReason })
-    });
-  },
+      return request(`/signed-documents/${docType}/${id}/approval`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action, rejectionReason })
+      });
+    },
 
   async bulkUpdateSignedDocumentApprovals({ items, action, rejectionReason = '' }) {
-    return request('/signed-documents/bulk-approval', {
-      method: 'PATCH',
-      body: JSON.stringify({ items, action, rejectionReason })
-    });
-  },
+      return request('/signed-documents/bulk-approval', {
+        method: 'PATCH',
+        body: JSON.stringify({ items, action, rejectionReason })
+      });
+    },
 
 
 
   // ── Client Details & Accounts Management ──
   async getClients(params = {}) {
-    const qs = new URLSearchParams();
-    if (params.search) qs.set('search', params.search);
-    if (params.companyCode) qs.set('companyCode', params.companyCode);
-    if (params.status) qs.set('status', params.status);
-    if (params.page) qs.set('page', params.page);
-    if (params.limit) qs.set('limit', params.limit);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/clients${query}`);
-  },
+      const qs = new URLSearchParams();
+      if (params.search) qs.set('search', params.search);
+      if (params.companyCode) qs.set('companyCode', params.companyCode);
+      if (params.status) qs.set('status', params.status);
+      if (params.page) qs.set('page', params.page);
+      if (params.limit) qs.set('limit', params.limit);
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/clients${query}`);
+    },
 
   async getClientById(id) {
-    return request(`/clients/${id}`);
-  },
+      return request(`/clients/${id}`);
+    },
 
   async createClient(data) {
-    return request('/clients', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
+      return request('/clients', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
 
   async updateClient(id, data) {
-    return request(`/clients/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
+      return request(`/clients/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
 
   async deleteClient(id) {
-    return request(`/clients/${id}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/clients/${id}`, {
+        method: 'DELETE'
+      });
+    },
 
   async uploadClientImage(file) {
-    return this.uploadImage(file, 'clients/avatars');
-  },
+      return this.uploadImage(file, 'clients/avatars');
+    },
 
   async clientLogin({ mobile, password }) {
-    const res = await request('/clients/login', {
-      method: 'POST',
-      body: JSON.stringify({ mobile, password }),
-    });
-    if (res && res.success) {
-      const token = res.tokens?.access?.token || res.token;
-      if (token) {
-        inMemoryAccessToken = token;
+      const res = await request('/clients/login', {
+        method: 'POST',
+        body: JSON.stringify({ mobile, password }),
+      });
+      if (res && res.success) {
+        const token = res.tokens?.access?.token || res.token;
+        if (token) {
+          inMemoryAccessToken = token;
+        }
+        localStorage.removeItem('elite_auth_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('elite_refresh_token');
+        const user = res.user || { ...res.client, role: 'Client', isClient: true };
+        localStorage.setItem('elite_user', JSON.stringify(user));
+        localStorage.setItem('elite_is_client', 'true');
+        localStorage.setItem('elite_client_data', JSON.stringify(res.client || user));
       }
-      localStorage.removeItem('elite_auth_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('elite_refresh_token');
-      const user = res.user || { ...res.client, role: 'Client', isClient: true };
-      localStorage.setItem('elite_user', JSON.stringify(user));
-      localStorage.setItem('elite_is_client', 'true');
-      localStorage.setItem('elite_client_data', JSON.stringify(res.client || user));
-    }
-    return res;
-  },
+      return res;
+    },
 
   async updateClientProfile(id, data) {
-    const res = await request(`/clients/profile/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-    if (res && res.success && res.data) {
-      const existingUser = this.getCurrentUser() || {};
-      const updatedUser = { ...existingUser, ...res.data, role: 'Client', isClient: true };
-      localStorage.setItem('elite_user', JSON.stringify(updatedUser));
-      localStorage.setItem('elite_client_data', JSON.stringify(res.data));
-    }
-    return res;
-  },
+      const res = await request(`/clients/profile/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+      if (res && res.success && res.data) {
+        const existingUser = this.getCurrentUser() || {};
+        const updatedUser = { ...existingUser, ...res.data, role: 'Client', isClient: true };
+        localStorage.setItem('elite_user', JSON.stringify(updatedUser));
+        localStorage.setItem('elite_client_data', JSON.stringify(res.data));
+      }
+      return res;
+    },
 
-  isClientUser() {
-    try {
-      const user = this.getCurrentUser();
-      return !!(user?.isClient || user?.role === 'Client' || localStorage.getItem('elite_is_client') === 'true');
-    } catch (e) {
-      return false;
-    }
-  },
+    isClientUser() {
+      try {
+        const user = this.getCurrentUser();
+        return !!(user?.isClient || user?.role === 'Client' || localStorage.getItem('elite_is_client') === 'true');
+      } catch (e) {
+        return false;
+      }
+    },
 
-  getClientData() {
-    try {
-      const raw = localStorage.getItem('elite_client_data');
-      return raw ? JSON.parse(raw) : this.getCurrentUser();
-    } catch (e) {
-      return this.getCurrentUser();
-    }
-  },
+    getClientData() {
+      try {
+        const raw = localStorage.getItem('elite_client_data');
+        return raw ? JSON.parse(raw) : this.getCurrentUser();
+      } catch (e) {
+        return this.getCurrentUser();
+      }
+    },
 
   // ─── DESIGNER MODULE & TASKS ──────────────────────────────────────────────
   async getDesignerTasks(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '' && v !== 'All') {
-        query.append(k, v);
-      }
-    });
-    const qs = query.toString();
-    return request(`/designer-tasks${qs ? `?${qs}` : ''}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '' && v !== 'All') {
+          query.append(k, v);
+        }
+      });
+      const qs = query.toString();
+      return request(`/designer-tasks${qs ? `?${qs}` : ''}`);
+    },
 
   async getDesignerTask(id) {
-    return request(`/designer-tasks/${id}`);
-  },
+      return request(`/designer-tasks/${id}`);
+    },
 
   async createDesignerTask(data) {
-    return request('/designer-tasks', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
+      return request('/designer-tasks', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
 
   async updateDesignerTask(id, data) {
-    return request(`/designer-tasks/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
+      return request(`/designer-tasks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
 
   async addDesignerTaskComment(id, commentData) {
-    return request(`/designer-tasks/${id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify(commentData)
-    });
-  },
+      return request(`/designer-tasks/${id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify(commentData)
+      });
+    },
 
   async updateDesignerTaskStage(id, stageData) {
-    return request(`/designer-tasks/${id}/stage`, {
-      method: 'PUT',
-      body: JSON.stringify(stageData)
-    });
-  },
+      return request(`/designer-tasks/${id}/stage`, {
+        method: 'PUT',
+        body: JSON.stringify(stageData)
+      });
+    },
 
   async deleteDesignerTask(id) {
-    return request(`/designer-tasks/${id}`, {
-      method: 'DELETE'
-    });
-  },
+      return request(`/designer-tasks/${id}`, {
+        method: 'DELETE'
+      });
+    },
 
   async getDesignerStats(params = {}) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '' && v !== 'All') {
-        query.append(k, v);
-      }
-    });
-    const qs = query.toString();
-    return request(`/designer-tasks/stats${qs ? `?${qs}` : ''}`);
-  },
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '' && v !== 'All') {
+          query.append(k, v);
+        }
+      });
+      const qs = query.toString();
+      return request(`/designer-tasks/stats${qs ? `?${qs}` : ''}`);
+    },
 
   async globalSearch(q, companyId) {
-    const qs = new URLSearchParams();
-    if (q) qs.set('q', q);
-    if (companyId) qs.set('companyId', companyId);
-    return request(`/search/global?${qs.toString()}`);
-  },
+      const qs = new URLSearchParams();
+      if (q) qs.set('q', q);
+      if (companyId) qs.set('companyId', companyId);
+      return request(`/search/global?${qs.toString()}`);
+    },
 
   async triggerAsyncExport(type, params = {}) {
-    return request('/jobs/export', {
-      method: 'POST',
-      body: JSON.stringify({ type, params })
-    });
-  },
+      return request('/jobs/export', {
+        method: 'POST',
+        body: JSON.stringify({ type, params })
+      });
+    },
 
   async getJobStatus(jobId) {
-    return request(`/jobs/${jobId}`);
-  },
+      return request(`/jobs/${jobId}`);
+    },
 
   // ── Universal Change Review & Approvals ──
   async getChangeApprovals(params = {}) {
-    const qs = new URLSearchParams();
-    if (params.status) qs.set('status', params.status);
-    if (params.module) qs.set('module', params.module);
-    if (params.companyEntity) qs.set('companyEntity', params.companyEntity);
-    if (params.search) qs.set('search', params.search);
-    if (params.page) qs.set('page', params.page);
-    if (params.limit) qs.set('limit', params.limit);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/change-approvals${query}`);
-  },
+      const qs = new URLSearchParams();
+      if (params.status) qs.set('status', params.status);
+      if (params.module) qs.set('module', params.module);
+      if (params.companyEntity) qs.set('companyEntity', params.companyEntity);
+      if (params.search) qs.set('search', params.search);
+      if (params.page) qs.set('page', params.page);
+      if (params.limit) qs.set('limit', params.limit);
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/change-approvals${query}`);
+    },
 
   async getChangeApprovalStats(params = {}) {
-    const qs = new URLSearchParams();
-    if (params?.companyEntity) qs.set('companyEntity', params.companyEntity);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/change-approvals/stats${query}`);
-  },
+      const qs = new URLSearchParams();
+      if (params?.companyEntity) qs.set('companyEntity', params.companyEntity);
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/change-approvals/stats${query}`);
+    },
 
   async approveChangeRequest(id, notes = '') {
-    return request(`/change-approvals/${id}/approve`, {
-      method: 'POST',
-      body: JSON.stringify({ notes })
-    });
-  },
+      return request(`/change-approvals/${id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ notes })
+      });
+    },
 
   async rejectChangeRequest(id, reason = '') {
-    return request(`/change-approvals/${id}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason })
-    });
-  },
+      return request(`/change-approvals/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      });
+    },
 
   async bulkApproveChangeRequests(ids, notes = '') {
-    return request('/change-approvals/bulk-approve', {
-      method: 'POST',
-      body: JSON.stringify({ ids, notes })
-    });
-  },
+      return request('/change-approvals/bulk-approve', {
+        method: 'POST',
+        body: JSON.stringify({ ids, notes })
+      });
+    },
 
   async bulkRejectChangeRequests(ids, reason = '') {
-    return request('/change-approvals/bulk-reject', {
-      method: 'POST',
-      body: JSON.stringify({ ids, reason })
-    });
-  },
+      return request('/change-approvals/bulk-reject', {
+        method: 'POST',
+        body: JSON.stringify({ ids, reason })
+      });
+    },
 
   async getChangeApprovalSettings(params = {}) {
-    const qs = new URLSearchParams();
-    if (params?.companyEntity) qs.set('companyEntity', params.companyEntity);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/change-approvals/settings${query}`);
-  },
+      const qs = new URLSearchParams();
+      if (params?.companyEntity) qs.set('companyEntity', params.companyEntity);
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/change-approvals/settings${query}`);
+    },
 
   async updateChangeApprovalSettings(settings) {
-    return request('/change-approvals/settings', {
-      method: 'PATCH',
-      body: JSON.stringify(settings)
-    });
-  },
+      return request('/change-approvals/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(settings)
+      });
+    },
 
   async getUserDataEntries(params = {}) {
-    const qs = new URLSearchParams();
-    if (params.user) qs.set('user', params.user);
-    if (params.module) qs.set('module', params.module);
-    if (params.company) qs.set('company', params.company);
-    if (params.department) qs.set('department', params.department);
-    if (params.startDate) qs.set('startDate', params.startDate);
-    if (params.endDate) qs.set('endDate', params.endDate);
-    if (params.search) qs.set('search', params.search);
-    if (params.page) qs.set('page', params.page);
-    if (params.limit) qs.set('limit', params.limit);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return request(`/change-approvals/user-entries${query}`);
-  },
+      const qs = new URLSearchParams();
+      if (params.user) qs.set('user', params.user);
+      if (params.module) qs.set('module', params.module);
+      if (params.company) qs.set('company', params.company);
+      if (params.department) qs.set('department', params.department);
+      if (params.startDate) qs.set('startDate', params.startDate);
+      if (params.endDate) qs.set('endDate', params.endDate);
+      if (params.search) qs.set('search', params.search);
+      if (params.page) qs.set('page', params.page);
+      if (params.limit) qs.set('limit', params.limit);
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/change-approvals/user-entries${query}`);
+    },
 
   async getEntryUsersList() {
-    return request('/change-approvals/entry-users');
-  },
+      return request('/change-approvals/entry-users');
+    },
 
   // --- Document & Invoice Design Studio Engine ---
   async getDocumentTemplates(documentType) {
-    const query = documentType ? `?documentType=${documentType}` : '';
-    return request(`/document-templates${query}`);
-  },
+      const query = documentType ? `?documentType=${documentType}` : '';
+      return request(`/document-templates${query}`);
+    },
 
   async getRecentRecords(documentType) {
-    const query = documentType ? `?documentType=${documentType}` : '';
-    return request(`/document-templates/recent-records${query}`);
-  },
+      const query = documentType ? `?documentType=${documentType}` : '';
+      return request(`/document-templates/recent-records${query}`);
+    },
 
   async getPrintLogs(documentType) {
-    const query = documentType ? `?documentType=${documentType}` : '';
-    return request(`/document-templates/print-logs${query}`);
-  },
+      const query = documentType ? `?documentType=${documentType}` : '';
+      return request(`/document-templates/print-logs${query}`);
+    },
 
   async getDocumentTemplateById(id) {
-    return request(`/document-templates/${id}`);
-  },
+      return request(`/document-templates/${id}`);
+    },
 
   async createDocumentTemplate(data) {
-    return request('/document-templates', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+      return request('/document-templates', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
 
   async updateDocumentTemplate(id, data) {
-    return request(`/document-templates/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+      return request(`/document-templates/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
 
   async deleteDocumentTemplate(id) {
-    return request(`/document-templates/${id}`, {
-      method: 'DELETE',
-    });
-  },
+      return request(`/document-templates/${id}`, {
+        method: 'DELETE',
+      });
+    },
 
   async setDefaultDocumentTemplate(id) {
-    return request(`/document-templates/${id}/set-default`, {
-      method: 'POST',
-    });
-  },
+      return request(`/document-templates/${id}/set-default`, {
+        method: 'POST',
+      });
+    },
 
   async generateTemplatePdf(payload) {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/document-templates/generate-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to generate template PDF');
-    }
-    const blob = await response.blob();
-    return { data: blob };
-  },
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/document-templates/generate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to generate template PDF');
+      }
+      const blob = await response.blob();
+      return { data: blob };
+    },
 
   async generateBatchPdf(payload) {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/document-templates/batch-print-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to generate batch PDF booklet');
-    }
-    const blob = await response.blob();
-    return { data: blob };
-  },
+      const baseUrl = getBaseUrl();
+      const response = await authFetch(`${baseUrl}/document-templates/batch-print-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to generate batch PDF booklet');
+      }
+      const blob = await response.blob();
+      return { data: blob };
+    },
 
   // ==========================================
   // LEDGER RECONCILIATION & GROK AI FORENSIC AUDIT
   // ==========================================
   async getReconciliationParties({ partyType = 'customer', search = '', companyEntity = '' } = {}) {
-    const params = new URLSearchParams();
-    if (partyType) params.append('partyType', partyType);
-    if (search) params.append('search', search);
-    if (companyEntity) params.append('companyEntity', companyEntity);
-    return request(`/ledger-reconciliation/parties?${params.toString()}`);
-  },
+      const params = new URLSearchParams();
+      if (partyType) params.append('partyType', partyType);
+      if (search) params.append('search', search);
+      if (companyEntity) params.append('companyEntity', companyEntity);
+      return request(`/ledger-reconciliation/parties?${params.toString()}`);
+    },
 
   async getErpLedger({ partyType = 'customer', partyName = '', partyId = '', startDate = '', endDate = '', companyEntity = '' } = {}) {
-    const params = new URLSearchParams();
-    if (partyType) params.append('partyType', partyType);
-    if (partyName) params.append('partyName', partyName);
-    if (partyId) params.append('partyId', partyId);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (companyEntity) params.append('companyEntity', companyEntity);
-    return request(`/ledger-reconciliation/erp-ledger?${params.toString()}`);
-  },
+      const params = new URLSearchParams();
+      if (partyType) params.append('partyType', partyType);
+      if (partyName) params.append('partyName', partyName);
+      if (partyId) params.append('partyId', partyId);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (companyEntity) params.append('companyEntity', companyEntity);
+      return request(`/ledger-reconciliation/erp-ledger?${params.toString()}`);
+    },
 
   async parseReconciliationStatement({ rawText = '', imageBase64 = '', partyType = 'customer', partyName = '' }) {
-    return request('/ledger-reconciliation/parse-statement', {
-      method: 'POST',
-      body: JSON.stringify({ rawText, imageBase64, partyType, partyName })
-    });
-  },
+      return request('/ledger-reconciliation/parse-statement', {
+        method: 'POST',
+        body: JSON.stringify({ rawText, imageBase64, partyType, partyName })
+      });
+    },
 
   async runReconciliationMatching(payload) {
-    return request('/ledger-reconciliation/reconcile', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ledger-reconciliation/reconcile', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async reconcileDirectFiles(payload) {
-    return request('/ledger-reconciliation/reconcile-direct', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ledger-reconciliation/reconcile-direct', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async runGrokForensicAudit(payload) {
-    return request('/ledger-reconciliation/ai-audit', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ledger-reconciliation/ai-audit', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
   async draftSettlementNotice(payload) {
-    return request('/ledger-reconciliation/draft-settlement-notice', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+      return request('/ledger-reconciliation/draft-settlement-notice', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
 
-  async sendGrokCopilotMessage({ query, conversationHistory = [], erpContext = {} }) {
-    return request('/ledger-reconciliation/copilot-chat', {
-      method: 'POST',
-      body: JSON.stringify({ query, conversationHistory, erpContext })
-    });
-  },
+  async sendGrokCopilotMessage({ query, conversationHistory =[], erpContext = {} }) {
+      return request('/ledger-reconciliation/copilot-chat', {
+        method: 'POST',
+        body: JSON.stringify({ query, conversationHistory, erpContext })
+      });
+    },
 
   async saveReconciliationSession(sessionData) {
-    return request('/ledger-reconciliation/save-session', {
-      method: 'POST',
-      body: JSON.stringify(sessionData)
-    });
-  },
+      return request('/ledger-reconciliation/save-session', {
+        method: 'POST',
+        body: JSON.stringify(sessionData)
+      });
+    },
 
   async getReconciliationHistory() {
-    return request('/ledger-reconciliation/sessions-history');
-  }
-};
+      return request('/ledger-reconciliation/sessions-history');
+    }
+  };
 
-export default api;
+  export default api;
 
 
 

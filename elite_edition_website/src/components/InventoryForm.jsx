@@ -475,10 +475,20 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
               <div style={styles.imagePreviewContainer}>
                 {formData.imageUrl && !imageError ? (
                   <img
+                    key={formData.imageUrl}
                     src={formData.imageUrl}
                     alt="Product Preview"
+                    referrerPolicy="no-referrer"
                     style={styles.previewImg}
-                    onError={() => setImageError(true)}
+                    onError={(e) => {
+                      const imgEl = e.currentTarget;
+                      if (!imgEl.dataset.proxyTried && /^https?:\/\//i.test(formData.imageUrl)) {
+                        imgEl.dataset.proxyTried = '1';
+                        imgEl.src = `/v1/upload/preview?url=${encodeURIComponent(formData.imageUrl)}&w=400`;
+                        return;
+                      }
+                      setImageError(true);
+                    }}
                   />
                 ) : (
                   <div style={styles.placeholderImg}>
@@ -984,15 +994,17 @@ const styles = {
     margin: 0,
   },
   closeBtn: {
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
+    background: 'rgba(148, 163, 184, 0.16)',
+    border: '1px solid rgba(148, 163, 184, 0.35)',
     borderRadius: '50%',
     width: '34px',
     height: '34px',
+    padding: 0,
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#64748b',
+    color: '#f8fafc',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },

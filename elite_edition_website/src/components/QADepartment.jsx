@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { triggerGlobalDataRefresh, triggerPushNotification } from './NotificationToast';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 function toLocalYMD(d = new Date()) {
   const year = d.getFullYear();
@@ -346,41 +348,73 @@ export default function QADepartment({ department = 'digital_print' }) {
   }, [whiteFabricLogs, statusFilter, historySearch]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       
-      {/* ── Top Header Banner ── */}
-      <div className="glass-panel" style={{
-        padding: '1.25rem 1.5rem',
-        borderRadius: '16px',
-        background: '#ffffff',
-        border: '1px solid #e0e7ff',
-        boxShadow: '0 10px 30px -10px rgba(79, 70, 229, 0.12)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)'
-            }}>
-              <ShieldCheck size={24} color="#ffffff" />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e1b4b', margin: 0, letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                QA DEPARTMENT <span style={{ fontSize: '0.72rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>Elite Digital Prints</span>
-              </h2>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 500 }}>
-                White Fabric Inward Inspection, Defect Audit &amp; Quality Verification
-              </p>
-            </div>
-          </div>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <ShieldCheck size={20} color="#38bdf8" />
+          <h1>QA &amp; Quality Checking</h1>
+          <EntityBrandBadge />
+        </div>
 
+        <div className="glass-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <QuickActionMenu
+            actions={[
+              { label: 'All QA Inspections', icon: '🛡️', onClick: () => setStatusFilter('All') },
+              { label: 'Passed Rolls Only', icon: '✅', onClick: () => setStatusFilter('Passed') },
+              { label: 'Rejected Rolls Only', icon: '⚠️', onClick: () => setStatusFilter('Rejected') },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREEN BUTTONS ── */}
+      <div className="glass-subtabs-bar" data-screen-subtabs="primary" role="tablist">
+        {['All', 'Passed', 'Conditionally Accepted', 'Rejected'].map(st => (
+          <button
+            key={st}
+            type="button"
+            onClick={() => setStatusFilter(st)}
+            className={`glass-subtab-btn ${statusFilter === st ? 'active' : ''}`}
+          >
+            {st === 'All' ? `All Inspections (${whiteFabricLogs.length})` : st}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TIER 3: SIDE-SCROLLING CALCULATION CARDS TRACK ── */}
+      <div className="glass-scroll-track">
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">TOTAL INSPECTED LOTS</span>
+          <span className="glass-calc-value">{whiteFabricLogs.length}</span>
+          <span className="glass-calc-sub">White fabric inward rolls</span>
+        </div>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">TOTAL METERS CHECKED</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
+            {whiteFabricLogs.reduce((s, l) => s + (parseFloat(l.totalMtr) || 0), 0).toFixed(1)} M
+          </span>
+          <span className="glass-calc-sub">Gross inward meterage</span>
+        </div>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">USABLE FRESH METERS</span>
+          <span className="glass-calc-value" style={{ color: '#34d399' }}>
+            {whiteFabricLogs.reduce((s, l) => s + (parseFloat(l.usableFreshMtr) || 0), 0).toFixed(1)} M
+          </span>
+          <span className="glass-calc-sub">Approved for printing</span>
+        </div>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">TOTAL DEFECT METERS</span>
+          <span className="glass-calc-value" style={{ color: '#f87171' }}>
+            {whiteFabricLogs.reduce((s, l) => s + (parseFloat(l.totalDefectMtr) || 0), 0).toFixed(1)} M
+          </span>
+          <span className="glass-calc-sub">Weaving, stain &amp; shading</span>
         </div>
       </div>
 
       {error && (
-        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', padding: '0.75rem 1rem', borderRadius: '8px', color: '#991b1b', fontSize: '0.85rem' }}>
+        <div style={{ background: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.75rem 1rem', borderRadius: '8px', color: '#fca5a5', fontSize: '0.85rem' }}>
           {error}
         </div>
       )}
@@ -389,12 +423,12 @@ export default function QADepartment({ department = 'digital_print' }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         
         {/* White Fabric Inspection Form Card */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '16px', background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)' }}>
+        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '1.25rem' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
               <Layers size={18} />
             </div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e1b4b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
               WHITE FABRIC INWARD CHECKING &amp; DEFECT LOG
             </h3>
           </div>
@@ -407,8 +441,8 @@ export default function QADepartment({ department = 'digital_print' }) {
             justifyContent: 'space-between',
             gap: '0.75rem',
             padding: '0.85rem 1rem',
-            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            border: '1px solid #86efac',
+            background: 'rgba(16, 185, 129, 0.14)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
             borderRadius: '12px',
             marginBottom: '1rem'
           }}>
@@ -417,23 +451,23 @@ export default function QADepartment({ department = 'digital_print' }) {
                 width: 32,
                 height: 32,
                 borderRadius: '8px',
-                background: '#16a34a',
+                background: '#10b981',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
               }}>
                 <Zap size={18} />
               </div>
               <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#14532d', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   AUTO-FILL FROM FABRIC INWARD
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#bbf7d0', color: '#15803d', padding: '1px 6px', borderRadius: '6px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, background: 'rgba(16, 185, 129, 0.22)', color: '#6ee7b7', padding: '1px 6px', borderRadius: '6px' }}>
                     White Fabric Only
                   </span>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#166534' }}>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.72)' }}>
                   Select an inward lot to automatically populate Date, Vendor, Challan, Fabric, Panna &amp; Roll Meters.
                 </div>
               </div>
@@ -445,12 +479,11 @@ export default function QADepartment({ department = 'digital_print' }) {
                   width: '100%',
                   padding: '0.55rem 0.75rem',
                   borderRadius: '8px',
-                  border: '1.5px solid #22c55e',
-                  background: '#ffffff',
+                  border: '1px solid rgba(16, 185, 129, 0.45)',
+                  background: 'rgba(15, 23, 42, 0.85)',
                   fontSize: '0.8rem',
                   fontWeight: 700,
-                  color: '#0f172a',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  color: '#ffffff'
                 }}
                 onChange={e => handleSelectInwardLot(e.target.value)}
                 defaultValue=""
@@ -473,19 +506,19 @@ export default function QADepartment({ department = 'digital_print' }) {
               gap: '0.4rem',
               fontSize: '0.74rem',
               fontWeight: 700,
-              color: '#15803d',
-              background: '#dcfce7',
-              border: '1px solid #86efac',
+              color: '#34d399',
+              background: 'rgba(16, 185, 129, 0.16)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
               padding: '0.3rem 0.65rem',
               borderRadius: '8px',
               marginBottom: '1rem'
             }}>
-              <CheckCircle2 size={14} color="#16a34a" />
+              <CheckCircle2 size={14} color="#34d399" />
               <span>Linked Inward: <strong>{selectedInwardBadge}</strong></span>
               <button
                 type="button"
                 onClick={() => setSelectedInwardBadge('')}
-                style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', padding: 0, marginLeft: '0.3rem' }}
+                style={{ background: 'none', border: 'none', color: '#34d399', cursor: 'pointer', padding: 0, marginLeft: '0.3rem' }}
               >
                 <X size={13} />
               </button>
@@ -497,31 +530,31 @@ export default function QADepartment({ department = 'digital_print' }) {
             {/* Row 1: Date, Vendor Name, Challan No, Fabric Quality, Panna */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Date *</label>
-                <input type="date" required value={whiteForm.date} onChange={e => setWhiteForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 700 }} />
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.72)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Date *</label>
+                <input type="date" required value={whiteForm.date} onChange={e => setWhiteForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.75)', color: '#ffffff', fontWeight: 700 }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Vendor Name</label>
-                <input type="text" placeholder="e.g. Surat Weaving Mills" value={whiteForm.vendorName} onChange={e => setWhiteForm(f => ({ ...f, vendorName: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600 }} />
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.72)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Vendor Name</label>
+                <input type="text" placeholder="e.g. Surat Weaving Mills" value={whiteForm.vendorName} onChange={e => setWhiteForm(f => ({ ...f, vendorName: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.75)', color: '#ffffff', fontWeight: 600 }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Challan No.</label>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.72)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Challan No.</label>
                 <input
                   type="text"
                   placeholder="CH-1002"
                   value={whiteForm.challanNo}
                   onChange={e => setWhiteForm(f => ({ ...f, challanNo: e.target.value }))}
                   onBlur={e => handleChallanBlur(e.target.value)}
-                  style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.75)', color: '#ffffff', fontWeight: 700 }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#4f46e5', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Fabric Quality *</label>
-                <input type="text" required placeholder="e.g. Heavy Rayon 14kg" value={whiteForm.fabricQuality} onChange={e => setWhiteForm(f => ({ ...f, fabricQuality: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #818cf8', fontWeight: 800, color: '#3730a3' }} />
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Fabric Quality *</label>
+                <input type="text" required placeholder="e.g. Heavy Rayon 14kg" value={whiteForm.fabricQuality} onChange={e => setWhiteForm(f => ({ ...f, fabricQuality: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.75)', fontWeight: 800, color: '#ffffff' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Panna *</label>
-                <select value={whiteForm.panna} onChange={e => setWhiteForm(f => ({ ...f, panna: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 800 }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.72)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Panna *</label>
+                <select value={whiteForm.panna} onChange={e => setWhiteForm(f => ({ ...f, panna: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.75)', color: '#ffffff', fontWeight: 800 }}>
                   <option value='44"'>44" Panna</option>
                   <option value='54"'>54" Panna</option>
                   <option value='58"'>58" Panna</option>
@@ -531,26 +564,26 @@ export default function QADepartment({ department = 'digital_print' }) {
             </div>
 
             {/* Row 2: Lot/Roll No, Total Meters & 4 White Fabric Defect Categories */}
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{ background: 'rgba(15, 23, 42, 0.65)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.12)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Lot / Roll No.</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.78)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Lot / Roll No.</label>
                   <input
                     type="text"
                     placeholder="LOT-88"
                     value={whiteForm.lotNo}
                     onChange={e => setWhiteForm(f => ({ ...f, lotNo: e.target.value }))}
                     onBlur={e => handleLotNoBlur(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 800 }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.85)', color: '#ffffff', fontWeight: 800 }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Total Roll Meters (Mtr) *</label>
-                  <input type="number" step="0.01" required placeholder="e.g. 500.00" value={whiteForm.totalMtr} onChange={e => setWhiteForm(f => ({ ...f, totalMtr: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '2px solid #10b981', fontWeight: 900, background: '#ecfdf5', color: '#047857' }} />
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#34d399', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Total Roll Meters (Mtr) *</label>
+                  <input type="number" step="0.01" required placeholder="e.g. 500.00" value={whiteForm.totalMtr} onChange={e => setWhiteForm(f => ({ ...f, totalMtr: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1.5px solid rgba(16, 185, 129, 0.5)', fontWeight: 900, background: 'rgba(16, 185, 129, 0.14)', color: '#34d399' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#4f46e5', marginBottom: '0.3rem', textTransform: 'uppercase' }}>QA Decision</label>
-                  <select value={whiteForm.status} onChange={e => setWhiteForm(f => ({ ...f, status: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 800, color: whiteForm.status === 'Passed' ? '#047857' : '#b91c1c' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.3rem', textTransform: 'uppercase' }}>QA Decision</label>
+                  <select value={whiteForm.status} onChange={e => setWhiteForm(f => ({ ...f, status: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.85)', fontWeight: 800, color: whiteForm.status === 'Passed' ? '#34d399' : '#f87171' }}>
                     <option value="Passed">✓ Passed (Ready for Printing)</option>
                     <option value="Conditionally Accepted">⚠️ Conditionally Accepted</option>
                     <option value="Rejected">✕ Rejected (Return to Vendor)</option>
@@ -559,26 +592,26 @@ export default function QADepartment({ department = 'digital_print' }) {
               </div>
 
               {/* 4 White Defect Categories */}
-              <div style={{ background: '#fff1f2', padding: '0.85rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+              <div style={{ background: 'rgba(244, 63, 94, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(244, 63, 94, 0.3)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fda4af', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
                   White Fabric Defect Breakdown (Meters)
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                   <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>1. Weaving Fault (m)</label>
-                    <input type="number" step="0.01" value={whiteForm.weavingFaultMtr} onChange={e => setWhiteForm(f => ({ ...f, weavingFaultMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #fda4af', fontWeight: 700 }} />
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>1. Weaving Fault (m)</label>
+                    <input type="number" step="0.01" value={whiteForm.weavingFaultMtr} onChange={e => setWhiteForm(f => ({ ...f, weavingFaultMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.4)', background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', fontWeight: 700 }} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>2. Stain / Oil Fault (m)</label>
-                    <input type="number" step="0.01" value={whiteForm.stainFaultMtr} onChange={e => setWhiteForm(f => ({ ...f, stainFaultMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #fda4af', fontWeight: 700 }} />
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>2. Stain / Oil Fault (m)</label>
+                    <input type="number" step="0.01" value={whiteForm.stainFaultMtr} onChange={e => setWhiteForm(f => ({ ...f, stainFaultMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.4)', background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', fontWeight: 700 }} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>3. Shading Fault (m)</label>
-                    <input type="number" step="0.01" value={whiteForm.shadingFaultMtr} onChange={e => setWhiteForm(f => ({ ...f, shadingFaultMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #fda4af', fontWeight: 700 }} />
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>3. Shading Fault (m)</label>
+                    <input type="number" step="0.01" value={whiteForm.shadingFaultMtr} onChange={e => setWhiteForm(f => ({ ...f, shadingFaultMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.4)', background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', fontWeight: 700 }} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>4. Width Shortage (m)</label>
-                    <input type="number" step="0.01" value={whiteForm.widthShortageMtr} onChange={e => setWhiteForm(f => ({ ...f, widthShortageMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #fda4af', fontWeight: 700 }} />
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>4. Width Shortage (m)</label>
+                    <input type="number" step="0.01" value={whiteForm.widthShortageMtr} onChange={e => setWhiteForm(f => ({ ...f, widthShortageMtr: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.4)', background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', fontWeight: 700 }} />
                   </div>
                 </div>
               </div>
@@ -590,7 +623,7 @@ export default function QADepartment({ department = 'digital_print' }) {
                 type="submit"
                 disabled={isWhiteSubmitting}
                 style={{
-                  background: isWhiteSubmitting ? '#94a3b8' : '#4f46e5',
+                  background: isWhiteSubmitting ? '#475569' : '#4f46e5',
                   color: '#ffffff',
                   border: 'none',
                   padding: '0.65rem 1.6rem',
@@ -602,7 +635,7 @@ export default function QADepartment({ department = 'digital_print' }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.35)',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -613,28 +646,28 @@ export default function QADepartment({ department = 'digital_print' }) {
         </div>
 
         {/* White Fabric QA Inspection History Table */}
-        <div className="glass-panel" style={{ padding: '1rem', borderRadius: '12px', background: '#ffffff' }}>
+        <div className="glass-panel" style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255, 255, 255, 0.14)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
               White Fabric Inspection History ({filteredLogs.length})
             </h3>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', width: '200px' }}>
-                <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              <div style={{ position: 'relative', width: '220px' }}>
+                <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.55)' }} />
                 <input
                   type="text"
                   value={historySearch}
                   onChange={e => setHistorySearch(e.target.value)}
                   placeholder="Search Vendor, Lot, Fabric..."
-                  style={{ width: '100%', padding: '0.4rem 0.6rem 0.4rem 28px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  style={{ width: '100%', padding: '0.4rem 0.6rem 0.4rem 28px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.85)', color: '#ffffff', fontSize: '0.8rem' }}
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 700 }}
+                style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(15,23,42,0.85)', color: '#ffffff', fontSize: '0.8rem', fontWeight: 700 }}
               >
                 <option value="All">All Status</option>
                 <option value="Passed">Passed</option>
@@ -645,14 +678,14 @@ export default function QADepartment({ department = 'digital_print' }) {
           </div>
 
           {filteredLogs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.6)' }}>
               No white fabric inspection logs recorded yet.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <table className="glass-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                  <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.14)', textTransform: 'uppercase', fontSize: '0.7rem' }}>
                     <th style={{ padding: '8px 10px', textAlign: 'left' }}>Date</th>
                     <th style={{ padding: '8px 10px', textAlign: 'left' }}>Vendor / Challan</th>
                     <th style={{ padding: '8px 10px', textAlign: 'left' }}>Fabric &amp; Lot</th>
@@ -665,20 +698,20 @@ export default function QADepartment({ department = 'digital_print' }) {
                 </thead>
                 <tbody>
                   {filteredLogs.map((l, idx) => (
-                    <tr key={l._id || l.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 700 }}>{formatDateDDMMYYYY(l.date)}</td>
-                      <td style={{ padding: '8px 10px' }}>{l.vendorName || '—'} {l.challanNo ? `(${l.challanNo})` : ''}</td>
-                      <td style={{ padding: '8px 10px', fontWeight: 800, color: '#4f46e5' }}>{l.fabricQuality} ({l.panna}) {l.lotNo ? `| Lot: ${l.lotNo}` : ''}</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800 }}>{l.totalMtr} m</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#be123c', fontWeight: 800 }}>{l.totalDefectMtr} m</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#047857', fontWeight: 900 }}>{l.usableFreshMtr} m</td>
+                    <tr key={l._id || l.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#ffffff' }}>{formatDateDDMMYYYY(l.date)}</td>
+                      <td style={{ padding: '8px 10px', color: 'rgba(255,255,255,0.85)' }}>{l.vendorName || '—'} {l.challanNo ? `(${l.challanNo})` : ''}</td>
+                      <td style={{ padding: '8px 10px', fontWeight: 800, color: '#38bdf8' }}>{l.fabricQuality} ({l.panna}) {l.lotNo ? `| Lot: ${l.lotNo}` : ''}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#ffffff' }}>{l.totalMtr} m</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#f87171', fontWeight: 800 }}>{l.totalDefectMtr} m</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#34d399', fontWeight: 900 }}>{l.usableFreshMtr} m</td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, background: l.status === 'Passed' ? '#d1fae5' : '#ffe4e6', color: l.status === 'Passed' ? '#047857' : '#be123c' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, background: l.status === 'Passed' ? 'rgba(16, 185, 129, 0.16)' : 'rgba(239, 68, 68, 0.16)', color: l.status === 'Passed' ? '#34d399' : '#f87171', border: `1px solid ${l.status === 'Passed' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}` }}>
                           {l.status}
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                        <button type="button" onClick={() => handleDeleteWhiteLog(l)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
+                        <button type="button" onClick={() => handleDeleteWhiteLog(l)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}>
                           <Trash2 size={14} />
                         </button>
                       </td>

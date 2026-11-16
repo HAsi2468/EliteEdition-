@@ -16,6 +16,8 @@ import { openPrintOptionsDialog } from '../utils/printService';
 import JobCardTooltip from './JobCardTooltip';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 // Automatic Shift Calculator:
 // Morning Shift: 9:00 AM (09:00) to 8:59 PM (20:59)
@@ -1638,43 +1640,53 @@ export default function JobPrintingLog() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingBottom: '2rem' }}>
 
-      {/* ── 1. HEADER BANNER ── */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#38bdf8,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(56,189,248,0.3)' }}>
-            <Printer size={22} color="#fff" />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Printing Department</h2>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-              Log multiple machine runs per Job Card, monitor shifts, and track completion progress.
-            </p>
-          </div>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <Printer size={20} color="#38bdf8" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            Printing Department
+          </span>
+          <EntityBrandBadge />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => {
-              setActiveView('reports');
-              fetchArchiveLogs(archiveDateStart, archiveDateEnd);
+              setEditingLogId(null);
+              setForm({
+                jobNo: '',
+                jobCardId: '',
+                machineName: '',
+                pass: '1 PASS',
+                meters: '',
+                date: toLocalYMD(),
+                operatorName: accountFullName,
+                shift: getAutoShift(),
+                notes: ''
+              });
+              setActiveView('log');
             }}
-            className="btn-secondary"
+            className="glass-btn-primary"
             style={{
               padding: '0.55rem 1.1rem',
-              fontSize: '0.82rem',
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.9), rgba(37, 99, 235, 0.85))',
+              color: '#ffffff',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              border: '1px solid rgba(168,85,247,0.4)',
-              background: 'rgba(168,85,247,0.1)',
-              color: '#c084fc',
-              fontWeight: 700
+              boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)'
             }}
           >
-            <History size={15} /> Previous Reports
+            <PlusCircle size={15} /> New Print Entry
           </button>
 
           <button
@@ -1684,135 +1696,48 @@ export default function JobPrintingLog() {
               setReportEndDate(dateEnd);
               setShowReportModal(true);
             }}
-            className="btn-primary"
-            style={{
-              padding: '0.55rem 1.1rem',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-              fontWeight: 700
-            }}
+            className="glass-subtab-btn"
+            style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}
           >
-            <FileText size={15} /> Download Report
+            <FileText size={14} color="#38bdf8" /> PDF Report
           </button>
 
-          {/* Export CSV */}
-          <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Download size={15} /> Export CSV
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="glass-subtab-btn"
+            style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}
+          >
+            <Download size={14} color="#38bdf8" /> Export CSV
           </button>
+
+          <QuickActionMenu />
         </div>
       </div>
 
-      {/* ── 1.1 CONSUMABLES & SHIFT EFFICIENCY BAR ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-        {/* Metric 1: Total Meters & Shift Ratio */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #38bdf8' }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Activity size={18} color="#38bdf8" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Output (Logged)</div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>{printMetrics.totalMtr.toFixed(1)} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>mtr</span></div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
-              ☀️ Day: <strong style={{ color: '#38bdf8' }}>{printMetrics.morningMtr.toFixed(0)}m</strong> | 🌙 Night: <strong style={{ color: '#a78bfa' }}>{printMetrics.nightMtr.toFixed(0)}m</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 2: Sublimation Ink Consumption Estimate */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #ec4899' }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(236,72,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Droplets size={18} color="#ec4899" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Est. Ink Consumed</div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ec4899' }}>{printMetrics.estimatedInkLiters} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Liters</span></div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
-              Avg. 16 ml / printed meter
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 3: Sublimation Paper Consumption Estimate */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Layers3 size={18} color="#f59e0b" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Est. Paper Used</div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b' }}>{printMetrics.estimatedPaperSqM} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>sq. mtr</span></div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
-              Approx. {(Number(printMetrics.estimatedPaperSqM) / 100).toFixed(1)} rolls used
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 4: Top Machine & Operator */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #10b981' }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TrendingUp size={18} color="#10b981" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Top Machine</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
-              {printMetrics.topMachine.name}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: '#10b981', marginTop: 2 }}>
-              {printMetrics.topMachine.mtr.toFixed(0)}m logged • {printMetrics.topOperator.name}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 1.2 VIEW SWITCHER NAVIGATION TABS ── */}
-      <div style={{ display: 'flex', gap: '0.6rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.4rem', flexWrap: 'wrap' }}>
+      {/* ── TIER 2: SUB-SCREENS BUTTONS ── */}
+      <div className="glass-subtabs-bar" style={{ marginTop: '0.2rem' }}>
         <button
           type="button"
           onClick={() => setActiveView('log')}
-          style={{
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            fontSize: '0.84rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            border: activeView === 'log' ? '1px solid #38bdf8' : '1px solid transparent',
-            background: activeView === 'log' ? 'rgba(56,189,248,0.15)' : 'transparent',
-            color: activeView === 'log' ? '#38bdf8' : 'var(--text-muted)',
-            cursor: 'pointer'
-          }}
+          className={`glass-subtab-btn ${activeView === 'log' ? 'active' : ''}`}
         >
-          <Printer size={15} /> Print Runs Log
+          <Printer size={15} /> <span>Print Runs Log</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveView('queue')}
-          style={{
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            fontSize: '0.84rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            border: activeView === 'queue' ? '1px solid #f59e0b' : '1px solid transparent',
-            background: activeView === 'queue' ? 'rgba(245,158,11,0.15)' : 'transparent',
-            color: activeView === 'queue' ? '#f59e0b' : 'var(--text-muted)',
-            cursor: 'pointer'
-          }}
+          className={`glass-subtab-btn ${activeView === 'queue' ? 'active' : ''}`}
         >
-          <Zap size={15} /> Machine Queue & Batch Scheduling
+          <Zap size={15} /> <span>Machine Queue &amp; Scheduling</span>
           <span style={{
             marginLeft: 4,
             padding: '0.1rem 0.45rem',
             borderRadius: '999px',
-            background: activeView === 'queue' ? '#f59e0b' : 'rgba(255,255,255,0.1)',
-            color: activeView === 'queue' ? '#000' : 'var(--text-muted)',
-            fontSize: '0.72rem',
+            background: activeView === 'queue' ? '#38bdf8' : 'rgba(255,255,255,0.1)',
+            color: activeView === 'queue' ? '#0f172a' : '#ffffff',
+            fontSize: '0.7rem',
             fontWeight: 800
           }}>
             {printQueueJobs.length}
@@ -1822,21 +1747,9 @@ export default function JobPrintingLog() {
         <button
           type="button"
           onClick={() => setActiveView('fleet')}
-          style={{
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            fontSize: '0.84rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            border: activeView === 'fleet' ? '1px solid #10b981' : '1px solid transparent',
-            background: activeView === 'fleet' ? 'rgba(16,185,129,0.15)' : 'transparent',
-            color: activeView === 'fleet' ? '#10b981' : 'var(--text-muted)',
-            cursor: 'pointer'
-          }}
+          className={`glass-subtab-btn ${activeView === 'fleet' ? 'active' : ''}`}
         >
-          <Cpu size={15} /> Live Machine Fleet Monitor
+          <Cpu size={15} /> <span>Live Machine Fleet Monitor</span>
         </button>
 
         <button
@@ -1845,33 +1758,49 @@ export default function JobPrintingLog() {
             setActiveView('reports');
             fetchArchiveLogs(archiveDateStart, archiveDateEnd);
           }}
-          style={{
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            fontSize: '0.84rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            border: activeView === 'reports' ? '1px solid #a855f7' : '1px solid transparent',
-            background: activeView === 'reports' ? 'rgba(168,85,247,0.18)' : 'transparent',
-            color: activeView === 'reports' ? '#c084fc' : 'var(--text-muted)',
-            cursor: 'pointer'
-          }}
+          className={`glass-subtab-btn ${activeView === 'reports' ? 'active' : ''}`}
         >
-          <History size={15} /> Previous Reports & Archives
-          <span style={{
-            marginLeft: 4,
-            padding: '0.1rem 0.45rem',
-            borderRadius: '999px',
-            background: activeView === 'reports' ? '#a855f7' : 'rgba(255,255,255,0.1)',
-            color: activeView === 'reports' ? '#fff' : 'var(--text-muted)',
-            fontSize: '0.72rem',
-            fontWeight: 800
-          }}>
-            {archiveGroups.length}
-          </span>
+          <History size={15} /> <span>Previous Reports &amp; Archives</span>
         </button>
+      </div>
+
+      {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+      <div className="glass-scroll-track" style={{ marginTop: '0.2rem' }}>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Logged Output</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{printMetrics.totalMtr.toFixed(1)} M</span>
+          <span className="glass-calc-sub">Cumulative printing volume</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Day Shift Output</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{printMetrics.morningMtr.toFixed(0)} M</span>
+          <span className="glass-calc-sub">☀️ Morning Shift</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Night Shift Output</span>
+          <span className="glass-calc-value" style={{ color: '#c084fc' }}>{printMetrics.nightMtr.toFixed(0)} M</span>
+          <span className="glass-calc-sub">🌙 Night Shift</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Est. Sublimation Ink</span>
+          <span className="glass-calc-value" style={{ color: '#f472b6' }}>{printMetrics.estimatedInkLiters} L</span>
+          <span className="glass-calc-sub">Avg 16 ml / meter</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Est. Paper Used</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{printMetrics.estimatedPaperSqM} SqM</span>
+          <span className="glass-calc-sub">~{(Number(printMetrics.estimatedPaperSqM) / 100).toFixed(1)} rolls</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Top Machine</span>
+          <span className="glass-calc-value" style={{ color: '#34d399', fontSize: '1.15rem' }}>{printMetrics.topMachine.name}</span>
+          <span className="glass-calc-sub">{printMetrics.topMachine.mtr.toFixed(0)}m logged</span>
+        </div>
       </div>
 
       {/* ── FLEET VIEW (When activeView === 'fleet') ── */}

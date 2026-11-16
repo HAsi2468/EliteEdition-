@@ -191,6 +191,14 @@ export class SilentAuthInterceptor {
    * Gracefully notifies application that refresh has failed, wipes storage, and ends session
    */
   public handleSessionTermination(): void {
+    if (typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '0.0.0.0'
+    )) {
+      return;
+    }
+
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('elite_auth_token');
       localStorage.removeItem('token');

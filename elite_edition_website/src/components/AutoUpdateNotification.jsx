@@ -17,6 +17,7 @@ export default function AutoUpdateNotification() {
   const [newVersionInfo, setNewVersionInfo] = useState(null);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [countdown, setCountdown] = useState(5);
   const initialVersionRef = useRef(null);
 
   const checkVersion = async () => {
@@ -101,7 +102,23 @@ export default function AutoUpdateNotification() {
     }, 250);
   };
 
-  if (!hasUpdate || isDismissed) return null;
+  useEffect(() => {
+    if (!hasUpdate) return;
+    setCountdown(5);
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleUpdateNow();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [hasUpdate]);
+
+  if (!hasUpdate) return null;
 
   return (
     <>
@@ -129,7 +146,9 @@ export default function AutoUpdateNotification() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Sparkles size={16} color="#60a5fa" />
-          <span>New version available</span>
+          <span>
+            Mandatory update {newVersionInfo?.releaseVersion || ''} · reloading in {countdown}s
+          </span>
         </div>
 
         <button
@@ -155,24 +174,6 @@ export default function AutoUpdateNotification() {
         >
           <RefreshCw size={13} className={isUpdating ? 'spin-loader' : ''} />
           {isUpdating ? 'Updating...' : 'Update Now'}
-        </button>
-
-        <button
-          onClick={() => setIsDismissed(true)}
-          title="Dismiss (keep working)"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'rgba(255, 255, 255, 0.65)',
-            cursor: 'pointer',
-            padding: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-          }}
-        >
-          <X size={15} />
         </button>
       </div>
 

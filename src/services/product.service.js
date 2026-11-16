@@ -1,5 +1,6 @@
 const db = require('../db/models');
 const { extractBaseSku } = require('../utils/skuHelper');
+const { normalizeImageUrl, extractApiImageUrl } = require('../utils/imageUrlHelper');
 
 const getProducts = async (skuCodes) => {
   return await db.Product.find({ skuCode: { $in: skuCodes } }).lean();
@@ -8,16 +9,21 @@ const getProducts = async (skuCodes) => {
 const imageCache = new Map();
 const IMAGE_CACHE_MAX = 5000;
 
+const clearProductImageCache = () => {
+  imageCache.clear();
+};
+
 const fetchProductImages = async (skuCodes) => {
   if (!Array.isArray(skuCodes) || skuCodes.length === 0) return {};
 
-  const cleanSkus = skuCodes.filter(Boolean);
+  const cleanSkus = skuCodes.filter(Boolean).map((s) => String(s).trim());
   const acc = {};
   const unCachedSkus = [];
 
   for (const sku of cleanSkus) {
-    if (imageCache.has(sku)) {
-      acc[sku] = imageCache.get(sku);
+    const cached = imageCache.get(sku.toUpperCase());
+    if (cached) {
+      acc[sku] = cached;
     } else {
       unCachedSkus.push(sku);
     }
@@ -27,62 +33,84 @@ const fetchProductImages = async (skuCodes) => {
     return acc;
   }
 
-  const baseSkus = [...new Set(unCachedSkus.map(s => extractBaseSku(s)))];
-  
-  // Build regexes to match base SKUs with any variation suffix or exact match
-  const regexes = baseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
-  
-  // Helper to store image for base SKU and any variation SKUs
-  const registerImage = (skuCode, imageUrl) => {
-    if (!skuCode || !imageUrl) return;
+  const baseSkus = [...new Set(unCachedSkus.map((s) => extractBaseSku(s)).filter(Boolean))];
+  const regexes = baseSkus.map((s) => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+
+  const registerImage = (skuCode, rawImageUrl, brandCodes = []) => {
+    const cleanUrl = normalizeImageUrl(rawImageUrl);
+    if (!skuCode || !cleanUrl) return;
+    const skuUpper = String(skuCode).trim().toUpperCase();
     const base = extractBaseSku(skuCode);
-    if (base && !acc[base]) {
-      acc[base] = imageUrl;
+    const baseUpper = base ? base.trim().toUpperCase() : skuUpper;
+
+    if (base && !acc[base]) acc[base] = cleanUrl;
+    if (!acc[skuCode]) acc[skuCode] = cleanUrl;
+    if (imageCache.size < IMAGE_CACHE_MAX) {
+      imageCache.set(skuUpper, cleanUrl);
+      if (baseUpper) imageCache.set(baseUpper, cleanUrl);
     }
-    if (!acc[skuCode]) {
-      acc[skuCode] = imageUrl;
-      if (imageCache.size < IMAGE_CACHE_MAX) imageCache.set(skuCode, imageUrl);
-    }
-    // Also match any input SKU that shares this base SKU
-    cleanSkus.forEach(inputSku => {
-      if (extractBaseSku(inputSku) === base && !acc[inputSku]) {
-        acc[inputSku] = imageUrl;
-        if (imageCache.size < IMAGE_CACHE_MAX) imageCache.set(inputSku, imageUrl);
+
+    const brandCodeStrings = (Array.isArray(brandCodes) ? brandCodes : [])
+      .map((bc) => (typeof bc === 'string' ? bc : bc?.code || ''))
+      .filter(Boolean)
+      .map((s) => s.trim().toUpperCase());
+
+    cleanSkus.forEach((inputSku) => {
+      const inUpper = inputSku.toUpperCase();
+      const inBaseUpper = extractBaseSku(inputSku).trim().toUpperCase();
+      if (
+        !acc[inputSku] &&
+        (inUpper === skuUpper ||
+          inBaseUpper === baseUpper ||
+          brandCodeStrings.includes(inUpper) ||
+          brandCodeStrings.includes(inBaseUpper))
+      ) {
+        acc[inputSku] = cleanUrl;
+        if (imageCache.size < IMAGE_CACHE_MAX) imageCache.set(inUpper, cleanUrl);
       }
     });
   };
 
-  // 1. Query InventoryProduct for matching SKUs
+  // 1. Query InventoryProduct for matching SKUs or brandCodes
   const invProducts = await db.InventoryProduct.find({
-    skuCode: { $in: regexes },
-    imageUrl: { $exists: true, $nin: [null, ''] }
+    $or: [
+      { skuCode: { $in: regexes } },
+      { brandCodes: { $in: unCachedSkus } },
+      { 'brandCodes.code': { $in: unCachedSkus } },
+    ],
+    imageUrl: { $exists: true, $nin: [null, '', 'null'] },
   }).lean();
 
-  invProducts.forEach(product => {
-    registerImage(product.skuCode, product.imageUrl);
+  invProducts.forEach((product) => {
+    registerImage(product.skuCode, extractApiImageUrl(product) || product.imageUrl, product.brandCodes);
   });
 
   // 2. Query Product collection for any missing base SKUs
-  const missingBaseSkus = baseSkus.filter(b => !acc[b]);
+  const missingBaseSkus = baseSkus.filter((b) => !imageCache.has(b.toUpperCase()));
   if (missingBaseSkus.length > 0) {
-    const missingRegexes = missingBaseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+    const missingRegexes = missingBaseSkus.map((s) => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
     const products = await db.Product.find({
       skuCode: { $in: [...missingBaseSkus, ...missingRegexes] },
-      imageUrl: { $exists: true, $nin: [null, ''] }
+      imageUrl: { $exists: true, $nin: [null, '', 'null'] },
     }).lean();
 
-    products.forEach(product => {
-      registerImage(product.skuCode, product.imageUrl);
+    products.forEach((product) => {
+      registerImage(product.skuCode, extractApiImageUrl(product) || product.imageUrl, product.brandCodes);
     });
   }
 
-  // Cache nulls for SKUs not found to prevent re-querying
-  for (const sku of unCachedSkus) {
-    if (!acc[sku] && imageCache.size < IMAGE_CACHE_MAX) {
-      imageCache.set(sku, null);
-    }
+  // 3. Query Inventory collection for any still missing SKUs
+  const stillMissing = baseSkus.filter((b) => !imageCache.has(b.toUpperCase()));
+  if (stillMissing.length > 0 && db.Inventory) {
+    const stillRegexes = stillMissing.map((s) => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+    const invItems = await db.Inventory.find({
+      skuCode: { $in: stillRegexes },
+      imageUrl: { $exists: true, $nin: [null, '', 'null'] },
+    }).lean();
+    invItems.forEach((inv) => {
+      registerImage(inv.skuCode, extractApiImageUrl(inv) || inv.imageUrl, inv.brandCodes);
+    });
   }
-
 
   return acc;
 };
@@ -167,4 +195,5 @@ const fetchSalesReportData = async (whereClause) => {
 module.exports = {
   fetchProductImages,
   fetchSalesReportData,
+  clearProductImageCache,
 };

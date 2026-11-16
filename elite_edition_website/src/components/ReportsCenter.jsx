@@ -21,6 +21,8 @@ import {
   X
 } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
+import EntityBrandBadge from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -396,106 +398,109 @@ export default function ReportsCenter({ department }) {
 
   return (
     <div style={styles.container}>
-      {/* Top Banner Status */}
-      <div className="glass-panel" style={styles.topBar}>
-        <div style={styles.topBarLeft}>
-          <BarChart2 size={22} color="var(--primary)" />
-          <div>
-            <h2 style={styles.pageTitle}>
-              {department === 'elite-print' ? "Elite Digital Print Reports" : 
-               department === 'elite-online' ? "Elite Edition Online Dashboard" : 
-               "Reports & Analytics Center"}
-            </h2>
-            <p style={styles.pageSubtitle}>
-              {department === 'elite-print' ? "Analyze performance, output, speeds, and variance metrics for the printing department." : 
-               department === 'elite-online' ? "E-commerce sales overview, inventory value, return rates, and integration health." : 
-               "View database-wide operations report, analyze performance, and download professional PDF archives."}
-            </p>
-          </div>
+      {/* TIER 1: GLASS SCREEN HEADER */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <span className="glass-title-icon">📊</span>
+          <h1>
+            {department === 'elite-print' ? 'Digital Print Reports' :
+             department === 'elite-online' ? 'E-Commerce Analytics' :
+             'Reports & Analytics Center'}
+          </h1>
+          <EntityBrandBadge entityCode={department === 'elite-print' ? 'EDP' : 'EE'} size="sm" />
+        </div>
+        <div className="glass-header-actions">
+          <QuickActionMenu
+            actions={[
+              { label: 'Fetch Latest Data', icon: '🔄', onClick: fetchReportData },
+              { label: 'Download PDF Report', icon: '📥', onClick: handleDownloadPdf },
+              { label: 'Share Report to Chat', icon: '📤', onClick: () => setShowShareModal(true) },
+            ]}
+          />
         </div>
       </div>
 
-      {/* Departments Header */}
+      {/* TIER 2: SUB-SCREEN BUTTONS */}
       {(!department || department === 'elite-online') && (
-        <div style={styles.tabsContainer}>
+        <div className="glass-subtabs-bar" role="tablist">
           {department !== 'elite-online' && (
             <button
+              type="button"
               onClick={() => handleDepartmentChange('elite-print')}
-              style={activeDepartment === 'elite-print' ? styles.tabActive : styles.tab}
+              className={`glass-subtab-btn ${activeDepartment === 'elite-print' ? 'active' : ''}`}
             >
-              <Layers size={14} />
-              <span>Elite Digital Print</span>
+              Elite Digital Print
             </button>
           )}
           <button
+            type="button"
             onClick={() => handleDepartmentChange('sales')}
-            style={activeDepartment === 'sales' ? styles.tabActive : styles.tab}
+            className={`glass-subtab-btn ${activeDepartment === 'sales' ? 'active' : ''}`}
           >
-            <TrendingUp size={14} />
-            <span>Sales & Orders</span>
+            Sales & Orders
           </button>
           <button
+            type="button"
             onClick={() => handleDepartmentChange('inventory')}
-            style={activeDepartment === 'inventory' ? styles.tabActive : styles.tab}
+            className={`glass-subtab-btn ${activeDepartment === 'inventory' ? 'active' : ''}`}
           >
-            <Briefcase size={14} />
-            <span>Inventory</span>
+            Inventory
           </button>
           {department !== 'elite-online' && (
             <button
+              type="button"
               onClick={() => handleDepartmentChange('returns')}
-              style={activeDepartment === 'returns' ? styles.tabActive : styles.tab}
+              className={`glass-subtab-btn ${activeDepartment === 'returns' ? 'active' : ''}`}
             >
-              <Activity size={14} />
-              <span>Returns & QC</span>
+              Returns & QC
             </button>
           )}
           {department !== 'elite-online' && (
             <button
+              type="button"
               onClick={() => handleDepartmentChange('integrations')}
-              style={activeDepartment === 'integrations' ? styles.tabActive : styles.tab}
+              className={`glass-subtab-btn ${activeDepartment === 'integrations' ? 'active' : ''}`}
             >
-              <FileText size={14} />
-              <span>Integrations</span>
+              Integrations
             </button>
           )}
         </div>
       )}
 
       {/* Sub Tabs Header */}
-      <div style={{ ...styles.tabsContainer, marginTop: '0.5rem', background: 'transparent', padding: 0 }}>
+      <div className="glass-subtabs-bar" data-screen-subtabs="primary" role="tablist">
         {activeDepartment === 'elite-print' && (
           <>
-            <button onClick={() => setActiveReportTab('pending-status')} style={activeReportTab === 'pending-status' ? styles.subTabActive : styles.subTab}>📊 Pending Status Overview</button>
-            <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>Smart Dashboard</button>
-            <button onClick={() => setActiveReportTab('creative-output')} style={activeReportTab === 'creative-output' ? styles.subTabActive : styles.subTab}>Creative Output</button>
-            <button onClick={() => setActiveReportTab('color-matching')} style={activeReportTab === 'color-matching' ? styles.subTabActive : styles.subTab}>Color Matching</button>
-            <button onClick={() => setActiveReportTab('machine-speed')} style={activeReportTab === 'machine-speed' ? styles.subTabActive : styles.subTab}>Machine Speed</button>
-            <button onClick={() => setActiveReportTab('fusing-throughput')} style={activeReportTab === 'fusing-throughput' ? styles.subTabActive : styles.subTab}>Fusing Throughput</button>
-            <button onClick={() => setActiveReportTab('fabric-variance')} style={activeReportTab === 'fabric-variance' ? styles.subTabActive : styles.subTab}>Fabric Variance</button>
-            <button onClick={() => setActiveReportTab('deadline-adherence')} style={activeReportTab === 'deadline-adherence' ? styles.subTabActive : styles.subTab}>Deadline Adherence</button>
+            <button type="button" onClick={() => setActiveReportTab('pending-status')} className={`glass-subtab-btn ${activeReportTab === 'pending-status' ? 'active' : ''}`}>Pending Status Overview</button>
+            <button type="button" onClick={() => setActiveReportTab('smart-dashboard')} className={`glass-subtab-btn ${activeReportTab === 'smart-dashboard' ? 'active' : ''}`}>Smart Dashboard</button>
+            <button type="button" onClick={() => setActiveReportTab('creative-output')} className={`glass-subtab-btn ${activeReportTab === 'creative-output' ? 'active' : ''}`}>Creative Output</button>
+            <button type="button" onClick={() => setActiveReportTab('color-matching')} className={`glass-subtab-btn ${activeReportTab === 'color-matching' ? 'active' : ''}`}>Color Matching</button>
+            <button type="button" onClick={() => setActiveReportTab('machine-speed')} className={`glass-subtab-btn ${activeReportTab === 'machine-speed' ? 'active' : ''}`}>Machine Speed</button>
+            <button type="button" onClick={() => setActiveReportTab('fusing-throughput')} className={`glass-subtab-btn ${activeReportTab === 'fusing-throughput' ? 'active' : ''}`}>Fusing Throughput</button>
+            <button type="button" onClick={() => setActiveReportTab('fabric-variance')} className={`glass-subtab-btn ${activeReportTab === 'fabric-variance' ? 'active' : ''}`}>Fabric Variance</button>
+            <button type="button" onClick={() => setActiveReportTab('deadline-adherence')} className={`glass-subtab-btn ${activeReportTab === 'deadline-adherence' ? 'active' : ''}`}>Deadline Adherence</button>
           </>
         )}
         {activeDepartment === 'sales' && (
           <>
-            <button onClick={() => setActiveReportTab('sales')} style={activeReportTab === 'sales' ? styles.subTabActive : styles.subTab}>Sales Summary</button>
-            <button onClick={() => setActiveReportTab('brand')} style={activeReportTab === 'brand' ? styles.subTabActive : styles.subTab}>Brand Analytics</button>
-            <button onClick={() => setActiveReportTab('brand-hourly')} style={activeReportTab === 'brand-hourly' ? styles.subTabActive : styles.subTab}>Hourly Brand Analysis</button>
-            <button onClick={() => setActiveReportTab('returns-analysis')} style={activeReportTab === 'returns-analysis' ? styles.subTabActive : styles.subTab}>Returns Brand Analysis</button>
+            <button type="button" onClick={() => setActiveReportTab('sales')} className={`glass-subtab-btn ${activeReportTab === 'sales' ? 'active' : ''}`}>Sales Summary</button>
+            <button type="button" onClick={() => setActiveReportTab('brand')} className={`glass-subtab-btn ${activeReportTab === 'brand' ? 'active' : ''}`}>Brand Analytics</button>
+            <button type="button" onClick={() => setActiveReportTab('brand-hourly')} className={`glass-subtab-btn ${activeReportTab === 'brand-hourly' ? 'active' : ''}`}>Hourly Brand Analysis</button>
+            <button type="button" onClick={() => setActiveReportTab('returns-analysis')} className={`glass-subtab-btn ${activeReportTab === 'returns-analysis' ? 'active' : ''}`}>Returns Brand Analysis</button>
           </>
         )}
         {activeDepartment === 'inventory' && (
           <>
-            <button onClick={() => setActiveReportTab('stock-value')} style={activeReportTab === 'stock-value' ? styles.subTabActive : styles.subTab}>Stock Value</button>
-            <button onClick={() => setActiveReportTab('stock-inward')} style={activeReportTab === 'stock-inward' ? styles.subTabActive : styles.subTab}>Inward</button>
-            <button onClick={() => setActiveReportTab('stock-outward')} style={activeReportTab === 'stock-outward' ? styles.subTabActive : styles.subTab}>Outward</button>
+            <button type="button" onClick={() => setActiveReportTab('stock-value')} className={`glass-subtab-btn ${activeReportTab === 'stock-value' ? 'active' : ''}`}>Stock Value</button>
+            <button type="button" onClick={() => setActiveReportTab('stock-inward')} className={`glass-subtab-btn ${activeReportTab === 'stock-inward' ? 'active' : ''}`}>Inward</button>
+            <button type="button" onClick={() => setActiveReportTab('stock-outward')} className={`glass-subtab-btn ${activeReportTab === 'stock-outward' ? 'active' : ''}`}>Outward</button>
           </>
         )}
         {activeDepartment === 'returns' && (
-          <button onClick={() => setActiveReportTab('returns-analysis')} style={activeReportTab === 'returns-analysis' ? styles.subTabActive : styles.subTab}>Returns Analysis</button>
+          <button type="button" onClick={() => setActiveReportTab('returns-analysis')} className={`glass-subtab-btn ${activeReportTab === 'returns-analysis' ? 'active' : ''}`}>Returns Analysis</button>
         )}
         {activeDepartment === 'integrations' && (
-          <button onClick={() => setActiveReportTab('api-health')} style={activeReportTab === 'api-health' ? styles.subTabActive : styles.subTab}>API Health & Logs</button>
+          <button type="button" onClick={() => setActiveReportTab('api-health')} className={`glass-subtab-btn ${activeReportTab === 'api-health' ? 'active' : ''}`}>API Health & Logs</button>
         )}
       </div>
 
@@ -520,21 +525,21 @@ export default function ReportsCenter({ department }) {
               />
               
               {/* Stable Time Window Selector */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.4rem 0.75rem', height: '38px', boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)' }}>
-                <Clock size={15} color="#4f46e5" style={{ flexShrink: 0 }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: '8px', padding: '0.4rem 0.75rem', height: '38px' }}>
+                <Clock size={15} color="#38bdf8" style={{ flexShrink: 0 }} />
                 <input 
                   type="time" 
                   value={timeStart} 
                   onChange={(e) => setTimeStart(e.target.value)} 
-                  style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '700', color: '#0f172a', width: '105px', minWidth: '105px', outline: 'none', cursor: 'pointer' }} 
+                  style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '700', color: '#ffffff', width: '105px', minWidth: '105px', outline: 'none', cursor: 'pointer' }} 
                   title="Report Start Time"
                 />
-                <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: '800', flexShrink: 0 }}>to</span>
+                <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.78rem', fontWeight: '800', flexShrink: 0 }}>to</span>
                 <input 
                   type="time" 
                   value={timeEnd} 
                   onChange={(e) => setTimeEnd(e.target.value)} 
-                  style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '700', color: '#0f172a', width: '105px', minWidth: '105px', outline: 'none', cursor: 'pointer' }} 
+                  style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '700', color: '#ffffff', width: '105px', minWidth: '105px', outline: 'none', cursor: 'pointer' }} 
                   title="Report End Time"
                 />
               </div>

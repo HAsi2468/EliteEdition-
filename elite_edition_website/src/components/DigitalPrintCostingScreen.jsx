@@ -21,9 +21,13 @@ import {
   X,
   FileText,
   Receipt,
-  Download
+  Download,
+  Table,
+  LayoutGrid
 } from 'lucide-react';
 import { api } from '../services/api';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -48,6 +52,7 @@ export default function DigitalPrintCostingScreen({ companyEntity = 'Elite Digit
   };
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth);
+  const [costingViewMode, setCostingViewMode] = useState('table'); // 'table' | 'cards'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reportData, setReportData] = useState(null);
@@ -165,428 +170,208 @@ export default function DigitalPrintCostingScreen({ companyEntity = 'Elite Digit
       color: '#0f172a',
       fontFamily: 'inherit'
     }}>
-      {/* ── Top Header Toolbar (White & Blue) ─────────────────────────────────── */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        marginBottom: '1.5rem',
-        background: '#ffffff',
-        padding: '1.25rem 1.75rem',
-        borderRadius: '16px',
-        border: '1px solid #bfdbfe',
-        boxShadow: '0 4px 20px -2px rgba(37, 99, 235, 0.08)'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
-              background: '#eff6ff',
-              color: '#2563eb',
-              border: '1px solid #bfdbfe'
-            }}>
-              <TrendingUp size={22} />
-            </span>
-            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#1e3a8a' }}>
-              Costing
-            </h1>
-            <span style={{
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              padding: '3px 12px',
-              borderRadius: '999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              border: '1px solid #93c5fd'
-            }}>
-              {companyEntity}
-            </span>
+      {/* ── TIER 1: HEADER (Rule 5: No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header" style={{ marginBottom: '0.65rem' }}>
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+            <TrendingUp size={16} color="#ffffff" />
           </div>
-          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-            Monthly cost centers breakdown, invoice billing realization & net financial standing
-          </p>
+          <span className="glass-screen-title">Costing</span>
+          <EntityBrandBadge entityId={companyEntity} />
         </div>
 
-        {/* Month Picker & Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: '#eff6ff',
-            borderRadius: '10px',
-            border: '1px solid #bfdbfe',
-            padding: '2px'
-          }}>
-            <button
-              onClick={handlePrevMonth}
-              title="Previous Month"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#2563eb',
-                padding: '0.45rem 0.75rem',
-                cursor: 'pointer',
-                borderRadius: '8px',
-                fontWeight: 800,
-                fontSize: '0.85rem'
-              }}
-            >
-              ◀
-            </button>
-            <div style={{ padding: '0.35rem 0.85rem', fontWeight: 800, fontSize: '0.9rem', color: '#1e40af' }}>
-              {monthLabel()}
-            </div>
-            <button
-              onClick={handleNextMonth}
-              title="Next Month"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#2563eb',
-                padding: '0.45rem 0.75rem',
-                cursor: 'pointer',
-                borderRadius: '8px',
-                fontWeight: 800,
-                fontSize: '0.85rem'
-              }}
-            >
-              ▶
-            </button>
-          </div>
-
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            style={{
-              padding: '0.5rem 0.75rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#0f172a',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-            }}
-          />
-
-          <button
-            onClick={() => setShowOverheadsModal(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.5rem 1rem',
-              borderRadius: '10px',
-              border: '1px solid #bfdbfe',
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s'
-            }}
-          >
-            <Edit3 size={15} /> Fixed Overheads
-          </button>
-
-          <button
-            onClick={handlePrint}
-            title="Print Monthly Report"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.5rem 1.15rem',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              color: '#ffffff',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
-            }}
-          >
-            <Printer size={15} /> Print Report
-          </button>
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <QuickActionMenu />
         </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Rule 5) ── */}
+      <div className="glass-subtabs-bar" style={{ marginBottom: '1rem' }}>
+        {[
+          { id: 'overview', label: `Cost Centers Breakdown (${Object.keys(breakdown).length})` },
+          { id: 'invoices', label: `Billed Invoices (${invoices.length})` },
+          { id: 'expenses', label: `Expense Records (${expenses.length})` }
+        ].map(t => (
+          <button
+            key={t.id}
+            type="button"
+            className={`glass-subtab-btn ${activeSubView === t.id ? 'active' : ''}`}
+            onClick={() => setActiveSubView(t.id)}
+          >
+            <span>{t.label}</span>
+          </button>
+        ))}
       </div>
 
       {error && (
         <div style={{
-          padding: '1rem 1.25rem',
-          borderRadius: '12px',
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          marginBottom: '1.5rem',
+          padding: '0.75rem 1rem',
+          borderRadius: '10px',
+          background: 'rgba(239, 68, 68, 0.16)',
+          border: '1px solid rgba(239, 68, 68, 0.40)',
+          color: '#fca5a5',
+          marginBottom: '1rem',
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          fontSize: '0.9rem',
+          fontSize: '0.85rem',
           fontWeight: 600
         }}>
-          <AlertCircle size={18} /> {error}
+          <AlertCircle size={16} color="#ef4444" /> {error}
         </div>
       )}
 
-      {/* ── Executive Hero Verdict: PLUS or MINUS (White & Blue Theme) ──────── */}
+      {/* ── TIER 3: SIDE SCROLLING CALCULATION CARDS TRACK (Rule 5) ── */}
+      <div className="glass-scroll-track" style={{ marginBottom: '1rem' }}>
+        {/* Card 1: Bottom Line Standing */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Net Standing</span>
+            {isPlus ? <TrendingUp size={16} color="#34d399" /> : <TrendingDown size={16} color="#f87171" />}
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: isPlus ? '#34d399' : '#f87171', marginTop: '4px' }}>
+            {isPlus ? '+' : '-'}{fmtINR(netAmount)}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: isPlus ? '#34d399' : '#f87171', marginTop: '2px', fontWeight: 700 }}>
+            {isPlus ? `+${summary.profitMarginPct || 0}% Profit Margin` : 'Operating in Minus'}
+          </div>
+        </div>
+
+        {/* Card 2: Total Billed Revenue */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Total Billed Revenue</span>
+            <DollarSign size={16} color="#38bdf8" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
+            {fmtINR(summary.totalRevenue)}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            {summary.invoiceCount || 0} Invoices Generated
+          </div>
+        </div>
+
+        {/* Card 3: Total Factory Operating Costs */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Factory Costs</span>
+            <Receipt size={16} color="#f87171" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#f87171', marginTop: '4px' }}>
+            {fmtINR(summary.totalOperationalCost)}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            11 Cost Centers
+          </div>
+        </div>
+
+        {/* Card 4: Volume Printed */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Volume Printed</span>
+            <Printer size={16} color="#c084fc" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>
+            {(summary.effectiveProductionMeters || 0).toLocaleString('en-IN')} Mtr
+          </div>
+          <div style={{ fontSize: '0.72rem', color: isPlus ? '#34d399' : '#f87171', marginTop: '2px', fontWeight: 700 }}>
+            {isPlus ? `+₹ ${summary.profitPerMeter || 0}/Mtr` : `-₹ ${Math.abs(summary.profitPerMeter || 0)}/Mtr`}
+          </div>
+        </div>
+
+        {/* Card 5: Production Cost / Mtr */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Cost / Meter</span>
+            <Zap size={16} color="#fbbf24" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fbbf24', marginTop: '4px' }}>
+            ₹ {summary.costPerMeter || 0}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            All 11 overheads included
+          </div>
+        </div>
+
+        {/* Card 6: Average Billed / Mtr */}
+        <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Realization / Mtr</span>
+            <CheckCircle2 size={16} color="#34d399" />
+          </div>
+          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#34d399', marginTop: '4px' }}>
+            ₹ {summary.revenuePerMeter || 0}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+            Avg realization rate
+          </div>
+        </div>
+      </div>
+
+      {/* ── TIER 4: ACTION TOOLBAR WITH VIEW TOGGLE (Rule 5: Table | Cards) ── */}
       <div style={{
-        background: isPlus
-          ? 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)'
-          : 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)',
-        border: `1.5px solid ${isPlus ? '#86efac' : '#fca5a5'}`,
-        borderRadius: '20px',
-        padding: '1.75rem 2rem',
-        marginBottom: '1.75rem',
-        boxShadow: isPlus
-          ? '0 10px 25px -5px rgba(16, 185, 129, 0.12), 0 4px 10px -3px rgba(37, 99, 235, 0.05)'
-          : '0 10px 25px -5px rgba(239, 68, 68, 0.12)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '1.5rem'
+        gap: '0.75rem',
+        padding: '0.65rem 1rem',
+        background: 'rgba(255, 255, 255, 0.06)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderRadius: '12px',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        marginBottom: '1.25rem'
       }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.5rem' }}>
-            <span style={{
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          {/* Month Selector */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(15, 23, 42, 0.65)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.16)', padding: '2px' }}>
+            <button onClick={handlePrevMonth} style={{ background: 'transparent', border: 'none', color: '#38bdf8', padding: '0.4rem 0.65rem', cursor: 'pointer', fontWeight: 800 }}>◀</button>
+            <span style={{ padding: '0.35rem 0.75rem', fontWeight: 800, fontSize: '0.82rem', color: '#ffffff' }}>{monthLabel()}</span>
+            <button onClick={handleNextMonth} style={{ background: 'transparent', border: 'none', color: '#38bdf8', padding: '0.4rem 0.65rem', cursor: 'pointer', fontWeight: 800 }}>▶</button>
+          </div>
+
+          <button
+            onClick={() => setShowOverheadsModal(true)}
+            style={{
+              padding: '0.45rem 0.95rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(56, 189, 248, 0.45)',
+              background: 'rgba(56, 189, 248, 0.15)',
+              color: '#38bdf8',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: '46px',
-              height: '46px',
-              borderRadius: '14px',
-              background: isPlus ? '#10b981' : '#ef4444',
-              color: '#ffffff',
-              boxShadow: isPlus
-                ? '0 6px 16px rgba(16, 185, 129, 0.35)'
-                : '0 6px 16px rgba(239, 68, 68, 0.35)'
-            }}>
-              {isPlus ? <TrendingUp size={26} /> : <TrendingDown size={26} />}
-            </span>
-            <div>
-              <span style={{
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                color: isPlus ? '#047857' : '#b91c1c'
-              }}>
-                Monthly Bottom Line Status ({monthLabel()})
-              </span>
-              <h2 style={{
-                fontSize: '2rem',
-                fontWeight: 900,
-                margin: '2px 0 0 0',
-                color: isPlus ? '#047857' : '#b91c1c',
-                letterSpacing: '-0.03em'
-              }}>
-                {isPlus ? '🟢 YOU ARE IN PLUS' : '🔴 YOU ARE IN MINUS'}: {isPlus ? '+' : '-'}{fmtINR(netAmount)}
-              </h2>
-            </div>
-          </div>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569', fontWeight: 500 }}>
-            {isPlus
-              ? `🎉 Net Profit margin of ${summary.profitMarginPct || 0}% across all generated bills and factory operating costs.`
-              : `⚠️ Operating costs exceed billed revenue by ${fmtINR(netAmount)}. Review high-expense cost centers below.`}
-          </p>
+              gap: '6px'
+            }}
+          >
+            <Edit3 size={14} /> Update Fixed Overheads
+          </button>
         </div>
 
-        {/* Big Key Figures Pills (Clean White Cards) */}
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{
-            background: '#ffffff',
-            border: '1px solid #bfdbfe',
-            padding: '0.95rem 1.35rem',
-            borderRadius: '14px',
-            minWidth: '170px',
-            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.06)'
-          }}>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Total Billed (Revenue)
-            </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: '2px' }}>
-              {fmtINR(summary.totalRevenue)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
-              {summary.invoiceCount || 0} Invoices Generated
-            </div>
-          </div>
-
-          <div style={{
-            background: '#ffffff',
-            border: '1px solid #fecaca',
-            padding: '0.95rem 1.35rem',
-            borderRadius: '14px',
-            minWidth: '170px',
-            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.05)'
-          }}>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Total Factory Costs
-            </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#dc2626', marginTop: '2px' }}>
-              {fmtINR(summary.totalOperationalCost)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
-              11 Cost Centers
-            </div>
-          </div>
-
-          <div style={{
-            background: '#ffffff',
-            border: '1px solid #bbf7d0',
-            padding: '0.95rem 1.35rem',
-            borderRadius: '14px',
-            minWidth: '170px',
-            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.05)'
-          }}>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Total Volume Printed
-            </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>
-              {(summary.effectiveProductionMeters || 0).toLocaleString('en-IN')} Mtr
-            </div>
-            <div style={{ fontSize: '0.75rem', color: isPlus ? '#059669' : '#b91c1c', marginTop: '2px', fontWeight: 700 }}>
-              {isPlus ? `+₹ ${summary.profitPerMeter || 0}/Mtr Profit` : `-₹ ${Math.abs(summary.profitPerMeter || 0)}/Mtr Loss`}
-            </div>
-          </div>
+        {/* View Mode Toggle: Table View vs Card View */}
+        <div className="glass-view-toggle">
+          <button
+            type="button"
+            className={costingViewMode === 'table' ? 'active' : ''}
+            onClick={() => setCostingViewMode('table')}
+            title="Switch to High-Density Table View"
+          >
+            <FileText size={14} />
+            <span>Table</span>
+          </button>
+          <button
+            type="button"
+            className={costingViewMode === 'cards' ? 'active' : ''}
+            onClick={() => setCostingViewMode('cards')}
+            title="Switch to Card Grid View"
+          >
+            <Layers size={14} />
+            <span>Cards</span>
+          </button>
         </div>
-      </div>
-
-      {/* ── Per-Meter Economics Strip (White & Blue Cards) ──────────────────── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '14px',
-          padding: '1.1rem 1.25rem',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Production Cost / Meter
-          </div>
-          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#dc2626', margin: '4px 0' }}>
-            ₹ {summary.costPerMeter || 0} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>/ Mtr</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Paper, ink, power, rent & labor included</div>
-        </div>
-
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #bfdbfe',
-          borderRadius: '14px',
-          padding: '1.1rem 1.25rem',
-          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Average Billed / Meter
-          </div>
-          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#2563eb', margin: '4px 0' }}>
-            ₹ {summary.revenuePerMeter || 0} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>/ Mtr</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Average billing realization rate</div>
-        </div>
-
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #bbf7d0',
-          borderRadius: '14px',
-          padding: '1.1rem 1.25rem',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Net Margin %
-          </div>
-          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: isPlus ? '#059669' : '#b91c1c', margin: '4px 0' }}>
-            {summary.profitMarginPct || 0}%
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Percentage of billed revenue retained</div>
-        </div>
-
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '14px',
-          padding: '1.1rem 1.25rem',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Collected vs Pending
-          </div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#059669', margin: '4px 0' }}>
-            {fmtINR(summary.totalPaid)} <span style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 700 }}>(Bal: {fmtINR(summary.totalBalance)})</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Payment collections this month</div>
-        </div>
-      </div>
-
-      {/* ── Sub-navigation Tabs (White & Blue) ──────────────────────────────── */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        background: '#ffffff',
-        padding: '6px',
-        borderRadius: '14px',
-        border: '1px solid #bfdbfe',
-        marginBottom: '1.5rem',
-        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.04)'
-      }}>
-        {[
-          { id: 'overview', label: '📊 11 Cost Centers Breakdown', count: Object.keys(breakdown).length },
-          { id: 'invoices', label: `🧾 Billed Invoices (${invoices.length})`, count: fmtINR(summary.totalRevenue) },
-          { id: 'expenses', label: `💸 Expense Records (${expenses.length})`, count: fmtINR(summary.totalOperationalCost) }
-        ].map(t => {
-          const active = activeSubView === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setActiveSubView(t.id)}
-              style={{
-                padding: '0.65rem 1.25rem',
-                borderRadius: '10px',
-                border: 'none',
-                background: active ? '#2563eb' : 'transparent',
-                color: active ? '#ffffff' : '#475569',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.15s',
-                boxShadow: active ? '0 2px 8px rgba(37, 99, 235, 0.3)' : 'none'
-              }}
-            >
-              <span>{t.label}</span>
-              {t.count && (
-                <span style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  background: active ? '#eff6ff' : '#f1f5f9',
-                  color: active ? '#1d4ed8' : '#475569',
-                  fontWeight: 800
-                }}>
-                  {t.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
       </div>
 
       {/* ── View 1: 11 Cost Centers Grid (White & Blue) ─────────────────────── */}

@@ -8,26 +8,85 @@ axios.defaults.httpsAgent = new https.Agent({ family: 4 });
 
 const { convertKeysToModelFields } = require('../utils/dataParser');
 const { csvExportedValue } = require('../utils/constant');
+const { extractBaseSku } = require('../utils/skuHelper');
+const { extractApiImageUrl, normalizeImageUrl } = require('../utils/imageUrlHelper');
 const csvParser = require('csv-parser');
+
+function normalizeUniwareElement(el) {
+  if (!el || typeof el !== 'object') return el;
+  const rawImg = extractApiImageUrl(el);
+  const cleanImg = rawImg ? normalizeImageUrl(rawImg) : '';
+  return {
+    ...el,
+    imageUrl: cleanImg || el.imageUrl || '',
+    description:
+      (el.description && el.description !== 'Unnamed Product' ? el.description : '') ||
+      el.name ||
+      el.categoryName ||
+      el.skuCode ||
+      '',
+  };
+}
 
 async function fetchProductData(skuCode, token) {
   console.log('[fetchProductData] Start - skuCode:', skuCode);
+  const headers = {
+    Authorization: `bearer ${token}`,
+    'Content-Type': 'application/json',
+    Cookie: 'unicommerce=app3',
+  };
+  const searchUrl = 'https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search';
+
   try {
     const response = await axios.post(
-      'https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search',
-      {
-        productCode: skuCode,
-      },
-      {
-        headers: {
-          Authorization: `bearer ${token}`,
-          'Content-Type': 'application/json',
-          Cookie: 'unicommerce=app3',
-        },
-      }
+      searchUrl,
+      { productCode: skuCode },
+      { headers, timeout: 8000 }
     );
-    console.log('[fetchProductData] Success');
-    return response.data;
+    let elements = Array.isArray(response.data?.elements)
+      ? response.data.elements.map(normalizeUniwareElement)
+      : [];
+
+    const hasImage = elements.some((el) => el && el.imageUrl);
+    if (elements.length === 0 || !hasImage) {
+      const baseSku = extractBaseSku(skuCode);
+      if (baseSku) {
+        try {
+          const kwRes = await axios.post(
+            searchUrl,
+            { keyword: baseSku },
+            { headers, timeout: 8000 }
+          );
+          const kwElements = Array.isArray(kwRes.data?.elements)
+            ? kwRes.data.elements.map(normalizeUniwareElement)
+            : [];
+          const baseUpper = baseSku.trim().toUpperCase();
+          const skuUpper = String(skuCode).trim().toUpperCase();
+          const matchingKw = kwElements.filter((el) => {
+            if (!el || !el.skuCode) return false;
+            const elSkuUpper = el.skuCode.trim().toUpperCase();
+            const elBaseUpper = extractBaseSku(el.skuCode).trim().toUpperCase();
+            return elSkuUpper === skuUpper || elBaseUpper === baseUpper;
+          });
+          if (matchingKw.length > 0) {
+            const bestWithImg = matchingKw.find((el) => el.imageUrl);
+            if (elements.length === 0) {
+              elements = bestWithImg ? [bestWithImg, ...matchingKw.filter((x) => x !== bestWithImg)] : matchingKw;
+            } else if (bestWithImg) {
+              elements[0].imageUrl = bestWithImg.imageUrl;
+              if (!elements[0].description || elements[0].description === 'Unnamed Product') {
+                elements[0].description = bestWithImg.description || bestWithImg.name || elements[0].description;
+              }
+            }
+          }
+        } catch (kwErr) {
+          // Ignore keyword fallback error
+        }
+      }
+    }
+
+    console.log('[fetchProductData] Success - matched elements:', elements.length);
+    return { ...(response.data || {}), elements };
   } catch (error) {
     console.error('[fetchProductData] Error fetching data for SKU:', skuCode, error.message);
     throw error;
@@ -36,20 +95,17 @@ async function fetchProductData(skuCode, token) {
 
 async function fetchEntireCatalog(token) {
   console.log('[fetchEntireCatalog] Starting full catalog sync...');
+  const headers = {
+    Authorization: `bearer ${token}`,
+    'Content-Type': 'application/json',
+    Cookie: 'unicommerce=app3',
+  };
+  const searchUrl = 'https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search';
   try {
-    const response = await axios.post(
-      'https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search',
-      {},
-      {
-        headers: {
-          Authorization: `bearer ${token}`,
-          'Content-Type': 'application/json',
-          Cookie: 'unicommerce=app3',
-        },
-      }
-    );
-    console.log('[fetchEntireCatalog] Success. Total Elements:', response.data.totalElements || response.data.elements?.length);
-    return response.data.elements || [];
+    const response = await axios.post(searchUrl, {}, { headers, timeout: 25000 });
+    const rawElements = response.data?.elements || [];
+    console.log('[fetchEntireCatalog] Success. Total Elements:', response.data?.totalElements || rawElements.length);
+    return rawElements.map(normalizeUniwareElement);
   } catch (error) {
     console.error('[fetchEntireCatalog] Error fetching full catalog:', error.response ? error.response.data : error.message);
     throw error;

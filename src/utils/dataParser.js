@@ -157,6 +157,7 @@ function convertKeysToModelFields(jsonData) {
   }));
 }
 const { extractBaseSku } = require('./skuHelper');
+const { extractApiImageUrl, normalizeImageUrl } = require('./imageUrlHelper');
 
 function convertKeysV2(jsonData) {
   return jsonData.map((item) => {
@@ -175,20 +176,31 @@ function convertKeysV2(jsonData) {
       shippingAddressState: item.shippingAddressState,
       shippingAddressPincode: item.shippingAddressPincode,
       orderDate: parseDate(item.orderDate),
-      productImage: '',
+      productImage: item.productImage || item.imageUrl || '',
       saleOrderStatus: item.saleOrderStatus,
-      skuName: item.skuName,
-      saleCount: item.saleOrderStatus === 'CANCELLED' ? 0 :1,
+      skuName: item.skuName || item.itemTypeName || '',
+      saleCount: item.saleOrderStatus === 'CANCELLED' ? 0 : 1,
     };
   });
 }
 const transformProducts = (products) => {
-  return products.map(({ skuCode, color, size, ...product }) => {
+  return products.map((rawItem) => {
+    const { skuCode, color, size, ...product } = rawItem || {};
+    const resolvedImg = normalizeImageUrl(extractApiImageUrl(rawItem));
+    const resolvedDesc =
+      (product.description && product.description !== 'Unnamed Product' ? product.description : '') ||
+      product.name ||
+      product.itemTypeName ||
+      product.categoryName ||
+      extractBaseSku(skuCode) ||
+      skuCode;
     return {
       ...product,
       skuCode: extractBaseSku(skuCode) || skuCode,
-      size: size ? [size] : [],
-      color: color ? [color] : [],
+      description: resolvedDesc,
+      imageUrl: resolvedImg || product.imageUrl || '',
+      size: Array.isArray(size) ? size : (size ? [size] : []),
+      color: Array.isArray(color) ? color : (color ? [color] : []),
     };
   });
 };

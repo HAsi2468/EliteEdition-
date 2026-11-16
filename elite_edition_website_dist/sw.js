@@ -183,8 +183,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Elite ERP Notification';
   const notificationOptions = {
     body: payload.body || 'You received a new update.',
-    icon: payload.icon || '/Logo.png',
-    badge: payload.badge || '/Logo.png',
+    icon: payload.icon || '/pwa-192x192.png',
+    badge: payload.badge || '/pwa-maskable-192x192.png',
     tag: tag, // Collapses multiple alerts gracefully per thread without tray spam
     renotify: payload.renotify !== undefined ? payload.renotify : true,
     data: {
@@ -218,7 +218,15 @@ self.addEventListener('push', (event) => {
         return;
       }
 
-      return self.registration.showNotification(title, notificationOptions);
+      return self.registration.showNotification(title, notificationOptions).catch(() => {
+        // Cross-device fallback (iOS/macOS Safari or strict browsers that reject actions/vibrate)
+        return self.registration.showNotification(title, {
+          body: notificationOptions.body,
+          icon: notificationOptions.icon,
+          tag: notificationOptions.tag,
+          data: notificationOptions.data,
+        });
+      });
     })
   );
 });

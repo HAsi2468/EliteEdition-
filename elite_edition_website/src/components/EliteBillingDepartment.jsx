@@ -112,7 +112,8 @@ import {
   Copy,
   Calculator,
   ShieldCheck,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Layers
 } from 'lucide-react';
 
 import { cloneDocumentPayload, focusPrimaryQuantityInput } from '../utils/documentCloneUtility';
@@ -463,6 +464,7 @@ export default function EliteBillingDepartment({
     narration: ''
   });
   const [purchaseTabFilter, setPurchaseTabFilter] = useState('all'); // 'all' | 'general' | 'contra'
+  const [purchaseViewMode, setPurchaseViewMode] = useState('table'); // 'table' | 'cards'
 
   const computeNextPurchaseNo = (list = purchases, forEntity = (purchaseForm?.companyEntity || companyEntity), isContra = (purchaseEntryType === 'contra')) => {
     if (isContra) {
@@ -4953,81 +4955,65 @@ export default function EliteBillingDepartment({
   return (
     <div className="ent-screen-container">
 
-      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
-      <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
-          <div className="ent-header-title-wrap">
-            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#7c3aed,#3b82f6)' }}>
-              <FileText size={18} color="#fff" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-              <h2 className="ent-header-title">Billing & Invoicing</h2>
-              <EntityBrandBadge entityId={companyEntity} />
-              <ScreenGroupRoster screenId="jobcards_billing" />
-            </div>
+      {/* ── UNIFIED GLASSY SCREEN HEADER & SUB-TABS (Rule 5 & Rule 3) ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon">
+            <FileText size={16} color="#fff" />
           </div>
-
-          {/* Quick Action Menu */}
-          <div className="ent-header-actions">
-            <QuickActionMenu
-              onNewInvoice={() => handleOpenCreateTab()}
-              onNewChallan={handleOpenCreateChallan}
-              onExpenseEntry={() => {
-                setActiveTab('expense');
-                setAutoOpenExpenseModal(true);
-              }}
-              onLedgerReports={() => setShowLedgerModal(true)}
-              onGstReports={() => setActiveTab('gst')}
-            />
-          </div>
+          <span className="glass-screen-title">Billing & Invoicing</span>
+          <EntityBrandBadge entityId={companyEntity} />
+          <ScreenGroupRoster screenId="jobcards_billing" />
         </div>
 
-        {/* Sub-Tabs Bar */}
-        <div
-          className="ent-tab-bar"
-          data-screen-subtabs="primary"
-          role="tablist"
-          aria-label="Billing Department Sub-Tabs"
-          style={{
-            display: 'flex',
-            flexWrap: 'nowrap',
-            overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-x pan-y',
-            width: '100%',
-            maxWidth: '100%',
-            gap: '0.5rem',
-            padding: '4px 2px 6px 2px',
-            scrollbarWidth: 'none',
-          }}
-        >
-          {[
-            { id: 'challans', label: isCorporateEntity ? 'Delivery Challan' : department === 'stitching' ? 'Stitching Challan' : 'Challan' },
-            { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
-            { id: 'purchase', label: 'Purchases' },
-            { id: 'gst', label: 'GST Summary' },
-            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
-            { id: 'expense', label: 'Expenses & Ledger' },
-            { id: 'customers', label: `Customers (${customers.length})` },
-            { id: 'vendors', label: `Vendors (${vendorsList.length})` },
-            { id: 'items', label: `Items (${itemsList.length})` }
-          ].map(t => {
-            const isActive = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={isActive}
-                data-subtab={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`ent-tab-btn ${isActive ? 'active' : ''}`}
-                style={{ flexShrink: 0, flex: '0 0 auto', whiteSpace: 'nowrap', minWidth: 'max-content' }}
-              >
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
+        {/* Quick Action Menu */}
+        <div className="ent-header-actions">
+          <QuickActionMenu
+            onNewInvoice={() => handleOpenCreateTab()}
+            onNewChallan={handleOpenCreateChallan}
+            onExpenseEntry={() => {
+              setActiveTab('expense');
+              setAutoOpenExpenseModal(true);
+            }}
+            onLedgerReports={() => setShowLedgerModal(true)}
+            onGstReports={() => setActiveTab('gst')}
+          />
         </div>
+      </div>
+
+      {/* Sub-Tabs Bar */}
+      <div
+        className="glass-subtabs-bar"
+        data-screen-subtabs="primary"
+        role="tablist"
+        aria-label="Billing Department Sub-Tabs"
+        style={{ marginBottom: '0.85rem' }}
+      >
+        {[
+          { id: 'challans', label: isCorporateEntity ? 'Delivery Challan' : department === 'stitching' ? 'Stitching Challan' : 'Challan' },
+          { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
+          { id: 'purchase', label: 'Purchases' },
+          { id: 'gst', label: 'GST Summary' },
+          ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
+          { id: 'expense', label: 'Expenses & Ledger' },
+          { id: 'customers', label: `Customers (${customers.length})` },
+          { id: 'vendors', label: `Vendors (${vendorsList.length})` },
+          { id: 'items', label: `Items (${itemsList.length})` }
+        ].map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={isActive}
+              data-subtab={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`glass-subtab-btn ${isActive ? 'active' : ''}`}
+            >
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ── DATE FILTER & KPI CARDS BAR (Displayed on Invoices Directory) ──────── */}
@@ -5676,19 +5662,16 @@ export default function EliteBillingDepartment({
 
       {/* ── TAB 2: INVOICE GENERATOR / EDITOR (myBillBook style) ────────────── */}
       {activeTab === 'create' && (
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', position: 'relative', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.04)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', position: 'relative', background: 'rgba(15, 23, 42, 0.72)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 8px 32px rgba(2, 6, 23, 0.45)', backdropFilter: 'blur(18px)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #7c3aed, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)' }}>
                 <Receipt size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {editingInvoiceId ? `Edit Tax Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
                 </h3>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
-                  Official B2B Tax Invoice with automated GST & TDS deductions
-                </div>
               </div>
               <EntityBrandBadge entityId={invoiceForm.issuingCompany || companyEntity} />
             </div>
@@ -5696,7 +5679,7 @@ export default function EliteBillingDepartment({
               <button
                 className="btn-secondary"
                 onClick={() => setActiveTab('invoices')}
-                style={{ padding: '0.5rem 1.1rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                style={{ padding: '0.5rem 1.1rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0' }}
               >
                 Cancel
               </button>
@@ -5728,7 +5711,7 @@ export default function EliteBillingDepartment({
           {/* Core Metadata */}
           <div id="inv-sec-meta" data-form-section="true" data-section-title="Metadata & Taxes" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ ...labelStyle, color: '#7c3aed', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
+              <label style={{ ...labelStyle, color: '#a78bfa', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
               <select
                 value={invoiceForm.issuingCompany || companyEntity}
                 onChange={async e => {
@@ -5766,9 +5749,9 @@ export default function EliteBillingDepartment({
                 style={{
                   ...inputStyle,
                   fontWeight: '800',
-                  color: '#7c3aed',
-                  background: 'rgba(124, 58, 237, 0.08)',
-                  border: '1px solid rgba(124, 58, 237, 0.4)',
+                  color: '#c4b5fd',
+                  background: 'rgba(124, 58, 237, 0.14)',
+                  border: '1px solid rgba(167, 139, 250, 0.45)',
                   cursor: 'pointer'
                 }}
               >
@@ -5840,9 +5823,9 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Customer Selection */}
-          <div id="inv-sec-customer" data-form-section="true" data-section-title="Customer / Party" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+          <div id="inv-sec-customer" data-form-section="true" data-section-title="Customer / Party" style={{ background: 'rgba(11, 17, 32, 0.55)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>🏢 Billed To (Customer Details)</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#60a5fa', textTransform: 'uppercase' }}>🏢 Billed To (Customer Details)</div>
               <button type="button" onClick={() => setShowCustomerModal(true)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>
                 + Add New Customer
               </button>
@@ -5910,7 +5893,6 @@ export default function EliteBillingDepartment({
                   style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
                   placeholder="e.g. 395006 or 110024"
                 />
-                <span style={{ fontSize: '0.65rem', color: '#a78bfa', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City, State & GST</span>
               </div>
 
               <div>
@@ -5923,7 +5905,6 @@ export default function EliteBillingDepartment({
                   style={inputStyle}
                   placeholder="e.g. Surat, Delhi, Mumbai"
                 />
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>⚡ Auto-sets State & Pincode</span>
               </div>
 
               <div>
@@ -5967,9 +5948,9 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Dynamic Products / Line Items Table */}
-          <div id="inv-sec-items" data-form-section="true" data-section-title="Line Items" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem', overflowX: 'auto' }}>
+          <div id="inv-sec-items" data-form-section="true" data-section-title="Line Items" style={{ background: 'rgba(11, 17, 32, 0.55)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '1rem', overflowX: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>📦 Invoice Line Items</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#60a5fa', textTransform: 'uppercase' }}>📦 Invoice Line Items</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                 {!isCorporateInvoice && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', cursor: 'pointer', background: 'rgba(251,191,36,0.12)', padding: '0.3rem 0.65rem', borderRadius: '5px', border: '1px solid rgba(251,191,36,0.3)' }}>
@@ -6022,7 +6003,7 @@ export default function EliteBillingDepartment({
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: isCorporateInvoice ? '960px' : '1060px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--border-light, #cbd5e1)', fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.14)', fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <th style={{ padding: '0.5rem 0.4rem', minWidth: '290px' }}>Item Description & Details</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '105px', minWidth: '105px' }}>HSN</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '95px', minWidth: '95px' }}>Qty</th>
@@ -6045,16 +6026,16 @@ export default function EliteBillingDepartment({
                       padding: '0.35rem 0.5rem',
                       fontSize: '0.84rem',
                       fontWeight: 600,
-                      background: 'var(--bg-input, #ffffff)',
-                      border: '1px solid var(--border-light, #cbd5e1)',
+                      background: 'rgba(11, 17, 32, 0.85)',
+                      border: '1px solid rgba(255, 255, 255, 0.16)',
                       borderRadius: '6px',
-                      color: 'var(--text-primary, #0f172a)',
+                      color: '#ffffff',
                       boxSizing: 'border-box',
                       outline: 'none'
                     };
 
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, #e2e8f0)', verticalAlign: 'top' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', verticalAlign: 'top' }}>
                         <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', height: '36px' }}>
@@ -6062,7 +6043,7 @@ export default function EliteBillingDepartment({
                                 <img
                                   src={convertDriveUrl(it.imageUrl, it.itemName)}
                                   alt="Design"
-                                  style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light, #cbd5e1)', flexShrink: 0 }}
+                                  style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover', border: '1px solid rgba(255, 255, 255, 0.18)', flexShrink: 0 }}
                                   onError={e => { e.target.style.display = 'none'; }}
                                 />
                               )}
@@ -6082,13 +6063,13 @@ export default function EliteBillingDepartment({
 
                             {/* Visible Fabric & Description badge */}
                             {(it.fabric || it.fabricName || it.description) && (
-                              <div style={{ fontSize: '0.72rem', color: '#4f46e5', background: '#eef2ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #c7d2fe', display: 'flex', alignItems: 'center', gap: 5, width: 'fit-content' }}>
+                              <div style={{ fontSize: '0.72rem', color: '#c7d2fe', background: 'rgba(99, 102, 241, 0.18)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(129, 140, 248, 0.35)', display: 'flex', alignItems: 'center', gap: 5, width: 'fit-content' }}>
                                 <span>🧵</span>
                                 <span style={{ fontWeight: 700 }}>
                                   {it.fabric || it.fabricName ? `Fabric: ${it.fabric || it.fabricName}` : it.description}
                                 </span>
                                 {it.description && !it.description.includes(it.fabric || it.fabricName || '') && (
-                                  <span style={{ color: '#64748b', fontWeight: 500 }}>({it.description})</span>
+                                  <span style={{ color: '#94a3b8', fontWeight: 500 }}>({it.description})</span>
                                 )}
                               </div>
                             )}
@@ -6096,88 +6077,88 @@ export default function EliteBillingDepartment({
                             {/* Sub-inputs: General Note / Ref for Corporate entities, or Job No, Lot No, Party Challan for Digital Prints */}
                             {isCorporateInvoice ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginTop: '1px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', flex: '1 1 200px' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Note/Desc</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden', flex: '1 1 200px' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 6px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Note/Desc</span>
                                   <input
                                     type="text"
                                     value={it.description || ''}
                                     onChange={e => handleItemChange(idx, 'description', e.target.value)}
                                     placeholder="Optional description / details..."
                                     title="Item Description / Note"
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Ref / Challan</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 6px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Ref / Challan</span>
                                   <input
                                     type="text"
                                     value={it.ourChallanNo || ''}
                                     onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
                                     placeholder="e.g. DC-01"
                                     title="Challan or Reference No"
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginTop: '1px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Job</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 5px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Job</span>
                                   <input
                                     type="text"
                                     value={it.jobNo || ''}
                                     onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
                                     placeholder="Job No"
                                     title="Job Card No"
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '65px', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '65px', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Lot</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 5px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Lot</span>
                                   <input
                                     type="text"
                                     value={it.lotNo || ''}
                                     onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
                                     placeholder="Lot No"
                                     title="Lot No"
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '60px', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '60px', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Party Ch.</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 5px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Party Ch.</span>
                                   <input
                                     type="text"
                                     value={it.partyChallan || ''}
                                     onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
                                     placeholder="Party Challan"
                                     title="Party / Vendor Challan"
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Our Ch.</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 5px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Our Ch.</span>
                                   <input
                                     type="text"
                                     value={it.ourChallanNo || ''}
                                     onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
                                     placeholder="Delivery Ch."
                                     title="Our Delivery Challan No"
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', flex: '1 1 110px' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Design URL</span>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '4px', overflow: 'hidden', flex: '1 1 110px' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: 'rgba(30, 41, 59, 0.9)', color: '#cbd5e1', padding: '2px 5px', borderRight: '1px solid rgba(255, 255, 255, 0.14)', userSelect: 'none' }}>Design URL</span>
                                   <input
                                     type="text"
                                     value={it.imageUrl || ''}
                                     onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
                                     placeholder="Paste design link..."
                                     title={it.imageUrl || 'Design Image URL'}
-                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#0f172a', background: 'transparent' }}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#ffffff', background: 'transparent' }}
                                   />
                                 </div>
                               </div>
@@ -6207,7 +6188,7 @@ export default function EliteBillingDepartment({
                                 ...rowInputStyle,
                                 textAlign: 'right',
                                 paddingRight: it.isLocked ? '24px' : '0.5rem',
-                                backgroundColor: it.isLocked ? 'rgba(251, 191, 36, 0.08)' : undefined,
+                                backgroundColor: it.isLocked ? 'rgba(251, 191, 36, 0.12)' : undefined,
                                 borderColor: it.isLocked ? 'rgba(251, 191, 36, 0.5)' : undefined
                               }}
                             />
@@ -6244,7 +6225,7 @@ export default function EliteBillingDepartment({
                             style={{ ...rowInputStyle, textAlign: 'right' }}
                           />
                           {!isCorporateInvoice && it.butterPaper && (
-                            <span style={{ fontSize: '0.66rem', color: '#d97706', fontWeight: 800, display: 'block', textAlign: 'right', marginTop: '2px' }}>
+                            <span style={{ fontSize: '0.66rem', color: '#fbbf24', fontWeight: 800, display: 'block', textAlign: 'right', marginTop: '2px' }}>
                               Eff: ₹{(parseFloat(it.unitPrice || 0) + 3).toFixed(2)}
                             </span>
                           )}
@@ -6257,8 +6238,8 @@ export default function EliteBillingDepartment({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              background: it.butterPaper ? 'rgba(251, 191, 36, 0.12)' : 'rgba(241, 245, 249, 0.7)',
-                              border: `1px solid ${it.butterPaper ? '#f59e0b' : 'var(--border-light, #cbd5e1)'}`,
+                              background: it.butterPaper ? 'rgba(251, 191, 36, 0.16)' : 'rgba(11, 17, 32, 0.85)',
+                              border: `1px solid ${it.butterPaper ? 'rgba(251, 191, 36, 0.5)' : 'rgba(255, 255, 255, 0.16)'}`,
                               borderRadius: '6px',
                               padding: '0 4px',
                               boxSizing: 'border-box'
@@ -6288,11 +6269,11 @@ export default function EliteBillingDepartment({
                                     cursor: 'pointer',
                                     width: '16px',
                                     height: '16px',
-                                    accentColor: '#d97706',
+                                    accentColor: '#f59e0b',
                                     margin: 0
                                   }}
                                 />
-                                <span style={{ fontSize: '0.68rem', color: it.butterPaper ? '#b45309' : '#64748b', fontWeight: 800 }}>
+                                <span style={{ fontSize: '0.68rem', color: it.butterPaper ? '#fbbf24' : '#94a3b8', fontWeight: 800 }}>
                                   {it.butterPaper ? '+₹3' : 'No'}
                                 </span>
                               </label>
@@ -6329,7 +6310,7 @@ export default function EliteBillingDepartment({
                             justifyContent: 'flex-end',
                             fontSize: '0.92rem',
                             fontWeight: 900,
-                            color: 'var(--text-primary, #0f172a)',
+                            color: '#ffffff',
                             fontVariantNumeric: 'tabular-nums',
                             whiteSpace: 'nowrap'
                           }}>
@@ -6355,7 +6336,7 @@ export default function EliteBillingDepartment({
                                 transition: 'background 0.15s'
                               }}
                               title="Remove line item"
-                              onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)'}
                               onMouseLeave={e => e.currentTarget.style.background = 'none'}
                             >
                               <X size={15} />
@@ -6373,68 +6354,65 @@ export default function EliteBillingDepartment({
           {/* Financial Summary & Tax Breakdown Box */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginTop: '1rem', alignItems: 'start' }}>
             {/* Left Card: Customer Notes & Contractual Terms */}
-            <div id="inv-sec-notes" data-form-section="true" data-section-title="Notes & Terms" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.6rem' }}>
-                <FileText size={18} style={{ color: '#2563eb' }} />
-                <div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Customer Notes & Supply Terms</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Printed at bottom of official tax invoice PDF</div>
-                </div>
+            <div id="inv-sec-notes" data-form-section="true" data-section-title="Notes & Terms" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(11, 17, 32, 0.65)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(2, 6, 23, 0.35)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '0.6rem' }}>
+                <FileText size={18} style={{ color: '#60a5fa' }} />
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#ffffff' }}>Customer Notes & Supply Terms</div>
               </div>
 
               <div>
-                <label style={{ ...labelStyle, color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
+                <label style={{ ...labelStyle, color: '#cbd5e1', display: 'flex', justifyContent: 'space-between' }}>
                   <span>Notes for Customer</span>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400 }}>Optional</span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 400 }}>Optional</span>
                 </label>
                 <textarea
                   rows={3}
                   value={invoiceForm.notes}
                   onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
                   placeholder="e.g. Thank you for your business! Please quote invoice number during NEFT/RTGS payment transfer."
-                  style={{ ...inputStyle, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', resize: 'vertical' }}
+                  style={{ ...inputStyle, background: 'rgba(11, 17, 32, 0.88)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#ffffff', resize: 'vertical' }}
                 />
               </div>
 
               <div>
-                <label style={{ ...labelStyle, color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
+                <label style={{ ...labelStyle, color: '#cbd5e1', display: 'flex', justifyContent: 'space-between' }}>
                   <span>Terms & Conditions</span>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400 }}>Contractual</span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 400 }}>Contractual</span>
                 </label>
                 <textarea
                   rows={3}
                   value={invoiceForm.terms}
                   onChange={e => setInvoiceForm(f => ({ ...f, terms: e.target.value }))}
                   placeholder="e.g. 1. Goods once sold will not be taken back. 2. Interest @ 18% p.a. will be charged after due date. 3. Subject to Surat jurisdiction only."
-                  style={{ ...inputStyle, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', resize: 'vertical' }}
+                  style={{ ...inputStyle, background: 'rgba(11, 17, 32, 0.88)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#ffffff', resize: 'vertical' }}
                 />
               </div>
 
-              <div style={{ fontSize: '0.73rem', color: '#475569', background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
-                💡 <strong>Audit Note:</strong> Standard legal declaration will accompany bank account details on the PDF.
+              <div style={{ fontSize: '0.73rem', color: '#cbd5e1', background: 'rgba(15, 23, 42, 0.65)', padding: '0.5rem 0.75rem', borderRadius: 6, border: '1px dashed rgba(255, 255, 255, 0.18)' }}>
+                💡 <strong style={{ color: '#ffffff' }}>Audit Note:</strong> Standard legal declaration will accompany bank account details on the PDF.
               </div>
             </div>
 
             {/* Right Card: Financial Summary, Taxes, TDS & Settlement */}
             <div id="inv-sec-totals" data-form-section="true" data-section-title="Summary & Total" style={{
               padding: '0.85rem 1rem',
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '10px',
+              background: 'rgba(11, 17, 32, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.5rem',
-              boxShadow: '0 2px 10px -2px rgba(15, 23, 42, 0.05)',
+              boxShadow: '0 4px 16px rgba(2, 6, 23, 0.35)',
               fontFamily: "var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)"
             }}>
 
               {/* Financial Dock Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.45rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '0.45rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Calculator size={16} style={{ color: '#2563eb' }} />
-                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>Tax & Financial Summary</span>
+                  <Calculator size={16} style={{ color: '#60a5fa' }} />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>Tax & Financial Summary</span>
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '9999px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '9999px', background: 'rgba(59, 130, 246, 0.16)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
                   {invoiceForm.taxType === 'IGST' ? '⚡ IGST 5%' : '⚡ CGST 2.5% + SGST 2.5%'}
                 </span>
               </div>
@@ -6443,13 +6421,13 @@ export default function EliteBillingDepartment({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
                 {/* Subtotal */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontWeight: 500 }}>Taxable Subtotal:</span>
-                  <span style={{ fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.subtotal.toFixed(2)}</span>
+                  <span style={{ color: '#cbd5e1', fontWeight: 500 }}>Taxable Subtotal:</span>
+                  <span style={{ fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.subtotal.toFixed(2)}</span>
                 </div>
 
                 {/* Discount if any */}
                 {calculatedInvoice.discountTotal > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#059669' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#34d399' }}>
                     <span style={{ fontWeight: 600 }}>Trade Discount:</span>
                     <span style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>- ₹ {calculatedInvoice.discountTotal.toFixed(2)}</span>
                   </div>
@@ -6458,36 +6436,36 @@ export default function EliteBillingDepartment({
                 {/* GST Breakdown */}
                 {invoiceForm.taxType === 'IGST' ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#475569' }}>
+                    <span style={{ color: '#cbd5e1' }}>
                       IGST ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal) * 100).toFixed(1) : 5}%):
                     </span>
-                    <span style={{ fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.igstAmount.toFixed(2)}</span>
+                    <span style={{ fontWeight: 700, color: '#f1f5f9', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.igstAmount.toFixed(2)}</span>
                   </div>
                 ) : (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#475569' }}>
+                      <span style={{ color: '#cbd5e1' }}>
                         CGST ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
                       </span>
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.cgstAmount.toFixed(2)}</span>
+                      <span style={{ fontWeight: 700, color: '#f1f5f9', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.cgstAmount.toFixed(2)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#475569' }}>
+                      <span style={{ color: '#cbd5e1' }}>
                         SGST ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
                       </span>
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.sgstAmount.toFixed(2)}</span>
+                      <span style={{ fontWeight: 700, color: '#f1f5f9', fontVariantNumeric: 'tabular-nums' }}>₹ {calculatedInvoice.sgstAmount.toFixed(2)}</span>
                     </div>
                   </>
                 )}
 
                 {/* Round Off Adjustment */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#334155', paddingTop: '0.3rem', borderTop: '1px dashed #e2e8f0' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#e2e8f0', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255, 255, 255, 0.14)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', color: '#e2e8f0' }}>
                     <input
                       type="checkbox"
                       checked={invoiceForm.enableRoundOff !== false}
                       onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked, manualRoundOff: undefined }))}
-                      style={{ accentColor: '#2563eb' }}
+                      style={{ accentColor: '#3b82f6' }}
                     />
                     Round Off Total
                   </label>
@@ -6500,14 +6478,14 @@ export default function EliteBillingDepartment({
                     onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualRoundOff: undefined })); }}
                     style={{
                       width: '72px',
-                      height: '26px',
-                      padding: '0.2rem 0.4rem',
+                      height: '28px',
+                      padding: '0.2rem 0.45rem',
                       fontSize: '0.8rem',
                       fontWeight: 700,
-                      background: invoiceForm.enableRoundOff === false ? '#f1f5f9' : '#f8fafc',
-                      border: '1px solid #cbd5e1',
+                      background: 'rgba(11, 17, 32, 0.88)',
+                      border: '1px solid rgba(255, 255, 255, 0.16)',
                       borderRadius: '5px',
-                      color: '#0f172a',
+                      color: '#ffffff',
                       textAlign: 'right',
                       fontVariantNumeric: 'tabular-nums'
                     }}
@@ -6518,34 +6496,34 @@ export default function EliteBillingDepartment({
 
               {/* TDS (Tax Deducted at Source) Compact Card */}
               <div style={{
-                padding: '0.45rem 0.65rem',
-                borderRadius: '6px',
-                background: invoiceForm.enableTds ? '#fffbeb' : '#f8fafc',
-                border: `1px solid ${invoiceForm.enableTds ? '#fde68a' : '#e2e8f0'}`,
+                padding: '0.55rem 0.7rem',
+                borderRadius: '8px',
+                background: invoiceForm.enableTds ? 'rgba(245, 158, 11, 0.12)' : 'rgba(15, 23, 42, 0.65)',
+                border: `1px solid ${invoiceForm.enableTds ? 'rgba(251, 191, 36, 0.42)' : 'rgba(255, 255, 255, 0.12)'}`,
                 transition: 'all 0.15s ease'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', color: invoiceForm.enableTds ? '#92400e' : '#475569' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: invoiceForm.enableTds ? '#fde68a' : '#cbd5e1' }}>
                     <input
                       type="checkbox"
                       checked={!!invoiceForm.enableTds}
                       onChange={e => setInvoiceForm(f => ({ ...f, enableTds: e.target.checked, manualTdsAmount: undefined, tdsRate: f.tdsRate || 2, _tdsPreset: f._tdsPreset || '194C_2' }))}
-                      style={{ accentColor: '#d97706' }}
+                      style={{ accentColor: '#f59e0b' }}
                     />
                     <span>TDS</span>
-                    <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: 4, background: invoiceForm.enableTds ? '#fef3c7' : '#e2e8f0', color: invoiceForm.enableTds ? '#b45309' : '#64748b', fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.66rem', padding: '1px 6px', borderRadius: 4, background: invoiceForm.enableTds ? 'rgba(251, 191, 36, 0.22)' : 'rgba(255, 255, 255, 0.08)', color: invoiceForm.enableTds ? '#fde68a' : '#94a3b8', border: invoiceForm.enableTds ? '1px solid rgba(251, 191, 36, 0.38)' : '1px solid rgba(255, 255, 255, 0.12)', fontWeight: 800 }}>
                       CBDT
                     </span>
                   </label>
                   {invoiceForm.enableTds && (
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#b45309', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
                       - ₹ {Math.round(calculatedInvoice.tdsAmount)}
                     </span>
                   )}
                 </div>
 
                 {invoiceForm.enableTds && (
-                  <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ marginTop: '0.45rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1.8fr) minmax(55px, 0.75fr) minmax(75px, 1.15fr)', gap: '0.4rem', alignItems: 'center' }}>
                       <select
                         value={invoiceForm._tdsPreset || (invoiceForm.tdsSection === '194C' ? (Number(invoiceForm.tdsRate) === 1 ? '194C_1' : '194C_2') : invoiceForm.tdsSection === '194Q' ? '194Q' : invoiceForm.tdsSection === '194J' ? (Number(invoiceForm.tdsRate) === 10 ? '194J_10' : '194J_2') : '194C_2')}
@@ -6563,14 +6541,14 @@ export default function EliteBillingDepartment({
                         }}
                         style={{
                           width: '100%',
-                          height: '26px',
-                          padding: '0.15rem 0.35rem',
-                          fontSize: '0.75rem',
+                          height: '30px',
+                          padding: '0.15rem 0.4rem',
+                          fontSize: '0.76rem',
                           fontWeight: 600,
-                          borderRadius: '5px',
-                          border: '1px solid #cbd5e1',
-                          background: '#ffffff',
-                          color: '#0f172a'
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.18)',
+                          background: 'rgba(11, 17, 32, 0.92)',
+                          color: '#ffffff'
                         }}
                       >
                         <option value="194C_2">Sec 194C (2% - Non Co / Firm)</option>
@@ -6581,7 +6559,7 @@ export default function EliteBillingDepartment({
                         <option value="CUSTOM">Custom % / Manual</option>
                       </select>
 
-                      <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '5px', padding: '0 0.35rem', height: '26px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.92)', border: '1px solid rgba(255, 255, 255, 0.18)', borderRadius: '6px', padding: '0 0.4rem', height: '30px' }}>
                         <input
                           type="number"
                           step="0.01"
@@ -6591,22 +6569,22 @@ export default function EliteBillingDepartment({
                           style={{
                             width: '100%',
                             padding: 0,
-                            fontSize: '0.76rem',
+                            fontSize: '0.78rem',
                             fontWeight: 700,
                             textAlign: 'right',
                             border: 'none',
                             background: 'transparent',
-                            color: '#0f172a',
+                            color: '#ffffff',
                             outline: 'none',
                             fontVariantNumeric: 'tabular-nums'
                           }}
                           title="TDS Rate %"
                         />
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: 2, fontWeight: 600 }}>%</span>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: 3, fontWeight: 700 }}>%</span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #d97706', borderRadius: '5px', padding: '0 0.35rem', height: '26px' }}>
-                        <span style={{ fontSize: '0.74rem', color: '#b45309', marginRight: 2, fontWeight: 800 }}>₹</span>
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 17, 32, 0.92)', border: '1px solid rgba(251, 191, 36, 0.5)', borderRadius: '6px', padding: '0 0.4rem', height: '30px' }}>
+                        <span style={{ fontSize: '0.76rem', color: '#fbbf24', marginRight: 3, fontWeight: 800 }}>₹</span>
                         <input
                           type="number"
                           step="1"
@@ -6623,12 +6601,12 @@ export default function EliteBillingDepartment({
                           style={{
                             width: '100%',
                             padding: 0,
-                            fontSize: '0.78rem',
+                            fontSize: '0.8rem',
                             fontWeight: 800,
                             textAlign: 'right',
                             border: 'none',
                             background: 'transparent',
-                            color: '#b45309',
+                            color: '#fbbf24',
                             outline: 'none',
                             fontVariantNumeric: 'tabular-nums'
                           }}
@@ -6636,7 +6614,7 @@ export default function EliteBillingDepartment({
                         />
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: '#92400e', fontWeight: 500, paddingLeft: 1 }}>
+                    <div style={{ fontSize: '0.71rem', color: '#fde68a', fontWeight: 600, paddingLeft: 2 }}>
                       ℹ️ Calculated on Taxable Subtotal (₹{calculatedInvoice.subtotal.toFixed(2)}). Deducted on payment.
                     </div>
                   </div>
@@ -6645,22 +6623,23 @@ export default function EliteBillingDepartment({
 
               {/* Unified Executive Summary Card (Grand Total + Net Receivable + In Words) */}
               <div style={{
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.92) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
                 borderRadius: '8px',
                 padding: '0.7rem 0.85rem',
                 color: '#ffffff',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.45rem',
-                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.12)'
+                boxShadow: '0 2px 8px rgba(2, 6, 23, 0.35)'
               }}>
                 {/* Grand Total Row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       INVOICE GRAND TOTAL
                     </div>
-                    <div style={{ fontSize: '0.66rem', color: '#64748b' }}>Inclusive of all taxes</div>
+                    <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>Inclusive of all taxes</div>
                   </div>
                   <div key={calculatedInvoice.grandTotal} className="reactive-value-pulse" style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
                     ₹ {calculatedInvoice.grandTotal.toFixed(2)}
@@ -6689,20 +6668,20 @@ export default function EliteBillingDepartment({
                 {/* Amount In Words */}
                 <div style={{
                   fontSize: '0.7rem',
-                  color: '#94a3b8',
+                  color: '#cbd5e1',
                   paddingTop: '0.35rem',
                   borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                   lineHeight: 1.3
                 }}>
-                  <strong style={{ color: '#cbd5e1' }}>In Words: </strong>
+                  <strong style={{ color: '#ffffff' }}>In Words: </strong>
                   <span style={{ fontStyle: 'italic' }}>{numToWords(calculatedInvoice.grandTotal)}</span>
                 </div>
               </div>
 
               {/* Advance Paid & Balance Due */}
-              <div style={{ paddingTop: '0.45rem', borderTop: '1px dashed #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'center' }}>
+              <div style={{ paddingTop: '0.45rem', borderTop: '1px dashed rgba(255, 255, 255, 0.14)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'center' }}>
                 <div>
-                  <label style={{ ...labelStyle, color: '#475569', fontSize: '0.7rem', marginBottom: '0.2rem' }}>Advance / Paid (₹)</label>
+                  <label style={{ ...labelStyle, color: '#cbd5e1', fontSize: '0.7rem', marginBottom: '0.2rem' }}>Advance / Paid (₹)</label>
                   <input
                     type="number"
                     value={invoiceForm.paidAmount}
@@ -6710,12 +6689,12 @@ export default function EliteBillingDepartment({
                     placeholder="0.00"
                     style={{
                       ...inputStyle,
-                      height: '30px',
+                      height: '32px',
                       padding: '0.2rem 0.5rem',
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '5px',
-                      color: '#0f172a',
+                      background: 'rgba(11, 17, 32, 0.88)',
+                      border: '1px solid rgba(255, 255, 255, 0.16)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
                       fontWeight: 700,
                       fontSize: '0.85rem',
                       fontVariantNumeric: 'tabular-nums'
@@ -6723,7 +6702,7 @@ export default function EliteBillingDepartment({
                   />
                 </div>
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 1 }}>
+                  <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 1 }}>
                     BALANCE DUE
                   </div>
                   <div
@@ -6732,7 +6711,7 @@ export default function EliteBillingDepartment({
                     style={{
                       fontSize: '1.15rem',
                       fontWeight: 900,
-                      color: calculatedInvoice.balanceDue > 0 ? '#dc2626' : '#059669',
+                      color: calculatedInvoice.balanceDue > 0 ? '#f87171' : '#34d399',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
@@ -6740,7 +6719,7 @@ export default function EliteBillingDepartment({
                     }}
                   >
                     {calculatedInvoice.balanceDue <= 0 ? (
-                      <span style={{ fontSize: '0.75rem', background: '#ecfdf5', color: '#059669', padding: '0.2rem 0.5rem', borderRadius: 5, border: '1px solid #a7f3d0', fontWeight: 800 }}>
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.16)', color: '#6ee7b7', padding: '0.2rem 0.5rem', borderRadius: 5, border: '1px solid rgba(52, 211, 153, 0.4)', fontWeight: 800 }}>
                         ✓ PAID IN FULL
                       </span>
                     ) : (
@@ -6751,12 +6730,12 @@ export default function EliteBillingDepartment({
               </div>
 
               {/* Bottom Quick Actions */}
-              <div style={{ marginTop: '0.6rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <div style={{ marginTop: '0.6rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
                   className="btn-secondary"
                   onClick={() => setActiveTab('invoices')}
-                  style={{ padding: '0.55rem 1.2rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155' }}
+                  style={{ padding: '0.55rem 1.2rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0' }}
                 >
                   Cancel
                 </button>
@@ -7236,39 +7215,98 @@ export default function EliteBillingDepartment({
           companyEntity={companyEntity}
           autoOpenCreate={autoOpenExpenseModal}
           onModalOpened={() => setAutoOpenExpenseModal(false)}
+          embedded={true}
         />
       )}
       {activeTab === 'purchase' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
-          {/* Top Metrics Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #4f46e5', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Purchase Orders</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4f46e5', marginTop: 4 }}>{purchases.length}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Logged Inward Bills</div>
+          {/* ── TIER 3: SIDE SCROLLING CALCULATION & PURCHASE METRICS TRACK ── */}
+          <div className="glass-scroll-track" style={{ marginBottom: '0.5rem' }}>
+            {/* Card 1: Total Purchase Orders */}
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Purchase Orders</span>
+                <Receipt size={16} color="#818cf8" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#818cf8', marginTop: '4px' }}>
+                {purchases.length}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+                Logged Inward Bills
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Purchase Amount</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0284c7', marginTop: 4 }}>₹{totalPurchaseValue.toLocaleString('en-IN')}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Gross Material Cost</div>
+            {/* Card 2: Total Purchase Amount */}
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Total Purchase Cost</span>
+                <DollarSign size={16} color="#38bdf8" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
+                ₹{totalPurchaseValue.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+                Gross Material Cost
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Inward Volume</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#16a34a', marginTop: 4 }}>{totalInwardQty.toLocaleString('en-IN')} Units</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Accumulated Material</div>
+            {/* Card 3: Total Inward Volume */}
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Inward Volume</span>
+                <Package size={16} color="#34d399" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#34d399', marginTop: '4px' }}>
+                {totalInwardQty.toLocaleString('en-IN')} Units
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+                Accumulated Material
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Vendors</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#8b5cf6', marginTop: 4 }}>{uniqueVendorsCount}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Registered Suppliers</div>
+            {/* Card 4: Active Vendors */}
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Active Vendors</span>
+                <Users size={16} color="#c084fc" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>
+                {uniqueVendorsCount}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+                Registered Suppliers
+              </div>
+            </div>
+
+            {/* Card 5: Contra Adjustments */}
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Contra Entries</span>
+                <ArrowLeftRight size={16} color="#fbbf24" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fbbf24', marginTop: '4px' }}>
+                {purchases.filter(p => p.entryType === 'contra' || p.purchaseType === 'contra').length}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+                Party Offsets Recorded
+              </div>
             </div>
           </div>
 
-          {/* Filter Bar & Action Header */}
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '0.85rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          {/* ── TIER 4: ACTION TOOLBAR WITH VIEW TOGGLE (Rule 5: Table | Cards) ── */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.06)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            padding: '0.75rem 1rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
             <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
               {/* Search Bar */}
               <div style={{ position: 'relative', minWidth: 220, flex: '1 1 220px', maxWidth: 320 }}>
@@ -7278,14 +7316,26 @@ export default function EliteBillingDepartment({
                   placeholder="Search Purchase No (DP-01), Vendor, Item..."
                   value={purchaseSearch}
                   onChange={e => setPurchaseSearch(e.target.value)}
-                  style={{ width: '100%', paddingLeft: 32, paddingRight: purchaseSearch ? 28 : 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  style={{
+                    width: '100%',
+                    paddingLeft: 32,
+                    paddingRight: purchaseSearch ? 28 : 10,
+                    paddingTop: 7,
+                    paddingBottom: 7,
+                    fontSize: '0.82rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.18)',
+                    background: 'rgba(15, 23, 42, 0.65)',
+                    color: '#ffffff',
+                    outline: 'none'
+                  }}
                 />
                 {purchaseSearch && (
                   <X size={14} onClick={() => setPurchaseSearch('')} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#94a3b8' }} />
                 )}
               </div>
 
-              {/* Standard ERP DateRangePicker matching all other screens */}
+              {/* Standard ERP DateRangePicker */}
               <DateRangePicker
                 preset={purchaseDatePreset}
                 onChange={({ preset: p }) => {
@@ -7320,14 +7370,14 @@ export default function EliteBillingDepartment({
                     onClick={clearPurchaseFilters}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 9px',
-                      fontSize: '0.76rem', fontWeight: 700, color: '#ef4444', background: '#fef2f2',
-                      border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer'
+                      fontSize: '0.76rem', fontWeight: 700, color: '#f87171', background: 'rgba(239, 68, 68, 0.16)',
+                      border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '6px', cursor: 'pointer'
                     }}
                     title="Reset all filters"
                   >
                     <RotateCcw size={12} /> Clear
                   </button>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600 }}>
                     ({filteredPurchases.length} of {purchases.length})
                   </span>
                 </div>
@@ -7335,77 +7385,20 @@ export default function EliteBillingDepartment({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-              {/* Segmented Entry Filter Tabs */}
-              <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--bg-input, #f1f5f9)', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', gap: '2px' }}>
-                <button
-                  type="button"
-                  onClick={() => setPurchaseTabFilter('all')}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: purchaseTabFilter === 'all' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: purchaseTabFilter === 'all' ? '#ffffff' : 'transparent',
-                    color: purchaseTabFilter === 'all' ? '#0f172a' : '#64748b',
-                    boxShadow: purchaseTabFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  All ({purchases.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPurchaseTabFilter('general')}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: purchaseTabFilter === 'general' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: purchaseTabFilter === 'general' ? '#ffffff' : 'transparent',
-                    color: purchaseTabFilter === 'general' ? '#2563eb' : '#64748b',
-                    boxShadow: purchaseTabFilter === 'general' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  📄 General ({purchases.filter(p => p.entryType !== 'contra' && p.purchaseType !== 'contra').length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPurchaseTabFilter('contra')}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: purchaseTabFilter === 'contra' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: purchaseTabFilter === 'contra' ? '#ffffff' : 'transparent',
-                    color: purchaseTabFilter === 'contra' ? '#7c3aed' : '#64748b',
-                    boxShadow: purchaseTabFilter === 'contra' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ⇄ Contra ({purchases.filter(p => p.entryType === 'contra' || p.purchaseType === 'contra').length})
-                </button>
-              </div>
-
               <button
                 type="button"
                 onClick={() => setActiveTab('vendors')}
-                className="ent-tab-btn"
                 title="View & Manage All Registered Vendors"
                 style={{
                   cursor: 'pointer',
                   fontWeight: 700,
                   fontSize: '0.8rem',
-                  border: '1px solid var(--border-light, #cbd5e1)',
-                  background: '#ffffff',
-                  color: '#475569',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
                   borderRadius: '8px',
                   height: '34px',
                   padding: '0 0.95rem',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -7413,37 +7406,6 @@ export default function EliteBillingDepartment({
                 }}
               >
                 <span>Vendors ({vendorsList.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  setEditingPurchaseId(null);
-                  setPurchaseEntryType('contra');
-                  const nextNo = computeNextPurchaseNo(purchases, companyEntity, true);
-                  setContraForm({
-                    voucherNo: nextNo,
-                    date: new Date().toISOString().split('T')[0],
-                    contraMode: 'party_offset',
-                    debitPartyType: 'vendor',
-                    debitParty: '',
-                    creditPartyType: 'customer',
-                    creditParty: '',
-                    referenceNo: '',
-                    amount: '',
-                    narration: ''
-                  });
-                  setShowPurchaseModal(true);
-                }}
-                style={{
-                  padding: '0.55rem 0.95rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                  border: '1px solid #7c3aed', background: '#f5f3ff', color: '#7c3aed',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Create Contra Entry"
-              >
-                <ArrowLeftRight size={15} /> + Contra Entry
               </button>
 
               <button
@@ -7492,19 +7454,41 @@ export default function EliteBillingDepartment({
                   setShowPurchaseModal(true);
                 }}
                 style={{
-                  padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                  border: 'none', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)',
+                  padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  border: 'none', background: 'linear-gradient(135deg, #0284c7, #2563eb)', color: '#ffffff',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)',
                   whiteSpace: 'nowrap'
                 }}
               >
                 <Plus size={16} /> + New Purchase Inward Entry
               </button>
+
+              {/* View Mode Toggle: Table View vs Card View */}
+              <div className="glass-view-toggle">
+                <button
+                  type="button"
+                  className={purchaseViewMode === 'table' ? 'active' : ''}
+                  onClick={() => setPurchaseViewMode('table')}
+                  title="Switch to High-Density Table View"
+                >
+                  <FileText size={14} />
+                  <span>Table</span>
+                </button>
+                <button
+                  type="button"
+                  className={purchaseViewMode === 'cards' ? 'active' : ''}
+                  onClick={() => setPurchaseViewMode('cards')}
+                  title="Switch to Card Grid View"
+                >
+                  <Layers size={14} />
+                  <span>Cards</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Purchase History Table */}
-          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
+          {/* Purchase Content: Table View vs Card View */}
+          <div style={{ background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.12)', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
                 <tr>
@@ -7558,41 +7542,41 @@ export default function EliteBillingDepartment({
                     const isPartial = p.paymentStatus === 'PARTIALLY_PAID' || p.paymentStatus === 'PARTIAL' || (paidAmt > 0 && balDue > 0);
 
                     return (
-                      <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b', background: getRowHighlightStyle(selectedPurchaseIds.includes(p._id || p.id)) }}>
+                      <tr key={p._id || p.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#ffffff', background: getRowHighlightStyle(selectedPurchaseIds.includes(p._id || p.id)) }}>
                         <RowCheckboxTd
                           checked={selectedPurchaseIds.includes(p._id || p.id)}
                           onChange={() => handleToggleSelectPurchase(p._id || p.id)}
                         />
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 800, color: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#7c3aed' : '#4f46e5', fontSize: '0.92rem' }}>{p.purchaseNo}</span>
+                            <span style={{ fontWeight: 800, color: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#c084fc' : '#38bdf8', fontSize: '0.92rem' }}>{p.purchaseNo}</span>
                             <span style={{
                               fontSize: '0.67rem',
                               fontWeight: 700,
                               padding: '2px 7px',
                               borderRadius: '4px',
-                              background: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#f5f3ff' : (/asset/i.test(p.purchaseType) ? '#f5f3ff' : /expense/i.test(p.purchaseType) ? '#fef3c7' : /inventory/i.test(p.purchaseType) ? '#eff6ff' : '#f1f5f9'),
-                              color: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#7c3aed' : (/asset/i.test(p.purchaseType) ? '#7c3aed' : /expense/i.test(p.purchaseType) ? '#b45309' : /inventory/i.test(p.purchaseType) ? '#1d4ed8' : '#334155'),
-                              border: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '1px solid #ddd6fe' : (/asset/i.test(p.purchaseType) ? '1px solid #ddd6fe' : /expense/i.test(p.purchaseType) ? '1px solid #fde68a' : /inventory/i.test(p.purchaseType) ? '1px solid #bfdbfe' : '1px solid #cbd5e1')
+                              background: (p.entryType === 'contra' || p.purchaseType === 'contra') ? 'rgba(192, 132, 252, 0.16)' : (/asset/i.test(p.purchaseType) ? 'rgba(192, 132, 252, 0.16)' : /expense/i.test(p.purchaseType) ? 'rgba(251, 191, 36, 0.16)' : /inventory/i.test(p.purchaseType) ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.08)'),
+                              color: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '#c084fc' : (/asset/i.test(p.purchaseType) ? '#c084fc' : /expense/i.test(p.purchaseType) ? '#fbbf24' : /inventory/i.test(p.purchaseType) ? '#38bdf8' : '#e2e8f0'),
+                              border: (p.entryType === 'contra' || p.purchaseType === 'contra') ? '1px solid rgba(192, 132, 252, 0.35)' : (/asset/i.test(p.purchaseType) ? '1px solid rgba(192, 132, 252, 0.35)' : /expense/i.test(p.purchaseType) ? '1px solid rgba(251, 191, 36, 0.35)' : /inventory/i.test(p.purchaseType) ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(255, 255, 255, 0.15)')
                             }}>
                               {(p.entryType === 'contra' || p.purchaseType === 'contra') ? '⇄ CONTRA' : (/asset/i.test(p.purchaseType) ? '🏛️ Asset' : /expense/i.test(p.purchaseType) ? '💼 Expense' : /inventory/i.test(p.purchaseType) ? '📦 Inventory' : `🏷️ ${p.purchaseType || 'Purchase'}`)}
                             </span>
                           </div>
                           {p.billNo && (
-                            <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: 3 }}>
-                              Bill: <strong style={{ color: '#0f172a' }}>{p.billNo}</strong>
+                            <div style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.7)', marginTop: 3 }}>
+                              Bill: <strong style={{ color: '#ffffff' }}>{p.billNo}</strong>
                             </div>
                           )}
                           {p.ourChallanNo && (
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
-                              Challan: <strong style={{ color: '#0284c7' }}>{p.ourChallanNo}</strong>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.7)', marginTop: 2 }}>
+                              Challan: <strong style={{ color: '#38bdf8' }}>{p.ourChallanNo}</strong>
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '0.85rem 0.8rem', color: '#64748b', verticalAlign: 'top', fontSize: '0.78rem' }}>
+                        <td style={{ padding: '0.85rem 0.8rem', color: 'rgba(255, 255, 255, 0.85)', verticalAlign: 'top', fontSize: '0.78rem' }}>
                           <div>{p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : ''}</div>
                           {p.dueDate && (
-                            <div style={{ fontSize: '0.68rem', color: '#d97706', marginTop: 2 }}>
+                            <div style={{ fontSize: '0.68rem', color: '#fbbf24', marginTop: 2 }}>
                               Due: {typeof p.dueDate === 'string' && p.dueDate.includes('T') ? p.dueDate.split('T')[0] : (p.dueDate instanceof Date ? p.dueDate.toISOString().split('T')[0] : p.dueDate)}
                             </div>
                           )}
@@ -7600,21 +7584,21 @@ export default function EliteBillingDepartment({
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
                           {(p.entryType === 'contra' || p.purchaseType === 'contra') && p.contraDetails ? (
                             <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#047857' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#34d399' }}>
                                 Dr: {p.contraDetails.debitParty}
                               </div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#b91c1c', marginTop: '3px' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#f87171', marginTop: '3px' }}>
                                 Cr: {p.contraDetails.creditParty}
                               </div>
                             </div>
                           ) : (
                             <>
-                              <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.vendor?.businessName || p.vendorName}</div>
+                              <div style={{ fontWeight: 800, color: '#ffffff' }}>{p.vendor?.businessName || p.vendorName}</div>
                               {p.vendor?.name && p.vendor?.name !== p.vendor?.businessName && (
-                                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Contact: {p.vendor.name}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)' }}>Contact: {p.vendor.name}</div>
                               )}
                               {p.vendor?.gstin && (
-                                <div style={{ fontSize: '0.68rem', color: '#4f46e5', fontWeight: 700, marginTop: 2 }}>
+                                <div style={{ fontSize: '0.68rem', color: '#c084fc', fontWeight: 700, marginTop: 2 }}>
                                   GSTIN: {p.vendor.gstin}
                                 </div>
                               )}
@@ -7624,14 +7608,14 @@ export default function EliteBillingDepartment({
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
                           {(p.entryType === 'contra' || p.purchaseType === 'contra') ? (
                             <div>
-                              <div style={{ fontWeight: 800, color: '#7c3aed', fontSize: '0.82rem' }}>
+                              <div style={{ fontWeight: 800, color: '#c084fc', fontSize: '0.82rem' }}>
                                 {p.contraDetails?.contraMode === 'party_offset' ? 'Party Settlement / Offset' : 'Internal Bank / Cash Transfer'}
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '3px', fontStyle: 'italic' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.75)', marginTop: '3px', fontStyle: 'italic' }}>
                                 "{p.contraDetails?.narration || p.notes || 'Internal fund transfer / adjustment'}"
                               </div>
                               {(p.contraDetails?.referenceNo || (p.billNo && p.billNo !== 'CONTRA')) && (
-                                <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700, marginTop: '3px' }}>
+                                <div style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 700, marginTop: '3px' }}>
                                   Ref: {p.contraDetails?.referenceNo || p.billNo}
                                 </div>
                               )}
@@ -7639,28 +7623,28 @@ export default function EliteBillingDepartment({
                           ) : Array.isArray(p.items) && p.items.length > 0 ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               {p.items.slice(0, 3).map((it, idx) => (
-                                <div key={idx} style={{ fontSize: '0.8rem' }}>
-                                  <span style={{ fontWeight: 700 }}>• {it.itemName}</span>
-                                  <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '5px' }}>
+                                <div key={idx} style={{ fontSize: '0.8rem', color: '#ffffff' }}>
+                                  <span style={{ fontWeight: 700, color: '#ffffff' }}>• {it.itemName}</span>
+                                  <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)', marginLeft: '5px' }}>
                                     ({it.qty || it.quantity || 1} {it.unit || 'Mtr'} @ ₹{it.unitPrice || it.rate || 0})
                                   </span>
                                   {it.description && (
-                                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '10px' }}>
+                                    <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginLeft: '10px' }}>
                                       {it.description}
                                     </div>
                                   )}
                                 </div>
                               ))}
                               {p.items.length > 3 && (
-                                <div style={{ fontSize: '0.7rem', color: '#6366f1', fontWeight: 700 }}>
+                                <div style={{ fontSize: '0.7rem', color: '#818cf8', fontWeight: 700 }}>
                                   +{p.items.length - 3} more items
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <span style={{ fontWeight: 700 }}>{p.itemName || 'Material Purchase'}</span>
+                            <span style={{ fontWeight: 700, color: '#ffffff' }}>{p.itemName || 'Material Purchase'}</span>
                           )}
-                          {p.notes && !p.contraDetails && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '3px' }}>{p.notes}</div>}
+                          {p.notes && !p.contraDetails && <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '3px' }}>{p.notes}</div>}
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
                           {(() => {
@@ -7670,9 +7654,9 @@ export default function EliteBillingDepartment({
                               const unitStr = units.length === 1 ? units[0] : 'Units';
                               return (
                                 <div>
-                                  <span style={{ fontWeight: 800, color: '#1e293b' }}>{totalQty > 0 ? `${totalQty} ${unitStr}` : `${p.items.length} Items`}</span>
+                                  <span style={{ fontWeight: 800, color: '#ffffff' }}>{totalQty > 0 ? `${totalQty} ${unitStr}` : `${p.items.length} Items`}</span>
                                   {p.items.length > 1 && (
-                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>({p.items.length} items)</div>
+                                    <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.65)' }}>({p.items.length} items)</div>
                                   )}
                                 </div>
                               );
@@ -7680,18 +7664,18 @@ export default function EliteBillingDepartment({
                             return `${p.quantity || 0} ${p.unit || 'Mtr'}`;
                           })()}
                         </td>
-                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 900, color: '#38bdf8', verticalAlign: 'top' }}>
                           <div>₹{billTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           {(p.taxType === 'IGST' ? p.igstAmount > 0 : p.totalTax > 0) && (
-                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4f46e5', marginTop: 2 }}>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#c084fc', marginTop: 2 }}>
                               Tax: ₹{Number(p.totalTax || p.gstAmount || 0).toFixed(2)}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 700, color: '#34d399', verticalAlign: 'top' }}>
                           ₹{paidAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 800, color: balDue > 0 ? '#ef4444' : '#16a34a', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 800, color: balDue > 0 ? '#f87171' : '#34d399', verticalAlign: 'top' }}>
                           ₹{balDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'middle' }}>
@@ -7784,91 +7768,21 @@ export default function EliteBillingDepartment({
 
       {/* ── NEW / EDIT PURCHASE ENTRY GENERATOR MODAL (MIRRORING INVOICE WITH VENDOR DETAILS) ── */}
       {showPurchaseModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '1080px', maxHeight: '92vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-light, #cbd5e1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', color: 'var(--text-primary, #1e293b)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div className="glass-modal-card" style={{ width: '100%', maxWidth: '1080px', maxHeight: '92vh', overflowY: 'auto', background: 'rgba(15, 23, 42, 0.92)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.14)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.65)', color: '#ffffff', backdropFilter: 'blur(20px)' }}>
 
             {/* Header */}
-            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--border-light, #e2e8f0)', background: purchaseEntryType === 'contra' ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 }}>
+            <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.85), rgba(29, 78, 216, 0.85))', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20, backdropFilter: 'blur(16px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                {purchaseEntryType === 'contra' ? <ArrowLeftRight size={22} /> : <ShoppingBag size={22} />}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
-                      {purchaseEntryType === 'contra'
-                        ? (editingPurchaseId ? `Edit Contra Entry — ${contraForm.voucherNo || 'CNTR'}` : `New Contra Entry (${contraForm.voucherNo || computeNextPurchaseNo(purchases, companyEntity, true)})`)
-                        : (editingPurchaseId ? `Edit Purchase Bill — ${purchaseForm.purchaseNo}` : `New Purchase Bill (${purchaseForm.purchaseNo || 'DP-01'})`)}
-                    </h3>
-                    <EntityBrandBadge entityId={companyEntity} />
-                  </div>
-                  <div style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: 2 }}>
-                    {purchaseEntryType === 'contra' ? 'Internal bank transfers, cash movements, and party balance adjustments' : 'Inward bill entry for inventory, stock materials, and expenses'}
-                  </div>
+                <ShoppingBag size={22} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, color: '#ffffff' }}>
+                    {editingPurchaseId ? `Edit Purchase Bill — ${purchaseForm.purchaseNo}` : `New Purchase Bill (${purchaseForm.purchaseNo || 'DP-01'})`}
+                  </h3>
+                  <EntityBrandBadge entityId={companyEntity} />
                 </div>
               </div>
-              <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
-            </div>
-
-            {/* Segmented Mode Switcher */}
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              padding: '0.85rem 1.5rem',
-              background: 'var(--bg-subtle, #f8fafc)',
-              borderBottom: '1px solid var(--border-light, #e2e8f0)'
-            }}>
-              <button
-                type="button"
-                onClick={() => setPurchaseEntryType('general')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: purchaseEntryType === 'general' ? '2px solid #4f46e5' : '1px solid #cbd5e1',
-                  background: purchaseEntryType === 'general' ? '#eef2ff' : '#ffffff',
-                  color: purchaseEntryType === 'general' ? '#4f46e5' : '#64748b',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  boxShadow: purchaseEntryType === 'general' ? '0 2px 6px rgba(79,70,229,0.15)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <FileSpreadsheet size={18} />
-                <span>📄 General Purchase Bill</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPurchaseEntryType('contra');
-                  if (!contraForm.voucherNo) {
-                    setContraForm(c => ({ ...c, voucherNo: computeNextPurchaseNo(purchases, companyEntity, true) }));
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: purchaseEntryType === 'contra' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
-                  background: purchaseEntryType === 'contra' ? '#f5f3ff' : '#ffffff',
-                  color: purchaseEntryType === 'contra' ? '#7c3aed' : '#64748b',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  boxShadow: purchaseEntryType === 'contra' ? '0 2px 6px rgba(124,58,237,0.15)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <ArrowLeftRight size={18} />
-                <span>⇄ Contra Entry</span>
-              </button>
+              <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'rgba(255, 255, 255, 0.12)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', width: 32, height: 32, color: '#ffffff', fontSize: '1.1rem', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
 
             <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -7879,13 +7793,13 @@ export default function EliteBillingDepartment({
                   <div style={{
                     display: 'flex',
                     gap: '1.5rem',
-                    background: 'rgba(124, 58, 237, 0.05)',
+                    background: 'rgba(124, 58, 237, 0.1)',
                     padding: '0.85rem 1.1rem',
                     borderRadius: '10px',
-                    border: '1px solid rgba(124, 58, 237, 0.2)',
+                    border: '1px solid rgba(167, 139, 250, 0.28)',
                     flexWrap: 'wrap'
                   }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', color: contraForm.contraMode === 'bank_cash' ? '#7c3aed' : '#475569' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', color: contraForm.contraMode === 'bank_cash' ? '#c4b5fd' : '#94a3b8' }}>
                       <input
                         type="radio"
                         name="contraMode"
@@ -7901,7 +7815,7 @@ export default function EliteBillingDepartment({
                       />
                       <span>Internal Bank / Cash Transfer</span>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', color: contraForm.contraMode === 'party_offset' ? '#7c3aed' : '#475569' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', color: contraForm.contraMode === 'party_offset' ? '#c4b5fd' : '#94a3b8' }}>
                       <input
                         type="radio"
                         name="contraMode"
@@ -7920,7 +7834,7 @@ export default function EliteBillingDepartment({
                   </div>
 
                   {/* Metadata Row: Voucher No, Date, Entity */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', background: 'rgba(11, 17, 32, 0.65)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                     <div>
                       <label style={labelStyle}>Voucher No. *</label>
                       <input
@@ -7928,7 +7842,7 @@ export default function EliteBillingDepartment({
                         value={contraForm.voucherNo}
                         onChange={e => setContraForm(c => ({ ...c, voucherNo: e.target.value }))}
                         placeholder="e.g. CNTR-01"
-                        style={{ ...inputStyle, fontWeight: 700, color: '#7c3aed' }}
+                        style={{ ...inputStyle, fontWeight: 700, color: '#c4b5fd' }}
                       />
                     </div>
                     <div>
@@ -7946,7 +7860,7 @@ export default function EliteBillingDepartment({
                         type="text"
                         disabled
                         value={companyEntity || 'Elite Digital Prints'}
-                        style={{ ...inputStyle, background: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
+                        style={{ ...inputStyle, background: 'rgba(15, 23, 42, 0.6)', cursor: 'not-allowed', color: '#94a3b8' }}
                       />
                     </div>
                   </div>
@@ -7955,16 +7869,16 @@ export default function EliteBillingDepartment({
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
                     {/* Debit Box */}
                     <div style={{
-                      background: 'rgba(5, 150, 105, 0.04)',
+                      background: 'rgba(16, 185, 129, 0.08)',
                       padding: '1.1rem',
                       borderRadius: '10px',
-                      border: '1.5px solid rgba(5, 150, 105, 0.3)'
+                      border: '1.5px solid rgba(52, 211, 153, 0.35)'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           Debit (Dr.) Account
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: '#059669', background: 'rgba(5, 150, 105, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.68rem', color: '#6ee7b7', background: 'rgba(16, 185, 129, 0.16)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                           Received In / To Account
                         </span>
                       </div>
@@ -8047,16 +7961,16 @@ export default function EliteBillingDepartment({
 
                     {/* Credit Box */}
                     <div style={{
-                      background: 'rgba(220, 38, 38, 0.04)',
+                      background: 'rgba(239, 68, 68, 0.08)',
                       padding: '1.1rem',
                       borderRadius: '10px',
-                      border: '1.5px solid rgba(220, 38, 38, 0.3)'
+                      border: '1.5px solid rgba(248, 113, 113, 0.35)'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           Credit (Cr.) Account
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: '#dc2626', background: 'rgba(220, 38, 38, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.68rem', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.16)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                           Paid Out / From Account
                         </span>
                       </div>
@@ -8139,13 +8053,13 @@ export default function EliteBillingDepartment({
                   </div>
 
                   {/* Amount & Reference Details */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', background: 'rgba(11, 17, 32, 0.65)', padding: '1.1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                     <div>
-                      <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#0f172a' }}>
+                      <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#cbd5e1' }}>
                         Amount (₹) *
                       </label>
                       <div style={{ position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: '1.1rem', color: '#7c3aed' }}>₹</span>
+                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: '1.1rem', color: '#a78bfa' }}>₹</span>
                         <input
                           type="number"
                           min="1"
@@ -8158,7 +8072,7 @@ export default function EliteBillingDepartment({
                             paddingLeft: '28px',
                             fontSize: '1.25rem',
                             fontWeight: 800,
-                            color: '#0f172a',
+                            color: '#ffffff',
                             letterSpacing: '0.5px'
                           }}
                         />
@@ -8166,7 +8080,7 @@ export default function EliteBillingDepartment({
                     </div>
 
                     <div>
-                      <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#0f172a' }}>
+                      <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#cbd5e1' }}>
                         Reference Bill / Invoice No.
                       </label>
                       <input
@@ -8176,9 +8090,6 @@ export default function EliteBillingDepartment({
                         placeholder="e.g. Bill #2092 / Inv #401 / Cheque #123456"
                         style={{ ...inputStyle, fontWeight: 700 }}
                       />
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
-                        Optional reference number for cheque, bill, or invoice.
-                      </div>
                     </div>
                   </div>
 
@@ -8188,7 +8099,7 @@ export default function EliteBillingDepartment({
                       <label style={{ ...labelStyle, marginBottom: 0 }}>
                         Narration / Remarks
                       </label>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                         Quick Templates:
                       </span>
                     </div>
@@ -8199,7 +8110,7 @@ export default function EliteBillingDepartment({
                           ...c,
                           narration: `Amount transferred from ${c.creditParty || 'Bank A'} to ${c.debitParty || 'Bank B'}${c.referenceNo ? ` (Ref: ${c.referenceNo})` : ''} for internal fund transfer.`
                         }))}
-                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.16)', background: 'rgba(15, 23, 42, 0.85)', color: '#cbd5e1', cursor: 'pointer' }}
                       >
                         + Bank Transfer
                       </button>
@@ -8209,7 +8120,7 @@ export default function EliteBillingDepartment({
                           ...c,
                           narration: `Cash deposited into ${c.debitParty || 'Bank Account'} from Cash in Hand.`
                         }))}
-                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.16)', background: 'rgba(15, 23, 42, 0.85)', color: '#cbd5e1', cursor: 'pointer' }}
                       >
                         + Cash Deposit
                       </button>
@@ -8219,7 +8130,7 @@ export default function EliteBillingDepartment({
                           ...c,
                           narration: `Cash withdrawn from ${c.creditParty || 'Bank Account'} for office cash expenses.`
                         }))}
-                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.16)', background: 'rgba(15, 23, 42, 0.85)', color: '#cbd5e1', cursor: 'pointer' }}
                       >
                         + Cash Withdrawal
                       </button>
@@ -8229,7 +8140,7 @@ export default function EliteBillingDepartment({
                           ...c,
                           narration: `Amount adjusted between ${c.debitParty || 'Party A'} and ${c.creditParty || 'Party B'}${c.referenceNo ? ` against Ref: ${c.referenceNo}` : ''}.`
                         }))}
-                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.16)', background: 'rgba(15, 23, 42, 0.85)', color: '#cbd5e1', cursor: 'pointer' }}
                       >
                         + Party Settlement
                       </button>
@@ -8244,11 +8155,11 @@ export default function EliteBillingDepartment({
                   </div>
 
                   {/* Buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1rem' }}>
                     <button
                       type="button"
                       onClick={() => setShowPurchaseModal(false)}
-                      style={{ padding: '0.55rem 1.2rem', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ padding: '0.55rem 1.2rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
@@ -8279,7 +8190,7 @@ export default function EliteBillingDepartment({
                 <>
 
               {/* Top Metadata Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', background: 'rgba(79, 70, 229, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(79, 70, 229, 0.15)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', background: 'rgba(11, 17, 32, 0.65)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                 <div>
                   <label style={labelStyle}>Purchasing Entity</label>
                   <select
@@ -8288,9 +8199,9 @@ export default function EliteBillingDepartment({
                     style={{
                       ...inputStyle,
                       fontWeight: 700,
-                      color: '#4f46e5',
-                      background: 'rgba(79, 70, 229, 0.08)',
-                      border: '1px solid rgba(79, 70, 229, 0.3)',
+                      color: '#a5b4fc',
+                      background: 'rgba(79, 70, 229, 0.15)',
+                      border: '1px solid rgba(129, 140, 248, 0.35)',
                       cursor: 'not-allowed'
                     }}
                   >
@@ -8306,9 +8217,9 @@ export default function EliteBillingDepartment({
                     style={{
                       ...inputStyle,
                       fontWeight: 700,
-                      color: /asset/i.test(purchaseForm.purchaseType) ? '#7c3aed' : /expense/i.test(purchaseForm.purchaseType) ? '#d97706' : '#2563eb',
-                      background: /asset/i.test(purchaseForm.purchaseType) ? 'rgba(124, 58, 237, 0.08)' : /expense/i.test(purchaseForm.purchaseType) ? 'rgba(245, 158, 11, 0.08)' : 'rgba(37, 99, 235, 0.08)',
-                      border: /asset/i.test(purchaseForm.purchaseType) ? '1px solid rgba(124, 58, 237, 0.35)' : /expense/i.test(purchaseForm.purchaseType) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(37, 99, 235, 0.35)',
+                      color: /asset/i.test(purchaseForm.purchaseType) ? '#c4b5fd' : /expense/i.test(purchaseForm.purchaseType) ? '#fbbf24' : '#93c5fd',
+                      background: /asset/i.test(purchaseForm.purchaseType) ? 'rgba(124, 58, 237, 0.15)' : /expense/i.test(purchaseForm.purchaseType) ? 'rgba(245, 158, 11, 0.15)' : 'rgba(37, 99, 235, 0.15)',
+                      border: /asset/i.test(purchaseForm.purchaseType) ? '1px solid rgba(167, 139, 250, 0.4)' : /expense/i.test(purchaseForm.purchaseType) ? '1px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(96, 165, 250, 0.4)',
                       cursor: 'pointer'
                     }}
                   >
@@ -8340,7 +8251,7 @@ export default function EliteBillingDepartment({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#4f46e5',
+                        color: '#93c5fd',
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         cursor: 'pointer',
@@ -8357,7 +8268,7 @@ export default function EliteBillingDepartment({
                     required
                     value={purchaseForm.purchaseNo}
                     onChange={e => setPurchaseForm(f => ({ ...f, purchaseNo: e.target.value }))}
-                    style={{ ...inputStyle, fontWeight: 700, letterSpacing: '0.02em', color: '#4f46e5' }}
+                    style={{ ...inputStyle, fontWeight: 700, letterSpacing: '0.02em', color: '#93c5fd' }}
                     placeholder={companyEntity === 'Ethno wear' ? "e.g. EWP-01, EWP-02" : "e.g. DP-01, DP-02"}
                   />
                 </div>
@@ -8396,16 +8307,16 @@ export default function EliteBillingDepartment({
                 </div>
 
                 <div>
-                  <label style={{ ...labelStyle, color: '#6366f1', fontWeight: 800 }}>⚡ GST Tax Type (Dynamic)</label>
+                  <label style={{ ...labelStyle, color: '#a5b4fc', fontWeight: 800 }}>⚡ GST Tax Type (Dynamic)</label>
                   <select
                     value={purchaseForm.taxType}
                     onChange={e => setPurchaseForm(f => ({ ...f, taxType: e.target.value }))}
                     style={{
                       ...inputStyle,
                       fontWeight: '700',
-                      color: '#4f46e5',
-                      background: 'rgba(79, 70, 229, 0.12)',
-                      border: '1px solid rgba(79, 70, 229, 0.4)'
+                      color: '#a5b4fc',
+                      background: 'rgba(79, 70, 229, 0.18)',
+                      border: '1px solid rgba(129, 140, 248, 0.45)'
                     }}
                   >
                     <option value="CGST_SGST">Intra-State (CGST + SGST)</option>
@@ -8415,13 +8326,13 @@ export default function EliteBillingDepartment({
               </div>
 
               {/* Vendor Details (Supplied By) - Mirrors Customer Details */}
-              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem' }}>
+              <div style={{ background: 'rgba(11, 17, 32, 0.65)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '10px', padding: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     🏢 Supplied By (Vendor / Supplier Details)
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                       {vendorsList.length} Registered Vendors
                     </span>
                     <button
@@ -8432,11 +8343,11 @@ export default function EliteBillingDepartment({
                         setShowVendorModal(true);
                       }}
                       style={{
-                        background: '#e0e7ff',
-                        color: '#4338ca',
-                        border: '1px solid #c7d2fe',
+                        background: 'rgba(99, 102, 241, 0.2)',
+                        color: '#c7d2fe',
+                        border: '1px solid rgba(129, 140, 248, 0.45)',
                         borderRadius: '6px',
-                        padding: '2px 8px',
+                        padding: '3px 9px',
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         cursor: 'pointer'
@@ -8549,7 +8460,7 @@ export default function EliteBillingDepartment({
 
                   <div>
                     <label style={labelStyle}>
-                      PIN Code {pincodeLoadingPurchase && <RefreshCw size={11} className="spin" color="#4f46e5" style={{ display: 'inline', marginLeft: 4 }} />}
+                      PIN Code {pincodeLoadingPurchase && <RefreshCw size={11} className="spin" color="#93c5fd" style={{ display: 'inline', marginLeft: 4 }} />}
                     </label>
                     <input
                       type="text"
@@ -8560,7 +8471,6 @@ export default function EliteBillingDepartment({
                       style={{ ...inputStyle, fontWeight: 700, letterSpacing: '1px' }}
                       placeholder="e.g. 395006 or 110024"
                     />
-                    <span style={{ fontSize: '0.65rem', color: '#4f46e5', display: 'block', marginTop: 2 }}>⚡ Auto-fetches City, State & GST</span>
                   </div>
 
                   <div>
@@ -8573,7 +8483,6 @@ export default function EliteBillingDepartment({
                       style={inputStyle}
                       placeholder="e.g. Surat, Delhi, Mumbai"
                     />
-                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>⚡ Auto-sets State & Pincode</span>
                   </div>
 
                   <div>
@@ -8617,9 +8526,9 @@ export default function EliteBillingDepartment({
               </div>
 
               {/* Dynamic Purchase Line Items Table */}
-              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', overflowX: 'auto' }}>
+              <div style={{ background: 'rgba(11, 17, 32, 0.65)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '10px', padding: '1rem', overflowX: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
                     📦 Purchase Line Items ({(purchaseForm.items || []).length})
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -8644,9 +8553,9 @@ export default function EliteBillingDepartment({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.3rem',
-                        background: '#ecfdf5',
-                        color: '#059669',
-                        border: '1px solid #a7f3d0',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        color: '#6ee7b7',
+                        border: '1px solid rgba(52, 211, 153, 0.4)',
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -8658,7 +8567,7 @@ export default function EliteBillingDepartment({
                       id="purchase-add-item-btn"
                       onClick={handleAddPurchaseItem}
                       className="btn-secondary"
-                      style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#eff6ff', color: '#4f46e5', border: '1px solid #bfdbfe' }}
+                      style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd', border: '1px solid rgba(96, 165, 250, 0.4)' }}
                     >
                       <Plus size={13} /> Add Item Row
                     </button>
@@ -8667,7 +8576,7 @@ export default function EliteBillingDepartment({
 
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '880px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '2px solid #cbd5e1', fontSize: '0.74rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                    <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.14)', fontSize: '0.74rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>
                       <th style={{ padding: '0.6rem 0.5rem' }}>Item Description & Details</th>
                       <th style={{ padding: '0.6rem 0.5rem', width: '120px' }}>HSN / SAC</th>
                       <th style={{ padding: '0.6rem 0.5rem', width: '85px', textAlign: 'center' }}>Qty</th>
@@ -8680,7 +8589,7 @@ export default function EliteBillingDepartment({
                   </thead>
                   <tbody>
                     {calculatedPurchase.items.map((it, idx) => (
-                      <tr key={it.id || idx} style={{ borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
+                      <tr key={it.id || idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', verticalAlign: 'top' }}>
                         <td style={{ padding: '0.5rem 0.4rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                           <input
                             id={`purchase-item-name-${idx}`}
@@ -8694,10 +8603,10 @@ export default function EliteBillingDepartment({
                               padding: '0.45rem 0.6rem',
                               fontSize: '0.84rem',
                               fontWeight: 600,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: 'rgba(11, 17, 32, 0.88)',
+                              border: '1px solid rgba(255, 255, 255, 0.16)',
                               borderRadius: '6px',
-                              color: '#1e293b',
+                              color: '#ffffff',
                               boxSizing: 'border-box',
                               outline: 'none'
                             }}
@@ -8716,10 +8625,10 @@ export default function EliteBillingDepartment({
                               width: '100%',
                               padding: '0.35rem 0.5rem',
                               fontSize: '0.78rem',
-                              background: '#ffffff',
-                              border: '1px solid #e2e8f0',
+                              background: 'rgba(11, 17, 32, 0.72)',
+                              border: '1px solid rgba(255, 255, 255, 0.12)',
                               borderRadius: '5px',
-                              color: '#475569',
+                              color: '#cbd5e1',
                               boxSizing: 'border-box',
                               outline: 'none'
                             }}
@@ -8731,13 +8640,13 @@ export default function EliteBillingDepartment({
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               gap: '0.4rem',
-                              background: '#ecfdf5',
-                              border: '1px solid #a7f3d0',
+                              background: 'rgba(16, 185, 129, 0.14)',
+                              border: '1px solid rgba(52, 211, 153, 0.35)',
                               borderRadius: '4px',
                               padding: '0.2rem 0.45rem',
                               marginTop: '2px'
                             }}>
-                              <span style={{ fontSize: '0.69rem', color: '#047857', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '0.69rem', color: '#6ee7b7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 ✨ New Item &bull; Auto-saves on Submit
                               </span>
                               <button
@@ -8776,10 +8685,10 @@ export default function EliteBillingDepartment({
                               padding: '0.45rem 0.5rem',
                               fontSize: '0.84rem',
                               fontWeight: 700,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: 'rgba(11, 17, 32, 0.88)',
+                              border: '1px solid rgba(255, 255, 255, 0.16)',
                               borderRadius: '6px',
-                              color: '#1e293b',
+                              color: '#ffffff',
                               boxSizing: 'border-box',
                               textAlign: 'center',
                               letterSpacing: '0.4px',
@@ -8800,10 +8709,10 @@ export default function EliteBillingDepartment({
                               padding: '0.45rem 0.4rem',
                               fontSize: '0.84rem',
                               fontWeight: 700,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: 'rgba(11, 17, 32, 0.88)',
+                              border: '1px solid rgba(255, 255, 255, 0.16)',
                               borderRadius: '6px',
-                              color: '#1e293b',
+                              color: '#ffffff',
                               boxSizing: 'border-box',
                               textAlign: 'center',
                               outline: 'none'
@@ -8819,10 +8728,10 @@ export default function EliteBillingDepartment({
                               padding: '0.45rem 0.4rem',
                               fontSize: '0.82rem',
                               fontWeight: 600,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: 'rgba(11, 17, 32, 0.88)',
+                              border: '1px solid rgba(255, 255, 255, 0.16)',
                               borderRadius: '6px',
-                              color: '#1e293b',
+                              color: '#ffffff',
                               boxSizing: 'border-box',
                               cursor: 'pointer',
                               outline: 'none'
@@ -8853,10 +8762,10 @@ export default function EliteBillingDepartment({
                               padding: '0.45rem 0.5rem',
                               fontSize: '0.84rem',
                               fontWeight: 700,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: 'rgba(11, 17, 32, 0.88)',
+                              border: '1px solid rgba(255, 255, 255, 0.16)',
                               borderRadius: '6px',
-                              color: '#1e293b',
+                              color: '#ffffff',
                               boxSizing: 'border-box',
                               textAlign: 'right',
                               outline: 'none'
@@ -8872,10 +8781,10 @@ export default function EliteBillingDepartment({
                               padding: '0.45rem 0.35rem',
                               fontSize: '0.82rem',
                               fontWeight: 700,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: 'rgba(11, 17, 32, 0.88)',
+                              border: '1px solid rgba(255, 255, 255, 0.16)',
                               borderRadius: '6px',
-                              color: '#4f46e5',
+                              color: '#a5b4fc',
                               boxSizing: 'border-box',
                               cursor: 'pointer',
                               textAlign: 'center',
@@ -8889,7 +8798,7 @@ export default function EliteBillingDepartment({
                             <option value={28}>28%</option>
                           </select>
                         </td>
-                        <td style={{ padding: '0.5rem 0.4rem', textAlign: 'right', fontWeight: 800, color: '#1e293b', fontSize: '0.88rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem', textAlign: 'right', fontWeight: 800, color: '#ffffff', fontSize: '0.88rem' }}>
                           ₹ {(it.totalAmount || 0).toFixed(2)}
                         </td>
                         <td style={{ padding: '0.5rem 0.2rem', textAlign: 'center' }}>
@@ -8897,7 +8806,7 @@ export default function EliteBillingDepartment({
                             <button
                               type="button"
                               onClick={() => handleRemovePurchaseItem(idx)}
-                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                              style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
                               title="Remove Row"
                             >
                               <X size={16} />
@@ -8919,22 +8828,22 @@ export default function EliteBillingDepartment({
                       rows={3}
                       value={purchaseForm.notes}
                       onChange={e => setPurchaseForm(f => ({ ...f, notes: e.target.value }))}
-                      style={inputStyle}
+                      style={{ ...inputStyle, background: 'rgba(11, 17, 32, 0.88)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#ffffff' }}
                       placeholder="e.g. Delivery challan verified, fabric quality approved, transporter: XYZ Logistics"
                     />
                   </div>
                 </div>
 
-                <div style={{ padding: '1.1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ padding: '1.1rem', background: 'rgba(11, 17, 32, 0.65)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                    <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal:</span>
-                    <span style={{ fontWeight: 800, color: '#1e293b' }}>₹ {calculatedPurchase.subtotal.toFixed(2)}</span>
+                    <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Subtotal:</span>
+                    <span style={{ fontWeight: 800, color: '#ffffff' }}>₹ {calculatedPurchase.subtotal.toFixed(2)}</span>
                   </div>
 
                   {/* Bottom Level Discount Configuration Row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', background: 'rgba(22, 163, 74, 0.05)', padding: '0.4rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(22, 163, 74, 0.2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', background: 'rgba(16, 185, 129, 0.1)', padding: '0.45rem 0.65rem', borderRadius: '7px', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ color: '#15803d', fontWeight: 800 }}>Discount:</span>
+                      <span style={{ color: '#34d399', fontWeight: 800 }}>Discount:</span>
                       <select
                         value={purchaseForm.discountType || 'flat'}
                         onChange={e => setPurchaseForm(f => ({ ...f, discountType: e.target.value }))}
@@ -8943,9 +8852,9 @@ export default function EliteBillingDepartment({
                           fontSize: '0.78rem',
                           fontWeight: 700,
                           borderRadius: '5px',
-                          border: '1px solid #86efac',
-                          background: '#ffffff',
-                          color: '#15803d',
+                          border: '1px solid rgba(52, 211, 153, 0.45)',
+                          background: 'rgba(11, 17, 32, 0.9)',
+                          color: '#6ee7b7',
                           cursor: 'pointer',
                           outline: 'none'
                         }}
@@ -8971,16 +8880,16 @@ export default function EliteBillingDepartment({
                           padding: '0.25rem 0.5rem',
                           fontSize: '0.85rem',
                           fontWeight: 800,
-                          background: '#ffffff',
-                          border: '1px solid #86efac',
+                          background: 'rgba(11, 17, 32, 0.9)',
+                          border: '1px solid rgba(52, 211, 153, 0.45)',
                           borderRadius: '5px',
-                          color: '#15803d',
+                          color: '#34d399',
                           textAlign: 'right',
                           outline: 'none'
                         }}
                       />
                       {calculatedPurchase.discountTotal > 0 && (
-                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#15803d', minWidth: '75px', textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#34d399', minWidth: '75px', textAlign: 'right' }}>
                           - ₹{calculatedPurchase.discountTotal.toFixed(2)}
                         </span>
                       )}
@@ -8988,38 +8897,38 @@ export default function EliteBillingDepartment({
                   </div>
 
                   {calculatedPurchase.discountTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#475569', paddingTop: '0.1rem' }}>
-                      <span style={{ color: '#64748b' }}>Taxable Net Subtotal:</span>
-                      <span style={{ fontWeight: 700 }}>₹ {calculatedPurchase.netSubtotal.toFixed(2)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#cbd5e1', paddingTop: '0.1rem' }}>
+                      <span style={{ color: '#94a3b8' }}>Taxable Net Subtotal:</span>
+                      <span style={{ fontWeight: 700, color: '#ffffff' }}>₹ {calculatedPurchase.netSubtotal.toFixed(2)}</span>
                     </div>
                   )}
 
                   {purchaseForm.taxType === 'IGST' ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                      <span style={{ color: '#64748b' }}>
+                      <span style={{ color: '#cbd5e1' }}>
                         IGST Tax ({calculatedPurchase.netSubtotal > 0 ? ((calculatedPurchase.totalTax / calculatedPurchase.netSubtotal) * 100).toFixed(1) : 5}%):
                       </span>
-                      <span style={{ fontWeight: 700, color: '#4f46e5' }}>₹ {calculatedPurchase.igstAmount.toFixed(2)}</span>
+                      <span style={{ fontWeight: 700, color: '#93c5fd' }}>₹ {calculatedPurchase.igstAmount.toFixed(2)}</span>
                     </div>
                   ) : (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                        <span style={{ color: '#64748b' }}>
+                        <span style={{ color: '#cbd5e1' }}>
                           CGST Tax ({calculatedPurchase.netSubtotal > 0 ? ((calculatedPurchase.totalTax / calculatedPurchase.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
                         </span>
-                        <span style={{ fontWeight: 700, color: '#4f46e5' }}>₹ {calculatedPurchase.cgstAmount.toFixed(2)}</span>
+                        <span style={{ fontWeight: 700, color: '#93c5fd' }}>₹ {calculatedPurchase.cgstAmount.toFixed(2)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                        <span style={{ color: '#64748b' }}>
+                        <span style={{ color: '#cbd5e1' }}>
                           SGST Tax ({calculatedPurchase.netSubtotal > 0 ? ((calculatedPurchase.totalTax / calculatedPurchase.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
                         </span>
-                        <span style={{ fontWeight: 700, color: '#4f46e5' }}>₹ {calculatedPurchase.sgstAmount.toFixed(2)}</span>
+                        <span style={{ fontWeight: 700, color: '#93c5fd' }}>₹ {calculatedPurchase.sgstAmount.toFixed(2)}</span>
                       </div>
                     </>
                   )}
 
                   {/* Round Off Checkbox & Value */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#4f46e5', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed #cbd5e1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#cbd5e1', marginTop: '0.2rem', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255, 255, 255, 0.14)' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
                       <input
                         type="checkbox"
@@ -9035,21 +8944,21 @@ export default function EliteBillingDepartment({
                       value={purchaseForm.manualRoundOff !== undefined ? purchaseForm.manualRoundOff : calculatedPurchase.roundOff}
                       onChange={e => setPurchaseForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
                       onBlur={e => { if (e.target.value === '') setPurchaseForm(f => ({ ...f, manualRoundOff: undefined })); }}
-                      style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.3)', borderRadius: '5px', color: '#4f46e5', textAlign: 'right' }}
+                      style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(11, 17, 32, 0.88)', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: '5px', color: '#ffffff', textAlign: 'right' }}
                       title="Auto-calculated. Edit to set manually."
                     />
                   </div>
 
-                  <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 900, color: '#4f46e5' }}>
+                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.14)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 900, color: '#60a5fa' }}>
                     <span>Grand Total:</span>
                     <span>₹ {calculatedPurchase.grandTotal.toFixed(2)}</span>
                   </div>
 
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.1rem' }}>
                     Amount in Words: {numToWords(calculatedPurchase.grandTotal)}
                   </div>
 
-                  <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(255, 255, 255, 0.14)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Advance / Paid Amount (₹)</label>
                       <input
@@ -9062,8 +8971,8 @@ export default function EliteBillingDepartment({
                       />
                     </div>
                     <div style={{ flex: 1, textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>BALANCE DUE</div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: calculatedPurchase.balanceDue > 0 ? '#ef4444' : '#16a34a' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>BALANCE DUE</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: calculatedPurchase.balanceDue > 0 ? '#f87171' : '#34d399' }}>
                         ₹ {calculatedPurchase.balanceDue.toFixed(2)}
                       </div>
                     </div>
@@ -9074,24 +8983,25 @@ export default function EliteBillingDepartment({
               {/* Duplicate Purchase Bill Alert Banner */}
               {duplicatePurchaseMatch && (
                 <div style={{
-                  background: 'rgba(239, 68, 68, 0.08)',
-                  border: '1.5px solid #ef4444',
+                  background: 'rgba(239, 68, 68, 0.14)',
+                  border: '1.5px solid rgba(248, 113, 113, 0.45)',
                   borderRadius: '10px',
                   padding: '1rem 1.25rem',
-                  color: '#b91c1c',
+                  color: '#fca5a5',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.6rem',
-                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.12)'
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.2)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, fontSize: '0.95rem', color: '#dc2626' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, fontSize: '0.95rem', color: '#f87171' }}>
                       <AlertTriangle size={20} />
                       <span>Duplicate Purchase Bill Detected!</span>
                     </div>
                     <span style={{
-                      background: '#fee2e2',
-                      color: '#991b1b',
+                      background: 'rgba(239, 68, 68, 0.25)',
+                      color: '#fecaca',
+                      border: '1px solid rgba(248, 113, 113, 0.45)',
                       padding: '3px 10px',
                       borderRadius: '4px',
                       fontSize: '0.72rem',
@@ -9102,28 +9012,28 @@ export default function EliteBillingDepartment({
                     </span>
                   </div>
 
-                  <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.82rem', color: '#e2e8f0', lineHeight: 1.4 }}>
                     A vendor purchase entry with these matching parameters already exists in the system:
                   </div>
 
                   <div style={{
-                    background: '#ffffff',
-                    border: '1px solid #fecaca',
+                    background: 'rgba(11, 17, 32, 0.85)',
+                    border: '1px solid rgba(248, 113, 113, 0.35)',
                     borderRadius: '8px',
                     padding: '0.75rem 1rem',
                     fontSize: '0.82rem',
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '0.5rem',
-                    color: '#1e293b'
+                    color: '#f1f5f9'
                   }}>
-                    <div><strong>Purchase No:</strong> <span style={{ color: '#4f46e5', fontWeight: 800 }}>{duplicatePurchaseMatch.purchaseNo}</span></div>
+                    <div><strong>Purchase No:</strong> <span style={{ color: '#93c5fd', fontWeight: 800 }}>{duplicatePurchaseMatch.purchaseNo}</span></div>
                     <div><strong>Vendor:</strong> {duplicatePurchaseMatch.vendorName || duplicatePurchaseMatch.vendor?.businessName || duplicatePurchaseMatch.vendor?.name}</div>
-                    <div><strong>Vendor Bill No:</strong> <span style={{ color: '#dc2626', fontWeight: 700 }}>{duplicatePurchaseMatch.billNo || 'None'}</span></div>
+                    <div><strong>Vendor Bill No:</strong> <span style={{ color: '#f87171', fontWeight: 700 }}>{duplicatePurchaseMatch.billNo || 'None'}</span></div>
                     <div><strong>Challan No / Ref:</strong> {duplicatePurchaseMatch.ourChallanNo || 'None'}</div>
                     <div><strong>Bill Date:</strong> {duplicatePurchaseMatch.date ? new Date(duplicatePurchaseMatch.date).toLocaleDateString('en-GB') : 'N/A'}</div>
-                    <div><strong>Total Amount:</strong> <span style={{ fontWeight: 800, color: '#16a34a' }}>₹ {(Number(duplicatePurchaseMatch.grandTotal || duplicatePurchaseMatch.totalAmount || 0)).toFixed(2)}</span></div>
-                    <div style={{ gridColumn: '1 / -1', fontSize: '0.78rem', color: '#64748b', borderTop: '1px dashed #e2e8f0', paddingTop: '0.4rem' }}>
+                    <div><strong>Total Amount:</strong> <span style={{ fontWeight: 800, color: '#34d399' }}>₹ {(Number(duplicatePurchaseMatch.grandTotal || duplicatePurchaseMatch.totalAmount || 0)).toFixed(2)}</span></div>
+                    <div style={{ gridColumn: '1 / -1', fontSize: '0.78rem', color: '#cbd5e1', borderTop: '1px dashed rgba(255, 255, 255, 0.14)', paddingTop: '0.4rem' }}>
                       <strong>Items on Existing Bill:</strong>{' '}
                       {Array.isArray(duplicatePurchaseMatch.items) && duplicatePurchaseMatch.items.length > 0
                         ? duplicatePurchaseMatch.items.map(it => `${it.itemName || it.fabric || 'Item'} (${it.qty || it.quantity || 0} ${it.unit || 'm'} @ ₹${it.rate || it.unitPrice || 0})`).join('; ')
@@ -9131,14 +9041,14 @@ export default function EliteBillingDepartment({
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600 }}>
+                  <div style={{ fontSize: '0.78rem', color: '#fca5a5', fontWeight: 600 }}>
                     ⚠️ Saving is blocked to prevent duplicate GST input tax credit and double-booked vendor payables.
                   </div>
                 </div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem' }}>
-                <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.55rem 1.2rem', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>
+                <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.55rem 1.2rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>
                   Cancel
                 </button>
                 <button
@@ -9146,7 +9056,7 @@ export default function EliteBillingDepartment({
                   disabled={isSavingPurchase || !!duplicatePurchaseMatch}
                   style={{
                     padding: '0.6rem 1.6rem',
-                    background: (isSavingPurchase || !!duplicatePurchaseMatch) ? '#94a3b8' : 'linear-gradient(135deg, #4f46e5, #3b82f6)',
+                    background: (isSavingPurchase || !!duplicatePurchaseMatch) ? 'rgba(71, 85, 105, 0.6)' : 'linear-gradient(135deg, #4f46e5, #3b82f6)',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '6px',
@@ -9170,11 +9080,11 @@ export default function EliteBillingDepartment({
       {viewPurchaseModal && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setViewPurchaseModal(null); }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
         >
-          <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
-            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: (viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="glass-modal-card" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', background: 'rgba(15, 23, 42, 0.94)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.14)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.65)', color: '#ffffff', backdropFilter: 'blur(20px)' }}>
+            <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', background: (viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? 'linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(79, 70, 229, 0.85))' : 'linear-gradient(135deg, rgba(30, 64, 175, 0.85), rgba(37, 99, 235, 0.85))', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
                 {(viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? (
                   <>
                     <ArrowLeftRight size={20} /> Contra Entry — {viewPurchaseModal.purchaseNo}
@@ -9185,49 +9095,49 @@ export default function EliteBillingDepartment({
                   </>
                 )}
               </h3>
-              <button onClick={() => setViewPurchaseModal(null)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <button onClick={() => setViewPurchaseModal(null)} style={{ background: 'rgba(255, 255, 255, 0.12)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', width: 32, height: 32, color: '#ffffff', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
 
             {(viewPurchaseModal.entryType === 'contra' || viewPurchaseModal.purchaseType === 'contra') ? (
-              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#ffffff' }}>
                 {/* Contra Overview */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'rgba(11, 17, 32, 0.65)', padding: '1.1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                   <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', marginBottom: 4 }}>DEBIT (Dr.) ACCOUNT</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{viewPurchaseModal.contraDetails?.debitParty || viewPurchaseModal.vendorName}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#047857', marginTop: 3 }}>Received In / To Account</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', marginBottom: 4 }}>DEBIT (Dr.) ACCOUNT</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ffffff' }}>{viewPurchaseModal.contraDetails?.debitParty || viewPurchaseModal.vendorName}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6ee7b7', marginTop: 3 }}>Received In / To Account</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c', textTransform: 'uppercase', marginBottom: 4 }}>CREDIT (Cr.) ACCOUNT</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{viewPurchaseModal.contraDetails?.creditParty || viewPurchaseModal.vendor?.businessName || '-'}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: 3 }}>Paid Out / From Account</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f87171', textTransform: 'uppercase', marginBottom: 4 }}>CREDIT (Cr.) ACCOUNT</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ffffff' }}>{viewPurchaseModal.contraDetails?.creditParty || viewPurchaseModal.vendor?.businessName || '-'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#fca5a5', marginTop: 3 }}>Paid Out / From Account</div>
                   </div>
                 </div>
 
                 {/* Amount & Status Card */}
-                <div style={{ background: '#f5f3ff', border: '1.5px solid #c4b5fd', borderRadius: '10px', padding: '1.25rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase' }}>CONTRA AMOUNT</div>
-                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#7c3aed', marginTop: '0.3rem' }}>
+                <div style={{ background: 'rgba(124, 58, 237, 0.15)', border: '1.5px solid rgba(167, 139, 250, 0.45)', borderRadius: '10px', padding: '1.25rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#c4b5fd', textTransform: 'uppercase' }}>CONTRA AMOUNT</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#ffffff', marginTop: '0.3rem' }}>
                     ₹ {Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#cbd5e1', fontStyle: 'italic', marginTop: '0.2rem' }}>
                     {numToWords(Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount || 0))}
                   </div>
                 </div>
 
                 {/* Details Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', background: 'rgba(11, 17, 32, 0.65)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', padding: '0.85rem' }}>
                   <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>VOUCHER DATE:</span>
-                    <div style={{ fontWeight: 800, fontSize: '0.85rem' }}>{viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}</div>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>VOUCHER DATE:</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#ffffff' }}>{viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}</div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>REF / BILL NO:</span>
-                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0284c7' }}>{viewPurchaseModal.contraDetails?.referenceNo || viewPurchaseModal.billNo || 'None'}</div>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>REF / BILL NO:</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#38bdf8' }}>{viewPurchaseModal.contraDetails?.referenceNo || viewPurchaseModal.billNo || 'None'}</div>
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>NARRATION / REMARKS:</span>
-                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#334155', marginTop: 2, fontStyle: 'italic' }}>"{viewPurchaseModal.contraDetails?.narration || viewPurchaseModal.notes || 'None'}"</div>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>NARRATION / REMARKS:</span>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#e2e8f0', marginTop: 2, fontStyle: 'italic' }}>"{viewPurchaseModal.contraDetails?.narration || viewPurchaseModal.notes || 'None'}"</div>
                   </div>
                 </div>
 
@@ -9235,66 +9145,66 @@ export default function EliteBillingDepartment({
                   <button
                     type="button"
                     onClick={() => setViewPurchaseModal(null)}
-                    style={{ padding: '0.55rem 1.25rem', background: '#7c3aed', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}
+                    style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg, #7c3aed, #6366f1)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}
                   >
                     Close Voucher
                   </button>
                 </div>
               </div>
             ) : (
-              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#ffffff' }}>
               {/* Metadata & Vendor Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'rgba(11, 17, 32, 0.65)', padding: '1.1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                 <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>SUPPLIED BY VENDOR</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>{viewPurchaseModal.vendor?.businessName || viewPurchaseModal.vendorName}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>SUPPLIED BY VENDOR</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>{viewPurchaseModal.vendor?.businessName || viewPurchaseModal.vendorName}</div>
                   {viewPurchaseModal.vendor?.name && viewPurchaseModal.vendor?.name !== viewPurchaseModal.vendor?.businessName && (
-                    <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 2 }}>Contact: <strong>{viewPurchaseModal.vendor.name}</strong></div>
+                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: 2 }}>Contact: <strong>{viewPurchaseModal.vendor.name}</strong></div>
                   )}
                   {viewPurchaseModal.vendor?.gstin && (
-                    <div style={{ fontSize: '0.78rem', color: '#4f46e5', fontWeight: 700, marginTop: 3 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#a5b4fc', fontWeight: 700, marginTop: 3 }}>
                       GSTIN: {viewPurchaseModal.vendor.gstin}
                     </div>
                   )}
                   {viewPurchaseModal.vendor?.billingAddress && (
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 3 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 3 }}>
                       {viewPurchaseModal.vendor.billingAddress}
                       {viewPurchaseModal.vendor?.state ? `, ${viewPurchaseModal.vendor.state}` : ''}
                     </div>
                   )}
                   {viewPurchaseModal.vendor?.phone && (
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>
                       Phone: {viewPurchaseModal.vendor.phone}
                     </div>
                   )}
                   {viewPurchaseModal.vendor?.email && (
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>
                       Email: {viewPurchaseModal.vendor.email}
                     </div>
                   )}
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE NO / BILL DETAILS</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE NO / BILL DETAILS</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#93c5fd' }}>{viewPurchaseModal.purchaseNo}</div>
                   {viewPurchaseModal.billNo && (
-                    <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 2 }}>
-                      Vendor Bill: <strong style={{ color: '#0f172a' }}>{viewPurchaseModal.billNo}</strong>
+                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: 2 }}>
+                      Vendor Bill: <strong style={{ color: '#ffffff' }}>{viewPurchaseModal.billNo}</strong>
                     </div>
                   )}
-                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: /asset/i.test(viewPurchaseModal.purchaseType) ? '#7c3aed' : /expense/i.test(viewPurchaseModal.purchaseType) ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: /asset/i.test(viewPurchaseModal.purchaseType) ? '#c4b5fd' : /expense/i.test(viewPurchaseModal.purchaseType) ? '#fbbf24' : '#60a5fa', marginTop: 2 }}>
                     Type: {/asset/i.test(viewPurchaseModal.purchaseType) ? '🏛️ Asset Purchase' : /expense/i.test(viewPurchaseModal.purchaseType) ? '💼 Expense Purchase' : /inventory/i.test(viewPurchaseModal.purchaseType) ? '📦 Inventory Purchase' : `🏷️ ${viewPurchaseModal.purchaseType}`}
                   </div>
                   {viewPurchaseModal.ourChallanNo && (
-                    <div style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
+                    <div style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 700, marginTop: 2 }}>
                       Challan / Ref: {viewPurchaseModal.ourChallanNo}
                     </div>
                   )}
-                  <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 4 }}>
+                  <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: 4 }}>
                     Inward Date: <strong>{viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}</strong>
                   </div>
                   {viewPurchaseModal.dueDate && (
-                    <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: 2 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#fbbf24', marginTop: 2 }}>
                       Due Date: {typeof viewPurchaseModal.dueDate === 'string' && viewPurchaseModal.dueDate.includes('T') ? viewPurchaseModal.dueDate.split('T')[0] : (viewPurchaseModal.dueDate instanceof Date ? viewPurchaseModal.dueDate.toISOString().split('T')[0] : viewPurchaseModal.dueDate)}
                     </div>
                   )}
@@ -9305,9 +9215,9 @@ export default function EliteBillingDepartment({
                       fontSize: '0.75rem',
                       fontWeight: 800,
                       display: 'inline-block',
-                      background: viewPurchaseModal.paymentStatus === 'PAID' ? '#ecfdf5' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#fffbeb' : '#fef2f2',
-                      color: viewPurchaseModal.paymentStatus === 'PAID' ? '#059669' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#d97706' : '#dc2626',
-                      border: `1px solid ${viewPurchaseModal.paymentStatus === 'PAID' ? '#6ee7b7' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#fcd34d' : '#fca5a5'}`
+                      background: viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.16)' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? 'rgba(245, 158, 11, 0.16)' : 'rgba(239, 68, 68, 0.16)',
+                      color: viewPurchaseModal.paymentStatus === 'PAID' ? '#34d399' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#fbbf24' : '#f87171',
+                      border: `1px solid ${viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(52, 211, 153, 0.4)' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? 'rgba(251, 191, 36, 0.4)' : 'rgba(248, 113, 113, 0.4)'}`
                     }}>
                       {viewPurchaseModal.paymentStatus || 'UNPAID'}
                     </span>
@@ -9317,13 +9227,13 @@ export default function EliteBillingDepartment({
 
               {/* Items Breakdown Table */}
               <div>
-                <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '0.88rem', fontWeight: 800, color: '#334155' }}>
+                <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '0.88rem', fontWeight: 800, color: '#e2e8f0' }}>
                   📦 Purchased Items Breakdown ({Array.isArray(viewPurchaseModal.items) ? viewPurchaseModal.items.length : 1})
                 </h4>
-                <div style={{ borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
+                <div style={{ borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.14)', overflowX: 'auto', background: 'rgba(11, 17, 32, 0.65)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left', minWidth: '600px' }}>
                     <thead>
-                      <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                      <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.14)', color: '#94a3b8', fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase' }}>
                         <th style={{ padding: '0.6rem 0.8rem', width: '30px' }}>#</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Item Description</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>HSN</th>
@@ -9337,42 +9247,42 @@ export default function EliteBillingDepartment({
                     <tbody>
                       {Array.isArray(viewPurchaseModal.items) && viewPurchaseModal.items.length > 0 ? (
                         viewPurchaseModal.items.map((it, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#94a3b8', fontWeight: 700 }}>{idx + 1}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700, color: '#ffffff' }}>
                               <div>{it.itemName}</div>
                               {it.description && (
-                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: 2 }}>
+                                <div style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 500, marginTop: 2 }}>
                                   {it.description}
                                 </div>
                               )}
                               {(it.jobNo || it.lotNo || it.partyChallan || it.ourChallanNo) && (
-                                <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', gap: '0.4rem', marginTop: 2, flexWrap: 'wrap' }}>
-                                  {it.jobNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Job: {it.jobNo}</span>}
-                                  {it.lotNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Lot: {it.lotNo}</span>}
-                                  {it.partyChallan && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Vendor Ch: {it.partyChallan}</span>}
-                                  {it.ourChallanNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Challan: {it.ourChallanNo}</span>}
+                                <div style={{ fontSize: '0.7rem', color: '#cbd5e1', display: 'flex', gap: '0.4rem', marginTop: 2, flexWrap: 'wrap' }}>
+                                  {it.jobNo && <span style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: 3 }}>Job: {it.jobNo}</span>}
+                                  {it.lotNo && <span style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: 3 }}>Lot: {it.lotNo}</span>}
+                                  {it.partyChallan && <span style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: 3 }}>Vendor Ch: {it.partyChallan}</span>}
+                                  {it.ourChallanNo && <span style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: 3 }}>Challan: {it.ourChallanNo}</span>}
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.hsnCode || '998821'}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{it.qty || it.quantity}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.unit || 'Meters'}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>₹{it.unitPrice || it.rate}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{it.taxRate != null ? `${it.taxRate}%` : `${viewPurchaseModal.gstRate || 0}%`}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(it.totalAmount || it.amount || ((it.qty || it.quantity || 1) * (it.unitPrice || it.rate || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#cbd5e1' }}>{it.hsnCode || '998821'}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700, color: '#ffffff' }}>{it.qty || it.quantity}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#cbd5e1' }}>{it.unit || 'Meters'}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: '#ffffff' }}>₹{it.unitPrice || it.rate}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: '#cbd5e1' }}>{it.taxRate != null ? `${it.taxRate}%` : `${viewPurchaseModal.gstRate || 0}%`}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#38bdf8' }}>₹{Number(it.totalAmount || it.amount || ((it.qty || it.quantity || 1) * (it.unitPrice || it.rate || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>1</td>
-                          <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{viewPurchaseModal.itemName}</td>
-                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>998821</td>
-                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{viewPurchaseModal.quantity}</td>
-                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{viewPurchaseModal.unit}</td>
-                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{viewPurchaseModal.rate !== '-' ? `₹${viewPurchaseModal.rate}` : '-'}</td>
-                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{viewPurchaseModal.gstRate || 0}%</td>
-                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#94a3b8' }}>1</td>
+                          <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700, color: '#ffffff' }}>{viewPurchaseModal.itemName}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#cbd5e1' }}>998821</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700, color: '#ffffff' }}>{viewPurchaseModal.quantity}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#cbd5e1' }}>{viewPurchaseModal.unit}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: '#ffffff' }}>{viewPurchaseModal.rate !== '-' ? `₹${viewPurchaseModal.rate}` : '-'}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: '#cbd5e1' }}>{viewPurchaseModal.gstRate || 0}%</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#38bdf8' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       )}
                     </tbody>
@@ -9381,16 +9291,16 @@ export default function EliteBillingDepartment({
               </div>
 
               {/* Financial Calculation Breakdown */}
-              <div style={{ background: '#f8fafc', border: '1.5px solid #93c5fd', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ background: 'rgba(11, 17, 32, 0.65)', border: '1.5px solid rgba(59, 130, 246, 0.35)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ color: '#64748b' }}>Subtotal:</span>
-                  <strong style={{ color: '#1e293b' }}>
+                  <span style={{ color: '#cbd5e1' }}>Subtotal:</span>
+                  <strong style={{ color: '#ffffff' }}>
                     ₹{Number(viewPurchaseModal.subtotal || viewPurchaseModal.subtotalAmount || (viewPurchaseModal.totalAmount - (viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </div>
 
                 {viewPurchaseModal.discountTotal > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#34d399' }}>
                     <span>Discount:</span>
                     <strong>- ₹{Number(viewPurchaseModal.discountTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                   </div>
@@ -9398,22 +9308,22 @@ export default function EliteBillingDepartment({
 
                 {viewPurchaseModal.taxType === 'IGST' ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#64748b' }}>IGST Tax ({viewPurchaseModal.gstRate || 5}%):</span>
-                    <strong style={{ color: '#4f46e5' }}>
+                    <span style={{ color: '#cbd5e1' }}>IGST Tax ({viewPurchaseModal.gstRate || 5}%):</span>
+                    <strong style={{ color: '#93c5fd' }}>
                       + ₹{Number(viewPurchaseModal.igstAmount || viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </strong>
                   </div>
                 ) : (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                      <span style={{ color: '#64748b' }}>CGST Tax:</span>
-                      <strong style={{ color: '#4f46e5' }}>
+                      <span style={{ color: '#cbd5e1' }}>CGST Tax:</span>
+                      <strong style={{ color: '#93c5fd' }}>
                         + ₹{Number(viewPurchaseModal.cgstAmount || ((viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0) / 2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                      <span style={{ color: '#64748b' }}>SGST Tax:</span>
-                      <strong style={{ color: '#4f46e5' }}>
+                      <span style={{ color: '#cbd5e1' }}>SGST Tax:</span>
+                      <strong style={{ color: '#93c5fd' }}>
                         + ₹{Number(viewPurchaseModal.sgstAmount || ((viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0) / 2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </strong>
                     </div>
@@ -9422,26 +9332,26 @@ export default function EliteBillingDepartment({
 
                 {viewPurchaseModal.roundOff !== 0 && viewPurchaseModal.roundOff != null && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#64748b' }}>Round Off:</span>
-                    <strong style={{ color: '#4f46e5' }}>
+                    <span style={{ color: '#cbd5e1' }}>Round Off:</span>
+                    <strong style={{ color: '#93c5fd' }}>
                       {viewPurchaseModal.roundOff > 0 ? `+ ₹${Number(viewPurchaseModal.roundOff).toFixed(2)}` : `- ₹${Math.abs(Number(viewPurchaseModal.roundOff)).toFixed(2)}`}
                     </strong>
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1.5px solid #cbd5e1', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>Grand Total:</span>
-                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1.5px solid rgba(255, 255, 255, 0.14)', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#93c5fd' }}>Grand Total:</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#38bdf8' }}>₹{Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
-                  <span style={{ color: '#16a34a', fontWeight: 700 }}>Advance / Paid Amount:</span>
-                  <strong style={{ color: '#16a34a' }}>₹{Number(viewPurchaseModal.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px dashed rgba(255, 255, 255, 0.14)', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                  <span style={{ color: '#34d399', fontWeight: 700 }}>Advance / Paid Amount:</span>
+                  <strong style={{ color: '#34d399' }}>₹{Number(viewPurchaseModal.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                  <span style={{ color: '#dc2626', fontWeight: 800 }}>Balance Due:</span>
-                  <strong style={{ color: (viewPurchaseModal.balanceDue > 0 || (viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount) > (viewPurchaseModal.paidAmount || 0)) ? '#dc2626' : '#16a34a' }}>
+                  <span style={{ color: '#f87171', fontWeight: 800 }}>Balance Due:</span>
+                  <strong style={{ color: (viewPurchaseModal.balanceDue > 0 || (viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount) > (viewPurchaseModal.paidAmount || 0)) ? '#f87171' : '#34d399' }}>
                     ₹{Number(viewPurchaseModal.balanceDue != null ? viewPurchaseModal.balanceDue : Math.max(0, (viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount || 0) - (viewPurchaseModal.paidAmount || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </div>
@@ -9449,8 +9359,8 @@ export default function EliteBillingDepartment({
 
               {viewPurchaseModal.notes && (
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', marginBottom: 2 }}>Notes / Remarks</div>
-                  <div style={{ fontSize: '0.85rem', color: '#334155', background: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>{viewPurchaseModal.notes}</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', marginBottom: 2 }}>Notes / Remarks</div>
+                  <div style={{ fontSize: '0.85rem', color: '#e2e8f0', background: 'rgba(11, 17, 32, 0.65)', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>{viewPurchaseModal.notes}</div>
                 </div>
               )}
 
@@ -9462,7 +9372,7 @@ export default function EliteBillingDepartment({
                     setViewPurchaseModal(null);
                     handleEditPurchase(p);
                   }}
-                  style={{ padding: '0.5rem 1.1rem', background: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '0.5rem 1.1rem', background: '#d97706', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <Edit2 size={15} /> Edit Purchase Entry
                 </button>
@@ -9476,7 +9386,7 @@ export default function EliteBillingDepartment({
                 >
                   <Printer size={15} /> Print Purchase Voucher
                 </button>
-                <button type="button" onClick={() => setViewPurchaseModal(null)} style={{ padding: '0.5rem 1.2rem', background: '#475569', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
+                <button type="button" onClick={() => setViewPurchaseModal(null)} style={{ padding: '0.5rem 1.2rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
                   Close
                 </button>
               </div>
@@ -9491,18 +9401,18 @@ export default function EliteBillingDepartment({
         <div
           className="modal-overlay"
           onClick={(e) => { if (e.target === e.currentTarget) setViewInvoiceModal(null); }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
         >
-          <div style={{ width: '100%', maxWidth: '860px', maxHeight: '94vh', overflowY: 'auto', padding: '1.5rem', background: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
+          <div className="glass-modal-card" style={{ width: '100%', maxWidth: '860px', maxHeight: '94vh', overflowY: 'auto', padding: '1.5rem', background: 'rgba(15, 23, 42, 0.94)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(20px)' }}>
 
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.9rem', marginBottom: '1.1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '0.9rem', marginBottom: '1.1rem' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <h3 style={{ margin: 0, color: '#1e3a8a', fontWeight: 900, fontSize: '1.25rem' }}>
+                  <h3 style={{ margin: 0, color: '#93c5fd', fontWeight: 900, fontSize: '1.25rem' }}>
                     🧾 Tax Invoice — {viewInvoiceModal.invoiceNo}
                   </h3>
-                  <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ display: 'inline-flex', background: 'rgba(11, 17, 32, 0.85)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.16)' }}>
                     <button
                       onClick={() => setInvoiceViewTab('master')}
                       style={{
@@ -9512,8 +9422,8 @@ export default function EliteBillingDepartment({
                         fontWeight: 800,
                         border: 'none',
                         cursor: 'pointer',
-                        background: invoiceViewTab === 'master' ? '#1e3a8a' : 'transparent',
-                        color: invoiceViewTab === 'master' ? '#ffffff' : '#64748b'
+                        background: invoiceViewTab === 'master' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                        color: invoiceViewTab === 'master' ? '#93c5fd' : '#94a3b8'
                       }}
                     >
                       📄 Master PDF View
@@ -9527,20 +9437,20 @@ export default function EliteBillingDepartment({
                         fontWeight: 800,
                         border: 'none',
                         cursor: 'pointer',
-                        background: invoiceViewTab === 'details' ? '#1e3a8a' : 'transparent',
-                        color: invoiceViewTab === 'details' ? '#ffffff' : '#64748b'
+                        background: invoiceViewTab === 'details' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                        color: invoiceViewTab === 'details' ? '#93c5fd' : '#94a3b8'
                       }}
                     >
                       📋 Quick Summary
                     </button>
                   </div>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginTop: 4, display: 'block' }}>
-                  Invoice Date: <strong>{formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)}</strong> {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
+                <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 500, marginTop: 4, display: 'block' }}>
+                  Invoice Date: <strong style={{ color: '#ffffff' }}>{formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)}</strong> {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
                   {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
                 </span>
               </div>
-              <button onClick={() => setViewInvoiceModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 8, padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setViewInvoiceModal(null)} style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#e2e8f0', borderRadius: 8, padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
@@ -9555,39 +9465,39 @@ export default function EliteBillingDepartment({
             ) : (
               <>
             {/* Billed To & Status Box */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '1.1rem', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem', background: 'rgba(11, 17, 32, 0.65)', padding: '1.1rem', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.12)', fontSize: '0.85rem' }}>
               <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>BILLED TO CUSTOMER</div>
-                <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0f172a' }}>{viewInvoiceModal.customer?.businessName || viewInvoiceModal.customer?.name || 'Walk-in Client'}</div>
-                {viewInvoiceModal.customer?.gstin && <div style={{ color: '#6d28d9', fontWeight: 700, marginTop: 3 }}>GSTIN: {viewInvoiceModal.customer.gstin}</div>}
-                {viewInvoiceModal.customer?.billingAddress && <div style={{ color: '#475569', marginTop: 3, lineHeight: '1.35' }}>{viewInvoiceModal.customer.billingAddress}</div>}
-                {viewInvoiceModal.customer?.phone && <div style={{ color: '#475569', marginTop: 3 }}>Phone: {viewInvoiceModal.customer.phone}</div>}
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>BILLED TO CUSTOMER</div>
+                <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#ffffff' }}>{viewInvoiceModal.customer?.businessName || viewInvoiceModal.customer?.name || 'Walk-in Client'}</div>
+                {viewInvoiceModal.customer?.gstin && <div style={{ color: '#c4b5fd', fontWeight: 700, marginTop: 3 }}>GSTIN: {viewInvoiceModal.customer.gstin}</div>}
+                {viewInvoiceModal.customer?.billingAddress && <div style={{ color: '#cbd5e1', marginTop: 3, lineHeight: '1.35' }}>{viewInvoiceModal.customer.billingAddress}</div>}
+                {viewInvoiceModal.customer?.phone && <div style={{ color: '#cbd5e1', marginTop: 3 }}>Phone: {viewInvoiceModal.customer.phone}</div>}
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>INVOICE DETAILS & STATUS</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>INVOICE DETAILS & STATUS</div>
                 <span style={{
                   padding: '4px 12px',
                   borderRadius: 6,
                   fontSize: '0.78rem',
                   fontWeight: 800,
                   display: 'inline-block',
-                  background: viewInvoiceModal.paymentStatus === 'PAID' ? '#ecfdf5' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fffbeb' : '#fef2f2',
-                  color: viewInvoiceModal.paymentStatus === 'PAID' ? '#059669' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#d97706' : '#dc2626',
-                  border: `1px solid ${viewInvoiceModal.paymentStatus === 'PAID' ? '#6ee7b7' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fcd34d' : '#fca5a5'}`
+                  background: viewInvoiceModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.16)' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245, 158, 11, 0.16)' : 'rgba(239, 68, 68, 0.16)',
+                  color: viewInvoiceModal.paymentStatus === 'PAID' ? '#34d399' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
+                  border: `1px solid ${viewInvoiceModal.paymentStatus === 'PAID' ? 'rgba(52, 211, 153, 0.4)' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(251, 191, 36, 0.4)' : 'rgba(248, 113, 113, 0.4)'}`
                 }}>
                   {viewInvoiceModal.paymentStatus || 'UNPAID'}
                 </span>
                 {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) && (
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2563eb', marginTop: 5 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#60a5fa', marginTop: 5 }}>
                     Challan No: {viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}
                   </div>
                 )}
-                <div style={{ marginTop: '0.5rem', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                <div style={{ marginTop: '0.5rem', fontSize: '1.2rem', fontWeight: 900, color: '#ffffff' }}>
                   Total: {fmtINR(viewInvoiceModal.grandTotal)}
                 </div>
                 {viewInvoiceModal.balanceDue > 0 && (
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#dc2626', marginTop: 2 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#f87171', marginTop: 2 }}>
                     Balance Due: {fmtINR(viewInvoiceModal.balanceDue)}
                   </div>
                 )}
@@ -9595,17 +9505,17 @@ export default function EliteBillingDepartment({
             </div>
 
             {/* Line Items Table */}
-            <div style={{ marginBottom: '1.25rem', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-              <table style={{ width: '100%', fontSize: '0.83rem', borderCollapse: 'collapse', textAlign: 'left', background: '#ffffff' }}>
+            <div style={{ marginBottom: '1.25rem', overflowX: 'auto', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: 8, background: 'rgba(11, 17, 32, 0.65)' }}>
+              <table style={{ width: '100%', fontSize: '0.83rem', borderCollapse: 'collapse', textAlign: 'left', background: 'transparent' }}>
                 <thead>
-                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Sr.</th>
-                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', width: '50px' }}>Image</th>
-                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Item Description & Details</th>
-                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>HSN</th>
-                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Qty</th>
-                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rate</th>
-                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Amount</th>
+                  <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.14)' }}>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Sr.</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', width: '50px' }}>Image</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Item Description & Details</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>HSN</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Qty</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rate</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#94a3b8', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -9617,12 +9527,12 @@ export default function EliteBillingDepartment({
                     if (it.ourChallanNo) secondaryBadges.push(`Challan: ${it.ourChallanNo}`);
 
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                        <td style={{ padding: '0.7rem 0.6rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.7rem 0.6rem', color: '#94a3b8', fontWeight: 700 }}>{idx + 1}</td>
                         <td style={{ padding: '0.7rem 0.6rem' }}>
                           {it.imageUrl ? (
                             <div
-                              style={{ position: 'relative', width: 44, height: 44, cursor: 'pointer', borderRadius: 8, overflow: 'hidden', border: '1.5px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', background: '#f8fafc' }}
+                              style={{ position: 'relative', width: 44, height: 44, cursor: 'pointer', borderRadius: 8, overflow: 'hidden', border: '1.5px solid rgba(255, 255, 255, 0.2)', background: 'rgba(15, 23, 42, 0.8)' }}
                               onClick={() => setPreviewImageModal({ url: convertDriveUrl(it.imageUrl, it.itemName), title: it.itemName, jobNo: it.jobNo, fabric: it.fabric })}
                               title="Click to view full design preview"
                             >
@@ -9637,46 +9547,46 @@ export default function EliteBillingDepartment({
                                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                                 }}
                               />
-                              <div style={{ display: 'none', width: '100%', height: '100%', background: '#f1f5f9', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                              <div style={{ display: 'none', width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.8)', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
                                 No Img
                               </div>
                             </div>
                           ) : (
-                            <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(15, 23, 42, 0.8)', border: '1px dashed rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
                               No Img
                             </div>
                           )}
                         </td>
                         <td style={{ padding: '0.7rem 0.6rem' }}>
-                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{it.itemName}</div>
+                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#ffffff' }}>{it.itemName}</div>
                           {jobDisplay && (
-                            <div style={{ fontSize: '0.76rem', color: '#7c3aed', fontWeight: 700, marginTop: 3, display: 'inline-block', background: '#f3e8ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #d8b4fe' }}>
+                            <div style={{ fontSize: '0.76rem', color: '#c4b5fd', fontWeight: 700, marginTop: 3, display: 'inline-block', background: 'rgba(124, 58, 237, 0.2)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(167, 139, 250, 0.4)' }}>
                               📋 {jobDisplay}
                             </div>
                           )}
                           {secondaryBadges.length > 0 && (
                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: 5 }}>
                               {secondaryBadges.map((b, bIdx) => (
-                                <span key={bIdx} style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 4, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontWeight: 600 }}>
+                                <span key={bIdx} style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 4, background: 'rgba(255, 255, 255, 0.08)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.14)', fontWeight: 600 }}>
                                   {b}
                                 </span>
                               ))}
                             </div>
                           )}
-                          {it.description && <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>{it.description}</div>}
+                          {it.description && <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>{it.description}</div>}
                         </td>
-                        <td style={{ padding: '0.7rem 0.6rem', fontWeight: 800, color: '#7c3aed' }}>{it.hsnCode || '998821'}</td>
-                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{it.qty} {it.unit || 'Meters'}</td>
-                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', color: '#475569', fontWeight: 600 }}>₹ {it.unitPrice}</td>
-                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 900, color: '#2563eb' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', fontWeight: 800, color: '#c4b5fd' }}>{it.hsnCode || '998821'}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#ffffff' }}>{it.qty} {it.unit || 'Meters'}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', color: '#cbd5e1', fontWeight: 600 }}>₹ {it.unitPrice}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 900, color: '#60a5fa' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
-                  <tr style={{ background: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 800 }}>
-                    <td colSpan={4} style={{ padding: '0.65rem', textAlign: 'right', color: '#475569', fontSize: '0.8rem' }}>Total Qty:</td>
-                    <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#6d28d9', fontSize: '0.9rem', fontWeight: 900 }}>
+                  <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderTop: '1px solid rgba(255, 255, 255, 0.16)', fontWeight: 800 }}>
+                    <td colSpan={4} style={{ padding: '0.65rem', textAlign: 'right', color: '#cbd5e1', fontSize: '0.8rem' }}>Total Qty:</td>
+                    <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#c4b5fd', fontSize: '0.9rem', fontWeight: 900 }}>
                       {(viewInvoiceModal.items || []).reduce((sum, item) => sum + (parseFloat(item.qty) || 0), 0).toFixed(2)} {viewInvoiceModal.items?.[0]?.unit || 'MTR'}
                     </td>
                     <td colSpan={2} style={{ padding: '0.65rem' }}></td>
@@ -9690,19 +9600,19 @@ export default function EliteBillingDepartment({
               <div>
                 {viewInvoiceModal.notes && (
                   <div style={{ marginBottom: '0.6rem' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOTES:</span>
-                    <div style={{ color: '#334155', fontSize: '0.83rem', marginTop: 2, background: '#f8fafc', padding: '0.6rem', borderRadius: 6, border: '1px solid #e2e8f0' }}>{viewInvoiceModal.notes}</div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOTES:</span>
+                    <div style={{ color: '#e2e8f0', fontSize: '0.83rem', marginTop: 2, background: 'rgba(11, 17, 32, 0.65)', padding: '0.6rem', borderRadius: 6, border: '1px solid rgba(255, 255, 255, 0.12)' }}>{viewInvoiceModal.notes}</div>
                   </div>
                 )}
-                <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 700, background: '#f5f3ff', padding: '0.65rem 0.85rem', borderRadius: 8, border: '1px solid #ddd6fe' }}>
-                  Amount in Words: <strong>{numToWords(viewInvoiceModal.grandTotal)}</strong>
+                <div style={{ fontSize: '0.8rem', color: '#c4b5fd', fontWeight: 700, background: 'rgba(124, 58, 237, 0.15)', padding: '0.65rem 0.85rem', borderRadius: 8, border: '1px solid rgba(167, 139, 250, 0.35)' }}>
+                  Amount in Words: <strong style={{ color: '#ffffff' }}>{numToWords(viewInvoiceModal.grandTotal)}</strong>
                 </div>
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <div style={{ background: 'rgba(11, 17, 32, 0.65)', padding: '1rem 1.25rem', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.12)', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal:</span>
-                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.subtotal)}</span>
+                  <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Subtotal:</span>
+                  <span style={{ color: '#ffffff', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.subtotal)}</span>
                 </div>
                 {(() => {
                   const taxable = Number(viewInvoiceModal.subtotal || viewInvoiceModal.taxableAmount || 0);
@@ -9713,45 +9623,45 @@ export default function EliteBillingDepartment({
 
                   return viewInvoiceModal.igstAmount > 0 ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>IGST Tax ({fullRate}%):</span>
-                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
+                      <span style={{ color: '#cbd5e1', fontWeight: 600 }}>IGST Tax ({fullRate}%):</span>
+                      <span style={{ color: '#ffffff', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
                     </div>
                   ) : (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#64748b', fontWeight: 600 }}>CGST Tax ({splitRate}%):</span>
-                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                        <span style={{ color: '#cbd5e1', fontWeight: 600 }}>CGST Tax ({splitRate}%):</span>
+                        <span style={{ color: '#ffffff', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#64748b', fontWeight: 600 }}>SGST Tax ({splitRate}%):</span>
-                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                        <span style={{ color: '#cbd5e1', fontWeight: 600 }}>SGST Tax ({splitRate}%):</span>
+                        <span style={{ color: '#ffffff', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
                       </div>
                     </>
                   );
                 })()}
 
                 {/* Round Off Details Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#7c3aed', fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c4b5fd', fontWeight: 600 }}>
                   <span>Round Off:</span>
                   <span style={{ fontWeight: 700 }}>{viewInvoiceModal.roundOff != null ? (viewInvoiceModal.roundOff > 0 ? '+' : '') + ' ₹ ' + Number(viewInvoiceModal.roundOff).toFixed(2) : '₹ 0.00'}</span>
                 </div>
 
                 {viewInvoiceModal.enableTds && Number(viewInvoiceModal.tdsAmount) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fbbf24', fontWeight: 600 }}>
                     <span>Less: TDS ({viewInvoiceModal.tdsSection || '194C'} @ {viewInvoiceModal.tdsRate || 0}%):</span>
                     <span style={{ fontWeight: 700 }}>- ₹ {Math.round(Number(viewInvoiceModal.tdsAmount || 0)).toLocaleString('en-IN')}</span>
                   </div>
                 )}
 
-                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '0.45rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#6d28d9', fontWeight: 800, fontSize: '1.05rem' }}>Grand Total:</span>
-                  <span style={{ color: '#059669', fontWeight: 900, fontSize: '1.25rem' }}>{fmtINR(viewInvoiceModal.grandTotal)}</span>
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.14)', paddingTop: '0.45rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#c4b5fd', fontWeight: 800, fontSize: '1.05rem' }}>Grand Total:</span>
+                  <span style={{ color: '#34d399', fontWeight: 900, fontSize: '1.25rem' }}>{fmtINR(viewInvoiceModal.grandTotal)}</span>
                 </div>
 
                 {viewInvoiceModal.enableTds && Number(viewInvoiceModal.tdsAmount) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(245, 158, 11, 0.08)', padding: '0.3rem 0.5rem', borderRadius: 6 }}>
-                    <span style={{ color: '#b45309', fontWeight: 700 }}>Net Receivable:</span>
-                    <span style={{ color: '#b45309', fontWeight: 800, fontSize: '1.1rem' }}>{fmtINR(Math.max(0, (viewInvoiceModal.grandTotal || 0) - (viewInvoiceModal.tdsAmount || 0)))}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(251, 191, 36, 0.35)', padding: '0.35rem 0.6rem', borderRadius: 6 }}>
+                    <span style={{ color: '#fde68a', fontWeight: 700 }}>Net Receivable:</span>
+                    <span style={{ color: '#fbbf24', fontWeight: 800, fontSize: '1.1rem' }}>{fmtINR(Math.max(0, (viewInvoiceModal.grandTotal || 0) - (viewInvoiceModal.tdsAmount || 0)))}</span>
                   </div>
                 )}
               </div>
@@ -9760,8 +9670,8 @@ export default function EliteBillingDepartment({
             )}
 
             {/* Modal Actions */}
-            <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-              <button style={{ padding: '0.5rem 1.1rem', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => setViewInvoiceModal(null)}>Close</button>
+            <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '1rem' }}>
+              <button style={{ padding: '0.5rem 1.1rem', background: 'rgba(15, 23, 42, 0.8)', color: '#e2e8f0', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => setViewInvoiceModal(null)}>Close</button>
               <button
                 style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                 disabled={printingInvoiceId === viewInvoiceModal._id}
@@ -9787,10 +9697,10 @@ export default function EliteBillingDepartment({
                   <CreditCard size={15} /> Record Payment
                 </button>
               )}
-              <button style={{ padding: '0.5rem 1.1rem', background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleOpenCreateTab(inv); }}>
+              <button style={{ padding: '0.5rem 1.1rem', background: 'rgba(15, 23, 42, 0.8)', color: '#e2e8f0', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleOpenCreateTab(inv); }}>
                 <Edit2 size={15} /> Edit Invoice
               </button>
-              <button style={{ padding: '0.5rem 1.1rem', background: 'rgba(139, 92, 246, 0.1)', color: '#7c3aed', border: '1px solid #c4b5fd', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleCloneInvoice(inv); }}>
+              <button style={{ padding: '0.5rem 1.1rem', background: 'rgba(139, 92, 246, 0.18)', color: '#c4b5fd', border: '1px solid rgba(167, 139, 250, 0.4)', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleCloneInvoice(inv); }}>
                 <Copy size={15} /> Clone Invoice
               </button>
             </div>
@@ -9803,13 +9713,13 @@ export default function EliteBillingDepartment({
         <div className="modal-overlay" style={{ alignItems: 'center' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Record Payment — {paymentModalInvoice.invoiceNo}</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>Record Payment — {paymentModalInvoice.invoiceNo}</h3>
               <button onClick={() => setPaymentModalInvoice(null)} className="btn-icon"><X size={16} /></button>
             </div>
 
             {paymentModalInvoice.enableTds && Number(paymentModalInvoice.tdsAmount) > 0 && (
-              <div style={{ fontSize: '0.78rem', color: '#b45309', background: 'rgba(245, 158, 11, 0.1)', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid rgba(245, 158, 11, 0.25)' }}>
-                ℹ️ TDS Deducted: <strong>₹ {Math.round(Number(paymentModalInvoice.tdsAmount || 0)).toLocaleString('en-IN')}</strong> ({paymentModalInvoice.tdsSection || '194C'} @ {paymentModalInvoice.tdsRate || 0}%)
+              <div style={{ fontSize: '0.78rem', color: '#fde68a', background: 'rgba(245, 158, 11, 0.15)', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid rgba(251, 191, 36, 0.35)' }}>
+                ℹ️ TDS Deducted: <strong style={{ color: '#fbbf24' }}>₹ {Math.round(Number(paymentModalInvoice.tdsAmount || 0)).toLocaleString('en-IN')}</strong> ({paymentModalInvoice.tdsSection || '194C'} @ {paymentModalInvoice.tdsRate || 0}%)
               </div>
             )}
 
@@ -10320,30 +10230,26 @@ export default function EliteBillingDepartment({
         </div>
       )}
 
-      {/* ── DOWNLOAD ACCOUNTS & PARTY LEDGER MODAL (WHITE & BLUE THEME) ─────────────── */}
+      {/* ── DOWNLOAD ACCOUNTS & PARTY LEDGER MODAL (DARK GLASS THEME) ─────────────── */}
       {showLedgerModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '16px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)', color: '#0f172a', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-modal-card" style={{ background: 'rgba(15, 23, 42, 0.94)', border: '1.5px solid rgba(59, 130, 246, 0.35)', borderRadius: '16px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.65)', color: '#ffffff', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', backdropFilter: 'blur(20px)' }}>
 
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.8rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
-                  <BookOpen size={22} color="#0284c7" />
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.18)', border: '1px solid rgba(96, 165, 250, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa' }}>
+                  <BookOpen size={22} color="#60a5fa" />
                 </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Ledger Export &amp; Accounts Statement</h3>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Download Party Account Statements &amp; Global Master Ledgers</span>
-                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>Ledger Export &amp; Accounts Statement</h3>
               </div>
-              <button onClick={() => setShowLedgerModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowLedgerModal(false)} style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: '8px', color: '#cbd5e1', cursor: 'pointer', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
 
             {/* Mode Selector Tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.35rem', borderRadius: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: 'rgba(11, 17, 32, 0.85)', border: '1px solid rgba(255, 255, 255, 0.14)', padding: '0.35rem', borderRadius: '10px' }}>
               <button
                 onClick={() => setLedgerMode('party')}
                 style={{
@@ -10354,8 +10260,8 @@ export default function EliteBillingDepartment({
                   fontSize: '0.82rem',
                   cursor: 'pointer',
                   background: ledgerMode === 'party' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'transparent',
-                  color: ledgerMode === 'party' ? '#ffffff' : '#64748b',
-                  boxShadow: ledgerMode === 'party' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
+                  color: ledgerMode === 'party' ? '#ffffff' : '#94a3b8',
+                  boxShadow: ledgerMode === 'party' ? '0 4px 12px rgba(37, 99, 235, 0.3)' : 'none',
                   transition: 'all 0.2s'
                 }}
               >
@@ -10371,8 +10277,8 @@ export default function EliteBillingDepartment({
                   fontSize: '0.82rem',
                   cursor: 'pointer',
                   background: ledgerMode === 'master' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'transparent',
-                  color: ledgerMode === 'master' ? '#ffffff' : '#64748b',
-                  boxShadow: ledgerMode === 'master' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
+                  color: ledgerMode === 'master' ? '#ffffff' : '#94a3b8',
+                  boxShadow: ledgerMode === 'master' ? '0 4px 12px rgba(37, 99, 235, 0.3)' : 'none',
                   transition: 'all 0.2s'
                 }}
               >
@@ -10383,11 +10289,11 @@ export default function EliteBillingDepartment({
             {/* Mode A: Select Party */}
             {ledgerMode === 'party' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Select Customer / Party Account</label>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Select Customer / Party Account</label>
                 <select
                   value={selectedPartyId}
                   onChange={e => setSelectedPartyId(e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(11, 17, 32, 0.88)', border: '1.5px solid rgba(255, 255, 255, 0.16)', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
                 >
                   <option value="ALL">All Parties (Combined)</option>
                   {customers.map(c => (
@@ -10401,7 +10307,7 @@ export default function EliteBillingDepartment({
 
             {/* Date Range Presets */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Date Range Filter</label>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Date Range Filter</label>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 {[
                   { id: 'this_month', label: 'This Month' },
@@ -10419,9 +10325,9 @@ export default function EliteBillingDepartment({
                         padding: '0.4rem 0.85rem',
                         borderRadius: '6px',
                         border: '1.5px solid',
-                        borderColor: isSel ? '#0284c7' : '#cbd5e1',
-                        background: isSel ? '#eff6ff' : '#ffffff',
-                        color: isSel ? '#0284c7' : '#64748b',
+                        borderColor: isSel ? '#38bdf8' : 'rgba(255, 255, 255, 0.16)',
+                        background: isSel ? 'rgba(56, 189, 248, 0.2)' : 'rgba(11, 17, 32, 0.85)',
+                        color: isSel ? '#38bdf8' : '#94a3b8',
                         fontSize: '0.78rem',
                         fontWeight: isSel ? 800 : 600,
                         cursor: 'pointer'
@@ -10440,12 +10346,12 @@ export default function EliteBillingDepartment({
                   gap: '0.85rem',
                   marginTop: '0.4rem',
                   padding: '0.85rem 1rem',
-                  background: 'rgba(2, 132, 199, 0.04)',
+                  background: 'rgba(56, 189, 248, 0.08)',
                   borderRadius: '10px',
-                  border: '1px solid rgba(2, 132, 199, 0.2)'
+                  border: '1px solid rgba(56, 189, 248, 0.28)'
                 }}>
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, marginBottom: '0.3rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#38bdf8', fontWeight: 700, marginBottom: '0.3rem' }}>
                       <Calendar size={13} /> FROM DATE
                     </label>
                     <input
@@ -10455,10 +10361,10 @@ export default function EliteBillingDepartment({
                       style={{
                         width: '100%',
                         padding: '0.5rem 0.65rem',
-                        background: '#ffffff',
-                        border: '1.5px solid #cbd5e1',
+                        background: 'rgba(11, 17, 32, 0.88)',
+                        border: '1.5px solid rgba(255, 255, 255, 0.16)',
                         borderRadius: '6px',
-                        color: '#0f172a',
+                        color: '#ffffff',
                         fontSize: '0.82rem',
                         fontWeight: 600,
                         boxSizing: 'border-box'
@@ -10466,7 +10372,7 @@ export default function EliteBillingDepartment({
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, marginBottom: '0.3rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#38bdf8', fontWeight: 700, marginBottom: '0.3rem' }}>
                       <Calendar size={13} /> TO DATE
                     </label>
                     <input
@@ -10476,10 +10382,10 @@ export default function EliteBillingDepartment({
                       style={{
                         width: '100%',
                         padding: '0.5rem 0.65rem',
-                        background: '#ffffff',
-                        border: '1.5px solid #cbd5e1',
+                        background: 'rgba(11, 17, 32, 0.88)',
+                        border: '1.5px solid rgba(255, 255, 255, 0.16)',
                         borderRadius: '6px',
-                        color: '#0f172a',
+                        color: '#ffffff',
                         fontSize: '0.82rem',
                         fontWeight: 600,
                         boxSizing: 'border-box'
@@ -10492,7 +10398,7 @@ export default function EliteBillingDepartment({
 
             {/* Export Format Selector — 5 Formats (Excel, PDF, CSV, Tally XML, Quick Print) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Select Export Format</label>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Select Export Format</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
                 {[
                   { id: 'excel', label: '📊 Excel (.xlsx)', icon: FileSpreadsheet },
@@ -10515,17 +10421,17 @@ export default function EliteBillingDepartment({
                         gap: '0.35rem',
                         padding: '0.75rem 0.4rem',
                         borderRadius: '10px',
-                        border: isSel ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                        background: isSel ? '#eff6ff' : '#ffffff',
-                        color: isSel ? '#0284c7' : '#475569',
+                        border: isSel ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.16)',
+                        background: isSel ? 'rgba(56, 189, 248, 0.18)' : 'rgba(11, 17, 32, 0.85)',
+                        color: isSel ? '#38bdf8' : '#cbd5e1',
                         fontWeight: isSel ? 800 : 700,
                         fontSize: '0.78rem',
                         cursor: 'pointer',
-                        boxShadow: isSel ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none',
+                        boxShadow: isSel ? '0 4px 12px rgba(56, 189, 248, 0.25)' : 'none',
                         transition: 'all 0.15s'
                       }}
                     >
-                      <Icon size={20} color={isSel ? '#0284c7' : '#64748b'} />
+                      <Icon size={20} color={isSel ? '#38bdf8' : '#94a3b8'} />
                       <span style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{fmt.label}</span>
                     </button>
                   );
@@ -10533,28 +10439,28 @@ export default function EliteBillingDepartment({
               </div>
             </div>
 
-            {/* Live Calculated Summary Box (White & Blue) */}
+            {/* Live Calculated Summary Box (Dark Glass) */}
             {(() => {
               const { startD, endD } = getLedgerDateRange();
               if (ledgerMode === 'party') {
                 const ledger = computePartyLedger(selectedPartyId, startD, endD);
                 return (
-                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(11, 17, 32, 0.65)', borderRadius: '12px', padding: '1rem', border: '1.5px solid rgba(255, 255, 255, 0.14)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Opening Balance</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmtINR(ledger.openingBalance)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Opening Balance</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#ffffff', marginTop: 2 }}>{fmtINR(ledger.openingBalance)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Debit (Billed)</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>{fmtINR(ledger.totalDebit)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Total Debit (Billed)</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>{fmtINR(ledger.totalDebit)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Credit (Paid)</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#16a34a', marginTop: 2 }}>{fmtINR(ledger.totalCredit)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Total Credit (Paid)</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>{fmtINR(ledger.totalCredit)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Closing Balance</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: ledger.closingBalance > 0 ? '#ea580c' : '#16a34a', marginTop: 2 }}>{fmtINR(ledger.closingBalance)} ({ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Closing Balance</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: ledger.closingBalance > 0 ? '#fbbf24' : '#34d399', marginTop: 2 }}>{fmtINR(ledger.closingBalance)} ({ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</div>
                     </div>
                   </div>
                 );
@@ -10569,22 +10475,22 @@ export default function EliteBillingDepartment({
                   grandBal += pL.closingBalance;
                 });
                 return (
-                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(11, 17, 32, 0.65)', borderRadius: '12px', padding: '1rem', border: '1.5px solid rgba(255, 255, 255, 0.14)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Parties Count</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{customers.length} Accounts</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Parties Count</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#ffffff', marginTop: 2 }}>{customers.length} Accounts</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Period Billed</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>{fmtINR(grandBilled)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Period Billed</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>{fmtINR(grandBilled)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Period Collected</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#16a34a', marginTop: 2 }}>{fmtINR(grandPaid)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Period Collected</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>{fmtINR(grandPaid)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Outstanding</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#ea580c', marginTop: 2 }}>{fmtINR(grandBal)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Total Outstanding</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fbbf24', marginTop: 2 }}>{fmtINR(grandBal)}</div>
                     </div>
                   </div>
                 );
@@ -10593,7 +10499,7 @@ export default function EliteBillingDepartment({
 
             {/* Modal Actions */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
-              <button onClick={() => setShowLedgerModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => setShowLedgerModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
               <button
                 onClick={handleGenerateLedgerExport}
                 style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', border: 'none', color: '#ffffff', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)' }}
@@ -10610,39 +10516,34 @@ export default function EliteBillingDepartment({
       {selectedInvoiceHistory && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 99999,
-          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
-          <div style={{
-            width: '100%', maxWidth: '600px', background: '#ffffff', border: '1px solid #e2e8f0',
-            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+          <div className="glass-modal-card" style={{
+            width: '100%', maxWidth: '600px', background: 'rgba(15, 23, 42, 0.94)', border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '14px', padding: '1.25rem', color: '#ffffff', boxShadow: '0 25px 50px rgba(0,0,0,0.65)', backdropFilter: 'blur(20px)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Clock size={18} /> Tax Invoice #{selectedInvoiceHistory.invoiceNo} — Staff Audit Log
-                </h3>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Staff member attribution for invoice generation and billing history.
-                </p>
-              </div>
-              <button className="btn-icon" onClick={() => setSelectedInvoiceHistory(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={18} /> Tax Invoice #{selectedInvoiceHistory.invoiceNo} — Staff Audit Log
+              </h3>
+              <button className="btn-icon" onClick={() => setSelectedInvoiceHistory(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ padding: '1.25rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: 'rgba(11, 17, 32, 0.65)', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Generated By (Staff):</span>
-                <span style={{ padding: '3px 10px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 800, fontSize: '0.85rem', border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0' }}>Generated By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.18)', color: '#93c5fd', fontWeight: 800, fontSize: '0.85rem', border: '1px solid rgba(96, 165, 250, 0.4)' }}>
                   {selectedInvoiceHistory.createdByName || selectedInvoiceHistory.createdBy || 'HASI'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
-                <div>Customer: <strong style={{ color: '#0f172a' }}>{selectedInvoiceHistory.customer?.businessName || selectedInvoiceHistory.customer?.name || 'Client'}</strong></div>
-                <div>Grand Total: <strong style={{ color: '#16a34a' }}>{fmtINR(selectedInvoiceHistory.grandTotal)}</strong></div>
-                <div>Invoice Date: <strong style={{ color: '#0f172a' }}>{formatDateDDMMYYYY(selectedInvoiceHistory.invoiceDate)}</strong></div>
-                <div>Payment Status: <strong style={{ color: selectedInvoiceHistory.paymentStatus === 'PAID' ? '#16a34a' : '#ef4444' }}>{selectedInvoiceHistory.paymentStatus}</strong></div>
+              <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Customer: <strong style={{ color: '#ffffff' }}>{selectedInvoiceHistory.customer?.businessName || selectedInvoiceHistory.customer?.name || 'Client'}</strong></div>
+                <div>Grand Total: <strong style={{ color: '#34d399' }}>{fmtINR(selectedInvoiceHistory.grandTotal)}</strong></div>
+                <div>Invoice Date: <strong style={{ color: '#ffffff' }}>{formatDateDDMMYYYY(selectedInvoiceHistory.invoiceDate)}</strong></div>
+                <div>Payment Status: <strong style={{ color: selectedInvoiceHistory.paymentStatus === 'PAID' ? '#34d399' : '#f87171' }}>{selectedInvoiceHistory.paymentStatus}</strong></div>
               </div>
             </div>
           </div>
@@ -10687,8 +10588,8 @@ export default function EliteBillingDepartment({
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.78)',
-            backdropFilter: 'blur(5px)',
+            background: 'rgba(2, 6, 23, 0.82)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -10699,31 +10600,34 @@ export default function EliteBillingDepartment({
           onClick={() => setPreviewImageModal(null)}
         >
           <div
+            className="glass-modal-card"
             style={{
-              background: '#ffffff',
+              background: 'rgba(15, 23, 42, 0.94)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
               borderRadius: 16,
               padding: '1.25rem',
               maxWidth: '92vw',
               maxHeight: '92vh',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.65)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              position: 'relative'
+              position: 'relative',
+              backdropFilter: 'blur(20px)'
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '0.75rem' }}>
               <div>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{previewImageModal.title || 'Design Artwork Preview'}</h4>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>{previewImageModal.title || 'Design Artwork Preview'}</h4>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: 4 }}>
-                  {previewImageModal.jobNo && <span style={{ fontSize: '0.75rem', color: '#7c3aed', background: '#f3e8ff', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>Job: {previewImageModal.jobNo}</span>}
-                  {previewImageModal.fabric && <span style={{ fontSize: '0.75rem', color: '#0284c7', background: '#e0f2fe', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>Fabric: {previewImageModal.fabric}</span>}
+                  {previewImageModal.jobNo && <span style={{ fontSize: '0.75rem', color: '#c4b5fd', background: 'rgba(124, 58, 237, 0.2)', border: '1px solid rgba(167, 139, 250, 0.4)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>Job: {previewImageModal.jobNo}</span>}
+                  {previewImageModal.fabric && <span style={{ fontSize: '0.75rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.18)', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>Fabric: {previewImageModal.fabric}</span>}
                 </div>
               </div>
               <button
                 onClick={() => setPreviewImageModal(null)}
-                style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', color: '#475569' }}
+                style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: 8, padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', color: '#e2e8f0' }}
               >
                 ✕ Close
               </button>
@@ -10731,7 +10635,7 @@ export default function EliteBillingDepartment({
             <img
               src={previewImageModal.url}
               alt="Design Preview"
-              style={{ maxWidth: '82vw', maxHeight: '70vh', objectFit: 'contain', borderRadius: 10, border: '1px solid #e2e8f0' }}
+              style={{ maxWidth: '82vw', maxHeight: '70vh', objectFit: 'contain', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.16)' }}
             />
           </div>
         </div>
@@ -10747,7 +10651,7 @@ export default function EliteBillingDepartment({
 const labelStyle = {
   fontSize: '0.7rem',
   fontWeight: 700,
-  color: 'var(--text-muted)',
+  color: '#cbd5e1',
   textTransform: 'uppercase',
   marginBottom: '0.3rem',
   display: 'block'
@@ -10757,9 +10661,9 @@ const inputStyle = {
   width: '100%',
   padding: '0.5rem 0.7rem',
   fontSize: '0.85rem',
-  background: 'var(--bg-input, #161b26)',
-  border: '1px solid var(--border-light, #2d3748)',
+  background: 'rgba(11, 17, 32, 0.88)',
+  border: '1px solid rgba(255, 255, 255, 0.16)',
   borderRadius: 'var(--radius-sm, 6px)',
-  color: 'var(--text-primary, #f7fafc)',
+  color: '#ffffff',
   boxSizing: 'border-box'
 };

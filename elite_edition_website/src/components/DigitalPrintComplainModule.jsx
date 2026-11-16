@@ -10,6 +10,8 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange, DATE_PRESETS } from './DateRangePicker';
 import { toLocalYMD } from '../utils/dateUtils';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const CATEGORIES = [
   'Printing Defect',
@@ -85,6 +87,8 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
       options: (Array.isArray(dynamicCategories) && dynamicCategories.length > 0 ? dynamicCategories : CATEGORIES).map(c => ({ value: c, label: c }))
     }
   ], [dynamicCategories]);
+  const [complaintViewMode, setComplaintViewMode] = useState('cards');
+  const [activeComplaintTab, setActiveComplaintTab] = useState('All');
   const [datePreset, setDatePreset] = useState('all');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
@@ -727,97 +731,129 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
   return (
     <div className="ent-screen-container">
       
-      {/* ── UNIFIED ENTERPRISE HEADER ── */}
-      <div className="ent-screen-header">
-        <div className="ent-header-title-wrap">
-          <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #f43f5e, #fb923c)' }}>
-            <AlertTriangle size={18} color="#fff" />
-          </div>
-          <div>
-            <h2 className="ent-header-title">
-              Quality Complaints
-            </h2>
-          </div>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <AlertTriangle size={20} color="#f43f5e" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            Quality Complaints
+          </span>
+          <EntityBrandBadge />
         </div>
 
-        {/* Action Buttons */}
-        <div className="ent-header-actions">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {canCreateComplaint && (
             <button
               onClick={handleOpenNew}
-              className="ent-btn ent-btn-primary"
-              style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+              className="glass-btn-primary"
+              style={{
+                background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.9), rgba(225, 29, 72, 0.85))',
+                boxShadow: '0 4px 14px rgba(244, 63, 94, 0.35)',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.84rem',
+                padding: '0.55rem 1.1rem',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                cursor: 'pointer'
+              }}
             >
-              <PlusCircle size={14} /> New Ticket
+              <PlusCircle size={15} /> New Ticket
             </button>
           )}
           {canViewDashboard && (
             <button
               onClick={handleExportPDF}
-              className="ent-btn ent-btn-secondary"
+              className="glass-subtab-btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.9rem', fontSize: '0.84rem' }}
             >
-              <FileText size={14} color="#e11d48" /> Export PDF
+              <FileText size={14} color="#f43f5e" /> Export PDF
             </button>
           )}
-          <button
-            onClick={handleClearAllComplaints}
-            className="ent-btn ent-btn-danger"
-            title="Clear test complaints and reset data"
-          >
-            <Trash2 size={14} /> Clear Tickets
-          </button>
+          <QuickActionMenu />
         </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREENS / STATUS TABS ── */}
+      <div className="glass-subtabs-bar" style={{ marginTop: '0.75rem' }}>
+        {[
+          { id: 'All', label: `All Complaints (${analytics.total || complaints.length})` },
+          { id: 'Open', label: `Open Tickets (${analytics.open || 0})` },
+          { id: 'Hold', label: `On Hold (${analytics.hold || 0})` },
+          { id: 'Close', label: `Resolved (${analytics.close || 0})` },
+          { id: 'Feedback', label: `Feedback (${analytics.feedback || 0})` }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`glass-subtab-btn ${activeComplaintTab === tab.id ? 'active' : ''}`}
+            onClick={() => {
+              setActiveComplaintTab(tab.id);
+              if (tab.id === 'All') {
+                setComplaintFilters(prev => ({ ...prev, status: [] }));
+              } else {
+                setComplaintFilters(prev => ({ ...prev, status: [tab.id] }));
+              }
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Dashboard View (Scoped by Permission) */}
       {canViewDashboard ? (
         <>
-          {/* KPI Analytical Cards */}
-          <div className="ent-stat-grid">
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #60a5fa' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Total Complaints</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{analytics.total || 0}</div>
+          {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+          <div className="glass-scroll-track" style={{ marginTop: '0.85rem' }}>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Total Complaints</span>
+              <span className="glass-calc-value" style={{ color: '#ffffff' }}>{analytics.total || 0}</span>
+              <span className="glass-calc-sub">All-time tickets</span>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #eab308' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Open</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#eab308', marginTop: 2 }}>{analytics.open || 0}</div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Open Tickets</span>
+              <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{analytics.open || 0}</span>
+              <span className="glass-calc-sub">Action required</span>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f97316' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Hold</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#f97316', marginTop: 2 }}>{analytics.hold || 0}</div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">On Hold</span>
+              <span className="glass-calc-value" style={{ color: '#fb923c' }}>{analytics.hold || 0}</span>
+              <span className="glass-calc-sub">Pending review</span>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #4ade80' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Close</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#4ade80', marginTop: 2 }}>{analytics.close || 0}</div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Resolved</span>
+              <span className="glass-calc-value" style={{ color: '#34d399' }}>{analytics.close || 0}</span>
+              <span className="glass-calc-sub">Closed tickets</span>
             </div>
 
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #c084fc' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Feedback</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>{analytics.feedback || 0}</div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Feedback</span>
+              <span className="glass-calc-value" style={{ color: '#c084fc' }}>{analytics.feedback || 0}</span>
+              <span className="glass-calc-sub">Customer notes</span>
             </div>
 
-            {/* Complaint Rate (%) */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f43f5e' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Rate (%)</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#f43f5e', marginTop: 2 }}>
-                {analytics.complaintRate || '0.00'}%
-              </div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Complaint Rate</span>
+              <span className="glass-calc-value" style={{ color: '#f87171' }}>{analytics.complaintRate || '0.00'}%</span>
+              <span className="glass-calc-sub">% defective output</span>
             </div>
 
-            {/* Resolution SLA / TAT */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #38bdf8' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Resolution TAT</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
-                {analytics.avgTatFormatted || 'N/A'}
-              </div>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Resolution TAT</span>
+              <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{analytics.avgTatFormatted || 'N/A'}</span>
+              <span className="glass-calc-sub">Avg turnaround</span>
             </div>
           </div>
 
-          {/* Filter Toolbar */}
-          <div className="glass-panel" style={{ padding: '1rem 1.25rem', overflow: 'visible', position: 'relative', zIndex: 100 }}>
+          {/* ── TIER 4: ACTION TOOLBAR WITH VIEW TOGGLE ── */}
+          <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', marginTop: '0.85rem', overflow: 'visible', position: 'relative', zIndex: 100 }}>
             <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: '1 1 200px' }}>
                 <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -848,6 +884,24 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                 onChange={setComplaintFilters}
                 placeholder="Filters"
               />
+
+              {/* View Toggle */}
+              <div className="glass-view-toggle" style={{ marginLeft: 'auto' }}>
+                <button
+                  type="button"
+                  className={complaintViewMode === 'cards' ? 'active' : ''}
+                  onClick={() => setComplaintViewMode('cards')}
+                >
+                  🎴 Cards
+                </button>
+                <button
+                  type="button"
+                  className={complaintViewMode === 'table' ? 'active' : ''}
+                  onClick={() => setComplaintViewMode('table')}
+                >
+                  📄 Table
+                </button>
+              </div>
             </div>
           </div>
 
@@ -862,6 +916,145 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
               <CheckCircle size={48} color="#4ade80" style={{ opacity: 0.5 }} />
               <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>No Complaints Logged</h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>There are no quality complaints matching your selected filters.</p>
+            </div>
+          ) : complaintViewMode === 'table' ? (
+            /* ── TIER 5: TABLE VIEW ── */
+            <div className="glass-table-container">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>Ticket #</th>
+                    <th>Date</th>
+                    <th>Party / Customer</th>
+                    <th>Assigned / Resp</th>
+                    <th>Linkage</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Defect</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {complaints.map(item => {
+                    const statusMeta = getStatusBadge(item?.status) || { bg: 'rgba(255,255,255,0.08)', color: '#94a3b8', border: 'rgba(255,255,255,0.15)', dot: '#94a3b8' };
+                    const priorityMeta = getPriorityMeta(item?.priority);
+                    const statusOptions = Array.from(new Set([...STATUSES, item?.status].filter(Boolean)));
+
+                    return (
+                      <tr key={item._id}>
+                        <td>
+                          <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 800, color: '#38bdf8' }}>
+                            {item.complaintNo}
+                          </span>
+                        </td>
+                        <td style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                          {item.date ? new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
+                        </td>
+                        <td>
+                          <strong style={{ color: '#ffffff', fontSize: '0.86rem' }}>{item.partyName || 'N/A'}</strong>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem' }}>
+                            {item.assignedTo && (
+                              <span style={{ color: '#38bdf8' }}>By: {item.assignedTo}</span>
+                            )}
+                            {item.responsiblePerson && (
+                              <span style={{ color: '#f87171' }}>Resp: {item.responsiblePerson}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem' }}>
+                            {item.jobCardNo && <span style={{ color: '#ffffff' }}>JC: {item.jobCardNo}</span>}
+                            {item.challanNo && <span style={{ color: '#38bdf8' }}>CH: {item.challanNo}</span>}
+                            {item.invoiceNo && <span style={{ color: 'rgba(255, 255, 255, 0.65)' }}>INV: {item.invoiceNo}</span>}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.72rem', color: '#c084fc', background: 'rgba(192, 132, 252, 0.15)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(192, 132, 252, 0.3)' }}>
+                            {item.category}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            background: priorityMeta.bg,
+                            color: priorityMeta.color,
+                            border: `1px solid ${priorityMeta.border}`,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {item.priority || 'Medium'}
+                          </span>
+                        </td>
+                        <td>
+                          {item.defectiveMeters > 0 ? (
+                            <span style={{ color: '#f87171', fontWeight: 700, fontSize: '0.78rem' }}>
+                              {item.defectiveMeters} Mtr
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          <select
+                            className="complaint-status-select"
+                            value={item.status || 'Open'}
+                            onChange={e => handleQuickStatusUpdate(item, e.target.value)}
+                            style={{
+                              background: statusMeta.bg,
+                              color: statusMeta.color,
+                              border: `1px solid ${statusMeta.border}`
+                            }}
+                          >
+                            {statusOptions.map(st => (
+                              <option key={st} value={st} style={{ background: '#0f172a', color: '#ffffff' }}>
+                                {st}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenViewModal(item)}
+                              className="glass-action-btn"
+                              title="View & Resolve"
+                              style={{ padding: '4px 8px', fontSize: '0.72rem', color: '#38bdf8' }}
+                            >
+                              <Eye size={13} />
+                            </button>
+                            {canCreateComplaint && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(item)}
+                                  className="glass-action-btn"
+                                  title="Edit Ticket"
+                                  style={{ padding: '4px 8px', fontSize: '0.72rem', color: '#fbbf24' }}
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(item._id, item.complaintNo)}
+                                  className="glass-action-btn"
+                                  title="Delete Ticket"
+                                  style={{ padding: '4px 8px', fontSize: '0.72rem', color: '#f87171' }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.25rem' }}>
@@ -893,7 +1086,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                             fontSize: '1rem',
                             fontWeight: 800,
-                            color: '#0f172a',
+                            color: '#ffffff',
                             letterSpacing: '-0.02em',
                             whiteSpace: 'nowrap'
                           }}>
@@ -920,7 +1113,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                         {/* Submitter & Date */}
                         <div style={{
                           fontSize: '0.73rem',
-                          color: '#64748b',
+                          color: 'rgba(255, 255, 255, 0.65)',
                           marginTop: '5px',
                           display: 'flex',
                           alignItems: 'center',
@@ -933,12 +1126,12 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                               {new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           )}
-                          <span style={{ color: '#cbd5e1' }}>•</span>
+                          <span style={{ color: 'rgba(255, 255, 255, 0.3)' }}>•</span>
                           <span style={{
                             fontSize: '0.7rem',
-                            color: '#0369a1',
-                            background: '#f0f9ff',
-                            border: '1px solid #e0f2fe',
+                            color: '#38bdf8',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
                             padding: '1px 7px',
                             borderRadius: '6px',
                             fontWeight: 600,
@@ -951,9 +1144,9 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                           {item.updatedByName && item.updatedByName !== (item.createdByName || item.createdBy) && (
                             <span style={{
                               fontSize: '0.68rem',
-                              color: '#475569',
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
+                              color: 'rgba(255, 255, 255, 0.75)',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
                               padding: '1px 6px',
                               borderRadius: '6px'
                             }}>
@@ -987,7 +1180,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                           }}
                         >
                           {statusOptions.map(st => (
-                            <option key={st} value={st} style={{ background: '#ffffff', color: '#0f172a' }}>
+                            <option key={st} value={st} style={{ background: '#0f172a', color: '#ffffff' }}>
                               {st}
                             </option>
                           ))}
@@ -998,9 +1191,9 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
 
                     {/* Customer, Assigned To & Responsible Person */}
                     <div style={{
-                      background: '#f8fafc',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       borderRadius: '10px',
-                      border: '1px solid #f1f5f9',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                       padding: '0.75rem',
                       display: 'flex',
                       flexDirection: 'column',
@@ -1008,17 +1201,17 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Customer:</span>
-                          <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700 }}>{item.partyName || 'N/A'}</strong>
+                          <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>Customer:</span>
+                          <strong style={{ fontSize: '0.85rem', color: '#ffffff', fontWeight: 700 }}>{item.partyName || 'N/A'}</strong>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Assigned By:</span>
+                          <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>Assigned By:</span>
                           <span style={{
                             fontSize: '0.73rem',
                             fontWeight: 600,
-                            color: '#1d4ed8',
-                            background: '#eff6ff',
-                            border: '1px solid #dbeafe',
+                            color: '#38bdf8',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
                             padding: '1px 8px',
                             borderRadius: '6px'
                           }}>
@@ -1028,8 +1221,8 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                       </div>
 
                       {/* Responsible Person Tags */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingTop: '5px', borderTop: '1px dashed #e2e8f0' }}>
-                        <span style={{ fontSize: '0.7rem', color: '#be123c', fontWeight: 700 }}>Responsible:</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingTop: '5px', borderTop: '1px dashed rgba(255, 255, 255, 0.15)' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: 700 }}>Responsible:</span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                           {(() => {
                             const persons = Array.isArray(item.responsiblePersons) && item.responsiblePersons.length > 0
@@ -1046,9 +1239,9 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                                 style={{
                                   fontSize: '0.72rem',
                                   fontWeight: 600,
-                                  color: '#be123c',
-                                  background: '#fff1f2',
-                                  border: '1px solid #ffe4e6',
+                                  color: '#fca5a5',
+                                  background: 'rgba(244, 63, 94, 0.16)',
+                                  border: '1px solid rgba(244, 63, 94, 0.3)',
                                   padding: '1px 8px',
                                   borderRadius: '6px',
                                   display: 'inline-flex',
@@ -1069,27 +1262,27 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                     {(item.jobCardNo || item.challanNo || item.invoiceNo || item.defectiveMeters > 0 || item.expectedAmount > 0) && (
                       <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         {item.jobCardNo && (
-                          <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '6px', color: '#475569' }}>
-                            Job: <strong style={{ color: '#0f172a' }}>{item.jobCardNo}</strong>
+                          <span style={{ background: 'rgba(255, 255, 255, 0.07)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '2px 8px', borderRadius: '6px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                            Job: <strong style={{ color: '#ffffff' }}>{item.jobCardNo}</strong>
                           </span>
                         )}
                         {item.challanNo && (
-                          <span style={{ background: '#eff6ff', border: '1px solid #dbeafe', padding: '2px 8px', borderRadius: '6px', color: '#1e40af' }}>
-                            Challan: <strong style={{ color: '#1d4ed8' }}>{item.challanNo}</strong>
+                          <span style={{ background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '2px 8px', borderRadius: '6px', color: '#38bdf8' }}>
+                            Challan: <strong style={{ color: '#38bdf8' }}>{item.challanNo}</strong>
                           </span>
                         )}
                         {item.invoiceNo && (
-                          <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '6px', color: '#475569' }}>
-                            Invoice: <strong style={{ color: '#0f172a' }}>{item.invoiceNo}</strong>
+                          <span style={{ background: 'rgba(255, 255, 255, 0.07)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '2px 8px', borderRadius: '6px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                            Invoice: <strong style={{ color: '#ffffff' }}>{item.invoiceNo}</strong>
                           </span>
                         )}
                         {item.defectiveMeters > 0 && (
-                          <span style={{ background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 8px', borderRadius: '6px', color: '#dc2626', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ background: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '2px 8px', borderRadius: '6px', color: '#fca5a5', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <AlertTriangle size={11} /> {item.defectiveMeters} Mtr
                           </span>
                         )}
                         {item.expectedAmount > 0 && (
-                          <span style={{ background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '6px', color: '#16a34a', fontWeight: 700 }}>
+                          <span style={{ background: 'rgba(34, 197, 94, 0.16)', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 8px', borderRadius: '6px', color: '#86efac', fontWeight: 700 }}>
                             ₹{Number(item.expectedAmount).toLocaleString('en-IN')}
                           </span>
                         )}
@@ -1098,9 +1291,9 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
 
                     {/* Category & Sub-Category & Description */}
                     <div style={{
-                      background: '#f8fafc',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       borderRadius: '10px',
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                       padding: '0.75rem 0.85rem',
                       display: 'flex',
                       flexDirection: 'column',
@@ -1110,9 +1303,9 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                         <span style={{
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          color: '#4f46e5',
-                          background: '#eef2ff',
-                          border: '1px solid #e0e7ff',
+                          color: '#c084fc',
+                          background: 'rgba(192, 132, 252, 0.15)',
+                          border: '1px solid rgba(192, 132, 252, 0.3)',
                           padding: '1px 7px',
                           borderRadius: '4px',
                           display: 'inline-flex',
@@ -1127,7 +1320,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                         {item.subCategory && (
                           <>
                             <ChevronRight size={12} style={{ color: '#94a3b8' }} />
-                            <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#334155' }}>
+                            <span style={{ fontSize: '0.73rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.85)' }}>
                               {item.subCategory}
                             </span>
                           </>
@@ -1137,7 +1330,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                         margin: 0,
                         fontSize: '0.82rem',
                         lineHeight: 1.45,
-                        color: '#1e293b',
+                        color: 'rgba(255, 255, 255, 0.9)',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
@@ -1151,7 +1344,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                     {/* Photos Thumbnails */}
                     {item.photoUrls && item.photoUrls.length > 0 && (
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <ImageIcon size={12} /> Proof ({item.photoUrls.length}):
                         </span>
                         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -1167,8 +1360,8 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                                 borderRadius: 6,
                                 objectFit: 'cover',
                                 cursor: 'zoom-in',
-                                border: '1px solid #cbd5e1',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
                                 transition: 'transform 0.15s ease'
                               }}
                               onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
@@ -1183,18 +1376,18 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                     {item.actionTaken && (
                       <div style={{
                         fontSize: '0.74rem',
-                        color: '#15803d',
-                        background: '#f0fdf4',
+                        color: '#86efac',
+                        background: 'rgba(34, 197, 94, 0.16)',
                         padding: '0.5rem 0.75rem',
                         borderRadius: '8px',
-                        border: '1px solid #bbf7d0',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
                         display: 'flex',
                         alignItems: 'flex-start',
                         gap: '6px'
                       }}>
-                        <CheckCircle2 size={13} style={{ marginTop: '2px', flexShrink: 0, color: '#16a34a' }} />
+                        <CheckCircle2 size={13} style={{ marginTop: '2px', flexShrink: 0, color: '#4ade80' }} />
                         <div>
-                          <strong style={{ color: '#166534' }}>Action Taken:</strong> {item.actionTaken}
+                          <strong style={{ color: '#86efac' }}>Action Taken:</strong> {item.actionTaken}
                         </div>
                       </div>
                     )}
@@ -1205,11 +1398,12 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       paddingTop: '0.65rem',
-                      borderTop: '1px solid #f1f5f9',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                       marginTop: 'auto'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <button
+                          type="button"
                           onClick={() => handleOpenViewModal(item)}
                           style={{
                             display: 'inline-flex',
@@ -1232,14 +1426,15 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                           <Eye size={13} /> View & Resolve
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleOpenViewModal(item)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '5px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            color: '#475569',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            color: '#ffffff',
                             fontSize: '0.72rem',
                             fontWeight: 600,
                             borderRadius: '8px',
@@ -1247,16 +1442,8 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                             cursor: 'pointer',
                             transition: 'all 0.15s ease'
                           }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.background = '#f1f5f9';
-                            e.currentTarget.style.borderColor = '#cbd5e1';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.background = '#f8fafc';
-                            e.currentTarget.style.borderColor = '#e2e8f0';
-                          }}
                         >
-                          <MessageSquare size={12} style={{ color: '#64748b' }} />
+                          <MessageSquare size={12} style={{ color: '#38bdf8' }} />
                           <span>{item.comments?.length || 0}</span>
                         </button>
                       </div>
@@ -1264,6 +1451,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                       {canCreateComplaint && (
                         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                           <button
+                            type="button"
                             onClick={() => handleOpenEdit(item)}
                             style={{
                               display: 'flex',
@@ -1272,27 +1460,18 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                               width: '28px',
                               height: '28px',
                               borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              background: '#ffffff',
-                              color: '#64748b',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              color: '#cbd5e1',
                               cursor: 'pointer',
                               transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = '#f8fafc';
-                              e.currentTarget.style.color = '#0284c7';
-                              e.currentTarget.style.borderColor = '#bae6fd';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = '#ffffff';
-                              e.currentTarget.style.color = '#64748b';
-                              e.currentTarget.style.borderColor = '#e2e8f0';
                             }}
                             title="Edit Complaint"
                           >
                             <Edit2 size={13} />
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDelete(item._id, item.complaintNo)}
                             style={{
                               display: 'flex',
@@ -1301,19 +1480,11 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                               width: '28px',
                               height: '28px',
                               borderRadius: '6px',
-                              border: '1px solid #fee2e2',
-                              background: '#ffffff',
-                              color: '#ef4444',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#f87171',
                               cursor: 'pointer',
                               transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = '#fef2f2';
-                              e.currentTarget.style.borderColor = '#fca5a5';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = '#ffffff';
-                              e.currentTarget.style.borderColor = '#fee2e2';
                             }}
                             title="Delete Ticket"
                           >

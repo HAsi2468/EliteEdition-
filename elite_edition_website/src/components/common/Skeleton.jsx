@@ -12,7 +12,7 @@ export function SkeletonBlock({ width = '100%', height = '1rem', style = {} }) {
       style={{
         width,
         height,
-        backgroundColor: '#e2e8f0',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderRadius: '6px',
         ...style
       }}
@@ -27,13 +27,14 @@ export function SkeletonCard({ count = 4 }) {
         <div
           key={i}
           style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
+            backgroundColor: 'rgba(15, 23, 42, 0.72)',
+            border: '1px solid rgba(255, 255, 255, 0.10)',
+            borderRadius: '10px',
             padding: '1rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem'
+            gap: '0.75rem',
+            backdropFilter: 'blur(18px)'
           }}
         >
           <SkeletonBlock width="45%" height="0.875rem" />
@@ -50,10 +51,11 @@ export function SkeletonTable({ rows = 6, cols = 5 }) {
     <div
       style={{
         width: '100%',
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        overflow: 'hidden'
+        backgroundColor: 'rgba(15, 23, 42, 0.72)',
+        border: '1px solid rgba(255, 255, 255, 0.10)',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        backdropFilter: 'blur(18px)'
       }}
     >
       {/* Table Header Placeholder */}
@@ -62,8 +64,8 @@ export function SkeletonTable({ rows = 6, cols = 5 }) {
           display: 'grid',
           gridTemplateColumns: `repeat(${cols}, 1fr)`,
           padding: '0.75rem 1rem',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: 'rgba(11, 17, 32, 0.90)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           gap: '1rem'
         }}
       >
@@ -80,7 +82,7 @@ export function SkeletonTable({ rows = 6, cols = 5 }) {
             display: 'grid',
             gridTemplateColumns: `repeat(${cols}, 1fr)`,
             padding: '0.875rem 1rem',
-            borderBottom: r === rows - 1 ? 'none' : '1px solid #f1f5f9',
+            borderBottom: r === rows - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
             gap: '1rem',
             alignItems: 'center'
           }}
@@ -98,14 +100,15 @@ export function SkeletonForm({ fields = 4 }) {
   return (
     <div
       style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
+        backgroundColor: 'rgba(15, 23, 42, 0.72)',
+        border: '1px solid rgba(255, 255, 255, 0.10)',
+        borderRadius: '10px',
         padding: '1.25rem',
         display: 'flex',
         flexDirection: 'column',
         gap: '1.25rem',
-        width: '100%'
+        width: '100%',
+        backdropFilter: 'blur(18px)'
       }}
     >
       {Array.from({ length: fields }).map((_, i) => (
@@ -143,14 +146,15 @@ export function DashboardSkeleton() {
           <div
             key={i}
             style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
+              backgroundColor: 'rgba(15, 23, 42, 0.72)',
+              border: '1px solid rgba(255, 255, 255, 0.10)',
               borderRadius: '10px',
               padding: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
+              backdropFilter: 'blur(18px)'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -164,7 +168,7 @@ export function DashboardSkeleton() {
       </div>
 
       {/* Filter / Search Bar Placeholder */}
-      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255, 255, 255, 0.10)', borderRadius: '10px', padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', backdropFilter: 'blur(18px)' }}>
         <SkeletonBlock width="240px" height="2.25rem" style={{ borderRadius: '6px' }} />
         <SkeletonBlock width="130px" height="2.25rem" style={{ borderRadius: '6px' }} />
         <SkeletonBlock width="130px" height="2.25rem" style={{ borderRadius: '6px' }} />

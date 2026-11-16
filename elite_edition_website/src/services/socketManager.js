@@ -267,8 +267,22 @@ class SocketManager {
       } catch (e) {}
     });
 
-    // Targeted notification when admin approves/rejects an edit requested by this user
+    // Targeted notification ONLY when admin approves/rejects an edit requested by this user
     this.socket.on('approval-result-notify', (payload) => {
+      try {
+        const reqUserId = payload?.requestedBy?.userId;
+        if (reqUserId && typeof localStorage !== 'undefined') {
+          const rawUser = localStorage.getItem('elite_user');
+          if (rawUser) {
+            const cur = JSON.parse(rawUser);
+            const curId = String(cur?._id || cur?.id || '');
+            if (curId && String(reqUserId) !== curId) {
+              return; // Ignore if intended for another user
+            }
+          }
+        }
+      } catch (e) {}
+
       console.info('[SocketManager] Approval result notification:', payload);
       try {
         window.dispatchEvent(new CustomEvent('elite-approval-result-notify', { detail: payload }));

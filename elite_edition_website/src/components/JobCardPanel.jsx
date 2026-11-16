@@ -13,6 +13,8 @@ import DocumentPresence from './common/DocumentPresence';
 import AuditTrailModal from './common/AuditTrailModal';
 import { socketManager } from '../services/socketManager';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
 import JobCardTracking from './JobCardTracking';
@@ -204,8 +206,8 @@ function WorkflowStageBadge({ card }) {
 
   if (isDispatched) {
     return (
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'#ecfdf5', color:'#065f46', border:'1px solid #a7f3d0', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title={`Dispatched: ${deliveredMtr}m`}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'rgba(52, 211, 153, 0.16)', color:'#34d399', border:'1px solid rgba(52, 211, 153, 0.35)', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title={`Dispatched: ${deliveredMtr}m`}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399' }} />
         4. Dispatched
       </span>
     );
@@ -214,8 +216,8 @@ function WorkflowStageBadge({ card }) {
   if (isFusingDone || fusedMtr > 0) {
     const avail = Math.max(0, fusedMtr - deliveredMtr);
     return (
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title={`${fusedMtr}m fused (${avail}m ready for Challan)`}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} />
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'rgba(56, 189, 248, 0.16)', color:'#38bdf8', border:'1px solid rgba(56, 189, 248, 0.35)', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title={`${fusedMtr}m fused (${avail}m ready for Challan)`}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8' }} />
         {isPartiallyDispatched ? `Partially Dispatched (${deliveredMtr}m)` : `3. Ready for Challan (${avail}m)`}
       </span>
     );
@@ -223,15 +225,15 @@ function WorkflowStageBadge({ card }) {
 
   if (isPrintDone) {
     return (
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'#fffbeb', color:'#92400e', border:'1px solid #fde68a', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title="Printing is done. Next stage: Fusing Department">
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'rgba(251, 191, 36, 0.16)', color:'#fbbf24', border:'1px solid rgba(251, 191, 36, 0.35)', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title="Printing is done. Next stage: Fusing Department">
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24' }} />
         2. Fusing Pending
       </span>
     );
   }
 
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'#f8fafc', color:'#475569', border:'1px solid #e2e8f0', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title="Job Card created. Next stage: Printing Log">
+    <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'rgba(148, 163, 184, 0.16)', color:'#e2e8f0', border:'1px solid rgba(148, 163, 184, 0.3)', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title="Job Card created. Next stage: Printing Log">
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8' }} />
       1. Printing Pending
     </span>
@@ -2824,13 +2826,13 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
   };
 
   return (
-    <div className="modal-overlay" style={{ alignItems:'flex-start', paddingTop:'1rem' }}>
+    <div className="modal-overlay" style={{ alignItems:'flex-start', paddingTop:'1rem', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
         {/* Header */}
-        <form onSubmit={handleSubmit} style={{ background:'var(--bg-modal,#ffffff)', border:'1px solid var(--border-light)',
-          borderRadius:'var(--radius-lg)', width:'100%', maxWidth:900,
-          boxShadow:'var(--shadow-lg)', overflow:'hidden', maxHeight:'96vh', display:'flex', flexDirection:'column' }}>
+        <form onSubmit={handleSubmit} className="glass-panel" style={{ background:'rgba(15, 23, 42, 0.96)', border:'1px solid rgba(148, 163, 184, 0.28)',
+          borderRadius:'16px', width:'100%', maxWidth:900, color: '#ffffff',
+          boxShadow:'0 24px 64px rgba(0, 0, 0, 0.65)', overflow:'hidden', maxHeight:'96vh', display:'flex', flexDirection:'column' }}>
 
-          <div style={{ padding:'1.25rem 1.5rem', borderBottom:'1px solid var(--border-light)',
+          <div style={{ padding:'1.15rem 1.5rem', borderBottom:'1px solid rgba(148, 163, 184, 0.2)', background: 'rgba(11, 17, 32, 0.85)',
             display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
               <div style={{ width:36, height:36, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center',
@@ -2839,10 +2841,9 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
                 <Cpu size={18} color="#fff"/>
               </div>
               <div>
-                <h3 style={{ fontSize:'1.05rem', fontWeight:700, color:'var(--text-primary)' }}>
-                  {card ? `Edit Job Card — ${card.jobNo}` : 'New Job Card'}
+                <h3 style={{ fontSize:'1.05rem', fontWeight:800, color:'#ffffff', margin: 0 }}>
+                  {card ? `Edit Job Card — #${card.jobNo}` : 'New Job Card'}
                 </h3>
-                <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginTop:1 }}>Elite Digital Prints</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3494,21 +3495,21 @@ const JobCardGridItem = React.memo(function JobCardGridItem({
         flexDirection: 'column',
         gap: '0.75rem',
         borderRadius: '16px',
-        background: 'var(--bg-card, #ffffff)',
-        border: '1px solid var(--border-color, #e2e8f0)',
-        boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+        background: 'rgba(15, 23, 42, 0.78)',
+        border: '1px solid rgba(148, 163, 184, 0.22)',
+        boxShadow: '0 8px 28px rgba(0, 0, 0, 0.32)',
+        transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease',
         position: 'relative'
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(15,23,42,0.08), 0 8px 10px -6px rgba(15,23,42,0.04)';
-        e.currentTarget.style.borderColor = '#bfdbfe';
+        e.currentTarget.style.transform = 'translateY(-3px)';
+        e.currentTarget.style.boxShadow = '0 14px 36px rgba(0, 0, 0, 0.48), 0 0 18px rgba(56, 189, 248, 0.16)';
+        e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.48)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = '';
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.04)';
-        e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
+        e.currentTarget.style.boxShadow = '0 8px 28px rgba(0, 0, 0, 0.32)';
+        e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.22)';
       }}
     >
       {/* Header Row 1: Job Number & Machine (Left) + Urgent & Status (Right) */}
@@ -3784,10 +3785,10 @@ const JobCardGridItem = React.memo(function JobCardGridItem({
               fontSize: '0.76rem',
               fontWeight: 700,
               cursor: 'pointer',
-              background: isReadyForChallan ? 'linear-gradient(135deg, #4f46e5, #4338ca)' : '#f1f5f9',
-              color: isReadyForChallan ? '#ffffff' : '#64748b',
-              border: isReadyForChallan ? 'none' : '1px solid #cbd5e1',
-              boxShadow: isReadyForChallan ? '0 2px 6px rgba(79,70,229,0.25)' : 'none',
+              background: isReadyForChallan ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.08)',
+              color: isReadyForChallan ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
+              border: isReadyForChallan ? 'none' : '1px solid rgba(255, 255, 255, 0.16)',
+              boxShadow: isReadyForChallan ? '0 2px 8px rgba(37,99,235,0.35)' : 'none',
               transition: 'all 0.15s ease',
               whiteSpace: 'nowrap'
             }}
@@ -3810,9 +3811,9 @@ const JobCardGridItem = React.memo(function JobCardGridItem({
               fontSize: '0.76rem',
               fontWeight: 700,
               cursor: 'pointer',
-              background: '#ecfdf5',
-              color: '#065f46',
-              border: '1px solid #a7f3d0',
+              background: 'rgba(52, 211, 153, 0.16)',
+              color: '#34d399',
+              border: '1px solid rgba(52, 211, 153, 0.35)',
               transition: 'all 0.15s ease',
               whiteSpace: 'nowrap'
             }}
@@ -4582,52 +4583,48 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
         )
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          {/* Enterprise Header Banner */}
-          <div className="ent-screen-header">
-            <div className="ent-header-title-wrap">
-              <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
-                <FileText size={18} />
-              </div>
-              <div>
-                <h2 className="ent-header-title">
-                  {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
-                </h2>
-                <p className="ent-header-meta">
-                  {loading && total === 0 ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ display: 'inline-block', width: '60px', height: '12px', background: '#cbd5e1', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                      <span>•</span>
-                      <span style={{ display: 'inline-block', width: '80px', height: '12px', background: '#cbd5e1', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                    </span>
-                  ) : (
-                    <>
-                      <strong style={{ color: 'var(--primary)' }}>{total}</strong> Total Cards • <strong style={{ color: '#059669' }}>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr
-                    </>
-                  )}
-                </p>
-              </div>
+          {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+          <div className="glass-screen-header">
+            <div className="glass-title-capsule">
+              <FileText size={20} color="#38bdf8" />
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
+              </span>
+              <EntityBrandBadge />
             </div>
 
-            {/* Header Actions */}
-            <div className="ent-header-actions">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
                 type="button"
-                className="ent-btn ent-btn-primary"
+                className="glass-btn-primary"
                 onClick={openNew}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.9), rgba(37, 99, 235, 0.85))',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  padding: '0.55rem 1.1rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  cursor: 'pointer'
+                }}
               >
-                <PlusCircle size={14} /> <span>New Job Card</span>
+                <PlusCircle size={15} /> <span>New Job Card</span>
               </button>
+              <QuickActionMenu />
             </div>
           </div>
 
-          {/* Sub-Tab Navigation Bar */}
-          <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Job Card Primary Tabs" style={{ margin: '0 0 0.2rem 0' }}>
+          {/* ── TIER 2: SUB-SCREENS BUTTONS ── */}
+          <div className="glass-subtabs-bar" style={{ marginTop: '0.75rem' }}>
             <button
               type="button"
-              role="tab"
-              aria-selected={effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')}
               onClick={() => setOverrideSubTab('list')}
-              className={`ent-tab-btn ${(effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'active' : ''}`}
+              className={`glass-subtab-btn ${(effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'active' : ''}`}
             >
               <FileText size={14} />
               <span>Production Cards</span>
@@ -4635,14 +4632,78 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
             <button
               type="button"
-              role="tab"
-              aria-selected={effectiveSubTab === 'tracking'}
               onClick={() => setOverrideSubTab('tracking')}
-              className={`ent-tab-btn ${effectiveSubTab === 'tracking' ? 'active' : ''}`}
+              className={`glass-subtab-btn ${effectiveSubTab === 'tracking' ? 'active' : ''}`}
             >
               <RefreshCw size={14} />
               <span>Tracking</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setOverrideSubTab('status_dashboard')}
+              className={`glass-subtab-btn ${(effectiveSubTab === 'status_dashboard' || effectiveSubTab === 'pending_summary' || effectiveSubTab === 'status_overview') ? 'active' : ''}`}
+            >
+              <Activity size={14} />
+              <span>Status Overview</span>
+            </button>
+          </div>
+
+          {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+          <div className="glass-scroll-track" style={{ marginTop: '0.85rem' }}>
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Total Job Cards</span>
+              <span className="glass-calc-value" style={{ color: '#ffffff' }}>{total || 0}</span>
+              <span className="glass-calc-sub">All active orders</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Total Meters</span>
+              <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
+                {(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} M
+              </span>
+              <span className="glass-calc-sub">Cumulative volume</span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Pending Orders</span>
+              <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
+                {statusCounts?.Pending?.count ?? statusCounts?.pending?.count ?? (typeof statusCounts?.Pending === 'number' ? statusCounts.Pending : (typeof statusCounts?.pending === 'number' ? statusCounts.pending : 0))}
+              </span>
+              <span className="glass-calc-sub">
+                {statusCounts?.Pending?.meters ? `${Number(statusCounts.Pending.meters).toFixed(0)} M in queue` : 'Awaiting print queue'}
+              </span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Printing Line</span>
+              <span className="glass-calc-value" style={{ color: '#60a5fa' }}>
+                {statusCounts?.Printing?.count ?? statusCounts?.printing?.count ?? (typeof statusCounts?.Printing === 'number' ? statusCounts.Printing : (typeof statusCounts?.printing === 'number' ? statusCounts.printing : 0))}
+              </span>
+              <span className="glass-calc-sub">
+                {statusCounts?.Printing?.meters ? `${Number(statusCounts.Printing.meters).toFixed(0)} M running` : 'Active printing'}
+              </span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Fusing Stage</span>
+              <span className="glass-calc-value" style={{ color: '#fb923c' }}>
+                {statusCounts?.Fusing?.count ?? statusCounts?.fusing?.count ?? (typeof statusCounts?.Fusing === 'number' ? statusCounts.Fusing : (typeof statusCounts?.fusing === 'number' ? statusCounts.fusing : 0))}
+              </span>
+              <span className="glass-calc-sub">
+                {statusCounts?.Fusing?.meters ? `${Number(statusCounts.Fusing.meters).toFixed(0)} M fusing` : 'Post-print fusing'}
+              </span>
+            </div>
+
+            <div className="glass-calc-card">
+              <span className="glass-calc-title">Ready for Delivery</span>
+              <span className="glass-calc-value" style={{ color: '#34d399' }}>
+                {statusCounts?.Delivery?.count ?? statusCounts?.delivery?.count ?? (typeof statusCounts?.Delivery === 'number' ? statusCounts.Delivery : (typeof statusCounts?.delivery === 'number' ? statusCounts.delivery : 0))}
+              </span>
+              <span className="glass-calc-sub">
+                {statusCounts?.Delivery?.meters ? `${Number(statusCounts.Delivery.meters).toFixed(0)} M ready` : 'Ready to dispatch'}
+              </span>
+            </div>
           </div>
 
           {effectiveSubTab === 'tracking' ? (
@@ -4692,17 +4753,17 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
             gap: '0.45rem',
             padding: '0.45rem 0.85rem',
             borderRadius: '8px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
             fontSize: '0.8rem',
             fontWeight: 700,
-            color: '#0f172a',
-            boxShadow: '0 1px 3px rgba(15,23,42,0.04)'
+            color: '#ffffff',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
           }}>
-            <span style={{ color: '#2563eb' }}>📊 {statusFilter}:</span>
-            <span style={{ color: '#0f172a' }}><strong>{total}</strong> Cards</span>
-            <span style={{ color: '#cbd5e1', margin: '0 1px' }}>•</span>
-            <span style={{ color: '#15803d' }}><strong>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr</span>
+            <span style={{ color: '#38bdf8' }}>📊 {statusFilter}:</span>
+            <span style={{ color: '#ffffff' }}><strong>{total}</strong> Cards</span>
+            <span style={{ color: 'rgba(255, 255, 255, 0.3)', margin: '0 1px' }}>•</span>
+            <span style={{ color: '#34d399' }}><strong>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr</span>
           </div>
 
           <button onClick={() => { setSortBy(prev => prev === 'urgency' ? '' : 'urgency'); setPage(1); }}
@@ -4713,10 +4774,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
               fontFamily: 'var(--font-sans)', 
               fontWeight: 700, 
               cursor: 'pointer', 
-              border: '1px solid',
-              borderColor: sortBy === 'urgency' ? '#f59e0b' : '#e2e8f0',
-              background: sortBy === 'urgency' ? '#fef3c7' : '#ffffff',
-              color: sortBy === 'urgency' ? '#b45309' : '#475569',
+              border: sortBy === 'urgency' ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255, 255, 255, 0.15)',
+              background: sortBy === 'urgency' ? 'rgba(245, 158, 11, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+              color: sortBy === 'urgency' ? '#fbbf24' : '#ffffff',
               display: 'flex', 
               alignItems: 'center', 
               gap: '0.45rem', 
@@ -4725,16 +4785,16 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
             🔥 Urgency Priority
           </button>
           
-          <div style={{ display: 'flex', gap: '0.2rem', marginLeft: 'auto', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '3px' }}>
+          <div style={{ display: 'flex', gap: '0.2rem', marginLeft: 'auto', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', padding: '3px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
             <button 
               type="button" 
               onClick={() => setViewMode('grid')}
               style={{
                 padding: '0.35rem 0.65rem',
-                border: 'none',
-                background: viewMode === 'grid' ? '#ffffff' : 'transparent',
-                color: viewMode === 'grid' ? '#2563eb' : '#64748b',
-                boxShadow: viewMode === 'grid' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                border: viewMode === 'grid' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
+                background: viewMode === 'grid' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                color: viewMode === 'grid' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                boxShadow: viewMode === 'grid' ? '0 2px 6px rgba(56, 189, 248, 0.25)' : 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -4752,10 +4812,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
               onClick={() => setViewMode('list')}
               style={{
                 padding: '0.35rem 0.65rem',
-                border: 'none',
-                background: viewMode === 'list' ? '#ffffff' : 'transparent',
-                color: viewMode === 'list' ? '#2563eb' : '#64748b',
-                boxShadow: viewMode === 'list' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                border: viewMode === 'list' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
+                background: viewMode === 'list' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                color: viewMode === 'list' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                boxShadow: viewMode === 'list' ? '0 2px 6px rgba(56, 189, 248, 0.25)' : 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -5170,23 +5230,25 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
             padding: '1rem',
             animation: 'fadeIn 0.2s ease-out'
           }}>
-            <div style={{
-              background: '#ffffff',
+            <div className="glass-panel" style={{
+              background: 'rgba(15, 23, 42, 0.96)',
+              backdropFilter: 'blur(28px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(28px) saturate(180%)',
               width: '100%',
               maxWidth: '540px',
               borderRadius: '16px',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
-              border: '1px solid #cbd5e1',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.65)',
+              border: '1px solid rgba(148, 163, 184, 0.28)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              color: '#0f172a'
+              color: '#ffffff'
             }}>
               {/* Modal Header */}
               <div style={{
                 padding: '1.1rem 1.4rem',
-                background: '#f8fafc',
-                borderBottom: '1px solid #e2e8f0',
+                background: 'rgba(11, 17, 32, 0.85)',
+                borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
@@ -5196,20 +5258,18 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                     width: 36,
                     height: 36,
                     borderRadius: 10,
-                    background: '#eff6ff',
+                    background: 'rgba(56, 189, 248, 0.16)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <Send size={20} color="#2563eb" />
+                    <Send size={20} color="#38bdf8" />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
                       Share Job Card {shareCard?.jobNo ? `— #${shareCard.jobNo}` : ''}
                     </h3>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                      Send directly into company team channels or private messages.
-                    </p>
                   </div>
                 </div>
 
@@ -5217,8 +5277,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                   type="button"
                   onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); setShareNote(''); }} 
                   style={{
-                    background: '#f1f5f9',
-                    border: 'none',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.16)',
                     borderRadius: '50%',
                     width: 32,
                     height: 32,
@@ -5226,7 +5286,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#475569'
+                    color: '#e2e8f0'
                   }}
                 >
                   <X size={16} />
@@ -5237,8 +5297,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                 {/* 📋 Job Card Mini Context Card */}
                 {shareCard && (
                   <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    background: 'rgba(11, 17, 32, 0.78)',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
                     borderRadius: '10px',
                     padding: '8px 12px',
                     display: 'flex',
@@ -5248,10 +5308,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                     gap: '8px',
                     fontSize: '0.8rem'
                   }}>
-                    <span style={{ fontWeight: 800, color: '#2563eb' }}>JC #{shareCard.jobNo}</span>
-                    <span style={{ color: '#475569', fontWeight: 600 }}>Party: <strong>{shareCard.party || 'Client'}</strong></span>
-                    <span style={{ color: '#059669', fontWeight: 700 }}>{shareCard.totalMtr || 0} Mtr</span>
-                    <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
+                    <span style={{ fontWeight: 800, color: '#38bdf8' }}>JC #{shareCard.jobNo}</span>
+                    <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Party: <strong style={{ color: '#ffffff' }}>{shareCard.party || 'Client'}</strong></span>
+                    <span style={{ color: '#34d399', fontWeight: 700 }}>{shareCard.totalMtr || 0} Mtr</span>
+                    <span style={{ background: 'rgba(56, 189, 248, 0.16)', color: '#7dd3fc', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
                       {shareCard.currentStage || shareCard.status || 'Active'}
                     </span>
                   </div>
@@ -5260,12 +5320,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                 {/* 🏢 Quick Company Filter Pills */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff' }}>
                       🏢 Select Company
                     </label>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                      Filters channels &amp; auto-selects direct group
-                    </span>
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -5279,9 +5336,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                           style={{
                             padding: '5px 10px',
                             borderRadius: '20px',
-                            border: isSelected ? `2px solid ${opt.color}` : '1px solid #cbd5e1',
-                            background: isSelected ? `${opt.color}15` : '#ffffff',
-                            color: isSelected ? opt.color : '#475569',
+                            border: isSelected ? `2px solid ${opt.color}` : '1px solid rgba(148, 163, 184, 0.24)',
+                            background: isSelected ? `${opt.color}28` : 'rgba(15, 23, 42, 0.78)',
+                            color: isSelected ? '#ffffff' : '#cbd5e1',
                             fontWeight: isSelected ? 800 : 600,
                             fontSize: '0.78rem',
                             cursor: 'pointer',
@@ -5302,26 +5359,26 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                 {/* ⚡ 1-Click Direct Share Banner */}
                 {selectedRoom ? (
                   <div style={{
-                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                    border: '1.5px solid #93c5fd',
+                    background: 'rgba(37, 99, 235, 0.18)',
+                    border: '1.5px solid rgba(56, 189, 248, 0.4)',
                     borderRadius: '12px',
                     padding: '12px 14px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '12px',
-                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.08)'
+                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.28)'
                   }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1d4ed8', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#38bdf8', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span>⚡ 1-Click Destination</span>
                         {selectedRoom.companyEntity && (
-                          <span style={{ background: '#bfdbfe', color: '#1e40af', padding: '1px 5px', borderRadius: '4px', fontSize: '0.66rem' }}>
+                          <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#7dd3fc', padding: '1px 5px', borderRadius: '4px', fontSize: '0.66rem' }}>
                             {selectedRoom.companyEntity}
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
                         #{selectedRoom.name}
                       </div>
                     </div>
@@ -5341,7 +5398,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                         alignItems: 'center',
                         gap: '6px',
                         cursor: sharingJobCard ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
                         flexShrink: 0
                       }}
                     >
@@ -5351,11 +5408,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                   </div>
                 ) : (
                   <div style={{
-                    background: '#fef3c7',
-                    border: '1px solid #fde68a',
+                    background: 'rgba(245, 158, 11, 0.16)',
+                    border: '1px solid rgba(251, 191, 36, 0.35)',
                     borderRadius: '10px',
                     padding: '10px 12px',
-                    color: '#92400e',
+                    color: '#fcd34d',
                     fontSize: '0.8rem',
                     fontWeight: 700
                   }}>
@@ -5365,7 +5422,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
                 {/* 💬 Optional Note Input */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>
                     💬 Optional Note / Instruction (Shared with Job Card)
                   </label>
                   <input 
@@ -5377,9 +5434,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       width: '100%',
                       padding: '0.55rem 0.8rem',
                       borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#ffffff',
-                      color: '#0f172a',
+                      border: '1px solid rgba(148, 163, 184, 0.24)',
+                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                      color: '#ffffff',
                       outline: 'none',
                       fontSize: '0.84rem'
                     }}
@@ -5389,7 +5446,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                 {/* 🔍 Search & Channels Roster */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff' }}>
                       Destination Channels ({filteredRooms.length})
                     </label>
                     <button
@@ -5399,7 +5456,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#2563eb',
+                        color: '#38bdf8',
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         cursor: 'pointer',
@@ -5424,9 +5481,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                         width: '100%',
                         padding: '0.5rem 0.8rem 0.5rem 2rem',
                         borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
-                        color: '#0f172a',
+                        border: '1px solid rgba(148, 163, 184, 0.24)',
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                        color: '#ffffff',
                         outline: 'none',
                         fontSize: '0.82rem'
                       }}
@@ -5436,21 +5493,21 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                   <div style={{
                     maxHeight: '170px',
                     overflowY: 'auto',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
                     borderRadius: '10px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px',
                     padding: '6px',
-                    backgroundColor: '#f8fafc'
+                    backgroundColor: 'rgba(11, 17, 32, 0.78)'
                   }}>
                     {loadingShareRooms ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <Loader size={20} className="animate-spin" color="#2563eb" />
+                      <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <Loader size={20} className="animate-spin" color="#38bdf8" />
                         <span>Loading team communication channels...</span>
                       </div>
                     ) : filteredRooms.length === 0 ? (
-                      <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
                         <p style={{ margin: '0 0 8px 0' }}>No active channels found for this filter.</p>
                         <button
                           type="button"
@@ -5488,9 +5545,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                               alignItems: 'center',
                               gap: '8px',
                               cursor: 'pointer',
-                              backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                              border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
-                              color: isSelected ? '#1d4ed8' : '#0f172a',
+                              backgroundColor: isSelected ? 'rgba(37, 99, 235, 0.24)' : 'rgba(15, 23, 42, 0.65)',
+                              border: isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(148, 163, 184, 0.16)',
+                              color: '#ffffff',
                               transition: 'all 0.12s ease',
                             }}
                           >
@@ -5500,8 +5557,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                               borderRadius: '50%',
                               background: isSelected
                                 ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
-                                : '#e2e8f0',
-                              color: isSelected ? '#ffffff' : '#475569',
+                                : 'rgba(255, 255, 255, 0.12)',
+                              color: '#ffffff',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -5516,13 +5573,13 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                                 {displayName}
                               </div>
                               {r.companyEntity && (
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                                   {r.companyEntity}
                                 </div>
                               )}
                             </div>
                             {isSelected && (
-                              <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 900 }}>✓</span>
+                              <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 900 }}>✓</span>
                             )}
                           </div>
                         );
@@ -5532,7 +5589,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                 </div>
 
                 {/* Bottom action controls */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem', paddingTop: '0.75rem', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(148, 163, 184, 0.2)' }}>
                   <button 
                     type="button" 
                     onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); setShareNote(''); }} 
@@ -5553,7 +5610,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       padding: '8px 20px',
                       borderRadius: '8px',
                       border: 'none',
-                      background: selectedRoomId ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : '#cbd5e1',
+                      background: selectedRoomId ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'rgba(148, 163, 184, 0.25)',
                       color: 'white',
                       cursor: selectedRoomId ? 'pointer' : 'not-allowed',
                       fontWeight: 'bold',
@@ -5579,51 +5636,48 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       {historyModalCard && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 99999,
-          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
-          <div style={{
-            width: '100%', maxWidth: '640px', background: '#ffffff', border: '1px solid #e2e8f0',
-            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+          <div className="glass-panel" style={{
+            width: '100%', maxWidth: '640px', background: 'rgba(15, 23, 42, 0.96)', border: '1px solid rgba(148, 163, 184, 0.28)',
+            borderRadius: '16px', padding: '1.25rem', color: '#ffffff', boxShadow: '0 24px 60px rgba(0,0,0,0.65)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Clock size={20} /> Job Card #{historyModalCard.jobNo} — Staff Audit History
                 </h3>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Complete timeline of every staff member who created or edited this Job Card.
-                </p>
               </div>
-              <button className="btn-icon" onClick={() => setHistoryModalCard(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+              <button className="btn-icon" onClick={() => setHistoryModalCard(null)} style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#e2e8f0', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
             <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {(!historyModalCard.auditTrail || historyModalCard.auditTrail.length === 0) ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Created By: <span style={{ color: '#2563eb' }}>{historyModalCard.createdByName || historyModalCard.createdBy || 'Staff User'}</span></div>
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', background: 'rgba(11, 17, 32, 0.78)', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' }}>Created By: <span style={{ color: '#38bdf8' }}>{historyModalCard.createdByName || historyModalCard.createdBy || 'Staff User'}</span></div>
                   {historyModalCard.updatedByName && (
-                    <div style={{ marginTop: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Last Updated By: <span style={{ color: '#0284c7' }}>{historyModalCard.updatedByName}</span></div>
+                    <div style={{ marginTop: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Last Updated By: <span style={{ color: '#38bdf8' }}>{historyModalCard.updatedByName}</span></div>
                   )}
                   <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#94a3b8' }}>No detailed field changes recorded prior to system upgrade.</div>
                 </div>
               ) : (
                 historyModalCard.auditTrail.map((entry, idx) => (
-                  <div key={idx} style={{ padding: '0.85rem 1rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <div key={idx} style={{ padding: '0.85rem 1rem', borderRadius: '10px', background: 'rgba(11, 17, 32, 0.78)', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: entry.action === 'CREATE' ? '#16a34a' : '#0284c7', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: entry.action === 'CREATE' ? '#34d399' : '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>👤 {entry.performedByName || entry.performedBy || 'Staff User'}</span>
-                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: entry.action === 'CREATE' ? '#dcfce7' : '#e0f2fe', color: entry.action === 'CREATE' ? '#15803d' : '#0369a1', border: `1px solid ${entry.action === 'CREATE' ? '#bbf7d0' : '#bae6fd'}` }}>
+                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: entry.action === 'CREATE' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(56, 189, 248, 0.18)', color: entry.action === 'CREATE' ? '#6ee7b7' : '#7dd3fc', border: `1px solid ${entry.action === 'CREATE' ? 'rgba(52, 211, 153, 0.35)' : 'rgba(56, 189, 248, 0.35)'}` }}>
                           {entry.action}
                         </span>
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
                         {new Date(entry.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 600, background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.82rem', color: '#f8fafc', fontWeight: 600, background: 'rgba(15, 23, 42, 0.85)', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
                       {entry.details || entry.changesSummary || 'Updated Job Card'}
                     </div>
                   </div>

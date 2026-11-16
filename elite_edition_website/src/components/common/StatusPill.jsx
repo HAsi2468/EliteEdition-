@@ -64,27 +64,27 @@ export function normalizeStatusCategory(rawStatus) {
 
 const STATUS_THEMES = {
   done: {
-    bg: '#ecfdf5',
-    text: '#065f46',
-    border: '#a7f3d0',
+    bg: 'rgba(34, 197, 94, 0.16)',
+    text: '#34d399',
+    border: 'rgba(34, 197, 94, 0.35)',
     label: 'Done'
   },
   in_progress: {
-    bg: '#eff6ff',
-    text: '#1e40af',
-    border: '#bfdbfe',
+    bg: 'rgba(56, 189, 248, 0.16)',
+    text: '#38bdf8',
+    border: 'rgba(56, 189, 248, 0.35)',
     label: 'In Progress'
   },
   delayed: {
-    bg: '#fef2f2',
-    text: '#991b1b',
-    border: '#fecaca',
+    bg: 'rgba(239, 68, 68, 0.16)',
+    text: '#f87171',
+    border: 'rgba(239, 68, 68, 0.35)',
     label: 'Delayed'
   },
   pending: {
-    bg: '#fffbeb',
-    text: '#92400e',
-    border: '#fde68a',
+    bg: 'rgba(251, 191, 36, 0.16)',
+    text: '#fbbf24',
+    border: 'rgba(251, 191, 36, 0.35)',
     label: 'Pending'
   }
 };

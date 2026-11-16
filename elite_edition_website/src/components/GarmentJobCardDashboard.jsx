@@ -11,6 +11,8 @@ import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DateRangePicker from './DateRangePicker';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const PIPELINE_STAGES = [
   { stage_number: 1, key: '1_fabric_order', name: 'Fabric Order', icon: '🧵', color: '#60a5fa', desc: 'Fabric Procurement & Requisition' },
@@ -359,67 +361,50 @@ export default function GarmentJobCardDashboard() {
   const { summary, designAnalytics } = analytics;
 
   return (
-    <div style={{ padding: '1.25rem', paddingTop: '1.5rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Minimal White Card Header with Entry Button Top Right */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>
-              <Scissors size={20} color="#fff" />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Stitching Production
-              </h2>
-              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                8-Stage Garment Handover & Job Cards
-              </p>
-            </div>
-          </div>
+    <div style={{ padding: '0.85rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <Scissors size={20} color="#c084fc" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            Stitching Production
+          </span>
+          <EntityBrandBadge />
+        </div>
 
-          {/* Entry Buttons Top in Header */}
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => { setEditingCard(null); setShowForm(true); }}
-              style={{
-                padding: '0.48rem 1.1rem', borderRadius: '8px',
-                background: 'linear-gradient(135deg, #4f46e5, #6366f1)', color: '#fff',
-                fontSize: '0.84rem', fontWeight: 700, border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px',
-                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)'
-              }}
-            >
-              <Plus size={16} /> New Garment Job Card
-            </button>
-            <button
-              onClick={() => setShowPKDImportModal(true)}
-              style={{
-                padding: '0.45rem 0.95rem', borderRadius: '8px',
-                border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a',
-                fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-              }}
-            >
-              📥 Import PKD Orders
-            </button>
-            <button
-              onClick={handleExportCSV}
-              style={{
-                padding: '0.45rem 0.95rem', borderRadius: '8px',
-                border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a',
-                fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-              }}
-            >
-              <Download size={15} /> Export CSV
-            </button>
-          </div>
+        {/* Entry Buttons Top in Header */}
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => { setEditingCard(null); setShowForm(true); }}
+            className="glass-btn-primary"
+            style={{
+              padding: '0.55rem 1.1rem', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.85))', color: '#fff',
+              fontSize: '0.84rem', fontWeight: 700, border: '1px solid rgba(255, 255, 255, 0.15)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)'
+            }}
+          >
+            <Plus size={15} /> New Garment Job Card
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPKDImportModal(true)}
+            className="glass-subtab-btn"
+            style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}
+          >
+            📥 Import PKD
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="glass-subtab-btn"
+            style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}
+          >
+            <Download size={14} color="#38bdf8" /> Export CSV
+          </button>
+          <QuickActionMenu />
         </div>
       </div>
 
@@ -433,112 +418,76 @@ export default function GarmentJobCardDashboard() {
         />
       )}
 
-      {/* KPI Analytical Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={kpiLabelStyle}>Total Jobs</span>
-            <Layers size={18} color="#4f46e5" />
-          </div>
-          <span style={kpiValStyle}>{summary.totalJobs || 0}</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Active Production Lots</span>
-        </div>
-
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={kpiLabelStyle}>Total Garments</span>
-            <Calculator size={18} color="#4f46e5" />
-          </div>
-          <span style={{ ...kpiValStyle, color: '#0f172a' }}>{summary.totalPieces || 0} Pcs</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Manufactured Volume</span>
-        </div>
-
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={kpiLabelStyle}>Fabric Expense</span>
-            <DollarSign size={18} color="#059669" />
-          </div>
-          <span style={{ ...kpiValStyle, color: '#0f172a' }}>₹{(summary.totalFabricCost || 0).toLocaleString('en-IN')}</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Raw Material Cost</span>
-        </div>
-
-        <div style={kpiCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={kpiLabelStyle}>Stitching & Labor</span>
-            <Scissors size={18} color="#4f46e5" />
-          </div>
-          <span style={{ ...kpiValStyle, color: '#0f172a' }}>₹{(summary.totalStitchingCost || 0).toLocaleString('en-IN')}</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Vendor Operations</span>
-        </div>
-
-        <div style={{ ...kpiCardStyle, border: '1px solid #cbd5e1', background: '#ffffff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={kpiLabelStyle}>Avg Cost / Piece</span>
-            <TrendingUp size={18} color="#4f46e5" />
-          </div>
-          <span style={{ ...kpiValStyle, color: '#4f46e5' }}>₹{(summary.avgCostPerPiece || 0).toFixed(2)}</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Grand Total / Total Pcs</span>
-        </div>
+      {/* ── TIER 2: SUB-SCREENS BUTTONS (PIPELINE STAGES) ── */}
+      <div className="glass-subtabs-bar" style={{ marginTop: '0.2rem' }}>
+        <button
+          type="button"
+          onClick={() => { setStageFilter('All'); setPage(1); }}
+          className={`glass-subtab-btn ${stageFilter === 'All' ? 'active' : ''}`}
+        >
+          <span>All Stages ({summary.totalJobs || 0})</span>
+        </button>
+        {PIPELINE_STAGES.map(stage => {
+          const isActive = stageFilter === String(stage.stage_number);
+          const count = cards.filter(c => Number(c.current_stage) === Number(stage.stage_number)).length;
+          return (
+            <button
+              key={stage.stage_number}
+              type="button"
+              onClick={() => { setStageFilter(isActive ? 'All' : String(stage.stage_number)); setPage(1); }}
+              className={`glass-subtab-btn ${isActive ? 'active' : ''}`}
+            >
+              <span>{stage.icon} {stage.stage_number}. {stage.name}</span>
+              {count > 0 && (
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  padding: '1px 6px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  color: '#ffffff',
+                  marginLeft: '4px'
+                }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* 8-Stage Production Filter Pills (Horizontal Scrollable Container) */}
-      <div style={{
-        background: '#ffffff',
-        padding: '0.85rem 1rem',
-        borderRadius: '10px',
-        border: '1px solid #cbd5e1',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem'
-      }}>
-        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          📌 Filter Production Stage (8 Steps):
+      {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+      <div className="glass-scroll-track" style={{ marginTop: '0.2rem' }}>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Jobs</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{summary.totalJobs || 0}</span>
+          <span className="glass-calc-sub">Active Production Lots</span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.35rem', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
-          <button
-            onClick={() => setStageFilter('All')}
-            style={{
-              padding: '0.35rem 0.85rem',
-              borderRadius: '20px',
-              border: stageFilter === 'All' ? '1px solid #4f46e5' : '1px solid #cbd5e1',
-              background: stageFilter === 'All' ? '#4f46e5' : '#ffffff',
-              color: stageFilter === 'All' ? '#ffffff' : '#334155',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              boxShadow: stageFilter === 'All' ? '0 2px 8px rgba(79,70,229,0.3)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            All Stages
-          </button>
-          {PIPELINE_STAGES.map(st => (
-            <button
-              key={st.stage_number}
-              onClick={() => setStageFilter(String(st.stage_number))}
-              style={{
-                padding: '0.35rem 0.85rem',
-                borderRadius: '20px',
-                border: stageFilter === String(st.stage_number) ? '1px solid #4f46e5' : '1px solid #cbd5e1',
-                background: stageFilter === String(st.stage_number) ? 'rgba(79,70,229,0.1)' : '#ffffff',
-                color: stageFilter === String(st.stage_number) ? '#4f46e5' : '#334155',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <span>{st.icon}</span>
-              <span>{st.stage_number}. {st.name}</span>
-            </button>
-          ))}
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Garments</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{summary.totalPieces || 0} Pcs</span>
+          <span className="glass-calc-sub">Manufactured Volume</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Fabric Expense</span>
+          <span className="glass-calc-value" style={{ color: '#34d399' }}>₹{(summary.totalFabricCost || 0).toLocaleString('en-IN')}</span>
+          <span className="glass-calc-sub">Raw Material Cost</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Stitching &amp; Labor</span>
+          <span className="glass-calc-value" style={{ color: '#c084fc' }}>₹{(summary.totalStitchingCost || 0).toLocaleString('en-IN')}</span>
+          <span className="glass-calc-sub">Vendor Operations</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Avg Cost / Piece</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
+            ₹{summary.totalPieces > 0 ? (((summary.totalFabricCost || 0) + (summary.totalStitchingCost || 0)) / summary.totalPieces).toFixed(1) : 0}
+          </span>
+          <span className="glass-calc-sub">Average Production Cost</span>
         </div>
       </div>
 

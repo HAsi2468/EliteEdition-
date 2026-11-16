@@ -139,6 +139,35 @@ const getOne = async (req, res) => {
 const create = async (req, res) => {
   try {
     const body = { ...req.body };
+    const reqUser = req.user || {};
+    const roleStr = String(reqUser.role || '').toLowerCase();
+    const unameStr = String(reqUser.username || '').toLowerCase();
+    const isAdminUser = Boolean(
+      reqUser.isMainAdmin ||
+      reqUser.isAdmin === true ||
+      roleStr === 'admin' ||
+      roleStr === 'master_admin' ||
+      roleStr === 'master' ||
+      unameStr === 'admin' ||
+      unameStr === 'master'
+    );
+
+    if (!isAdminUser) {
+      const sampleTaskId = body.sampleTaskId;
+      if (!sampleTaskId) {
+        return res.status(403).json({
+          error: 'Only admins can directly add designs to Design Catalog. Please create a Sample Design first and add it from there.',
+        });
+      }
+      const sampleDoc = db.DesignerTask ? await db.DesignerTask.findById(sampleTaskId).select('_id').lean().catch(() => null) : null;
+      if (!sampleDoc) {
+        return res.status(403).json({
+          error: 'Valid Sample Design is required before adding to Design Catalog.',
+        });
+      }
+    }
+    delete body.sampleTaskId;
+
     if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
     if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
 

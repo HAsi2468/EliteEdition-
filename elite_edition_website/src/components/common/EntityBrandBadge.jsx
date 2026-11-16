@@ -9,8 +9,8 @@ import './EntitySwitcher.css';
  * Guarantees operator spatial awareness so documents and entries are never
  * misallocated between companies.
  */
-export function EntityBrandBadge({ entityId, customLabel, style }) {
-  const company = getCompanyById(entityId);
+export function EntityBrandBadge({ entityId, entityCode, customLabel, style }) {
+  const company = getCompanyById(entityId || entityCode);
   const color = company.badgeColor || company.iconColor || '#0284c7';
   const hex = color.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16) || 2;

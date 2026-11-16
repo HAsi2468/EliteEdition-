@@ -43,12 +43,41 @@ export function StickyScrollShadowTracker() {
     // Listen to capture phase on document to catch all scrollable table wrappers
     document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
 
+    const onWinScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      document.body.classList.toggle('erp-page-scrolled', scrollTop > 8);
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const ratio = Math.min(1, Math.max(0, scrollTop / maxScroll));
+      document.documentElement.style.setProperty('--erp-scroll-progress', ratio.toFixed(4));
+    };
+    window.addEventListener('scroll', onWinScroll, { passive: true });
+    onWinScroll();
+
+    // VisionOS-style cursor spotlight on glass & KPI cards (desktop pointer only)
+    const isFinePointer = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const onPointerMove = (e) => {
+      const card = e.target instanceof Element
+        ? e.target.closest('.ent-stat-card, .stat-card, .metric-card, .glass-calc-card, .fusing-metric-card, .glass-card-item')
+        : null;
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+    };
+    if (isFinePointer) {
+      document.addEventListener('pointermove', onPointerMove, { passive: true });
+    }
+
     return () => {
       document.removeEventListener('scroll', handleScroll, { capture: true });
+      window.removeEventListener('scroll', onWinScroll);
+      if (isFinePointer) {
+        document.removeEventListener('pointermove', onPointerMove);
+      }
     };
   }, []);
 
-  return null;
+  return <div className="erp-scroll-progress" aria-hidden="true" />;
 }
 
 export default StickyScrollShadowTracker;

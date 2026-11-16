@@ -1,810 +1,630 @@
-/* ═══════════════════════════════════════════════════════════════════
-   MYNTRA INTEGRATION & PPMP 6-STAGE LIFECYCLE SUITE
-   Pixel-Perfect Enterprise Styling with Rose Accent & Clean Cards
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   MYNTRA / MARKETPLACE INTEGRATION — DARK FROSTED GLASS STYLESHEET
+   100% High-Contrast Text • Deep Navy Glassmorphic Surfaces • Smooth Animations
+   ========================================================================== */
 
-.myntra-root {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  font-family: var(--font-family, 'Inter', -apple-system, sans-serif);
+.myntra-hub-wrapper {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #ffffff !important;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
-/* Main Container Card */
+/* Base Card Container */
 .myntra-card-container {
-  background-color: #ffffff;
-  border-radius: 1rem; /* rounded-2xl */
-  border: 1px solid rgba(226, 232, 240, 0.8); /* border-slate-200/80 */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
-  padding: 1.5rem; /* p-6 */
-  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.78) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  box-shadow: 0 14px 36px rgba(2, 6, 23, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 24px;
+  margin-bottom: 20px;
 }
 
-/* Page Header */
+/* Top Header Section */
 .myntra-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: flex-start;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid #f1f5f9;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
-.myntra-header-left {
+.myntra-title-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 14px;
 }
 
-.myntra-badge-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #f43f5e, #e11d48);
+.myntra-brand-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff3f6c 0%, #ff6b35 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  box-shadow: 0 6px 16px rgba(225, 29, 72, 0.22);
+  font-weight: 900;
+  font-size: 22px;
+  box-shadow: 0 4px 12px rgba(255, 63, 108, 0.35);
   flex-shrink: 0;
 }
 
 .myntra-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #0f172a; /* text-slate-900 */
-  line-height: 1.2;
   margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff !important;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .myntra-subtitle {
-  font-size: 0.85rem;
-  color: #64748b; /* text-slate-500 */
-  margin-top: 0.25rem;
-  margin-bottom: 0;
+  display: none !important;
 }
 
-/* Tab Navigation Bar */
+/* Connection Health Pills */
+.myntra-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.myntra-status-pill.live {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.myntra-status-pill.sandbox {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.myntra-status-pill.disconnected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.myntra-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+  animation: myntraPulse 2s infinite;
+}
+
+@keyframes myntraPulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Primary Navigation Tabs */
 .myntra-nav-tabs {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-bottom: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  gap: 8px;
+  margin-top: 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  padding-bottom: 12px;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .myntra-nav-tabs::-webkit-scrollbar {
-  height: 4px;
-}
-.myntra-nav-tabs::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 4px;
+  display: none;
 }
 
 .myntra-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem; /* px-4 py-2 */
-  border-radius: 0.75rem; /* rounded-xl */
-  font-size: 0.875rem;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease-in-out;
-  border: 1px solid transparent;
-  outline: none;
-}
-
-/* Inactive Tab: text-slate-500 hover:text-slate-800 hover:bg-slate-50 font-medium */
-.myntra-tab-btn.inactive {
-  background: transparent;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.myntra-tab-btn.inactive:hover {
-  color: #1e293b;
-  background-color: #f8fafc;
-}
-
-/* Active Tab: bg-rose-50 text-rose-600 border border-rose-200 font-semibold */
-.myntra-tab-btn.active {
-  background-color: #fff1f2; /* bg-rose-50 */
-  color: #e11d48; /* text-rose-600 */
-  border-color: #fecdd3; /* border-rose-200 */
-  font-weight: 600;
-}
-
-/* ==================== PIPELINE STAGE BAR ==================== */
-.myntra-pipeline-bar {
-  display: flex;
-  align-items: center;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.875rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.25rem;
-  gap: 0.5rem;
-  overflow-x: auto;
-}
-
-.myntra-stage-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 0.625rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  color: #475569;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.myntra-stage-item:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.myntra-stage-item.selected {
-  background: #fff1f2;
-  border-color: #fda4af;
-  color: #e11d48;
-}
-
-.myntra-stage-count {
-  padding: 0.15rem 0.45rem;
-  border-radius: 9999px;
-  font-size: 0.72rem;
-  background: #e2e8f0;
-  color: #334155;
-}
-
-.myntra-stage-item.selected .myntra-stage-count {
-  background: #ffe4e6;
-  color: #e11d48;
-}
-
-.myntra-stage-arrow {
+  transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  background: rgba(11, 17, 32, 0.65);
   color: #cbd5e1;
-  display: flex;
-  align-items: center;
+  white-space: nowrap;
 }
 
-/* ==================== SEARCH & SCAN BAR ==================== */
-.myntra-action-bar {
+.myntra-tab-btn:hover {
+  background: rgba(30, 41, 59, 0.85);
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.myntra-tab-btn.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border-color: #38bdf8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.myntra-tab-count {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.15);
+  color: inherit;
+}
+
+/* KPI Summary Strip */
+.myntra-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.myntra-kpi-card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  background: rgba(11, 17, 32, 0.78) !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.myntra-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.40) !important;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
+}
+
+.myntra-kpi-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  color: #cbd5e1 !important;
+}
+
+.myntra-kpi-value {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #ffffff !important;
+}
+
+.myntra-kpi-sub {
+  font-size: 11px;
+  margin-top: 6px;
+  font-weight: 600;
+  color: #94a3b8 !important;
+}
+
+/* Order Lifecycle Pipeline Filter Bar */
+.myntra-pipeline-bar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  padding: 6px;
+  background: rgba(11, 17, 32, 0.75) !important;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+}
+
+.myntra-stage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.78) !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.myntra-stage-item:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(30, 41, 59, 0.85) !important;
+}
+
+.myntra-stage-item.active {
+  border-color: #ff3f6c;
+  background: rgba(255, 63, 108, 0.15) !important;
+  box-shadow: 0 2px 8px rgba(255, 63, 108, 0.20);
+}
+
+.myntra-stage-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.myntra-stage-item.active .myntra-stage-title {
+  color: #ff8da8;
+}
+
+.myntra-stage-count {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-top: 2px;
+}
+
+/* Filter & Search Toolbar */
+.myntra-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 1.25rem;
-}
-
-.myntra-search-wrapper {
-  position: relative;
-  flex: 1;
-  min-width: 260px;
-}
-
-.myntra-search-icon {
-  position: absolute;
-  left: 0.85rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-  pointer-events: none;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .myntra-search-input {
-  width: 100%;
-  padding: 0.6rem 0.85rem 0.6rem 2.35rem;
-  font-size: 0.85rem;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.625rem;
-  color: #0f172a;
+  padding: 9px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  font-size: 13px;
+  min-width: 280px;
   outline: none;
-  transition: all 0.2s;
-  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background: rgba(11, 17, 32, 0.85) !important;
+  color: #ffffff !important;
 }
 
 .myntra-search-input:focus {
-  border-color: #f43f5e;
-  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12);
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
 }
 
-.myntra-scan-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  border-radius: 0.625rem;
-  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
-}
-
-.myntra-scan-input {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #9f1239;
-  width: 180px;
-}
-
-.myntra-scan-input::placeholder {
-  color: #f43f5e;
-  opacity: 0.7;
-}
-
-/* ==================== BUTTONS ==================== */
+/* Action Buttons */
 .myntra-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  padding: 0.55rem 0.95rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  border-radius: 0.625rem;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
+  transition: all 0.15s ease;
   border: 1px solid transparent;
   white-space: nowrap;
 }
 
-.myntra-btn-primary {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #1d4ed8;
-}
-
-.myntra-btn-primary:hover {
-  background: #1d4ed8;
-}
-
-.myntra-btn-rose {
-  background: #e11d48;
-  color: #ffffff;
-  border-color: #be123c;
-}
-
-.myntra-btn-rose:hover {
-  background: #be123c;
-}
-
-.myntra-btn-outline {
-  background: #ffffff;
-  border-color: #cbd5e1;
-  color: #334155;
-}
-
-.myntra-btn-outline:hover {
-  background: #f8fafc;
-  color: #0f172a;
-  border-color: #94a3b8;
-}
-
-.myntra-btn-subtle {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #e2e8f0;
-}
-
-.myntra-btn-subtle:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.myntra-btn-danger {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fca5a5;
-}
-
-.myntra-btn-danger:hover {
-  background: #fecaca;
-}
-
 .myntra-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-/* ==================== DATA TABLES ==================== */
+.myntra-btn-primary {
+  background: linear-gradient(135deg, #ff3f6c 0%, #e11d48 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(255, 63, 108, 0.25);
+}
+
+.myntra-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.myntra-btn-dark {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+}
+
+.myntra-btn-dark:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.myntra-btn-success {
+  background: #059669;
+  color: #ffffff;
+}
+
+.myntra-btn-success:hover:not(:disabled) {
+  background: #047857;
+}
+
+.myntra-btn-outline {
+  background: rgba(15, 23, 42, 0.80) !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+  color: #e2e8f0 !important;
+}
+
+.myntra-btn-outline:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 0.90) !important;
+  border-color: rgba(56, 189, 248, 0.40) !important;
+  color: #ffffff !important;
+}
+
+.myntra-btn-subtle {
+  background: rgba(30, 41, 59, 0.70) !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.myntra-btn-subtle:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.85) !important;
+  color: #ffffff !important;
+}
+
+.myntra-btn-xs {
+  padding: 5px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+/* Enterprise Data Tables */
 .myntra-table-container {
-  width: 100%;
   overflow-x: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  background: #ffffff;
-  margin-top: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.78) !important;
 }
 
 .myntra-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
   text-align: left;
-  font-size: 0.82rem;
+}
+
+.myntra-table thead tr {
+  background: rgba(11, 17, 32, 0.90) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
 }
 
 .myntra-table th {
-  background: #f8fafc;
-  color: #475569;
-  font-weight: 600;
+  padding: 11px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #cbd5e1 !important;
   text-transform: uppercase;
-  font-size: 0.72rem;
   letter-spacing: 0.04em;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
   white-space: nowrap;
 }
 
 .myntra-table td {
-  padding: 0.8rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #334155;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   vertical-align: middle;
+  color: #f8fafc !important;
 }
 
-.myntra-table tr:hover td {
-  background-color: #f8fafc;
+.myntra-table tbody tr:hover {
+  background: rgba(30, 41, 59, 0.55) !important;
 }
 
-.myntra-table tr:last-child td {
+.myntra-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-/* Stage & Status Badges */
+/* Order Status Badges */
 .myntra-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px;
-  font-size: 0.72rem;
-  font-weight: 600;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
-.myntra-badge-amber {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
+.myntra-badge.created { background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); }
+.myntra-badge.packed { background: rgba(129, 140, 248, 0.18); color: #818cf8; border: 1px solid rgba(129, 140, 248, 0.35); }
+.myntra-badge.rtd { background: rgba(251, 191, 36, 0.18); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); }
+.myntra-badge.shipped { background: rgba(52, 211, 153, 0.18); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35); }
+.myntra-badge.delivered { background: rgba(16, 185, 129, 0.22); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.45); }
+.myntra-badge.cancelled { background: rgba(248, 113, 113, 0.18); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.35); }
+.myntra-badge.returned { background: rgba(244, 63, 94, 0.18); color: #fb7185; border: 1px solid rgba(251, 113, 133, 0.35); }
+
+/* SLA Countdown Timer Badge */
+.myntra-sla-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
-.myntra-badge-blue {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+.myntra-sla-badge.safe {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
 }
 
-.myntra-badge-purple {
-  background: #faf5ff;
-  color: #6b21a8;
-  border: 1px solid #e9d5ff;
+.myntra-sla-badge.warning {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
 }
 
-.myntra-badge-emerald {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
+.myntra-sla-badge.breached {
+  background: rgba(239, 68, 68, 0.20);
+  color: #f87171;
 }
 
-.myntra-badge-sky {
-  background: #f0f9ff;
-  color: #0369a1;
-  border: 1px solid #bae6fd;
-}
-
-.myntra-badge-rose {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1px solid #fecdd3;
-}
-
-.myntra-badge-slate {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
-}
-
-/* ==================== MOCKIFY SIMULATOR & WEBHOOKS ==================== */
-.myntra-sim-grid {
+/* Webhook Simulator Grid */
+.myntra-simulator-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .myntra-sim-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.875rem;
-  padding: 1.25rem;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(11, 17, 32, 0.78) !important;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.myntra-sim-card-header {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.myntra-webhook-card {
-  background: #0f172a; /* Slate 900 */
-  border: 1px solid #1e293b;
-  border-radius: 0.875rem;
-  padding: 1.25rem;
+.myntra-code-preview {
+  background: #090f1d;
   color: #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.myntra-webhook-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.myntra-webhook-body {
-  max-height: 380px;
-  overflow-y: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.78rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.myntra-webhook-item {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-}
-
-.myntra-webhook-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  color: #38bdf8;
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.myntra-webhook-json {
-  background: #090d16;
-  padding: 0.6rem;
-  border-radius: 0.375rem;
-  color: #cbd5e1;
+  padding: 14px;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
   overflow-x: auto;
-  white-space: pre;
-  margin: 0;
+  line-height: 1.5;
+  max-height: 320px;
+  border: 1px solid rgba(148, 163, 184, 0.20);
 }
 
-/* ==================== API & WEBHOOK SETTINGS ==================== */
-.myntra-settings-grid {
+/* Credentials Vault Box */
+.myntra-vault-banner {
+  background: linear-gradient(135deg, #0b1120 0%, #1e293b 100%);
+  color: #ffffff;
+  padding: 20px;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+}
+
+.myntra-token-box {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 .myntra-token-card {
-  background: linear-gradient(135deg, #f8fafc, #eff6ff);
-  border: 1px solid #bfdbfe;
-  border-radius: 0.875rem;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(11, 17, 32, 0.78) !important;
 }
 
-.myntra-pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  display: inline-block;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  animation: myntraPulse 2s infinite;
-}
-
-@keyframes myntraPulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-/* ==================== MODALS ==================== */
+/* Modal Overlay */
 .myntra-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  z-index: 9999;
+  padding: 20px;
 }
 
 .myntra-modal {
-  background: #ffffff;
-  border-radius: 1rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  background: rgba(15, 23, 42, 0.96) !important;
+  color: #ffffff !important;
+  border-radius: 16px;
+  max-width: 640px;
   width: 100%;
-  max-width: 520px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  animation: myntraFadeIn 0.2s ease-out;
-}
-
-@keyframes myntraFadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.myntra-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.myntra-modal-body {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  max-height: 75vh;
+  max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 24px;
 }
 
-.myntra-modal-footer {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #f1f5f9;
-  background: #f8fafc;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-/* Form Groups */
 .myntra-form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 5px;
+  margin-bottom: 14px;
 }
 
 .myntra-form-label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5e1 !important;
 }
 
-.myntra-form-input, .myntra-form-select {
-  padding: 0.6rem 0.85rem;
-  font-size: 0.85rem;
-  border-radius: 0.5rem;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #0f172a;
+.myntra-form-input {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  font-size: 13px;
   outline: none;
-  transition: all 0.2s;
-  box-sizing: border-box;
-  width: 100%;
+  background: rgba(11, 17, 32, 0.85) !important;
+  color: #ffffff !important;
 }
 
-.myntra-form-input:focus, .myntra-form-select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+.myntra-form-input:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
 }
 
-/* Tailored Utility Polyfills */
-.bg-white { background-color: #ffffff !important; }
-.rounded-2xl { border-radius: 1rem !important; }
-.border { border-width: 1px !important; border-style: solid !important; }
-.border-slate-200\/80 { border-color: rgba(226, 232, 240, 0.8) !important; }
-.shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; }
-.p-6 { padding: 1.5rem !important; }
-.bg-rose-50 { background-color: #fff1f2 !important; }
-.text-rose-600 { color: #e11d48 !important; }
-.border-rose-200 { border-color: #fecdd3 !important; }
-.font-semibold { font-weight: 600 !important; }
-.rounded-xl { border-radius: 0.75rem !important; }
-.px-4 { padding-left: 1rem !important; padding-right: 1rem !important; }
-.py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-.text-slate-500 { color: #64748b !important; }
-.font-medium { font-weight: 500 !important; }
-
-/* ═══════════════════════════════════════════════════════════════════
-   MOBILE RESPONSIVENESS & NATIVE APP EXPERIENCE (< 768px)
-   ═══════════════════════════════════════════════════════════════════ */
-
+/* Responsive Breakpoints */
 @media (max-width: 768px) {
-  .myntra-root {
-    gap: 1rem;
-    /* Safe padding so bottom navigation bar does not cover content */
-    padding-bottom: 95px !important;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
   .myntra-card-container {
-    padding: 0.85rem !important;
-    border-radius: 0.875rem !important;
+    padding: 16px;
   }
-
-  /* Header */
-  .myntra-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.85rem;
-  }
-
-  .myntra-header-left {
-    gap: 0.75rem;
-    width: 100%;
-  }
-
-  .myntra-badge-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-  }
-
-  .myntra-title {
-    font-size: 1.15rem;
-  }
-
-  .myntra-subtitle {
-    font-size: 0.75rem;
-  }
-
-  .myntra-header-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  /* Smooth Touch Tab Navigation Bar */
-  .myntra-nav-tabs {
-    display: flex;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
-    padding-bottom: 6px;
-    gap: 0.35rem;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .myntra-nav-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .myntra-nav-tab {
-    flex-shrink: 0;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.82rem;
-    white-space: nowrap;
-  }
-
-  /* Smooth Touch Pipeline Bar */
-  .myntra-pipeline-bar {
-    display: flex;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
-    padding: 0.35rem;
-    padding-bottom: 6px;
-    gap: 0.35rem;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .myntra-pipeline-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .myntra-pipeline-step {
-    flex-shrink: 0;
-    white-space: nowrap;
-    padding: 0.5rem 0.85rem;
-  }
-
-  /* Actions Bar */
-  .myntra-action-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-
-  .myntra-action-bar > div {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-    gap: 0.5rem;
-  }
-
-  .myntra-search-wrapper {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
   .myntra-search-input {
-    width: 100% !important;
+    min-width: 100%;
   }
+  .myntra-pipeline-bar {
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+  }
+}
 
-  .myntra-scan-box {
-    width: 100% !important;
-    box-sizing: border-box;
-    justify-content: space-between;
-  }
+/* Utility Classes inside Myntra Panel */
+.myntra-hub-wrapper .grid { display: grid; }
+.myntra-hub-wrapper .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.myntra-hub-wrapper .gap-4 { gap: 16px; }
+.myntra-hub-wrapper .gap-6 { gap: 24px; }
+.myntra-hub-wrapper .mb-4 { margin-bottom: 16px; }
+.myntra-hub-wrapper .mb-6 { margin-bottom: 24px; }
+.myntra-hub-wrapper .p-4 { padding: 16px; }
+.myntra-hub-wrapper .p-5 { padding: 20px; }
+.myntra-hub-wrapper .rounded-xl { border-radius: 12px; }
+.myntra-hub-wrapper .border { border-width: 1px; border-style: solid; }
+.myntra-hub-wrapper .border-slate-200 { border-color: rgba(148, 163, 184, 0.22) !important; }
+.myntra-hub-wrapper .bg-white { background-color: rgba(15, 23, 42, 0.78) !important; color: #ffffff !important; }
+.myntra-hub-wrapper .shadow-sm { box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35); }
+.myntra-hub-wrapper .flex { display: flex; }
+.myntra-hub-wrapper .items-center { align-items: center; }
+.myntra-hub-wrapper .justify-between { justify-content: space-between; }
 
-  .myntra-scan-input {
-    flex: 1;
-    min-width: 0;
-  }
+@media (min-width: 768px) {
+  .myntra-hub-wrapper .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .myntra-hub-wrapper .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .myntra-hub-wrapper .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
-  /* Data Table */
-  .myntra-table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-    margin-top: 0.5rem;
-    border-radius: 0.5rem;
-  }
-
-  .myntra-table {
-    min-width: 720px;
-  }
-
-  .myntra-th, .myntra-td {
-    padding: 0.6rem 0.75rem;
-  }
-
-  /* Grids: Stock, Simulator & Settings */
-  .myntra-grid-3,
-  div[style*="gridTemplateColumns: repeat(auto-fit"],
-  div[style*="gridTemplateColumns: repeat(auto-fill"],
-  div[style*="gridTemplateColumns: repeat(2, 1fr)"] {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Modals on Mobile */
-  .myntra-modal-content {
-    width: 94% !important;
-    max-width: 94% !important;
-    margin: 1rem auto;
-    padding: 1.15rem !important;
-    max-height: 85vh;
-    overflow-y: auto;
-  }
+@media (min-width: 1024px) {
+  .myntra-hub-wrapper .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .myntra-hub-wrapper .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

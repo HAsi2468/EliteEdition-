@@ -229,37 +229,36 @@ export default function AdminUserDataReview({ companyEntity }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', fontFamily: 'inherit' }}>
       {/* Top Banner */}
-      <div style={{
-        background: '#ffffff',
-        border: '1.5px solid #bfdbfe',
+      <div className="glass-panel" style={{
+        background: 'rgba(15, 23, 42, 0.78)',
+        border: '1px solid var(--border-color)',
         borderRadius: '12px',
         padding: '1.2rem 1.5rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '1rem',
-        boxShadow: '0 2px 10px rgba(37,99,235,0.06)'
+        gap: '1rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <div style={{
             width: '42px',
             height: '42px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1.5px solid #93c5fd',
+            background: 'rgba(59, 130, 246, 0.18)',
+            border: '1px solid rgba(59, 130, 246, 0.38)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#1d4ed8'
+            color: '#60a5fa'
           }}>
             <FileText size={22} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#f8fafc' }}>
               User Data Entry Review & Audit Feed
             </h3>
-            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
               Track and review all records, invoices, job cards, and fabric transactions entered into the ERP by staff users.
             </p>
           </div>
@@ -271,16 +270,15 @@ export default function AdminUserDataReview({ companyEntity }) {
           style={{
             padding: '0.55rem 1.1rem',
             borderRadius: '8px',
-            border: '1px solid #bfdbfe',
-            background: '#eff6ff',
-            color: '#1d4ed8',
+            border: '1px solid rgba(59, 130, 246, 0.4)',
+            background: 'rgba(59, 130, 246, 0.18)',
+            color: '#93c5fd',
             fontSize: '0.8rem',
             fontWeight: 800,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 1px 3px rgba(37,99,235,0.1)'
+            gap: '0.4rem'
           }}
         >
           <Download size={15} /> Export to CSV
@@ -288,21 +286,20 @@ export default function AdminUserDataReview({ companyEntity }) {
       </div>
 
       {/* Control & Filter Panel */}
-      <div style={{
-        background: '#ffffff',
-        border: '1.5px solid #bfdbfe',
+      <div className="glass-panel" style={{
+        background: 'rgba(15, 23, 42, 0.72)',
+        border: '1px solid var(--border-color)',
         borderRadius: '12px',
         padding: '1.1rem 1.3rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.85rem',
-        boxShadow: '0 2px 10px rgba(37,99,235,0.04)'
+        gap: '0.85rem'
       }}>
         {/* Row 1: Company, Department, User, Module & Search Selectors */}
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Company selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: '1 1 180px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               🏢 Company:
             </label>
             <select
@@ -313,9 +310,9 @@ export default function AdminUserDataReview({ companyEntity }) {
                 borderRadius: '7px',
                 fontSize: '0.85rem',
                 fontWeight: 700,
-                background: '#ffffff',
-                border: '1.5px solid #bfdbfe',
-                color: '#0f172a'
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid var(--border-color)',
+                color: '#f8fafc'
               }}
             >
               {companyOptions.map(c => (
@@ -326,7 +323,7 @@ export default function AdminUserDataReview({ companyEntity }) {
 
           {/* Department selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: '1 1 180px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               🏛️ Department:
             </label>
             <select
@@ -337,9 +334,9 @@ export default function AdminUserDataReview({ companyEntity }) {
                 borderRadius: '7px',
                 fontSize: '0.85rem',
                 fontWeight: 700,
-                background: '#ffffff',
-                border: '1.5px solid #bfdbfe',
-                color: '#0f172a'
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid var(--border-color)',
+                color: '#f8fafc'
               }}
             >
               {departmentOptions.map(d => (
@@ -350,7 +347,7 @@ export default function AdminUserDataReview({ companyEntity }) {
 
           {/* User selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: '1 1 180px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               👤 Filter by User:
             </label>
             <select
@@ -361,9 +358,9 @@ export default function AdminUserDataReview({ companyEntity }) {
                 borderRadius: '7px',
                 fontSize: '0.85rem',
                 fontWeight: 700,
-                background: '#ffffff',
-                border: '1.5px solid #bfdbfe',
-                color: '#0f172a'
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid var(--border-color)',
+                color: '#f8fafc'
               }}
             >
               <option value="ALL">-- All Staff Users ({usersList.length}) --</option>
@@ -375,7 +372,7 @@ export default function AdminUserDataReview({ companyEntity }) {
 
           {/* Module selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: '1 1 180px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               📁 Module:
             </label>
             <select
@@ -386,9 +383,9 @@ export default function AdminUserDataReview({ companyEntity }) {
                 borderRadius: '7px',
                 fontSize: '0.85rem',
                 fontWeight: 700,
-                background: '#ffffff',
-                border: '1.5px solid #bfdbfe',
-                color: '#0f172a'
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid var(--border-color)',
+                color: '#f8fafc'
               }}
             >
               {moduleOptions.map(m => (
@@ -399,11 +396,11 @@ export default function AdminUserDataReview({ companyEntity }) {
 
           {/* Search box */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: '2 1 240px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               🔍 Search Query:
             </label>
             <div style={{ position: 'relative' }}>
-              <Search size={15} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
                 placeholder="Search by Job #, Invoice #, Party, Fabric..."
@@ -415,9 +412,9 @@ export default function AdminUserDataReview({ companyEntity }) {
                   borderRadius: '7px',
                   fontSize: '0.85rem',
                   fontWeight: 600,
-                  background: '#ffffff',
-                  border: '1.5px solid #bfdbfe',
-                  color: '#0f172a',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  border: '1px solid var(--border-color)',
+                  color: '#f8fafc',
                   boxSizing: 'border-box'
                 }}
               />
@@ -432,9 +429,9 @@ export default function AdminUserDataReview({ companyEntity }) {
               style={{
                 padding: '0.55rem 0.9rem',
                 borderRadius: '7px',
-                border: '1.5px solid #bfdbfe',
-                background: '#ffffff',
-                color: '#1d4ed8',
+                border: '1px solid var(--border-color)',
+                background: 'rgba(30, 41, 59, 0.85)',
+                color: '#93c5fd',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -449,8 +446,8 @@ export default function AdminUserDataReview({ companyEntity }) {
         </div>
 
         {/* Row 2: Date Filters & Presets */}
-        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#93c5fd' }}>
             Date Filter:
           </span>
 
@@ -471,9 +468,9 @@ export default function AdminUserDataReview({ companyEntity }) {
                 fontSize: '0.74rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                border: datePreset === p.key ? '1.5px solid #2563eb' : '1px solid #bfdbfe',
-                background: datePreset === p.key ? '#2563eb' : '#ffffff',
-                color: datePreset === p.key ? '#ffffff' : '#1e40af'
+                border: datePreset === p.key ? '1px solid #3b82f6' : '1px solid var(--border-color)',
+                background: datePreset === p.key ? '#2563eb' : 'rgba(15, 23, 42, 0.85)',
+                color: datePreset === p.key ? '#ffffff' : '#cbd5e1'
               }}
             >
               {p.label}
@@ -486,14 +483,14 @@ export default function AdminUserDataReview({ companyEntity }) {
               type="date"
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setDatePreset('CUSTOM'); setPage(1); }}
-              style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.75rem', color: '#0f172a' }}
+              style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'rgba(15, 23, 42, 0.85)', fontSize: '0.75rem', color: '#f8fafc' }}
             />
-            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>to</span>
+            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>to</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setDatePreset('CUSTOM'); setPage(1); }}
-              style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.75rem', color: '#0f172a' }}
+              style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'rgba(15, 23, 42, 0.85)', fontSize: '0.75rem', color: '#f8fafc' }}
             />
           </div>
         </div>
@@ -505,29 +502,29 @@ export default function AdminUserDataReview({ companyEntity }) {
         gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
         gap: '0.85rem'
       }}>
-        <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Total Entries</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1d4ed8', marginTop: '2px' }}>{pagination.total}</div>
+        <div className="glass-panel" style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>Total Entries</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#60a5fa', marginTop: '2px' }}>{pagination.total}</div>
         </div>
-        <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Company Filter</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{selectedCompany === 'ALL' ? '🏢 All Companies' : selectedCompany}</div>
+        <div className="glass-panel" style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>Company Filter</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{selectedCompany === 'ALL' ? '🏢 All Companies' : selectedCompany}</div>
         </div>
-        <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Department Filter</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{selectedDepartment === 'ALL' ? '🏛️ All Depts' : selectedDepartment}</div>
+        <div className="glass-panel" style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>Department Filter</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{selectedDepartment === 'ALL' ? '🏛️ All Depts' : selectedDepartment}</div>
         </div>
-        <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Staff User</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{selectedUser === 'ALL' ? '👤 All Users' : selectedUser}</div>
+        <div className="glass-panel" style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>Staff User</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{selectedUser === 'ALL' ? '👤 All Users' : selectedUser}</div>
         </div>
-        <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Module Filter</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{selectedModule === 'ALL' ? '📁 All Modules' : selectedModule}</div>
+        <div className="glass-panel" style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>Module Filter</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{selectedModule === 'ALL' ? '📁 All Modules' : selectedModule}</div>
         </div>
-        <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Date Scope</div>
-          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
+        <div className="glass-panel" style={{ background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>Date Scope</div>
+          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#f8fafc', marginTop: '6px' }}>
             {startDate && endDate ? `${startDate} to ${endDate}` : 'All Recorded History'}
           </div>
         </div>
@@ -535,15 +532,15 @@ export default function AdminUserDataReview({ companyEntity }) {
 
       {/* Entries List */}
       {loading ? (
-        <div style={{ padding: '3rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '12px' }}>
-          <RotateCw size={28} color="#2563eb" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem' }} />
-          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>Loading user entries feed...</div>
+        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+          <RotateCw size={28} color="#60a5fa" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem' }} />
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#93c5fd' }}>Loading user entries feed...</div>
         </div>
       ) : entries.length === 0 ? (
-        <div style={{ padding: '3rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '12px' }}>
-          <FileText size={38} color="#2563eb" style={{ margin: '0 auto 0.75rem' }} />
-          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>No user data entries found</h4>
-          <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+          <FileText size={38} color="#60a5fa" style={{ margin: '0 auto 0.75rem' }} />
+          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>No user data entries found</h4>
+          <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
             Try expanding your date range or clearing filters to view more entries.
           </p>
         </div>
@@ -552,9 +549,10 @@ export default function AdminUserDataReview({ companyEntity }) {
           {entries.map(item => (
             <div
               key={`${item.module}_${item.id}`}
+              className="glass-panel"
               style={{
-                background: '#ffffff',
-                border: '1.5px solid #bfdbfe',
+                background: 'rgba(15, 23, 42, 0.72)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '10px',
                 padding: '0.9rem 1.2rem',
                 display: 'flex',

@@ -27,6 +27,8 @@ import {
 import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import CustomerProfilesPanel from './CustomerProfilesPanel';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const STAGES = [
   { id: 'All', label: 'All Leads', color: 'var(--text-muted)' },
@@ -51,6 +53,7 @@ const CUSTOMER_TYPES = [
 ];
 
 export default function CrmPanel({ currentUser, initialSubTab }) {
+  const [crmViewMode, setCrmViewMode] = useState('table'); // 'table' | 'cards'
   const [subTab, setSubTab] = useState(() => {
     if (initialSubTab) return initialSubTab;
     if (typeof window !== 'undefined' && window.location.hash.toLowerCase().includes('profile')) {
@@ -425,181 +428,78 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
 
   return (
     <div className="crm-container" style={{ padding: '1.5rem', maxWidth: '1440px', margin: '0 auto', color: 'var(--text-main)' }}>
-      {/* Top Banner Header */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          padding: '1.4rem 1.8rem',
-          borderRadius: '16px',
-          background: 'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(59,130,246,0.06) 100%)',
-          border: '1px solid rgba(37,99,235,0.25)',
-          marginBottom: '1.5rem'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              boxShadow: '0 8px 16px rgba(37, 99, 235, 0.35)'
-            }}
-          >
-            <Users size={28} />
+      {/* ── TIER 1: HEADER (Rule 5: No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header" style={{ marginBottom: '0.65rem' }}>
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+            <Users size={16} color="#ffffff" />
           </div>
-          <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
-              CRM & Customer Management
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-              Unified customer profiles, inquiry tracking, follow-ups, and sales pipeline.
-            </p>
-          </div>
+          <span className="glass-screen-title">CRM & Customer Management</span>
+          <EntityBrandBadge entityId="EDP" />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* SubTab Switcher Buttons */}
-          <div
-            style={{
-              display: 'inline-flex',
-              padding: '4px',
-              borderRadius: '12px',
-              background: 'var(--bg-card, #ffffff)',
-              border: '1px solid var(--border-light, #e2e8f0)',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-              gap: '4px'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setSubTab('leads')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                outline: 'none',
-                background: subTab === 'leads' ? '#2563eb' : 'transparent',
-                color: subTab === 'leads' ? '#ffffff' : 'var(--text-muted, #64748b)',
-                fontWeight: subTab === 'leads' ? 700 : 600,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: subTab === 'leads' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
-              }}
-            >
-              <FileText size={16} />
-              <span>Customer Leads</span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  background: subTab === 'leads' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
-                  color: subTab === 'leads' ? '#ffffff' : '#475569',
-                  fontWeight: 700
-                }}
-              >
-                {leads.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSubTab('profiles')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                outline: 'none',
-                background: subTab === 'profiles' ? '#2563eb' : 'transparent',
-                color: subTab === 'profiles' ? '#ffffff' : 'var(--text-muted, #64748b)',
-                fontWeight: subTab === 'profiles' ? 700 : 600,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: subTab === 'profiles' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
-              }}
-            >
-              <Users size={16} />
-              <span>Customer Profiles</span>
-              <span
-                style={{
-                  fontSize: '10px',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  background: subTab === 'profiles' ? 'rgba(255,255,255,0.25)' : '#dbeafe',
-                  color: subTab === 'profiles' ? '#ffffff' : '#1e40af',
-                  fontWeight: 700
-                }}
-              >
-                Directory
-              </span>
-            </button>
-          </div>
-
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           {subTab === 'leads' ? (
             <button
               onClick={() => openAddModal()}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '10px 18px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                gap: '6px',
+                padding: '0.45rem 0.95rem',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                 color: '#fff',
                 border: 'none',
-                outline: 'none',
                 fontWeight: 700,
-                fontSize: '0.88rem',
+                fontSize: '0.82rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-                transition: 'all 0.2s ease'
+                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
               }}
             >
-              <UserPlus size={17} />
-              Add New Lead
+              <UserPlus size={15} /> + Add Lead
             </button>
           ) : (
             <button
               onClick={() => setTriggerAddProfile(prev => prev + 1)}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '10px 18px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                gap: '6px',
+                padding: '0.45rem 0.95rem',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                 color: '#fff',
                 border: 'none',
-                outline: 'none',
                 fontWeight: 700,
-                fontSize: '0.88rem',
+                fontSize: '0.82rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-                transition: 'all 0.2s ease'
+                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
               }}
             >
-              <UserPlus size={17} />
-              Add New Profile
+              <UserPlus size={15} /> + Add Profile
             </button>
           )}
+          <QuickActionMenu />
         </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Rule 5) ── */}
+      <div className="glass-subtabs-bar" style={{ marginBottom: '1rem' }}>
+        <button
+          type="button"
+          className={`glass-subtab-btn ${subTab === 'leads' ? 'active' : ''}`}
+          onClick={() => setSubTab('leads')}
+        >
+          <span>Customer Leads ({totalLeadsCount})</span>
+        </button>
+        <button
+          type="button"
+          className={`glass-subtab-btn ${subTab === 'profiles' ? 'active' : ''}`}
+          onClick={() => setSubTab('profiles')}
+        >
+          <span>Customer Profiles Directory</span>
+        </button>
       </div>
 
       {subTab === 'profiles' ? (
@@ -611,38 +511,53 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
         />
       ) : (
         <>
-          {/* Summary Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-          marginBottom: '1.5rem'
-        }}
-      >
-        <div className="glass-panel" style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Inquiries</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: 'var(--text-main)' }}>{totalLeadsCount}</div>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 600, textTransform: 'uppercase' }}>New Leads</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#3b82f6' }}>{newLeadsCount}</div>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600, textTransform: 'uppercase' }}>Active Discussions</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#f59e0b' }}>{activeDiscussionCount}</div>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, textTransform: 'uppercase' }}>Orders Confirmed</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#10b981' }}>{confirmedCount}</div>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase' }}>Total Pipeline Value</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#2563eb' }}>
-            ₹{totalPipelineVal.toLocaleString('en-IN')}
+          {/* ── TIER 3: SIDE SCROLLING CALCULATION & METRICS TRACK (Rule 5) ── */}
+          <div className="glass-scroll-track" style={{ marginBottom: '1rem' }}>
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Total Inquiries</span>
+                <Users size={16} color="#38bdf8" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>{totalLeadsCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>Logged Customer Leads</div>
+            </div>
+
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>New Leads</span>
+                <Clock size={16} color="#818cf8" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#818cf8', marginTop: '4px' }}>{newLeadsCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>Awaiting Initial Contact</div>
+            </div>
+
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>In Discussion</span>
+                <MessageSquare size={16} color="#fbbf24" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fbbf24', marginTop: '4px' }}>{activeDiscussionCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>Quotation Sent / Active</div>
+            </div>
+
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Orders Confirmed</span>
+                <CheckCircle size={16} color="#34d399" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#34d399', marginTop: '4px' }}>{confirmedCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>Converted to Sales</div>
+            </div>
+
+            <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Pipeline Value</span>
+                <IndianRupee size={16} color="#c084fc" />
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>₹{totalPipelineVal.toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>Estimated Pipeline Value</div>
+            </div>
           </div>
-        </div>
-      </div>
 
       {/* Filters & Search Toolbar */}
       <div
@@ -735,24 +650,45 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
             <button
               onClick={handleExportPDF}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
                 padding: '8px 14px',
                 borderRadius: '8px',
-                background: '#ffffff',
-                color: '#0f172a',
-                border: '1px solid var(--border-light)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
                 fontWeight: 700,
                 fontSize: '0.82rem',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(15,23,42,0.06)'
+                cursor: 'pointer'
               }}
               title="Export PDF Report of Leads Pipeline"
             >
-              <Printer size={15} color="#2563eb" />
+              <Printer size={15} color="#38bdf8" />
               <span>Export PDF</span>
             </button>
+
+            {/* View Mode Toggle: Table View vs Card View */}
+            <div className="glass-view-toggle">
+              <button
+                type="button"
+                className={crmViewMode === 'table' ? 'active' : ''}
+                onClick={() => setCrmViewMode('table')}
+                title="Switch to High-Density Table View"
+              >
+                <FileText size={14} />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
+                className={crmViewMode === 'cards' ? 'active' : ''}
+                onClick={() => setCrmViewMode('cards')}
+                title="Switch to Card Grid View"
+              >
+                <Users size={14} />
+                <span>Cards</span>
+              </button>
+            </div>
           </div>
         </div>
 

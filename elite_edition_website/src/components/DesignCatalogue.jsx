@@ -19,6 +19,8 @@ import DesignerScreen from './DesignerScreen';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates, ACCEPTED_IMAGE_FORMATS, isTiffFile } from '../utils/imageUrlHelper';
 import DesignImage from './DesignImage';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 // Image compression helper
 function compressAndConvertToBase64(file, maxWidth = 900, maxHeight = 900, quality = 0.7) {
@@ -1296,121 +1298,103 @@ export default function DesignCatalogue({ department: rawDepartment, companyEnti
   return (
     <div className="ent-screen-container">
       
-      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
-      <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
-        
-        {/* Top Header Row: Title & Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
-          
-          {/* Left Title & Icon */}
-          <div className="ent-header-title-wrap">
-            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)' }}>
-              <Image size={18} color="#fff" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <h2 className="ent-header-title">
-                {activeSubTab === 'sample' || activeSubTab === 'sample_design'
-                  ? (department === 'stitching' ? 'Stitching Sample Designs' : department === 'ethno_wear' ? 'Ethno Wear Sample Designs' : 'Sample Designs')
-                  : (department === 'stitching' ? 'Stitching Design Room' : department === 'ethno_wear' ? 'Ethno Wear Design Room' : 'Design Catalog')}
-              </h2>
-              <span className="ent-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                {loading && total === 0 ? (
-                  <span style={{ display: 'inline-block', width: '48px', height: '10px', background: '#bfdbfe', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                ) : (
-                  `${total} Designs`
-                )}
-              </span>
-            </div>
+      {/* ── TIER 1: HEADER (Rule 5: No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header" style={{ marginBottom: '0.65rem' }}>
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+            <Image size={16} color="#ffffff" />
           </div>
+          <span className="glass-screen-title">
+            {activeSubTab === 'sample' || activeSubTab === 'sample_design'
+              ? (department === 'stitching' ? 'Stitching Sample Designs' : department === 'ethno_wear' ? 'Ethno Wear Sample Designs' : 'Sample Designs')
+              : (department === 'stitching' ? 'Stitching Design Room' : department === 'ethno_wear' ? 'Ethno Wear Design Room' : 'Design Catalog')}
+          </span>
+          <EntityBrandBadge entityId="EDP" />
+        </div>
 
-          {/* Right Action Buttons */}
-          <div className="ent-header-actions">
-            {activeSubTab === 'sample' || activeSubTab === 'sample_design' ? (
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {activeSubTab === 'sample' || activeSubTab === 'sample_design' ? (
+            <button
+              type="button"
+              className="ent-btn ent-btn-primary"
+              onClick={() => designerScreenRef.current?.openCreateModal?.()}
+              style={{ padding: '0.45rem 0.95rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700 }}
+            >
+              <Plus size={14} />
+              <span>New Sample Design</span>
+            </button>
+          ) : (
+            <>
               <button
                 type="button"
-                className="ent-btn ent-btn-primary"
-                onClick={() => designerScreenRef.current?.openCreateModal?.()}
+                onClick={handleBulkAutoDetectColors}
+                disabled={bulkDetecting}
+                className="ent-btn ent-btn-secondary"
+                style={{ opacity: bulkDetecting ? 0.6 : 1, padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem' }}
               >
-                <Plus size={14} />
-                <span>New Sample Design</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={handleBulkAutoDetectColors}
-                  disabled={bulkDetecting}
-                  className="ent-btn ent-btn-secondary"
-                  style={{ opacity: bulkDetecting ? 0.6 : 1 }}
-                >
-                  {bulkDetecting ? (
-                    <><RefreshCw size={14} className="spin-loader" /> Processing...</>
-                  ) : (
-                    <><Sparkles size={14} color="#8b5cf6" /> Auto-set Colours</>
-                  )}
-                </button>
-
-                {department === 'stitching' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPKDImportModal(true)}
-                    className="ent-btn ent-btn-secondary"
-                  >
-                    Import PKD
-                  </button>
+                {bulkDetecting ? (
+                  <><RefreshCw size={14} className="spin-loader" /> Processing...</>
+                ) : (
+                  <><Sparkles size={14} color="#8b5cf6" /> Auto-set Colours</>
                 )}
+              </button>
 
+              {isMasterAdmin ? (
                 <button
                   type="button"
                   onClick={openNew}
                   className="ent-btn ent-btn-primary"
+                  style={{ padding: '0.45rem 0.95rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700 }}
                 >
                   <PlusCircle size={14} />
                   <span>New Design</span>
                 </button>
-              </>
-            )}
-          </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('sample')}
+                  className="ent-btn ent-btn-primary"
+                  style={{ padding: '0.45rem 0.95rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700 }}
+                  title="Non-admin users must create a Sample Design first and add to Design Catalog from there"
+                >
+                  <PlusCircle size={14} />
+                  <span>Add via Sample Design</span>
+                </button>
+              )}
+            </>
+          )}
+          <QuickActionMenu />
         </div>
-
-        {/* Sub-Tab Navigation Bar */}
-        {department !== 'stitching' && department !== 'ethno_wear' && (
-          <div className="ent-tab-bar" data-screen-subtabs="primary" role="tablist" aria-label="Design Room Primary Tabs">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeSubTab === 'sample' || activeSubTab === 'sample_design'}
-              onClick={() => setActiveSubTab('sample')}
-              className={`ent-tab-btn ${(activeSubTab === 'sample' || activeSubTab === 'sample_design') ? 'active' : ''}`}
-            >
-              <Sparkles size={14} />
-              <span>Sample Design</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeSubTab === 'catalogue'}
-              onClick={() => setActiveSubTab('catalogue')}
-              className={`ent-tab-btn ${activeSubTab === 'catalogue' ? 'active' : ''}`}
-            >
-              <BookOpen size={14} />
-              <span>Design Catalog</span>
-            </button>
-            
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeSubTab === 'master'}
-              onClick={() => setActiveSubTab('master')}
-              className={`ent-tab-btn ${activeSubTab === 'master' ? 'active' : ''}`}
-            >
-              <Layers size={14} />
-              <span>Design Master (100 Pic)</span>
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Rule 5) ── */}
+      {department !== 'stitching' && department !== 'ethno_wear' && (
+        <div className="glass-subtabs-bar" style={{ marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={`glass-subtab-btn ${(activeSubTab === 'sample' || activeSubTab === 'sample_design') ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('sample')}
+          >
+            <span>Sample Design</span>
+          </button>
+
+          <button
+            type="button"
+            className={`glass-subtab-btn ${activeSubTab === 'catalogue' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('catalogue')}
+          >
+            <span>Design Catalog ({total})</span>
+          </button>
+          
+          <button
+            type="button"
+            className={`glass-subtab-btn ${activeSubTab === 'master' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('master')}
+          >
+            <span>Design Master (100 Pic)</span>
+          </button>
+        </div>
+      )}
 
       {activeSubTab === 'master' ? (
         <DesignMaster department={department} />

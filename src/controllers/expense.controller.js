@@ -212,22 +212,52 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
         { status: { $ne: 'REJECTED' } },
         { date: histDateCond }
       ]
-    }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
+    }, { type: 1, entryType: 1, contraDetails: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
 
     let histCashIn = 0;
     let histCashOut = 0;
     let histBankIn = 0;
     let histBankOut = 0;
 
+    const ensureBankStat = (bank) => {
+      allBanksSet.add(bank);
+      if (!bankStats[bank]) bankStats[bank] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+    };
+
     historicalTxns.forEach(item => {
       const amt = Number(item.amount) || 0;
+      if (item.entryType === 'contra' && item.contraDetails) {
+        const mode = item.contraDetails.contraMode;
+        if (mode === 'bank_to_cash') {
+          const fromB = item.contraDetails.fromAccount || bankAccountName || 'Bank';
+          ensureBankStat(fromB);
+          histBankOut += amt;
+          bankStats[fromB].histOut += amt;
+          histCashIn += amt;
+        } else if (mode === 'cash_to_bank') {
+          const toB = item.contraDetails.toAccount || bankAccountName || 'Bank';
+          ensureBankStat(toB);
+          histCashOut += amt;
+          histBankIn += amt;
+          bankStats[toB].histIn += amt;
+        } else if (mode === 'bank_to_bank') {
+          const fromB = item.contraDetails.fromAccount || bankAccountName || 'Bank';
+          const toB = item.contraDetails.toAccount || bankAccountName || 'Bank';
+          ensureBankStat(fromB);
+          ensureBankStat(toB);
+          histBankOut += amt;
+          histBankIn += amt;
+          bankStats[fromB].histOut += amt;
+          bankStats[toB].histIn += amt;
+        }
+        return;
+      }
       if (isCashTransaction(item)) {
         if (item.type === 'IN') histCashIn += amt;
         else if (item.type === 'OUT') histCashOut += amt;
       } else {
         const bank = identifyBankName(item, Array.from(allBanksSet), bankAccountName);
-        allBanksSet.add(bank);
-        if (!bankStats[bank]) bankStats[bank] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+        ensureBankStat(bank);
         if (item.type === 'IN') {
           histBankIn += amt;
           bankStats[bank].histIn += amt;
@@ -263,22 +293,52 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
 
   const periodTxns = await db.Expense.find({
     $and: periodConditions
-  }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
+  }, { type: 1, entryType: 1, contraDetails: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
 
   let cashIn = 0;
   let cashExpense = 0;
   let bankIn = 0;
   let bankExpense = 0;
 
+  const ensurePeriodBankStat = (bank) => {
+    allBanksSet.add(bank);
+    if (!bankStats[bank]) bankStats[bank] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+  };
+
   periodTxns.forEach(item => {
     const amt = Number(item.amount) || 0;
+    if (item.entryType === 'contra' && item.contraDetails) {
+      const mode = item.contraDetails.contraMode;
+      if (mode === 'bank_to_cash') {
+        const fromB = item.contraDetails.fromAccount || bankAccountName || 'Bank';
+        ensurePeriodBankStat(fromB);
+        bankExpense += amt;
+        bankStats[fromB].periodOut += amt;
+        cashIn += amt;
+      } else if (mode === 'cash_to_bank') {
+        const toB = item.contraDetails.toAccount || bankAccountName || 'Bank';
+        ensurePeriodBankStat(toB);
+        cashExpense += amt;
+        bankIn += amt;
+        bankStats[toB].periodIn += amt;
+      } else if (mode === 'bank_to_bank') {
+        const fromB = item.contraDetails.fromAccount || bankAccountName || 'Bank';
+        const toB = item.contraDetails.toAccount || bankAccountName || 'Bank';
+        ensurePeriodBankStat(fromB);
+        ensurePeriodBankStat(toB);
+        bankExpense += amt;
+        bankIn += amt;
+        bankStats[fromB].periodOut += amt;
+        bankStats[toB].periodIn += amt;
+      }
+      return;
+    }
     if (isCashTransaction(item)) {
       if (item.type === 'IN') cashIn += amt;
       else if (item.type === 'OUT') cashExpense += amt;
     } else {
       const bank = identifyBankName(item, Array.from(allBanksSet), bankAccountName);
-      allBanksSet.add(bank);
-      if (!bankStats[bank]) bankStats[bank] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+      ensurePeriodBankStat(bank);
       if (item.type === 'IN') {
         bankIn += amt;
         bankStats[bank].periodIn += amt;
@@ -761,6 +821,23 @@ const getOne = async (req, res) => {
 const create = async (req, res) => {
   try {
     const payload = req.body;
+    const { checkBooksLock } = require('../utils/booksLockGuard');
+    const lockRes = await checkBooksLock(payload.date || payload.expenseDate || new Date(), req.user);
+    if (lockRes.locked) return res.status(403).json({ error: lockRes.message, code: 'BOOKS_LOCKED' });
+    const isContra = payload.entryType === 'contra';
+    if (isContra) {
+      payload.entryType = 'contra';
+      if (!payload.category) payload.category = 'Contra Entry';
+      if (!payload.paymentMode) payload.paymentMode = 'Contra';
+      if (!payload.title || !payload.title.trim()) {
+        const cd = payload.contraDetails || {};
+        payload.title = cd.contraMode === 'party_offset'
+          ? `Contra: Dr. ${cd.debitParty || 'Party'} ⇄ Cr. ${cd.creditParty || 'Party'}`
+          : `Contra: ${cd.fromAccount || 'Source'} → ${cd.toAccount || 'Target'}`;
+      }
+    } else {
+      payload.entryType = 'general';
+    }
     if (!payload.title || !payload.title.trim()) {
       return res.status(400).json({ error: 'Title/Purpose is required' });
     }
@@ -845,6 +922,10 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = req.body;
+    const { checkBooksLock } = require('../utils/booksLockGuard');
+    const existingDoc = await db.Expense.findById(id).select('date').lean();
+    const lockRes = await checkBooksLock(payload.date || existingDoc?.date, req.user);
+    if (lockRes.locked) return res.status(403).json({ error: lockRes.message, code: 'BOOKS_LOCKED' });
 
     if (!payload.companyEntity) {
       payload.companyEntity = 'Elite Digital Print';
@@ -892,6 +973,12 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
+    const { checkBooksLock } = require('../utils/booksLockGuard');
+    const existingDoc = await db.Expense.findById(id).select('date').lean();
+    if (existingDoc) {
+      const lockRes = await checkBooksLock(existingDoc.date, req.user);
+      if (lockRes.locked) return res.status(403).json({ error: lockRes.message, code: 'BOOKS_LOCKED' });
+    }
     const deleted = await db.Expense.findByIdAndDelete(id);
     if (!deleted) return res.status(404).json({ error: 'Expense record not found' });
     emitSocketEvent(req, 'expense-deleted', { id });

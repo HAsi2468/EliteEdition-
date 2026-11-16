@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer, Building2 } from 'lucide-react';
 import BrandManagerModal from './BrandManagerModal';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
 import { generateCode128Svg, resolveItemSize, resolveBarcodeTitle, resolveBarcodeSkuAndSize } from '../utils/barcodeHelper';
+import { extractApiProductImage } from '../utils/imageUrlHelper';
+import { extractBaseSku } from '../utils/skuHelper';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync, onOpenManager }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,8 +133,57 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   const sortedCatalogBrands = Array.from(brandMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const allBrands = ['All', ...sortedCatalogBrands];
 
+  // Cross-index API product images & descriptions by exact SKU, base SKU, and brandCodes
+  const enrichedItems = useMemo(() => {
+    const imgMap = new Map();
+    const descMap = new Map();
+    const isPlaceholderName = (d, s) => {
+      if (!d || typeof d !== 'string') return true;
+      const t = d.trim();
+      if (!t || /^(unnamed product|uniware sku|product|sku|n\/a|-)$/i.test(t)) return true;
+      if (s && t.toUpperCase() === String(s).trim().toUpperCase()) return true;
+      return false;
+    };
+
+    (items || []).forEach((it) => {
+      const sku = (it.skuCode || '').trim();
+      const base = extractBaseSku(sku).trim().toUpperCase();
+      const full = sku.toUpperCase();
+      const apiImg = extractApiProductImage(it);
+      if (apiImg) {
+        if (full && !imgMap.has(full)) imgMap.set(full, apiImg);
+        if (base && !imgMap.has(base)) imgMap.set(base, apiImg);
+      }
+      if (!isPlaceholderName(it.description, sku)) {
+        const d = it.description.trim();
+        if (full && !descMap.has(full)) descMap.set(full, d);
+        if (base && !descMap.has(base)) descMap.set(base, d);
+      }
+    });
+
+    return (items || []).map((it) => {
+      const sku = (it.skuCode || '').trim();
+      const base = extractBaseSku(sku).trim().toUpperCase();
+      const full = sku.toUpperCase();
+      const resolvedImg = extractApiProductImage(it) || imgMap.get(full) || imgMap.get(base) || '';
+      let resolvedDesc = !isPlaceholderName(it.description, sku)
+        ? it.description.trim()
+        : (descMap.get(full) || descMap.get(base) || '');
+      if (!resolvedDesc) {
+        const brandPrefix = it.brand && !/^(uniware|n\/a|-)$/i.test(it.brand) ? `${it.brand} ` : '';
+        const catLabel = it.categoryName && !/^(general|n\/a|-)$/i.test(it.categoryName) ? it.categoryName : 'Kurta Set';
+        resolvedDesc = `${brandPrefix}${catLabel} (${extractBaseSku(sku) || sku || 'Item'})`;
+      }
+      return {
+        ...it,
+        imageUrl: resolvedImg,
+        description: resolvedDesc,
+      };
+    });
+  }, [items]);
+
   // Get unique sizes for the filter dropdown
-  const sizes = ['All', ...new Set(items.flatMap(item => item.size || []).filter(Boolean))];
+  const sizes = ['All', ...new Set(enrichedItems.flatMap(item => item.size || []).filter(Boolean))];
 
   // Handle Sort
   const handleSort = (field) => {
@@ -145,7 +196,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   };
 
   // Filter & Search Logic
-  const filteredItems = items
+  const filteredItems = enrichedItems
     .filter(item => {
       const matchSearch = matchSearchQuery(item, searchTerm, ['description', 'brand', 'skuCode', 'categoryName', 'color', 'size']);
       

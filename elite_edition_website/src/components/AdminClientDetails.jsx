@@ -287,21 +287,21 @@ export default function AdminClientDetails() {
 
       {/* Top Stat Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', border: '1px solid #bfdbfe', color: '#0f172a', borderRadius: '12px', boxShadow: '0 4px 12px rgba(37,99,235,0.06)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Clients</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e40af', marginTop: '4px' }}>{clients.length}</div>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#f8fafc', borderRadius: '12px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Clients</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#60a5fa', marginTop: '4px' }}>{clients.length}</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', border: '1px solid #bbf7d0', color: '#0f172a', borderRadius: '12px', boxShadow: '0 4px 12px rgba(16,185,129,0.06)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Accounts</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(16, 185, 129, 0.35)', color: '#f8fafc', borderRadius: '12px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Accounts</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
             {clients.filter((c) => c.status === 'Active').length}
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', border: '1px solid #e0e7ff', color: '#0f172a', borderRadius: '12px', boxShadow: '0 4px 12px rgba(99,102,241,0.06)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parties Configured in Settings</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#3730a3', marginTop: '4px' }}>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(129, 140, 248, 0.35)', color: '#f8fafc', borderRadius: '12px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parties Configured in Settings</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#818cf8', marginTop: '4px' }}>
             {partyOptions.length}
           </div>
         </div>
@@ -440,7 +440,7 @@ export default function AdminClientDetails() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <tr style={{ background: 'rgba(15, 23, 42, 0.72)', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 <th style={{ padding: '0.85rem 1rem' }}>Client</th>
                 <th style={{ padding: '0.85rem 1rem' }}>User Name</th>
                 <th style={{ padding: '0.85rem 1rem' }}>Mobile Number</th>
@@ -576,7 +576,7 @@ export default function AdminClientDetails() {
                       {/* Password */}
                       <td style={{ padding: '0.75rem 1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#f8fafc' }}>
                             {client.password}
                           </span>
                           <button
@@ -645,8 +645,8 @@ export default function AdminClientDetails() {
 
       {/* ── CREATE / EDIT CLIENT MODAL ── */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: 580, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 580, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'rgba(15, 23, 42, 0.96)', border: '1px solid rgba(148, 163, 184, 0.24)', color: '#f8fafc', boxShadow: '0 24px 48px rgba(0,0,0,0.55)' }}>
             
             {/* Modal Header */}
             <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff' }}>
@@ -658,7 +658,7 @@ export default function AdminClientDetails() {
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <X size={16} />
               </button>
@@ -668,8 +668,8 @@ export default function AdminClientDetails() {
             <form onSubmit={handleSubmit} style={{ padding: '1.25rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               {/* Profile Image & R2 Storage Section */}
-              <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ position: 'relative', width: 68, height: 68, borderRadius: '50%', overflow: 'hidden', background: '#e2e8f0', border: '2px solid #2563eb', flexShrink: 0 }}>
+              <div style={{ background: 'rgba(30, 41, 59, 0.55)', border: '1px dashed rgba(148, 163, 184, 0.35)', borderRadius: '12px', padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ position: 'relative', width: 68, height: 68, borderRadius: '50%', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.85)', border: '2px solid #3b82f6', flexShrink: 0 }}>
                   {formData.image ? (
                     <img src={formData.image} alt="Client Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
@@ -851,7 +851,7 @@ export default function AdminClientDetails() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'rgba(15, 23, 42, 0.85)', color: '#f8fafc', boxSizing: 'border-box' }}
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>

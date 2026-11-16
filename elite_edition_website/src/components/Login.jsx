@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { api } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { api, fetchCsrfToken } from '../services/api';
 
 export default function Login({ onLoginSuccess, onSwitchToClient }) {
   const [email, setEmail] = useState('');
@@ -7,6 +7,10 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchCsrfToken().catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,14 +36,16 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.header}>
-          <img
-            src="/Logo.png"
-            alt="Elite Edition"
-            style={styles.logo}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+          <div style={styles.logoCapsule} className="glass-logo-badge">
+            <img
+              src="/Logo.png"
+              alt="Elite Edition"
+              style={styles.logo}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
           <h1 style={styles.title}>Elite Edition</h1>
         </div>
 
@@ -111,31 +117,50 @@ const styles = {
     justifyContent: 'center',
     minHeight: '100vh',
     padding: '16px',
-    backgroundColor: 'var(--bg-main, #f8fafc)',
+    background: 'radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.22) 0%, rgba(9, 15, 29, 0.98) 48%), linear-gradient(135deg, #090f1d 0%, #0d1527 100%)',
   },
   card: {
     width: '100%',
     maxWidth: '400px',
-    padding: '32px 24px',
-    backgroundColor: '#ffffff',
-    border: '1px solid var(--border-color, #e2e8f0)',
-    borderRadius: '8px',
-    boxShadow: 'none',
+    padding: '32px 26px',
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    backdropFilter: 'blur(24px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+    border: '1px solid rgba(56, 189, 248, 0.28)',
+    borderRadius: '16px',
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.16)',
   },
   header: {
     textAlign: 'center',
     marginBottom: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  logoCapsule: {
+    height: '54px',
+    padding: '8px 20px',
+    borderRadius: '14px',
+    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(11, 17, 32, 0.96) 100%)',
+    border: '1px solid rgba(56, 189, 248, 0.45)',
+    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4), 0 0 18px rgba(56, 189, 248, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logo: {
-    height: '40px',
+    height: '34px',
     width: 'auto',
-    marginBottom: '12px',
-    display: 'inline-block',
+    display: 'block',
+    filter: 'drop-shadow(0 2px 8px rgba(251, 191, 36, 0.38)) brightness(1.12)',
   },
   title: {
-    fontSize: 'var(--font-size-title, 1.125rem)',
-    fontWeight: '600',
-    color: 'var(--text-primary, #0f172a)',
+    fontSize: '1.2rem',
+    fontWeight: '800',
+    color: '#ffffff',
+    margin: 0,
+    letterSpacing: '-0.01em',
   },
   form: {
     display: 'flex',
@@ -153,16 +178,19 @@ const styles = {
     alignItems: 'center',
   },
   label: {
-    fontSize: 'var(--font-size-meta, 0.75rem)',
-    fontWeight: '500',
-    color: 'var(--text-primary, #0f172a)',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    color: '#cbd5e1',
     marginBottom: '4px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
   toggleBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-muted, #64748b)',
-    fontSize: 'var(--font-size-meta, 0.75rem)',
+    color: '#38bdf8',
+    fontSize: '0.75rem',
+    fontWeight: '700',
     cursor: 'pointer',
     padding: '0 4px',
     minHeight: 'auto',
@@ -171,37 +199,41 @@ const styles = {
     width: '100%',
     minHeight: '44px',
     padding: '10px 12px',
-    borderRadius: '8px',
-    border: '1px solid var(--border-color, #e2e8f0)',
-    fontSize: 'var(--font-size-body, 0.875rem)',
-    color: 'var(--text-primary, #0f172a)',
-    backgroundColor: '#ffffff',
+    borderRadius: '10px',
+    border: '1px solid rgba(255, 255, 255, 0.16)',
+    fontSize: '0.88rem',
+    color: '#ffffff',
+    backgroundColor: 'rgba(11, 17, 32, 0.85)',
+    boxSizing: 'border-box',
   },
   submitBtn: {
     width: '100%',
     minHeight: '44px',
     marginTop: '8px',
-    fontSize: 'var(--font-size-body, 0.875rem)',
-    fontWeight: '500',
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    borderRadius: '10px',
   },
   error: {
-    backgroundColor: 'var(--danger-bg, #fef2f2)',
-    border: '1px solid var(--danger-border, #fecaca)',
-    borderRadius: '8px',
+    backgroundColor: 'rgba(239, 68, 68, 0.16)',
+    border: '1px solid rgba(239, 68, 68, 0.42)',
+    borderRadius: '10px',
     padding: '8px 12px',
-    color: 'var(--danger-text, #991b1b)',
-    fontSize: 'var(--font-size-meta, 0.75rem)',
+    color: '#fca5a5',
+    fontSize: '0.78rem',
+    fontWeight: '600',
     marginBottom: '16px',
   },
   footer: {
     marginTop: '24px',
     paddingTop: '16px',
-    borderTop: '1px solid var(--border-color, #e2e8f0)',
+    borderTop: '1px solid rgba(255, 255, 255, 0.12)',
     textAlign: 'center',
   },
   switchBtn: {
     width: '100%',
     minHeight: '44px',
-    fontSize: 'var(--font-size-body, 0.875rem)',
+    fontSize: '0.875rem',
+    borderRadius: '10px',
   },
 };

@@ -1846,8 +1846,14 @@ const downloadChallanPdf = async (req, res) => {
     }
 
     const resolvedCompany = challan.companyEntity || 'Elite Digital Print';
-    const { getCompanyBrandColor } = require('../services/tallyInvoicePdfService');
+    const {
+      getCompanyBrandColor,
+      tintColor,
+      getDuplicateLighterColor,
+      isMeaningfulValue
+    } = require('../utils/departmentThemeHelper');
     const companyBrandColor = getCompanyBrandColor(resolvedCompany);
+    const duplicateBrandColor = getDuplicateLighterColor(companyBrandColor);
 
     const PrintConfig = require('../db/models/printConfig.model');
     let companyConfig = await PrintConfig.findOne({ companyEntity: resolvedCompany }).lean();
@@ -1858,9 +1864,9 @@ const downloadChallanPdf = async (req, res) => {
       companyConfig = await PrintConfig.findOne({ isConfig: true }).lean() || {};
     }
     const isDirectConfig = companyConfig.companyEntity === resolvedCompany;
-    const compGstin = (isDirectConfig && companyConfig.companyGstin) ? companyConfig.companyGstin : (resolvedCompany === 'Elite Digital Print' ? '24AANFE0044M1ZG' : (companyConfig.companyGstin || ''));
-    const compPhone = (isDirectConfig && companyConfig.companyPhone) ? companyConfig.companyPhone : '+91 99098 66667';
-    const compAddress = (isDirectConfig && companyConfig.companyAddress) ? companyConfig.companyAddress : 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
+    const compGstin = (isDirectConfig && companyConfig.companyGstin) ? companyConfig.companyGstin : (companyConfig.companyGstin || '');
+    const compPhone = (isDirectConfig && companyConfig.companyPhone) ? companyConfig.companyPhone : (companyConfig.companyPhone || '');
+    const compAddress = (isDirectConfig && companyConfig.companyAddress) ? companyConfig.companyAddress : (companyConfig.companyAddress || '');
 
     let prefix = 'EDP-';
     const normComp = resolvedCompany.toLowerCase().replace(/[\s_-]+/g, '');
@@ -1873,20 +1879,26 @@ const downloadChallanPdf = async (req, res) => {
     else if (normComp === 'eliteonline' || normComp === 'eon') prefix = 'EON-';
     else if (normComp === 'exedp') prefix = 'EXEDP-';
 
-    const rawChNo = String(challan.challanNo || '—');
-    const challanValue = rawChNo.startsWith(prefix) ? rawChNo : `${prefix}${rawChNo}`;
+    const rawChNo = String(challan.challanNo || '');
+    const challanValue = rawChNo ? (rawChNo.startsWith(prefix) ? rawChNo : `${prefix}${rawChNo}`) : '';
 
+    // Original uses 100% department brand color; Duplicate uses exact same department color at 50% lighter
     const getColor = (colorStr, isColorPage) => {
       if (isColorPage) {
         if (colorStr === '#0000ff') return companyBrandColor;
         return colorStr;
       }
-      if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No & Total TP in RED!
-      if (colorStr === '#475569') return '#555555'; // Expected Pcs text in Gray
-      return '#000000'; // Everything else B&W
+      if (colorStr === '#0000ff') return duplicateBrandColor;
+      if (colorStr === '#dc2626') return tintColor('#dc2626', 0.45);
+      if (colorStr === '#10b981') return tintColor('#10b981', 0.45);
+      if (colorStr === '#475569') return '#64748b';
+      if (colorStr === '#0f172a') return '#334155';
+      return tintColor(colorStr, 0.50);
     };
 
     const renderPage = (isColorPage) => {
+      const pageTintBg = isColorPage ? tintColor(companyBrandColor, 0.94) : tintColor(duplicateBrandColor, 0.96);
+
       // Draw border
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
          .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
@@ -1896,13 +1908,17 @@ const downloadChallanPdf = async (req, res) => {
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(7.5).font('Helvetica-Bold')
          .text(copyBadge, ML, MR - 12, { width: contentWidth, align: 'right' });
 
-      // Top line texts
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
-        .text(compGstin ? `GST : ${compGstin}` : '', ML + 12, MR + 4, { lineBreak: false });
+      // Top line texts (only render GST / Phone if present)
+      if (isMeaningfulValue(compGstin)) {
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
+          .text(`GST : ${compGstin}`, ML + 12, MR + 4, { lineBreak: false });
+      }
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
         .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
-        .text(`Mo. ${compPhone}`, ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
+      if (isMeaningfulValue(compPhone)) {
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
+          .text(`Mo. ${compPhone}`, ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
+      }
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
         .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
@@ -1926,57 +1942,65 @@ const downloadChallanPdf = async (req, res) => {
         }
       }
 
-      // Pin
-      const drawMapPin = (d, x, y) => {
-        d.save();
-        d.fillColor(getColor('#0000ff', isColorPage));
-        d.translate(x, y);
-        d.moveTo(0, 0)
-         .bezierCurveTo(-4, -4, -4, -9, 0, -9)
-         .bezierCurveTo(4, -9, 4, -4, 0, 0)
-         .fill();
-        d.fillColor('#ffffff')
-         .circle(0, -5, 1.5)
-         .fill();
-        d.restore();
-      };
+      // Pin & Address (only if address is configured)
+      if (isMeaningfulValue(compAddress)) {
+        const drawMapPin = (d, x, y) => {
+          d.save();
+          d.fillColor(getColor('#0000ff', isColorPage));
+          d.translate(x, y);
+          d.moveTo(0, 0)
+           .bezierCurveTo(-4, -4, -4, -9, 0, -9)
+           .bezierCurveTo(4, -9, 4, -4, 0, 0)
+           .fill();
+          d.fillColor('#ffffff')
+           .circle(0, -5, 1.5)
+           .fill();
+          d.restore();
+        };
 
-      const addressText = compAddress;
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold');
-      const textWidth = doc.widthOfString(addressText);
-      const startX = ML + (contentWidth - textWidth) / 2;
-      
-      drawMapPin(doc, startX - 8, MR + 79 + 7);
-      doc.text(addressText, startX, MR + 79, { lineBreak: false });
+        const addressText = compAddress;
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold');
+        const textWidth = doc.widthOfString(addressText);
+        const startX = ML + (contentWidth - textWidth) / 2;
+        
+        drawMapPin(doc, startX - 8, MR + 79 + 7);
+        doc.text(addressText, startX, MR + 79, { lineBreak: false });
+      }
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.8)
         .moveTo(ML, MR + 94).lineTo(PW - MR, MR + 94).stroke();
 
       const startY = MR + 98;
 
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('M/S:', ML + 12, startY + 6, { lineBreak: false });
-      doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
-        .text(challan.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
+      if (isMeaningfulValue(challan.partyName)) {
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+          .text('M/S:', ML + 12, startY + 6, { lineBreak: false });
+        doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
+          .text(String(challan.partyName).trim(), ML + 42, startY + 4, { lineBreak: false });
+      }
         
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('DATE:', PW - MR - 260, startY + 6, { width: 48, align: 'right', lineBreak: false });
-      doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
-        .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
+      if (isMeaningfulValue(formattedDate)) {
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+          .text('DATE:', PW - MR - 260, startY + 6, { width: 48, align: 'right', lineBreak: false });
+        doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
+          .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
+      }
 
       // CH. NO. label — right-aligned
-      const challanLabel = 'CH. NO.:';
-      const rightEdge = PW - MR - 8;          
-      const chNoValueW = 70;                   
-      const chNoLabelW = 58;                   
-      const chNoValueX = rightEdge - chNoValueW;
-      const chNoLabelX = chNoValueX - chNoLabelW;
+      if (isMeaningfulValue(challanValue)) {
+        const challanLabel = 'CH. NO.:';
+        const rightEdge = PW - MR - 8;          
+        const chNoValueW = 70;                   
+        const chNoLabelW = 58;                   
+        const chNoValueX = rightEdge - chNoValueW;
+        const chNoLabelX = chNoValueX - chNoLabelW;
 
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text(challanLabel, chNoLabelX, startY + 6, { width: chNoLabelW, align: 'right', lineBreak: false });
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+          .text(challanLabel, chNoLabelX, startY + 6, { width: chNoLabelW, align: 'right', lineBreak: false });
 
-      doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
-        .text(challanValue, chNoValueX, startY + 4, { width: chNoValueW, align: 'right', lineBreak: false });
+        doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
+          .text(challanValue, chNoValueX, startY + 4, { width: chNoValueW, align: 'right', lineBreak: false });
+      }
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.6)
         .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
@@ -1988,7 +2012,7 @@ const downloadChallanPdf = async (req, res) => {
         doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold')
           .text(label.toUpperCase(), x + 6, y + 3, { width: width - 12, align: 'left', lineBreak: false });
 
-        const valStr = String(value || '—').trim();
+        const valStr = String(value || '').trim();
         let fontSize = 12;
         if (valStr.length > 28) {
           fontSize = 7.5;
@@ -2002,40 +2026,62 @@ const downloadChallanPdf = async (req, res) => {
           .text(valStr, x + 6, y + 15, { width: width - 12, align: 'left', lineBreak: true, height: height - 16 });
       }
 
-      const billStartY = startY + 28;
-      const halfWidth = contentWidth / 2;
-      renderField('Bill to', billTo, ML, billStartY, halfWidth, 34);
-      renderField('Ship to', shipTo, ML + halfWidth, billStartY, halfWidth, 34);
+      // Dynamically render only populated Bill To / Ship To and Metadata fields
+      let currentGridY = startY + 28;
+      const hasBillTo = isMeaningfulValue(billTo);
+      const hasShipTo = isMeaningfulValue(shipTo);
+      if (hasBillTo && hasShipTo) {
+        const halfWidth = contentWidth / 2;
+        renderField('Bill to', billTo, ML, currentGridY, halfWidth, 34);
+        renderField('Ship to', shipTo, ML + halfWidth, currentGridY, halfWidth, 34);
+        currentGridY += 34;
+      } else if (hasBillTo) {
+        renderField('Bill to', billTo, ML, currentGridY, contentWidth, 34);
+        currentGridY += 34;
+      } else if (hasShipTo) {
+        renderField('Ship to', shipTo, ML, currentGridY, contentWidth, 34);
+        currentGridY += 34;
+      }
 
-      const gridStartY = billStartY + 34;
-      const colWidth4 = contentWidth / 4;
+      const rawMetaFields = [
+        { label: 'Job No.', value: challan.jobNo },
+        { label: 'Design No.', value: challan.designNo },
+        { label: 'Lot No.', value: isMeaningfulValue(challan.lotNo) ? `#${String(challan.lotNo).replace(/^#/, '')}` : '' },
+        { label: 'Panno', value: challan.panna },
+        { label: 'Colour', value: challan.colour },
+        { label: 'Fabric', value: challan.fabricName },
+        { label: 'Vendor Challan', value: challan.vendorChallanNo || challan.partyChallan },
+        { label: 'Delivery By', value: challan.deliveryBy }
+      ].filter(f => isMeaningfulValue(f.value));
 
-      renderField('Job No.', challan.jobNo, ML, gridStartY, colWidth4, 34);
-      renderField('Design No.', challan.designNo, ML + colWidth4, gridStartY, colWidth4, 34);
-      renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', ML + colWidth4 * 2, gridStartY, colWidth4, 34);
-      renderField('Panno', challan.panna, ML + colWidth4 * 3, gridStartY, colWidth4, 34);
+      for (let i = 0; i < rawMetaFields.length; i += 4) {
+        const rowSlice = rawMetaFields.slice(i, i + 4);
+        const colW = contentWidth / rowSlice.length;
+        rowSlice.forEach((f, idx) => {
+          renderField(f.label, f.value, ML + idx * colW, currentGridY, colW, 34);
+        });
+        currentGridY += 34;
+      }
 
-      renderField('Colour', challan.colour, ML, gridStartY + 34, colWidth4, 34);
-      renderField('Fabric', challan.fabricName, ML + colWidth4, gridStartY + 34, colWidth4, 34);
-      renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 34, colWidth4, 34);
-      renderField('Delivery By', challan.deliveryBy, ML + colWidth4 * 3, gridStartY + 34, colWidth4, 34);
+      const dynTpSectionY = currentGridY + 10;
+      const dynTpTableStartY = dynTpSectionY + 16;
 
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(13).font('Helvetica-Bold')
-        .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
+        .text('TP Details', ML + 16, dynTpSectionY, { lineBreak: false });
 
       for (let c = 0; c < tpColsCount; c++) {
         const x = ML + c * tpColWidth;
-        doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill(isColorPage ? '#f8fafc' : '#ffffff');
-        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
+        doc.rect(x, dynTpTableStartY, tpColWidth, tableHeaderHeight).fill(pageTintBg);
+        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, dynTpTableStartY, tpColWidth, tableHeaderHeight).stroke();
         
         doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
-          .text('TP NO.', x, tpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
-        doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
+          .text('TP NO.', x, dynTpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
+        doc.text('METRES', x + tpColWidth * 0.35, dynTpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
       }
 
       if (activeCount === 0) {
         const x = ML;
-        const y = tpTableStartY + tableHeaderHeight;
+        const y = dynTpTableStartY + tableHeaderHeight;
         doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
         doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Oblique')
           .text('No active TP details entered.', x, y + 7, { width: contentWidth, align: 'center' });
@@ -2046,7 +2092,7 @@ const downloadChallanPdf = async (req, res) => {
           const rowIndex = i % rowsPerCol;
 
           const x = ML + colIndex * tpColWidth;
-          const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
+          const y = dynTpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
 
           doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
 
@@ -2065,7 +2111,7 @@ const downloadChallanPdf = async (req, res) => {
         }
       }
 
-      const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
+      const summaryStartY = dynTpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
       const summaryColWidth2 = contentWidth / 2;
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth2, 48).stroke();
@@ -2114,7 +2160,7 @@ const downloadChallanPdf = async (req, res) => {
           const imgBoxH = Math.min(105, Math.max(30, maxBoxH));
           const imgBoxW = Math.min(150, Math.round(imgBoxH * 1.45));
           const imgBoxX = ML + (contentWidth - imgBoxW) / 2;
-          const imgBoxY = bottomBorderY - imgBoxH; // Bottom edge rests directly ON the outer bottom border!
+          const imgBoxY = bottomBorderY - imgBoxH;
 
           // Draw image frame box
           doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
@@ -2147,9 +2193,9 @@ const downloadChallanPdf = async (req, res) => {
         .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
     };
 
-    renderPage(true);  // Page 1: Color
+    renderPage(true);  // Page 1: Original Copy (100% Department Color)
     doc.addPage();
-    renderPage(false); // Page 2: Black & White (Challan No in red)
+    renderPage(false); // Page 2: Duplicate Copy (50% Lighter Department Color)
 
     // ── PAGE 3+ : DESIGN IMAGES ANNEXURE (IF MULTIPLE IMAGES EXIST) ──
     if (allDesignImages.length > 1) {
@@ -2360,162 +2406,181 @@ const downloadBulkChallansPdf = async (req, res) => {
 
       const partyDetailsWidth = contentWidth - imageWidth;
 
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).rect(MR, MR, contentWidth, PH - 2 * MR).stroke();
+      const resolvedCompany = challan.companyEntity || 'Elite Digital Print';
+      const {
+        getCompanyBrandColor,
+        tintColor,
+        getDuplicateLighterColor,
+        isMeaningfulValue
+      } = require('../utils/departmentThemeHelper');
+      const baseBrandColor = getCompanyBrandColor(resolvedCompany);
+      const dupBrandColor = getDuplicateLighterColor(baseBrandColor);
 
-      const headerHeight = 98;
-      doc.fillColor('#f8fafc').rect(MR, MR, contentWidth, headerHeight).fill();
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).rect(MR, MR, contentWidth, headerHeight).stroke();
+      const renderBulkCopy = (isDuplicate = false) => {
+        const BRAND = isDuplicate ? dupBrandColor : baseBrandColor;
+        const BRAND_MID = isDuplicate ? tintColor(baseBrandColor, 0.58) : tintColor(baseBrandColor, 0.15);
+        const BRAND_LIGHT = isDuplicate ? tintColor(baseBrandColor, 0.95) : tintColor(baseBrandColor, 0.92);
+        const BORDER_COL = tintColor(BRAND, 0.75);
+        const copyBadge = isDuplicate ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR CONSIGNEE';
 
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, MR + 14, MR + 14, { width: 140 });
-      } else {
-        doc.fillColor('#6b21a8').fontSize(22).font('Helvetica-Bold').text('ELITE DIGITAL PRINTS', MR + 14, MR + 22);
-      }
+        doc.strokeColor(BORDER_COL).lineWidth(0.8).rect(MR, MR, contentWidth, PH - 2 * MR).stroke();
 
-      const isDigitalPrintChallan = String(challan.partyChallan || '').toUpperCase().startsWith('EDP-');
-      doc.fillColor('#4c1d95').fontSize(16).font('Helvetica-Bold')
-        .text(isDigitalPrintChallan ? 'DELIVERY CHALLAN' : 'FABRIC DELIVERY CHALLAN', MR + 160, MR + 16, { width: contentWidth - 174, align: 'right' });
+        const headerHeight = 98;
+        doc.fillColor(BRAND_LIGHT).rect(MR, MR, contentWidth, headerHeight).fill();
+        doc.strokeColor(BORDER_COL).lineWidth(0.8).rect(MR, MR, contentWidth, headerHeight).stroke();
 
-      doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
-        .text('G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006', MR + 160, MR + 38, { width: contentWidth - 174, align: 'right' })
-        .text('Phone: +91 98790 00000  |  GSTIN: 24AANFE0044M1ZG', MR + 160, MR + 50, { width: contentWidth - 174, align: 'right' });
-
-      doc.fillColor('#4c1d95').fontSize(12).font('Helvetica-Bold')
-        .text(`Challan No: EDP-${challan.challanNo}`, MR + 160, MR + 68, { width: contentWidth - 174, align: 'right' });
-
-      const partyY = MR + headerHeight;
-      const detailsBoxHeight = 68;
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).rect(MR, partyY, partyDetailsWidth, detailsBoxHeight).stroke();
-
-      const midPartyX = MR + partyDetailsWidth / 2;
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).moveTo(midPartyX, partyY).lineTo(midPartyX, partyY + detailsBoxHeight).stroke();
-
-      doc.fillColor('#6b21a8').fontSize(8).font('Helvetica-Bold').text('BILL TO / PARTY NAME', MR + 10, partyY + 8);
-      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold').text((challan.partyName || billTo).toUpperCase(), MR + 10, partyY + 20, { width: partyDetailsWidth / 2 - 20 });
-      if (billTo && billTo !== challan.partyName) {
-        doc.fillColor('#475569').fontSize(8).font('Helvetica').text(`Bill To: ${billTo}`, MR + 10, partyY + 34, { width: partyDetailsWidth / 2 - 20 });
-      }
-
-      doc.fillColor('#6b21a8').fontSize(8).font('Helvetica-Bold').text('SHIP TO / DELIVERY LOCATION', midPartyX + 10, partyY + 8);
-      doc.fillColor('#000000').fontSize(9.5).font('Helvetica-Bold').text(shipTo.toUpperCase(), midPartyX + 10, partyY + 20, { width: partyDetailsWidth / 2 - 20 });
-
-      if (imageWidth > 0 && finalImgPath) {
-        const imgX = MR + partyDetailsWidth;
-        const imgBoxH = detailsBoxHeight + 34 + 34 + (tpSectionY + 16 + tableHeaderHeight + (rowsPerCol * tpRowHeight) - (MR + 98 + 68 + 34 + 34));
-        const finalImgH = Math.max(160, imgBoxH);
-        doc.strokeColor('#e2e8f0').lineWidth(0.8).rect(imgX, partyY, imageWidth, finalImgH).stroke();
-        try {
-          doc.image(finalImgPath, imgX + 5, partyY + 5, { width: imageWidth - 10, height: finalImgH - 10, fit: [imageWidth - 10, finalImgH - 10], align: 'center', valign: 'center' });
-        } catch (e) {
-          doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('[Design Image]', imgX + 10, partyY + 40, { width: imageWidth - 20, align: 'center' });
+        if (fs.existsSync(logoPath)) {
+          doc.image(logoPath, MR + 14, MR + 14, { width: 140 });
+        } else {
+          doc.fillColor(BRAND).fontSize(20).font('Helvetica-Bold').text(resolvedCompany.toUpperCase(), MR + 14, MR + 22);
         }
-      }
 
-      const meta1Y = partyY + detailsBoxHeight;
-      const metaRowHeight = 34;
-      const colW1 = partyDetailsWidth / 3;
+        const isDigitalPrintChallan = String(challan.partyChallan || '').toUpperCase().startsWith('EDP-');
+        doc.fillColor(BRAND).fontSize(15).font('Helvetica-Bold')
+          .text(isDigitalPrintChallan ? 'DELIVERY CHALLAN' : 'FABRIC DELIVERY CHALLAN', MR + 160, MR + 14, { width: contentWidth - 174, align: 'right' });
 
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).rect(MR, meta1Y, partyDetailsWidth, metaRowHeight).stroke();
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).moveTo(MR + colW1, meta1Y).lineTo(MR + colW1, meta1Y + metaRowHeight).stroke();
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).moveTo(MR + colW1 * 2, meta1Y).lineTo(MR + colW1 * 2, meta1Y + metaRowHeight).stroke();
+        doc.fillColor(BRAND_MID).fontSize(8).font('Helvetica-Bold')
+          .text(copyBadge, MR + 160, MR + 34, { width: contentWidth - 174, align: 'right' });
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('DATE', MR + 8, meta1Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(formattedDate, MR + 8, meta1Y + 17);
+        if (isMeaningfulValue(challan.challanNo)) {
+          doc.fillColor(BRAND).fontSize(12).font('Helvetica-Bold')
+            .text(`Challan No: ${challan.challanNo}`, MR + 160, MR + 68, { width: contentWidth - 174, align: 'right' });
+        }
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('JOB NO.', MR + colW1 + 8, meta1Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(challan.jobNo || '—', MR + colW1 + 8, meta1Y + 17);
+        const partyY = MR + headerHeight;
+        const detailsBoxHeight = 68;
+        doc.strokeColor(BORDER_COL).lineWidth(0.8).rect(MR, partyY, partyDetailsWidth, detailsBoxHeight).stroke();
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('DESIGN NO.', MR + colW1 * 2 + 8, meta1Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(challan.designNo || '—', MR + colW1 * 2 + 8, meta1Y + 17);
+        const midPartyX = MR + partyDetailsWidth / 2;
+        doc.strokeColor(BORDER_COL).lineWidth(0.8).moveTo(midPartyX, partyY).lineTo(midPartyX, partyY + detailsBoxHeight).stroke();
 
-      const meta2Y = meta1Y + metaRowHeight;
-      const colW2 = partyDetailsWidth / 4;
+        doc.fillColor(BRAND).fontSize(8).font('Helvetica-Bold').text('BILL TO / PARTY NAME', MR + 10, partyY + 8);
+        if (isMeaningfulValue(challan.partyName || billTo)) {
+          doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold').text(String(challan.partyName || billTo).toUpperCase(), MR + 10, partyY + 20, { width: partyDetailsWidth / 2 - 20 });
+        }
+        if (isMeaningfulValue(billTo) && billTo !== challan.partyName) {
+          doc.fillColor('#475569').fontSize(8).font('Helvetica').text(`Bill To: ${billTo}`, MR + 10, partyY + 34, { width: partyDetailsWidth / 2 - 20 });
+        }
 
-      doc.strokeColor('#e2e8f0').lineWidth(0.8).rect(MR, meta2Y, partyDetailsWidth, metaRowHeight).stroke();
-      for (let i = 1; i < 4; i++) {
-        doc.strokeColor('#e2e8f0').lineWidth(0.8).moveTo(MR + colW2 * i, meta2Y).lineTo(MR + colW2 * i, meta2Y + metaRowHeight).stroke();
-      }
+        doc.fillColor(BRAND).fontSize(8).font('Helvetica-Bold').text('SHIP TO / DELIVERY LOCATION', midPartyX + 10, partyY + 8);
+        if (isMeaningfulValue(shipTo)) {
+          doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold').text(String(shipTo).toUpperCase(), midPartyX + 10, partyY + 20, { width: partyDetailsWidth / 2 - 20 });
+        }
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('FABRIC NAME', MR + 8, meta2Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(challan.fabricName || '—', MR + 8, meta2Y + 17, { width: colW2 - 12 });
+        if (imageWidth > 0 && finalImgPath) {
+          const imgX = MR + partyDetailsWidth;
+          const imgBoxH = detailsBoxHeight + 34 + 34 + (tpSectionY + 16 + tableHeaderHeight + (rowsPerCol * tpRowHeight) - (MR + 98 + 68 + 34 + 34));
+          const finalImgH = Math.max(160, imgBoxH);
+          doc.strokeColor(BORDER_COL).lineWidth(0.8).rect(imgX, partyY, imageWidth, finalImgH).stroke();
+          try {
+            doc.image(finalImgPath, imgX + 5, partyY + 5, { width: imageWidth - 10, height: finalImgH - 10, fit: [imageWidth - 10, finalImgH - 10], align: 'center', valign: 'center' });
+          } catch (e) {}
+        }
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('COLOUR', MR + colW2 + 8, meta2Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(challan.colour || '—', MR + colW2 + 8, meta2Y + 17, { width: colW2 - 12 });
+        // Dynamic metadata rows (only populated fields)
+        const dynMetaFields = [
+          { label: 'DATE', value: formattedDate },
+          { label: 'JOB NO.', value: challan.jobNo },
+          { label: 'DESIGN NO.', value: challan.designNo },
+          { label: 'FABRIC NAME', value: challan.fabricName },
+          { label: 'COLOUR', value: challan.colour },
+          { label: 'LOT NO.', value: challan.lotNo },
+          { label: 'VENDOR CHALLAN', value: challan.partyChallan || challan.vendorChallanNo }
+        ].filter(f => isMeaningfulValue(f.value));
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('LOT NO.', MR + colW2 * 2 + 8, meta2Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(challan.lotNo || '—', MR + colW2 * 2 + 8, meta2Y + 17, { width: colW2 - 12 });
+        let dynMetaY = partyY + detailsBoxHeight;
+        const metaRowHeight = 34;
+        for (let i = 0; i < dynMetaFields.length; i += 4) {
+          const rowSlice = dynMetaFields.slice(i, i + 4);
+          const colW = partyDetailsWidth / rowSlice.length;
+          doc.strokeColor(BORDER_COL).lineWidth(0.8).rect(MR, dynMetaY, partyDetailsWidth, metaRowHeight).stroke();
+          rowSlice.forEach((f, idx) => {
+            if (idx > 0) {
+              doc.strokeColor(BORDER_COL).lineWidth(0.8).moveTo(MR + colW * idx, dynMetaY).lineTo(MR + colW * idx, dynMetaY + metaRowHeight).stroke();
+            }
+            doc.fillColor(BRAND_MID).fontSize(7.5).font('Helvetica-Bold').text(f.label, MR + colW * idx + 8, dynMetaY + 6);
+            doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold').text(String(f.value), MR + colW * idx + 8, dynMetaY + 17, { width: colW - 12 });
+          });
+          dynMetaY += metaRowHeight;
+        }
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('VENDOR CHALLAN', MR + colW2 * 3 + 8, meta2Y + 6);
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold').text(challan.partyChallan || '—', MR + colW2 * 3 + 8, meta2Y + 17, { width: colW2 - 12 });
+        const dynTpSectionY = dynMetaY + 10;
+        const dynTpTableStartY = dynTpSectionY + 16;
 
-      doc.fillColor('#4c1d95').fontSize(9.5).font('Helvetica-Bold')
-        .text('TAKE-OFF T.P. METER BREAKDOWN DETAILS', MR + 8, tpSectionY + 2);
+        doc.fillColor(BRAND).fontSize(9.5).font('Helvetica-Bold')
+          .text('TAKE-OFF T.P. METER BREAKDOWN DETAILS', MR + 8, dynTpSectionY + 2);
 
-      const fullWidthLimit = partyDetailsWidth;
+        const fullWidthLimit = partyDetailsWidth;
 
-      for (let col = 0; col < tpColsCount; col++) {
-        const colStartX = MR + (col * (fullWidthLimit / tpColsCount));
-        const currentColWidth = fullWidthLimit / tpColsCount;
+        for (let col = 0; col < tpColsCount; col++) {
+          const colStartX = MR + (col * (fullWidthLimit / tpColsCount));
+          const currentColWidth = fullWidthLimit / tpColsCount;
 
-        doc.fillColor('#6b21a8').rect(colStartX, tpTableStartY, currentColWidth, tableHeaderHeight).fill();
-        doc.strokeColor('#4c1d95').lineWidth(0.8).rect(colStartX, tpTableStartY, currentColWidth, tableHeaderHeight).stroke();
+          doc.fillColor(BRAND).rect(colStartX, dynTpTableStartY, currentColWidth, tableHeaderHeight).fill();
+          doc.strokeColor(BRAND).lineWidth(0.8).rect(colStartX, dynTpTableStartY, currentColWidth, tableHeaderHeight).stroke();
 
-        const subColW = currentColWidth / 2;
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
-          .text('T.P. NO.', colStartX + 6, tpTableStartY + 7, { width: subColW - 10, align: 'center' })
-          .text('METER', colStartX + subColW + 6, tpTableStartY + 7, { width: subColW - 12, align: 'right' });
+          const subColW = currentColWidth / 2;
+          doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
+            .text('T.P. NO.', colStartX + 6, dynTpTableStartY + 7, { width: subColW - 10, align: 'center' })
+            .text('METER', colStartX + subColW + 6, dynTpTableStartY + 7, { width: subColW - 12, align: 'right' });
 
-        for (let r = 0; r < rowsPerCol; r++) {
-          const tpIndex = r + (col * rowsPerCol);
-          const rowY = tpTableStartY + tableHeaderHeight + (r * tpRowHeight);
+          for (let r = 0; r < rowsPerCol; r++) {
+            const tpIndex = r + (col * rowsPerCol);
+            const rowY = dynTpTableStartY + tableHeaderHeight + (r * tpRowHeight);
 
-          const isEven = r % 2 === 0;
-          doc.fillColor(isEven ? '#fcfaff' : '#ffffff').rect(colStartX, rowY, currentColWidth, tpRowHeight).fill();
-          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(colStartX, rowY, currentColWidth, tpRowHeight).stroke();
-          doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(colStartX + subColW, rowY).lineTo(colStartX + subColW, rowY + tpRowHeight).stroke();
+            const isEven = r % 2 === 0;
+            doc.fillColor(isEven ? BRAND_LIGHT : '#ffffff').rect(colStartX, rowY, currentColWidth, tpRowHeight).fill();
+            doc.strokeColor(BORDER_COL).lineWidth(0.5).rect(colStartX, rowY, currentColWidth, tpRowHeight).stroke();
+            doc.strokeColor(BORDER_COL).lineWidth(0.5).moveTo(colStartX + subColW, rowY).lineTo(colStartX + subColW, rowY + tpRowHeight).stroke();
 
-          if (tpIndex < activeCount) {
-            const item = activeTps[tpIndex];
-            const mtrVal = parseFloat(item.tpMeter) || 0;
-            doc.fillColor('#1e293b').fontSize(8.5).font('Helvetica')
-              .text(`T.P. ${tpIndex + 1}`, colStartX + 6, rowY + 5, { width: subColW - 10, align: 'center' });
-            doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-              .text(`${mtrVal.toFixed(1)} m`, colStartX + subColW + 6, rowY + 5, { width: subColW - 12, align: 'right' });
+            if (tpIndex < activeCount) {
+              const item = activeTps[tpIndex];
+              const mtrVal = parseFloat(item.tpMeter) || 0;
+              doc.fillColor('#1e293b').fontSize(8.5).font('Helvetica')
+                .text(`T.P. ${tpIndex + 1}`, colStartX + 6, rowY + 5, { width: subColW - 10, align: 'center' });
+              doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
+                .text(`${mtrVal.toFixed(1)} m`, colStartX + subColW + 6, rowY + 5, { width: subColW - 12, align: 'right' });
+            }
           }
         }
+
+        const tpTableHeight = tableHeaderHeight + (rowsPerCol * tpRowHeight);
+        const summaryY = dynTpTableStartY + tpTableHeight + 10;
+        const summaryHeight = 44;
+
+        doc.fillColor(BRAND_LIGHT).rect(MR, summaryY, contentWidth, summaryHeight).fill();
+        doc.strokeColor(BRAND).lineWidth(1).rect(MR, summaryY, contentWidth, summaryHeight).stroke();
+
+        const hasDeliveryBy = isMeaningfulValue(challan.deliveryBy);
+        const sumColCount = hasDeliveryBy ? 3 : 2;
+        const sumColW = contentWidth / sumColCount;
+
+        doc.fillColor(BRAND_MID).fontSize(8).font('Helvetica-Bold').text('TOTAL T.P. ROLLS', MR + 14, summaryY + 8);
+        doc.fillColor(BRAND).fontSize(14).font('Helvetica-Bold').text(`${challan.totalTp || activeCount} ROLLS`, MR + 14, summaryY + 20);
+
+        doc.fillColor(BRAND_MID).fontSize(8).font('Helvetica-Bold').text('TOTAL METERS', MR + sumColW + 14, summaryY + 8);
+        doc.fillColor(BRAND).fontSize(14).font('Helvetica-Bold').text(`${(challan.totalMtr || 0).toLocaleString('en-IN')} METERS`, MR + sumColW + 14, summaryY + 20);
+
+        if (hasDeliveryBy) {
+          doc.fillColor(BRAND_MID).fontSize(8).font('Helvetica-Bold').text('DELIVERY BY / VEHICLE', MR + sumColW * 2 + 14, summaryY + 8);
+          doc.fillColor('#1e293b').fontSize(11).font('Helvetica-Bold').text(String(challan.deliveryBy), MR + sumColW * 2 + 14, summaryY + 22);
+        }
+
+        const termsY = summaryY + summaryHeight + 12;
+        const signY = termsY + 4;
+        const signW = 160;
+        const signX = MR + contentWidth - signW;
+
+        doc.fillColor(BRAND).fontSize(8.5).font('Helvetica-Bold').text(`For ${resolvedCompany.toUpperCase()}`, signX, signY, { width: signW, align: 'center' });
+        doc.strokeColor(BORDER_COL).lineWidth(0.6).moveTo(signX, signY + 36).lineTo(signX + signW, signY + 36).stroke();
+        doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('Authorised Signatory', signX, signY + 40, { width: signW, align: 'center' });
+      };
+
+      renderBulkCopy(false);
+      if (req.query?.duplicate !== 'false') {
+        doc.addPage({ margin: 28, size: 'A4' });
+        renderBulkCopy(true);
       }
-
-      const tpTableHeight = tableHeaderHeight + (rowsPerCol * tpRowHeight);
-      const summaryY = tpTableStartY + tpTableHeight + 10;
-      const summaryHeight = 44;
-
-      doc.fillColor('#f5f3ff').rect(MR, summaryY, contentWidth, summaryHeight).fill();
-      doc.strokeColor('#8b5cf6').lineWidth(1).rect(MR, summaryY, contentWidth, summaryHeight).stroke();
-
-      const sumColW = contentWidth / 3;
-
-      doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold').text('TOTAL T.P. ROLLS', MR + 14, summaryY + 8);
-      doc.fillColor('#4c1d95').fontSize(14).font('Helvetica-Bold').text(`${challan.totalTp || activeCount} ROLLS`, MR + 14, summaryY + 20);
-
-      doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold').text('TOTAL METERS', MR + sumColW + 14, summaryY + 8);
-      doc.fillColor('#4c1d95').fontSize(14).font('Helvetica-Bold').text(`${(challan.totalMtr || 0).toLocaleString('en-IN')} METERS`, MR + sumColW + 14, summaryY + 20);
-
-      doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold').text('DELIVERY BY / VEHICLE', MR + sumColW * 2 + 14, summaryY + 8);
-      doc.fillColor('#1e293b').fontSize(11).font('Helvetica-Bold').text(challan.deliveryBy || 'By Road', MR + sumColW * 2 + 14, summaryY + 22);
-
-      const termsY = summaryY + summaryHeight + 12;
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TERMS & CONDITIONS:', MR + 8, termsY);
-      doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
-        .text('1. Goods once delivered will not be taken back.', MR + 8, termsY + 11)
-        .text('2. All disputes subject to Surat Jurisdiction.', MR + 8, termsY + 20);
-
-      const signY = termsY + 4;
-      const signW = 160;
-      const signX = MR + contentWidth - signW;
-
-      doc.fillColor('#4c1d95').fontSize(8.5).font('Helvetica-Bold').text('For ELITE DIGITAL PRINTS', signX, signY, { width: signW, align: 'center' });
-      doc.strokeColor('#cbd5e1').lineWidth(0.6).moveTo(signX, signY + 36).lineTo(signX + signW, signY + 36).stroke();
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('Authorised Signatory', signX, signY + 40, { width: signW, align: 'center' });
     }
 
     doc.end();

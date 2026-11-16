@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import { ErpTh, MasterCheckboxTh, RowCheckboxTd, getRowHighlightStyle } from './common/ErpTableParts';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const parseCanSize = (val) => {
   if (val === undefined || val === null || val === '') return 0;
@@ -1612,76 +1614,132 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-      {/* Header & Navigation */}
-      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          {tabs.map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={isActive ? 'btn-primary' : 'btn-secondary'}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  position: 'relative'
-                }}
-              >
-                <tab.icon size={16} />
-                <span>{tab.label}</span>
-                {tab.badge != null && (
-                  <span
-                    style={{
-                      background: tab.badgeColor || '#ef4444',
-                      color: '#ffffff',
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      padding: '1px 6px',
-                      borderRadius: '10px',
-                      marginLeft: '2px',
-                      animation: 'pulse 2s infinite'
-                    }}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', height: '100%' }}>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <Layers size={20} color="#38bdf8" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            Raw Materials Inventory
+          </span>
+          <EntityBrandBadge />
         </div>
-        <button
-          onClick={handleDownloadScreenPdf}
-          className="btn-secondary"
-          disabled={pdfLoading}
-          title={`Download ${activeTab === 'inward' ? 'Inward Register' : activeTab === 'outward' ? 'Outward Register' : 'Stock Overview'} PDF Report`}
-          style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-        >
-          {pdfLoading ? <RefreshCw className="spin-loader" size={16} /> : <FileDown size={16} />}
-          PDF Report
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => setIsNewMaterialModalOpen(true)}
+            className="glass-btn-primary"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.85))',
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              padding: '0.55rem 1.1rem',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              cursor: 'pointer'
+            }}
+          >
+            <Plus size={15} /> Add Material
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadScreenPdf}
+            className="glass-subtab-btn"
+            disabled={pdfLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.9rem', fontSize: '0.84rem' }}
+          >
+            {pdfLoading ? <RefreshCw className="spin-loader" size={14} /> : <FileDown size={14} color="#38bdf8" />}
+            <span>PDF Report</span>
+          </button>
+          <QuickActionMenu />
+        </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREENS BUTTONS ── */}
+      <div className="glass-subtabs-bar" style={{ marginTop: '0.2rem' }}>
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`glass-subtab-btn ${isActive ? 'active' : ''}`}
+            >
+              <tab.icon size={15} />
+              <span>{tab.label}</span>
+              {tab.badge != null && (
+                <span style={{
+                  background: tab.badgeColor || '#ef4444',
+                  color: '#ffffff',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  padding: '1px 6px',
+                  borderRadius: '8px',
+                  marginLeft: '4px'
+                }}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+      <div className="glass-scroll-track" style={{ marginTop: '0.2rem' }}>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Catalog Items</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{materialsList.length}</span>
+          <span className="glass-calc-sub">Registered raw items</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Stock Profiles</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{filteredStock.length} / {stock.length}</span>
+          <span className="glass-calc-sub">Active in godown</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Inward Entries</span>
+          <span className="glass-calc-value" style={{ color: '#34d399' }}>{stockFilteredTx.filter(t => t.type === 'INWARD').length}</span>
+          <span className="glass-calc-sub">Received records</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Outward Entries</span>
+          <span className="glass-calc-value" style={{ color: '#fb923c' }}>{stockFilteredTx.filter(t => t.type === 'OUTWARD').length}</span>
+          <span className="glass-calc-sub">Dispatched / issued</span>
+        </div>
+
+        {sisterStats.pendingCount > 0 && (
+          <div className="glass-calc-card" style={{ borderColor: 'rgba(245, 158, 11, 0.4)' }}>
+            <span className="glass-calc-title" style={{ color: '#fbbf24' }}>Sister Transfers</span>
+            <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{sisterStats.pendingCount}</span>
+            <span className="glass-calc-sub">Pending check</span>
+          </div>
+        )}
       </div>
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
 
       {/* Main Content Area */}
-      <div className="glass-panel" style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+      <div className="glass-panel" style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.25rem', fontWeight: 800 }}>
-                  <Layers size={22} color="var(--primary)" /> Raw Materials Stock Overview
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>
+                  <Layers size={20} color="#38bdf8" /> Raw Materials Stock Overview
                 </h2>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {companyEntity} · Garment Industry Materials Catalog & Inventory Tracking
-                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 {/* Standard ERP DateRangePicker */}
@@ -1731,38 +1789,6 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   <ArrowUpFromLine size={16} /> Stock Outward
                 </button>
               </div>
-            </div>
-
-            {/* Summary Bar */}
-            <div style={{ marginBottom: '1.25rem', padding: '0.9rem 1.25rem', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Company Entity</span><br /><strong style={{ color: 'var(--primary)' }}>{companyEntity}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Catalog Items</span><br /><strong>{materialsList.length}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Active Stock Profiles</span><br /><strong>{filteredStock.length} / {stock.length}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Inward Transactions</span><br /><strong style={{ color: 'var(--success)' }}>{stockFilteredTx.filter(t => t.type === 'INWARD').length}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Outward Transactions</span><br /><strong style={{ color: 'var(--danger)' }}>{stockFilteredTx.filter(t => t.type === 'OUTWARD').length}</strong></div>
-              {sisterStats.pendingCount > 0 && (
-                <div style={{ marginLeft: 'auto' }}>
-                  <button
-                    onClick={() => setActiveTab('sister_inward')}
-                    style={{
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      color: '#f59e0b',
-                      borderRadius: '8px',
-                      padding: '6px 12px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <AlertTriangle size={15} />
-                    <span>{sisterStats.pendingCount} Sister Transfers Pending Check</span>
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Garment Category Filter Pills & Instant Search */}

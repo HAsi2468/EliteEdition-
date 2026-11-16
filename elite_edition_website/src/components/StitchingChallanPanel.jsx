@@ -7,6 +7,8 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { openPrintOptionsDialog } from '../utils/printService';
 
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -306,54 +308,66 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const grandTotalAmt = challans.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Minimal White Card Header with Entry Button Top Right */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <FileText size={20} color="#fff" />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                  Garment Challans
-                </h2>
-                <span style={{ background: 'rgba(37,99,235,0.15)', color: '#0284c7', fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.3)' }}>
-                  PCH Sequence
-                </span>
-              </div>
-              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                Delivery Challan Register & Auto PCH Numbering
-              </p>
-            </div>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <FileText size={20} color="#38bdf8" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            Garment Challans
+          </span>
+          <EntityBrandBadge />
+        </div>
 
-          {/* Entry Buttons Top in Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              onClick={openNew}
-              style={{ padding: '0.48rem 1.1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', fontSize: '0.84rem', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 14px rgba(79,70,229,0.3)' }}
-            >
-              <Plus size={16} /> New Stitching Challan
-            </button>
-          </div>
+        {/* Entry Buttons Top in Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={openNew}
+            className="glass-btn-primary"
+            style={{
+              padding: '0.55rem 1.1rem', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.85))',
+              color: '#ffffff', fontSize: '0.84rem', fontWeight: 700,
+              border: '1px solid rgba(255, 255, 255, 0.15)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)'
+            }}
+          >
+            <Plus size={15} /> New Stitching Challan
+          </button>
+          <QuickActionMenu />
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Challans</span>
-          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)' }}>{totalChallansCount}</span>
+      {/* ── TIER 2: SUB-SCREENS BUTTONS ── */}
+      <div className="glass-subtabs-bar" style={{ marginTop: '0.2rem' }}>
+        <button type="button" className="glass-subtab-btn active">
+          <span>All Challans ({totalChallansCount})</span>
+        </button>
+        <button type="button" className="glass-subtab-btn" onClick={() => onNavigateToBilling && onNavigateToBilling()}>
+          <span>Billed Invoices</span>
+        </button>
+      </div>
+
+      {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
+      <div className="glass-scroll-track" style={{ marginTop: '0.2rem' }}>
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Challans</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{totalChallansCount}</span>
+          <span className="glass-calc-sub">Registered Challans</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Garments (Pcs)</span>
-          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#34d399' }}>{grandTotalPcs.toLocaleString()} Pcs</span>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Garments</span>
+          <span className="glass-calc-value" style={{ color: '#34d399' }}>{grandTotalPcs.toLocaleString()} Pcs</span>
+          <span className="glass-calc-sub">Dispatched Pieces</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Value (₹)</span>
-          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#60a5fa' }}>₹{grandTotalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Challan Value</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>₹{grandTotalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          <span className="glass-calc-sub">Cumulative Amount</span>
         </div>
       </div>
 
@@ -838,112 +852,240 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
         </div>
       )}
 
-      {/* Printable Modal Paper Layout */}
-      {printChallan && (
-        <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '1rem' }}>
-          <div style={{ background: '#fff', color: '#000', borderRadius: '8px', width: '100%', maxWidth: 850, padding: '1.5rem', maxHeight: '95vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }} className="no-print">
-              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1e3a8a' }}>Print View — {printChallan.challanNo}</span>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  onClick={() => {
-                    const printEl = document.getElementById('stitching-challan-printable-paper');
-                    if (printEl && printChallan) {
-                      openPrintOptionsDialog({
-                        title: `Stitching Challan — ${printChallan.challanNo}`,
-                        content: printEl.outerHTML,
-                        defaultSettings: {
-                          paperSize: 'A4',
-                          orientation: 'portrait',
-                          margin: 'default'
-                        }
-                      });
-                    }
-                  }} 
-                  className="btn-primary" 
-                  style={{ padding: '0.4rem 1rem' }}
-                >
-                  <Printer size={14} /> Print Now
-                </button>
-                <button onClick={() => setPrintChallan(null)} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
-                  Close
-                </button>
-              </div>
-            </div>
+      {/* Printable Modal Paper Layout (Original = 100% Department Color, Duplicate = 50% Lighter Color) */}
+      {printChallan && (() => {
+        const CHALLAN_DEPT_COLORS = {
+          'EDP': '#2563eb',
+          'ELITE DIGITAL PRINT': '#2563eb',
+          'ES': '#7c3aed',
+          'ELITE STITCHING': '#7c3aed',
+          'EE': '#db2777',
+          'ELITE EMBROIDERY': '#db2777',
+          'EF': '#059669',
+          'ELITE FUSING': '#059669',
+          'EON': '#ea580c',
+          'ELITE ONLINE': '#ea580c',
+          'SO': '#d97706',
+          'SURAT OFFICE': '#d97706',
+          'EW': '#0d9488',
+          'ELITE WHOLESALE': '#0d9488',
+          'YJ': '#e11d48',
+          'YJ BY ELITE': '#e11d48',
+          'EXEDP': '#4f46e5',
+          'EXPORT EDP': '#4f46e5'
+        };
+        const resolvedCompany = (printChallan.companyEntity || printChallan.department || 'Elite Stitching').trim();
+        const baseBrandColor = CHALLAN_DEPT_COLORS[resolvedCompany.toUpperCase()] || '#7c3aed';
+        const tintHex = (hex, factor = 0.50) => {
+          const clean = String(hex || '#7c3aed').replace('#', '');
+          const r = parseInt(clean.substring(0, 2), 16) || 124;
+          const g = parseInt(clean.substring(2, 4), 16) || 58;
+          const b = parseInt(clean.substring(4, 6), 16) || 237;
+          const tr = Math.round(r + (255 - r) * factor);
+          const tg = Math.round(g + (255 - g) * factor);
+          const tb = Math.round(b + (255 - b) * factor);
+          return `#${tr.toString(16).padStart(2, '0')}${tg.toString(16).padStart(2, '0')}${tb.toString(16).padStart(2, '0')}`;
+        };
+        const hasVal = (v) => v !== null && v !== undefined && String(v).trim() !== '' && !['—', '--', '-', 'N/A', 'NA'].includes(String(v).trim().toUpperCase());
+        const items = printChallan.items || [];
+        const hasAnyDesign = items.some(it => hasVal(it.designNo));
+        const hasAnyRateAmt = items.some(it => Number(it.rate) > 0 || Number(it.amount) > 0) || Number(printChallan.totalAmount) > 0;
 
-            {/* Paper Layout */}
-            <div id="stitching-challan-printable-paper" style={{ border: '2px solid #1e40af', padding: '1.25rem', fontFamily: 'Arial, sans-serif' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #cbd5e1', paddingBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>GARMENT DELIVERY CHALLAN</span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e3a8a', letterSpacing: '1px' }}>ELITE EDITION</span>
-                <span style={{ fontSize: '0.75rem', color: '#475569' }}>Mo. +91 99098 66667</span>
+        const renderChallanSheet = (isOriginalCopy) => {
+          const primaryColor = isOriginalCopy ? baseBrandColor : tintHex(baseBrandColor, 0.50);
+          const mutedColor = isOriginalCopy ? '#475569' : tintHex('#475569', 0.45);
+          const darkText = isOriginalCopy ? '#0f172a' : tintHex('#0f172a', 0.40);
+          const lightBg = tintHex(primaryColor, 0.93);
+          const borderSubtle = tintHex(primaryColor, 0.65);
+          const copyLabel = isOriginalCopy ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
+
+          return (
+            <div
+              key={copyLabel}
+              style={{
+                border: `2px solid ${primaryColor}`,
+                padding: '1.25rem',
+                fontFamily: 'Arial, sans-serif',
+                marginBottom: isOriginalCopy ? '1.5rem' : 0,
+                pageBreakAfter: isOriginalCopy ? 'always' : 'auto',
+                color: darkText
+              }}
+            >
+              <div style={{ textAlign: 'right', fontSize: '0.7rem', fontWeight: 800, color: primaryColor, marginBottom: '4px', letterSpacing: '0.05em' }}>
+                {copyLabel}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${borderSubtle}`, paddingBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: primaryColor }}>GARMENT DELIVERY CHALLAN</span>
+                <span style={{ fontSize: '1.05rem', fontWeight: 900, color: primaryColor, letterSpacing: '1px' }}>{resolvedCompany.toUpperCase()}</span>
+                {hasVal(printChallan.companyPhone) ? (
+                  <span style={{ fontSize: '0.75rem', color: mutedColor }}>Mo. {printChallan.companyPhone}</span>
+                ) : <span />}
               </div>
 
               <div style={{ textAlign: 'center', margin: '0.75rem 0' }}>
-                <img src="/Logo.png" alt="Elite Edition Logo" style={{ height: '50px', objectFit: 'contain' }} onError={e => { e.target.style.display = 'none'; }} />
-                <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '4px' }}>
-                  Plot No-B/37, Siddheshwar Soc., Punagam Main Road, Surat | GSTIN: 24AANFE0044M1ZG
-                </div>
+                <img
+                  src="/Logo.png"
+                  alt="Elite Edition Logo"
+                  style={{ height: '48px', objectFit: 'contain', opacity: isOriginalCopy ? 1 : 0.55 }}
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+                {(hasVal(printChallan.companyAddress) || hasVal(printChallan.companyGstin)) && (
+                  <div style={{ fontSize: '0.72rem', color: mutedColor, marginTop: '4px' }}>
+                    {[
+                      hasVal(printChallan.companyAddress) ? printChallan.companyAddress : null,
+                      hasVal(printChallan.companyGstin) ? `GSTIN: ${printChallan.companyGstin}` : null
+                    ].filter(Boolean).join(' | ')}
+                  </div>
+                )}
               </div>
 
-              <div style={{ borderTop: '2px solid #1e40af', borderBottom: '1px solid #cbd5e1', padding: '0.5rem 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc' }}>
-                <div><strong>CHALLAN NO:</strong> {printChallan.challanNo}</div>
-                <div style={{ textAlign: 'right' }}><strong>DATE:</strong> {formatDateDDMMYYYY(printChallan.date)}</div>
-                <div><strong>PARTY NAME:</strong> {printChallan.partyName || '—'}</div>
-                <div style={{ textAlign: 'right' }}><strong>TRANSPORT:</strong> {printChallan.deliveryBy || '—'}</div>
+              <div style={{
+                borderTop: `2px solid ${primaryColor}`,
+                borderBottom: `1px solid ${borderSubtle}`,
+                padding: '0.55rem 0.65rem',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0.4rem 1rem',
+                fontSize: '0.8rem',
+                background: lightBg
+              }}>
+                {hasVal(printChallan.challanNo) && (
+                  <div><strong style={{ color: primaryColor }}>CHALLAN NO:</strong> {printChallan.challanNo}</div>
+                )}
+                {hasVal(printChallan.date) && (
+                  <div style={{ textAlign: 'right' }}><strong style={{ color: primaryColor }}>DATE:</strong> {formatDateDDMMYYYY(printChallan.date)}</div>
+                )}
+                {hasVal(printChallan.partyName) && (
+                  <div><strong style={{ color: primaryColor }}>PARTY NAME:</strong> {printChallan.partyName}</div>
+                )}
+                {hasVal(printChallan.deliveryBy) && (
+                  <div style={{ textAlign: 'right' }}><strong style={{ color: primaryColor }}>TRANSPORT / BY:</strong> {printChallan.deliveryBy}</div>
+                )}
+                {hasVal(printChallan.billTo) && (
+                  <div><strong style={{ color: primaryColor }}>BILL TO:</strong> {printChallan.billTo}</div>
+                )}
+                {hasVal(printChallan.shipTo) && (
+                  <div style={{ textAlign: 'right' }}><strong style={{ color: primaryColor }}>SHIP TO:</strong> {printChallan.shipTo}</div>
+                )}
               </div>
 
-              {/* Items Table */}
+              {/* Dynamic Items Table */}
               <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.75rem', fontSize: '0.78rem' }}>
                 <thead>
-                  <tr style={{ background: '#1e40af', color: '#fff' }}>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>SR</th>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>DESIGN NO</th>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>PARTICULARS</th>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af', textAlign: 'right' }}>PCS (QTY)</th>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af', textAlign: 'right' }}>RATE (₹)</th>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af', textAlign: 'right' }}>AMOUNT (₹)</th>
+                  <tr style={{ background: primaryColor, color: '#fff' }}>
+                    <th style={{ padding: '0.4rem', border: `1px solid ${primaryColor}`, width: '40px' }}>SR</th>
+                    {hasAnyDesign && <th style={{ padding: '0.4rem', border: `1px solid ${primaryColor}`, textAlign: 'left' }}>DESIGN NO</th>}
+                    <th style={{ padding: '0.4rem', border: `1px solid ${primaryColor}`, textAlign: 'left' }}>PARTICULARS</th>
+                    <th style={{ padding: '0.4rem', border: `1px solid ${primaryColor}`, textAlign: 'right' }}>PCS (QTY)</th>
+                    {hasAnyRateAmt && <th style={{ padding: '0.4rem', border: `1px solid ${primaryColor}`, textAlign: 'right' }}>RATE (₹)</th>}
+                    {hasAnyRateAmt && <th style={{ padding: '0.4rem', border: `1px solid ${primaryColor}`, textAlign: 'right' }}>AMOUNT (₹)</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {(printChallan.items || []).map((it, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'center' }}>{i + 1}</td>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>{it.designNo || '—'}</td>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1' }}>{it.particulars || 'Garment Goods'}</td>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>{it.pcs || 0}</td>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'right' }}>{it.rate ? `₹${it.rate.toFixed(2)}` : '—'}</td>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>{it.amount ? `₹${it.amount.toFixed(2)}` : '—'}</td>
+                  {items.map((it, i) => (
+                    <tr key={i} style={{ background: i % 2 === 0 ? lightBg : '#ffffff' }}>
+                      <td style={{ padding: '0.35rem', border: `1px solid ${borderSubtle}`, textAlign: 'center' }}>{i + 1}</td>
+                      {hasAnyDesign && (
+                        <td style={{ padding: '0.35rem', border: `1px solid ${borderSubtle}`, fontWeight: 'bold' }}>
+                          {hasVal(it.designNo) ? it.designNo : ''}
+                        </td>
+                      )}
+                      <td style={{ padding: '0.35rem', border: `1px solid ${borderSubtle}` }}>
+                        {hasVal(it.particulars) ? it.particulars : ''}
+                      </td>
+                      <td style={{ padding: '0.35rem', border: `1px solid ${borderSubtle}`, textAlign: 'right', fontWeight: 'bold' }}>
+                        {Number(it.pcs) > 0 ? it.pcs : ''}
+                      </td>
+                      {hasAnyRateAmt && (
+                        <td style={{ padding: '0.35rem', border: `1px solid ${borderSubtle}`, textAlign: 'right' }}>
+                          {Number(it.rate) > 0 ? `₹${Number(it.rate).toFixed(2)}` : ''}
+                        </td>
+                      )}
+                      {hasAnyRateAmt && (
+                        <td style={{ padding: '0.35rem', border: `1px solid ${borderSubtle}`, textAlign: 'right', fontWeight: 'bold' }}>
+                          {Number(it.amount) > 0 ? `₹${Number(it.amount).toFixed(2)}` : ''}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e40af', paddingTop: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                <span>TOTAL PIECES: {printChallan.totalPcs || 0} Pcs</span>
-                {printChallan.totalAmount > 0 && (
-                  <span>TOTAL AMOUNT: ₹{(printChallan.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${primaryColor}`, paddingTop: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                {Number(printChallan.totalPcs) > 0 ? (
+                  <span>TOTAL PIECES: {printChallan.totalPcs} Pcs</span>
+                ) : <span />}
+                {Number(printChallan.totalAmount) > 0 && (
+                  <span style={{ color: primaryColor }}>TOTAL AMOUNT: ₹{Number(printChallan.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 )}
               </div>
 
-              {printChallan.notes && (
-                <div style={{ fontSize: '0.75rem', fontStyle: 'italic', marginTop: '0.5rem', color: '#475569' }}>
+              {hasVal(printChallan.notes) && (
+                <div style={{ fontSize: '0.75rem', fontStyle: 'italic', marginTop: '0.5rem', color: mutedColor }}>
                   Notes: {printChallan.notes}
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2.5rem', fontSize: '0.78rem', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2.5rem', fontSize: '0.78rem', fontWeight: 'bold', color: mutedColor }}>
                 <div>PREPARED BY</div>
                 <div>RECEIVER'S SIGNATURE</div>
                 <div style={{ textAlign: 'right' }}>
-                  <div>FOR ELITE EDITION</div>
+                  <div style={{ color: primaryColor }}>FOR {resolvedCompany.toUpperCase()}</div>
                   <div style={{ marginTop: '1.8rem', fontWeight: 'normal' }}>(Authorized Signatory)</div>
                 </div>
               </div>
             </div>
+          );
+        };
+
+        return (
+          <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '1rem' }}>
+            <div style={{ background: '#fff', color: '#000', borderRadius: '8px', width: '100%', maxWidth: 850, padding: '1.5rem', maxHeight: '95vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }} className="no-print">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '1.05rem', color: baseBrandColor }}>
+                    Print View — {printChallan.challanNo}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '999px', background: tintHex(baseBrandColor, 0.88), color: baseBrandColor, fontWeight: 700 }}>
+                    Original (100% Color) + Duplicate (50% Lighter)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => {
+                      const printEl = document.getElementById('stitching-challan-printable-paper');
+                      if (printEl && printChallan) {
+                        openPrintOptionsDialog({
+                          title: `Stitching Challan — ${printChallan.challanNo}`,
+                          content: printEl.outerHTML,
+                          defaultSettings: {
+                            paperSize: 'A4',
+                            orientation: 'portrait',
+                            margin: 'default'
+                          }
+                        });
+                      }
+                    }}
+                    className="btn-primary"
+                    style={{ padding: '0.4rem 1rem', background: baseBrandColor }}
+                  >
+                    <Printer size={14} /> Print Both Copies
+                  </button>
+                  <button onClick={() => setPrintChallan(null)} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              {/* Paper Layout: Original Copy (100% Color) + Duplicate Copy (50% Lighter Color) */}
+              <div id="stitching-challan-printable-paper">
+                {renderChallanSheet(true)}
+                {renderChallanSheet(false)}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Stitching Challan Staff Audit History Modal */}
       {selectedStitchingHistory && (

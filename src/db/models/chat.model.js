@@ -8,8 +8,22 @@ const chatRoomSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['direct', 'group'],
+      enum: ['direct', 'group', 'broadcast', 'community'],
       default: 'group',
+    },
+    communityId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ChatRoom',
+      default: null,
+      index: true,
+    },
+    isAnnouncementChannel: {
+      type: Boolean,
+      default: false,
+    },
+    e2eeEnabled: {
+      type: Boolean,
+      default: false,
     },
     members: [
       {
@@ -21,6 +35,56 @@ const chatRoomSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    archivedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
+    mutedBy: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        mutedUntil: { type: Date, default: null },
+      }
+    ],
+    disappearAfterSec: {
+      type: Number,
+      default: 0,
+    },
+    pinnedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
+    unreadBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
+    lockedBy: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        pinHash: { type: String, default: '' },
+        lockedAt: { type: Date, default: Date.now },
+      }
+    ],
+    inviteToken: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    requireJoinApproval: {
+      type: Boolean,
+      default: false,
+    },
+    joinRequests: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        requestedAt: { type: Date, default: Date.now },
+      }
+    ],
     description: {
       type: String,
       default: '',
@@ -129,7 +193,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'poll', 'sticker', 'gif', 'image', 'attachment', 'call-log'],
+      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'video-note', 'poll', 'sticker', 'gif', 'image', 'attachment', 'call-log', 'location', 'contact', 'event', 'call-link'],
       default: 'text',
     },
     taskId: {
@@ -236,6 +300,29 @@ const chatMessageSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    starredBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: []
+      }
+    ],
+    expiresAt: {
+      type: Date,
+      default: null,
+      index: true
+    },
+    linkPreview: {
+      type: {
+        url: { type: String, default: '' },
+        title: { type: String, default: '' },
+        description: { type: String, default: '' },
+        image: { type: String, default: '' },
+        domain: { type: String, default: '' }
+      },
+      default: null,
+      _id: false
+    },
     // ── Authority-Based Communication Module fields ──
     msgType: {
       type: String,
@@ -276,6 +363,89 @@ const chatMessageSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    viewOnce: {
+      type: Boolean,
+      default: false,
+    },
+    viewedBy: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        viewedAt: { type: Date, default: Date.now },
+      }
+    ],
+    locationMeta: {
+      type: {
+        lat: { type: Number },
+        lng: { type: Number },
+        label: { type: String, default: '' },
+        address: { type: String, default: '' },
+        isLive: { type: Boolean, default: false },
+        liveExpiresAt: { type: Date, default: null },
+      },
+      default: null,
+      _id: false,
+    },
+    contactMeta: {
+      type: {
+        name: { type: String, default: '' },
+        phone: { type: String, default: '' },
+        email: { type: String, default: '' },
+        company: { type: String, default: '' },
+        role: { type: String, default: '' },
+        userId: { type: String, default: '' },
+      },
+      default: null,
+      _id: false,
+    },
+    transcript: {
+      type: String,
+      default: '',
+    },
+    broadcastListId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ChatRoom',
+      default: null,
+    },
+    isEncrypted: {
+      type: Boolean,
+      default: false,
+    },
+    encryptedPayload: {
+      type: {
+        iv: { type: String, default: '' },
+        ciphertext: { type: String, default: '' },
+      },
+      default: null,
+      _id: false,
+    },
+    eventMeta: {
+      type: {
+        title: { type: String, default: '' },
+        description: { type: String, default: '' },
+        eventDate: { type: Date, default: null },
+        location: { type: String, default: '' },
+        rsvps: [
+          {
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            status: { type: String, enum: ['going', 'maybe', 'not_going'], default: 'going' },
+            updatedAt: { type: Date, default: Date.now },
+          }
+        ],
+      },
+      default: null,
+      _id: false,
+    },
+    callLinkMeta: {
+      type: {
+        token: { type: String, default: '' },
+        callType: { type: String, enum: ['voice', 'video'], default: 'video' },
+        title: { type: String, default: '' },
+        createdByName: { type: String, default: '' },
+        active: { type: Boolean, default: true },
+      },
+      default: null,
+      _id: false,
+    },
   },
   {
     timestamps: true,
@@ -296,10 +466,72 @@ chatMessageSchema.index({ roomId: 1, clientMsgId: 1 }, { unique: true, sparse: t
 chatMessageSchema.index({ senderId: 1 });
 chatMessageSchema.index({ content: 'text' });
 
+const chatUserPreferenceSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      unique: true,
+    },
+    globalWallpaper: {
+      type: String,
+      default: 'default',
+    },
+    roomWallpapers: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+    roomTones: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+    hdMediaDefault: {
+      type: Boolean,
+      default: false,
+    },
+    privacy: {
+      lastSeen: { type: String, enum: ['everyone', 'nobody'], default: 'everyone' },
+      readReceipts: { type: Boolean, default: true },
+      onlineVisible: { type: Boolean, default: true },
+    },
+    mediaAutoDownload: {
+      photos: { type: Boolean, default: true },
+      videos: { type: Boolean, default: false },
+      documents: { type: Boolean, default: true },
+      audio: { type: Boolean, default: true },
+    },
+    lastSeenAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
+
+const chatMessageReminderSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    messageId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatMessage', required: true },
+    roomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom', required: true },
+    roomName: { type: String, default: 'Chat' },
+    snippet: { type: String, default: '' },
+    remindAt: { type: Date, required: true, index: true },
+    fired: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
 const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema, 'chatrooms');
 const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema, 'chatmessages');
+const ChatUserPreference = mongoose.model('ChatUserPreference', chatUserPreferenceSchema, 'chatuserpreferences');
+const ChatMessageReminder = mongoose.model('ChatMessageReminder', chatMessageReminderSchema, 'chatmessagereminders');
 
 module.exports = {
   ChatRoom,
   ChatMessage,
+  ChatUserPreference,
+  ChatMessageReminder,
 };

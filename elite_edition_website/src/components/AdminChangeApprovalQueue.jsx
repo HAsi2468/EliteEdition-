@@ -335,37 +335,36 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', fontFamily: 'inherit' }}>
       {/* Top Banner & Master Toggle */}
-      <div style={{
-        background: '#ffffff',
-        border: '1.5px solid #bfdbfe',
+      <div className="glass-panel" style={{
+        background: 'rgba(15, 23, 42, 0.78)',
+        border: '1px solid var(--border-color)',
         borderRadius: '12px',
         padding: '1.2rem 1.5rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '1rem',
-        boxShadow: '0 2px 10px rgba(37,99,235,0.06)'
+        gap: '1rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <div style={{
             width: '42px',
             height: '42px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1.5px solid #93c5fd',
+            background: 'rgba(59, 130, 246, 0.18)',
+            border: '1px solid rgba(59, 130, 246, 0.38)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#1d4ed8'
+            color: '#60a5fa'
           }}>
             <ShieldAlert size={22} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#f8fafc' }}>
               System Review & Approval Queue
             </h3>
-            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
               Review, approve, or reject record modifications submitted by staff users across all modules.
             </p>
           </div>
@@ -376,16 +375,16 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
           display: 'flex',
           alignItems: 'center',
           gap: '0.8rem',
-          background: '#eff6ff',
-          border: '1.5px solid #bfdbfe',
+          background: 'rgba(30, 41, 59, 0.72)',
+          border: '1px solid rgba(59, 130, 246, 0.35)',
           padding: '0.5rem 0.9rem',
           borderRadius: '10px'
         }}>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               Approval Policy • {companyEntity || 'Enterprise'}
             </div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: approvalSettings.enabled ? '#1d4ed8' : '#64748b' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: approvalSettings.enabled ? '#6ee7b7' : '#94a3b8' }}>
               {approvalSettings.enabled ? 'ACTIVE (User edits held for review)' : 'DISABLED (User edits apply immediately)'}
             </div>
           </div>
@@ -410,31 +409,30 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
         </div>
       </div>
 
-      {/* KPI Stats Cards (Pure White & Blue) */}
+      {/* KPI Stats Cards (Glassmorphic) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
         {/* Pending */}
         <div
           onClick={() => { setStatusFilter('PENDING'); setPage(1); }}
           style={{
-            background: statusFilter === 'PENDING' ? '#eff6ff' : '#ffffff',
-            border: statusFilter === 'PENDING' ? '2px solid #2563eb' : '1.5px solid #bfdbfe',
+            background: statusFilter === 'PENDING' ? 'rgba(37, 99, 235, 0.2)' : 'rgba(15, 23, 42, 0.72)',
+            border: statusFilter === 'PENDING' ? '1.5px solid #3b82f6' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '1rem 1.25rem',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(37,99,235,0.06)',
             transition: 'all 0.15s ease'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase' }}>
               Pending Review
             </span>
-            <Clock size={18} color="#2563eb" />
+            <Clock size={18} color="#60a5fa" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1d4ed8', marginTop: '0.3rem' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '0.3rem' }}>
             {stats.pending || 0}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
             Awaiting Admin authorization
           </div>
         </div>
@@ -443,25 +441,24 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
         <div
           onClick={() => { setStatusFilter('APPROVED'); setPage(1); }}
           style={{
-            background: statusFilter === 'APPROVED' ? '#eff6ff' : '#ffffff',
-            border: statusFilter === 'APPROVED' ? '2px solid #2563eb' : '1.5px solid #bfdbfe',
+            background: statusFilter === 'APPROVED' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(15, 23, 42, 0.72)',
+            border: statusFilter === 'APPROVED' ? '1.5px solid #10b981' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '1rem 1.25rem',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(37,99,235,0.06)',
             transition: 'all 0.15s ease'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase' }}>
               Approved & Applied
             </span>
-            <CheckCircle size={18} color="#2563eb" />
+            <CheckCircle size={18} color="#34d399" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', marginTop: '0.3rem' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '0.3rem' }}>
             {stats.approved || 0}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
             Applied into production
           </div>
         </div>
@@ -470,25 +467,24 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
         <div
           onClick={() => { setStatusFilter('REJECTED'); setPage(1); }}
           style={{
-            background: statusFilter === 'REJECTED' ? '#eff6ff' : '#ffffff',
-            border: statusFilter === 'REJECTED' ? '2px solid #2563eb' : '1.5px solid #bfdbfe',
+            background: statusFilter === 'REJECTED' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(15, 23, 42, 0.72)',
+            border: statusFilter === 'REJECTED' ? '1.5px solid #ef4444' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '1rem 1.25rem',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(37,99,235,0.06)',
             transition: 'all 0.15s ease'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fca5a5', textTransform: 'uppercase' }}>
               Rejected
             </span>
-            <XCircle size={18} color="#2563eb" />
+            <XCircle size={18} color="#f87171" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', marginTop: '0.3rem' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '0.3rem' }}>
             {stats.rejected || 0}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
             Discarded change requests
           </div>
         </div>
@@ -497,42 +493,40 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
         <div
           onClick={() => { setStatusFilter('ALL'); setPage(1); }}
           style={{
-            background: statusFilter === 'ALL' ? '#eff6ff' : '#ffffff',
-            border: statusFilter === 'ALL' ? '2px solid #2563eb' : '1.5px solid #bfdbfe',
+            background: statusFilter === 'ALL' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.72)',
+            border: statusFilter === 'ALL' ? '1.5px solid #3b82f6' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '1rem 1.25rem',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(37,99,235,0.06)',
             transition: 'all 0.15s ease'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', textTransform: 'uppercase' }}>
               Total Requests
             </span>
-            <FileText size={18} color="#2563eb" />
+            <FileText size={18} color="#94a3b8" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', marginTop: '0.3rem' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '0.3rem' }}>
             {stats.total || 0}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
             All submission history
           </div>
         </div>
       </div>
 
       {/* Control Bar: Filters, Search & Bulk Actions */}
-      <div style={{
-        background: '#ffffff',
-        border: '1.5px solid #bfdbfe',
+      <div className="glass-panel" style={{
+        background: 'rgba(15, 23, 42, 0.72)',
+        border: '1px solid var(--border-color)',
         borderRadius: '12px',
         padding: '0.9rem 1.2rem',
         display: 'flex',
         flexWrap: 'wrap',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '0.75rem',
-        boxShadow: '0 2px 10px rgba(37,99,235,0.04)'
+        gap: '0.75rem'
       }}>
         {/* Left: Status Filter Pills */}
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -552,10 +546,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                 fontSize: '0.78rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                border: statusFilter === tab.key ? '1.5px solid #2563eb' : '1px solid #bfdbfe',
-                background: statusFilter === tab.key ? '#2563eb' : '#ffffff',
-                color: statusFilter === tab.key ? '#ffffff' : '#1e40af',
-                boxShadow: statusFilter === tab.key ? '0 1px 4px rgba(37,99,235,0.2)' : 'none',
+                border: statusFilter === tab.key ? '1px solid #3b82f6' : '1px solid var(--border-color)',
+                background: statusFilter === 'PENDING' && tab.key === 'PENDING' ? '#2563eb' : statusFilter === tab.key ? '#2563eb' : 'rgba(15, 23, 42, 0.85)',
+                color: statusFilter === tab.key ? '#ffffff' : '#cbd5e1',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -575,9 +568,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
               borderRadius: '6px',
               fontSize: '0.78rem',
               fontWeight: 700,
-              background: '#ffffff',
-              border: '1.5px solid #bfdbfe',
-              color: '#0f172a'
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid var(--border-color)',
+              color: '#f8fafc'
             }}
           >
             {moduleOptions.map(m => (
@@ -589,7 +582,7 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
 
           {/* Search box */}
           <div style={{ position: 'relative', flex: '1 1 auto', minWidth: '180px' }}>
-            <Search size={14} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               placeholder="Search by ID, job #, user name..."
@@ -601,9 +594,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                 borderRadius: '6px',
                 fontSize: '0.8rem',
                 fontWeight: 600,
-                background: '#ffffff',
-                border: '1.5px solid #bfdbfe',
-                color: '#0f172a'
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid var(--border-color)',
+                color: '#f8fafc'
               }}
             />
           </div>
@@ -615,9 +608,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
             style={{
               padding: '0.45rem 0.65rem',
               borderRadius: '6px',
-              border: '1.5px solid #bfdbfe',
-              background: '#ffffff',
-              color: '#1d4ed8',
+              border: '1px solid var(--border-color)',
+              background: 'rgba(15, 23, 42, 0.85)',
+              color: '#93c5fd',
               cursor: 'pointer'
             }}
           >
@@ -636,9 +629,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                 borderRadius: '6px',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                border: '1px solid #bfdbfe',
-                background: '#ffffff',
-                color: '#1e40af',
+                border: '1px solid var(--border-color)',
+                background: 'rgba(15, 23, 42, 0.85)',
+                color: '#93c5fd',
                 cursor: 'pointer'
               }}
             >
@@ -692,24 +685,23 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
 
       {/* Main Request Cards List */}
       {loading ? (
-        <div style={{ padding: '3rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '12px' }}>
-          <RotateCw size={28} color="#2563eb" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem' }} />
-          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>Loading change requests...</div>
+        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', background: 'rgba(15, 23, 42, 0.72)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+          <RotateCw size={28} color="#60a5fa" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem' }} />
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#93c5fd' }}>Loading change requests...</div>
         </div>
       ) : requests.length === 0 ? (
-        <div style={{
+        <div className="glass-panel" style={{
           padding: '3rem',
           textAlign: 'center',
-          background: '#ffffff',
-          border: '1.5px solid #bfdbfe',
-          borderRadius: '12px',
-          boxShadow: '0 2px 10px rgba(37,99,235,0.04)'
+          background: 'rgba(15, 23, 42, 0.72)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px'
         }}>
-          <ShieldCheck size={42} color="#2563eb" style={{ margin: '0 auto 0.75rem' }} />
-          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+          <ShieldCheck size={42} color="#60a5fa" style={{ margin: '0 auto 0.75rem' }} />
+          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
             No {statusFilter === 'ALL' ? '' : statusFilter.toLowerCase()} requests found
           </h4>
-          <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
             {statusFilter === 'PENDING'
               ? 'All clear! There are no pending changes awaiting Admin authorization.'
               : 'Try changing your search term or filters.'}
@@ -727,12 +719,12 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
             return (
               <div
                 key={item._id}
+                className="glass-panel"
                 style={{
-                  background: isSelected ? '#eff6ff' : '#ffffff',
-                  border: isSelected ? '2px solid #2563eb' : '1.5px solid #bfdbfe',
+                  background: isSelected ? 'rgba(37, 99, 235, 0.16)' : 'rgba(15, 23, 42, 0.75)',
+                  border: isSelected ? '1.5px solid #3b82f6' : '1px solid var(--border-color)',
                   borderRadius: '12px',
                   padding: '1.1rem 1.3rem',
-                  boxShadow: '0 2px 8px rgba(37,99,235,0.05)',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -744,7 +736,7 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelect(item._id)}
-                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#2563eb' }}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }}
                       />
                     )}
 
@@ -756,9 +748,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                           borderRadius: '6px',
                           fontSize: '0.7rem',
                           fontWeight: 800,
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe'
+                          background: 'rgba(59, 130, 246, 0.18)',
+                          color: '#93c5fd',
+                          border: '1px solid rgba(59, 130, 246, 0.35)'
                         }}>
                           {item.module}
                         </span>
@@ -770,9 +762,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                             borderRadius: '6px',
                             fontSize: '0.7rem',
                             fontWeight: 800,
-                            background: '#f8fafc',
-                            color: '#0f172a',
-                            border: '1px solid #cbd5e1'
+                            background: 'rgba(148, 163, 184, 0.16)',
+                            color: '#e2e8f0',
+                            border: '1px solid rgba(148, 163, 184, 0.28)'
                           }}>
                             {item.companyEntity}
                           </span>
@@ -784,9 +776,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                           borderRadius: '6px',
                           fontSize: '0.7rem',
                           fontWeight: 800,
-                          background: item.action === 'DELETE' ? '#fff1f2' : item.action === 'CREATE' ? '#f0fdf4' : '#eff6ff',
-                          color: item.action === 'DELETE' ? '#be123c' : item.action === 'CREATE' ? '#15803d' : '#1d4ed8',
-                          border: item.action === 'DELETE' ? '1px solid #fecdd3' : item.action === 'CREATE' ? '1px solid #bbf7d0' : '1px solid #bfdbfe'
+                          background: item.action === 'DELETE' ? 'rgba(239, 68, 68, 0.18)' : item.action === 'CREATE' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(59, 130, 246, 0.18)',
+                          color: item.action === 'DELETE' ? '#fca5a5' : item.action === 'CREATE' ? '#6ee7b7' : '#93c5fd',
+                          border: item.action === 'DELETE' ? '1px solid rgba(239, 68, 68, 0.38)' : item.action === 'CREATE' ? '1px solid rgba(16, 185, 129, 0.38)' : '1px solid rgba(59, 130, 246, 0.38)'
                         }}>
                           {item.action}
                         </span>
@@ -797,26 +789,26 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                           borderRadius: '6px',
                           fontSize: '0.7rem',
                           fontWeight: 800,
-                          background: item.status === 'APPROVED' ? '#f0fdf4' : item.status === 'REJECTED' ? '#fef2f2' : '#fffbeb',
-                          color: item.status === 'APPROVED' ? '#166534' : item.status === 'REJECTED' ? '#991b1b' : '#b45309',
-                          border: item.status === 'APPROVED' ? '1px solid #bbf7d0' : item.status === 'REJECTED' ? '1px solid #fecaca' : '1px solid #fde68a'
+                          background: item.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.18)' : item.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(245, 158, 11, 0.18)',
+                          color: item.status === 'APPROVED' ? '#6ee7b7' : item.status === 'REJECTED' ? '#fca5a5' : '#fcd34d',
+                          border: item.status === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.38)' : item.status === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.38)' : '1px solid rgba(245, 158, 11, 0.38)'
                         }}>
                           {item.status}
                         </span>
 
                         {/* Target Identifier */}
-                        <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#f8fafc' }}>
                           {item.targetIdentifier || 'Document Record'}
                         </span>
                       </div>
 
                       {/* Submitter & Timestamp */}
-                      <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span>
-                          Requested by: <strong style={{ color: '#1e40af' }}>{item.requestedBy?.name || 'Staff User'}</strong> ({item.requestedBy?.role || 'user'})
+                          Requested by: <strong style={{ color: '#93c5fd' }}>{item.requestedBy?.name || 'Staff User'}</strong> ({item.requestedBy?.role || 'user'})
                         </span>
                         <span>•</span>
-                        <span>Dept: <strong style={{ color: '#0f172a' }}>{item.requestedBy?.department || 'General'}</strong></span>
+                        <span>Dept: <strong style={{ color: '#e2e8f0' }}>{item.requestedBy?.department || 'General'}</strong></span>
                         <span>•</span>
                         <span>Submitted: {new Date(item.createdAt).toLocaleString('en-IN')}</span>
                       </div>
@@ -855,9 +847,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                             borderRadius: '7px',
                             fontSize: '0.78rem',
                             fontWeight: 800,
-                            border: '1px solid #bfdbfe',
-                            background: '#ffffff',
-                            color: '#1e40af',
+                            border: '1px solid rgba(239, 68, 68, 0.35)',
+                            background: 'rgba(239, 68, 68, 0.14)',
+                            color: '#fca5a5',
                             cursor: 'pointer'
                           }}
                         >
@@ -865,7 +857,7 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                         </button>
                       </>
                     ) : (
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e40af', background: '#eff6ff', padding: '4px 10px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#93c5fd', background: 'rgba(59, 130, 246, 0.16)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
                         {item.status === 'APPROVED' ? (
                           <span>✓ Approved by {item.reviewedBy?.name || 'Admin'} on {item.reviewedAt ? new Date(item.reviewedAt).toLocaleDateString('en-IN') : ''}</span>
                         ) : (
@@ -881,9 +873,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                       style={{
                         padding: '0.45rem 0.6rem',
                         borderRadius: '6px',
-                        border: '1px solid #bfdbfe',
-                        background: '#ffffff',
-                        color: '#1d4ed8',
+                        border: '1px solid var(--border-color)',
+                        background: 'rgba(30, 41, 59, 0.8)',
+                        color: '#93c5fd',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -902,16 +894,16 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                 <div style={{
                   marginTop: '0.85rem',
                   paddingTop: '0.75rem',
-                  borderTop: '1px solid #bfdbfe'
+                  borderTop: '1px solid var(--border-light)'
                 }}>
                   {item.action === 'DELETE' ? (
                     <div style={{
                       padding: '0.75rem 1rem',
                       borderRadius: '8px',
-                      background: item.status === 'APPROVED' ? '#f0fdf4' : item.status === 'REJECTED' ? '#fef2f2' : '#eff6ff',
-                      border: item.status === 'APPROVED' ? '1.5px solid #86efac' : item.status === 'REJECTED' ? '1.5px solid #fca5a5' : '1.5px solid #bfdbfe',
+                      background: item.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.15)' : item.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                      border: item.status === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.38)' : item.status === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.38)' : '1px solid rgba(59, 130, 246, 0.38)',
                       fontSize: '0.8rem',
-                      color: item.status === 'APPROVED' ? '#166534' : item.status === 'REJECTED' ? '#991b1b' : '#1e40af',
+                      color: item.status === 'APPROVED' ? '#6ee7b7' : item.status === 'REJECTED' ? '#fca5a5' : '#93c5fd',
                       fontWeight: 700
                     }}>
                       {item.status === 'APPROVED' ? (
@@ -927,7 +919,7 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                       <div style={{
                         fontSize: '0.75rem',
                         fontWeight: 800,
-                        color: item.status === 'APPROVED' ? '#166534' : item.status === 'REJECTED' ? '#991b1b' : '#1e3a8a',
+                        color: item.status === 'APPROVED' ? '#6ee7b7' : item.status === 'REJECTED' ? '#fca5a5' : '#93c5fd',
                         marginBottom: '0.45rem',
                         textTransform: 'uppercase'
                       }}>
@@ -941,25 +933,25 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                       <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                           <thead>
-                            <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #bfdbfe' }}>
-                              <th style={{ padding: '0.45rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#1e40af', width: '25%' }}>Field Name</th>
-                              <th style={{ padding: '0.45rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#64748b', width: '37%' }}>Before (Current Value)</th>
-                              <th style={{ padding: '0.45rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#1d4ed8', width: '38%' }}>After (Proposed Value)</th>
+                            <tr style={{ background: 'rgba(15, 23, 42, 0.72)', borderBottom: '1px solid var(--border-color)' }}>
+                              <th style={{ padding: '0.45rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#93c5fd', width: '25%' }}>Field Name</th>
+                              <th style={{ padding: '0.45rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#94a3b8', width: '37%' }}>Before (Current Value)</th>
+                              <th style={{ padding: '0.45rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#60a5fa', width: '38%' }}>After (Proposed Value)</th>
                             </tr>
                           </thead>
                           <tbody>
                             {diffs.map((d, dIdx) => (
-                              <tr key={dIdx} style={{ borderBottom: '1px solid #e2e8f0', background: dIdx % 2 === 0 ? '#ffffff' : '#f8faff' }}>
-                                <td style={{ padding: '0.5rem 0.75rem', fontWeight: 800, color: '#0f172a' }}>
+                              <tr key={dIdx} style={{ borderBottom: '1px solid var(--border-light)', background: dIdx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                                <td style={{ padding: '0.5rem 0.75rem', fontWeight: 800, color: '#f8fafc' }}>
                                   {d.field}
                                 </td>
-                                <td style={{ padding: '0.5rem 0.75rem', color: '#64748b', wordBreak: 'break-word', fontFamily: 'monospace', fontSize: '0.76rem' }}>
-                                  <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                <td style={{ padding: '0.5rem 0.75rem', color: '#cbd5e1', wordBreak: 'break-word', fontFamily: 'monospace', fontSize: '0.76rem' }}>
+                                  <span style={{ background: 'rgba(148, 163, 184, 0.14)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(148, 163, 184, 0.25)' }}>
                                     {formatValue(d.before)}
                                   </span>
                                 </td>
-                                <td style={{ padding: '0.5rem 0.75rem', color: '#1d4ed8', fontWeight: 700, wordBreak: 'break-word', fontFamily: 'monospace', fontSize: '0.76rem' }}>
-                                  <span style={{ background: '#eff6ff', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+                                <td style={{ padding: '0.5rem 0.75rem', color: '#93c5fd', fontWeight: 700, wordBreak: 'break-word', fontFamily: 'monospace', fontSize: '0.76rem' }}>
+                                  <span style={{ background: 'rgba(59, 130, 246, 0.18)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
                                     {formatValue(d.after)}
                                   </span>
                                 </td>
@@ -970,7 +962,7 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                       </div>
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                       Payload update contains {Object.keys(item.requestBody || {}).length} fields. Click &quot;View Diff&quot; to inspect full details.
                     </div>
                   )}
@@ -979,38 +971,38 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
                   {isExpanded && (
                     <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                       <div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '3px' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', marginBottom: '3px' }}>
                           Original Document State (Before):
                         </div>
                         <pre style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          background: 'rgba(15, 23, 42, 0.85)',
+                          border: '1px solid var(--border-color)',
                           borderRadius: '8px',
                           padding: '0.75rem',
                           fontSize: '0.7rem',
                           maxHeight: '200px',
                           overflow: 'auto',
                           margin: 0,
-                          color: '#334155'
+                          color: '#cbd5e1'
                         }}>
                           {JSON.stringify(item.beforeData, null, 2) || '<No before snapshot>'}
                         </pre>
                       </div>
 
                       <div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d4ed8', marginBottom: '3px' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#93c5fd', marginBottom: '3px' }}>
                           Submitted Payload (Proposed After):
                         </div>
                         <pre style={{
-                          background: '#eff6ff',
-                          border: '1px solid #bfdbfe',
+                          background: 'rgba(30, 58, 138, 0.25)',
+                          border: '1px solid rgba(59, 130, 246, 0.38)',
                           borderRadius: '8px',
                           padding: '0.75rem',
                           fontSize: '0.7rem',
                           maxHeight: '200px',
                           overflow: 'auto',
                           margin: 0,
-                          color: '#1e40af'
+                          color: '#bfdbfe'
                         }}>
                           {JSON.stringify(item.requestBody, null, 2)}
                         </pre>
@@ -1034,16 +1026,16 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
             style={{
               padding: '0.4rem 0.8rem',
               borderRadius: '6px',
-              border: '1px solid #bfdbfe',
-              background: '#ffffff',
-              color: '#1d4ed8',
+              border: '1px solid var(--border-color)',
+              background: 'rgba(15, 23, 42, 0.85)',
+              color: '#93c5fd',
               cursor: page <= 1 ? 'not-allowed' : 'pointer',
               opacity: page <= 1 ? 0.5 : 1
             }}
           >
             Previous
           </button>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e40af' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#cbd5e1' }}>
             Page {page} of {pagination.totalPages}
           </span>
           <button
@@ -1053,9 +1045,9 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
             style={{
               padding: '0.4rem 0.8rem',
               borderRadius: '6px',
-              border: '1px solid #bfdbfe',
-              background: '#ffffff',
-              color: '#1d4ed8',
+              border: '1px solid var(--border-color)',
+              background: 'rgba(15, 23, 42, 0.85)',
+              color: '#93c5fd',
               cursor: page >= pagination.totalPages ? 'not-allowed' : 'pointer',
               opacity: page >= pagination.totalPages ? 0.5 : 1
             }}
@@ -1070,8 +1062,8 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(15, 23, 42, 0.78)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1079,18 +1071,19 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
           padding: '1rem'
         }}>
           <div style={{
-            background: '#ffffff',
-            border: '2px solid #bfdbfe',
+            background: 'rgba(15, 23, 42, 0.96)',
+            border: '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '1.5rem',
             width: '100%',
             maxWidth: '480px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.15)'
+            color: '#f8fafc',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.45)'
           }}>
-            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#f8fafc' }}>
               Reject Change Request
             </h4>
-            <p style={{ margin: '4px 0 1rem', fontSize: '0.8rem', color: '#64748b' }}>
+            <p style={{ margin: '4px 0 1rem', fontSize: '0.8rem', color: '#94a3b8' }}>
               Provide an explanation for rejecting changes to {rejectModalItem.module} ({rejectModalItem.targetIdentifier}).
             </p>
 

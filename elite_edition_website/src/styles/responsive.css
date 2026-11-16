@@ -1,50 +1,49 @@
 /*
- * Responsive table + modal + form patterns (plain CSS, framework-agnostic).
- * Grounded in: BUG-010 / Phase 4 Raw Materials – a 5000-char name widens the table and pushes the
- * Edit/Delete buttons off-screen; BUG-042 – long design notes overflow the card; BUG-032 – modals.
- * The multi-device UI audit (360–1920 px) is still running; its findings are NOT reflected here yet.
- * Requires <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
- * (viewport-fit=cover is needed for env(safe-area-inset-*) to be non-zero on notched phones).
+ * Responsive table + modal + form patterns — Dark Frosted Glass Edition
  */
 
 /* ---------- 1. Table wrapper: horizontal scroll, sticky header, sticky right action column ---------- */
 .erp-table-wrap {
   position: relative;
   max-width: 100%;
-  overflow-x: auto;                 /* the TABLE scrolls, never the page */
+  overflow-x: auto;
   overflow-y: auto;
-  max-height: min(70dvh, 70vh);     /* gives the sticky header a scroll container; dvh with vh fallback */
+  max-height: min(70dvh, 70vh);
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;   /* horizontal swipe does not trigger browser back on iOS/Android */
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  overscroll-behavior-x: contain;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
 }
 .erp-table {
-  width: max-content;               /* grow with content … */
-  min-width: 100%;                  /* … but never narrower than the wrapper */
-  border-collapse: separate;        /* required: position:sticky is unreliable with border-collapse:collapse */
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
   border-spacing: 0;
   table-layout: auto;
   font-size: 14px;
+  color: #ffffff;
 }
 .erp-table th,
 .erp-table td {
-  min-width: 96px;                  /* min-width cells: columns never collapse to 0 */
-  max-width: 280px;                 /* hard cap: a 5000-char value cannot widen the column (BUG-010) */
+  min-width: 96px;
+  max-width: 280px;
   padding: 8px 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   vertical-align: middle;
-  background: #fff;
+  background: rgba(15, 23, 42, 0.75);
+  color: #f8fafc;
 }
 .erp-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f8fafc;
-  font-weight: 600;
+  background: rgba(11, 17, 32, 0.92);
+  color: #cbd5e1;
+  font-weight: 700;
   white-space: nowrap;
 }
-/* text truncation – pair with title="full text" in markup */
 .erp-cell-truncate {
   display: block;
   overflow: hidden;
@@ -52,7 +51,6 @@
   text-overflow: ellipsis;
 }
 .erp-cell-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* sticky RIGHT action column (Edit / Delete / View always reachable) */
 .erp-table .erp-col-actions {
   position: sticky;
   right: 0;
@@ -61,13 +59,12 @@
   max-width: none;
   width: 1%;
   white-space: nowrap;
-  background: #fff;
-  box-shadow: -6px 0 6px -6px rgba(15, 23, 42, 0.25); /* edge cue that content scrolls underneath */
+  background: rgba(11, 17, 32, 0.95);
+  box-shadow: -6px 0 12px -4px rgba(2, 6, 23, 0.55);
 }
-.erp-table thead .erp-col-actions { z-index: 3; background: #f8fafc; } /* header ∩ sticky column corner */
-/* optional sticky FIRST column (e.g. Job No) */
-.erp-table .erp-col-key { position: sticky; left: 0; z-index: 1; background: #fff; }
-.erp-table thead .erp-col-key { z-index: 3; background: #f8fafc; }
+.erp-table thead .erp-col-actions { z-index: 3; background: rgba(11, 17, 32, 0.98); }
+.erp-table .erp-col-key { position: sticky; left: 0; z-index: 1; background: rgba(11, 17, 32, 0.95); }
+.erp-table thead .erp-col-key { z-index: 3; background: rgba(11, 17, 32, 0.98); }
 
 /* ---------- 2. Touch targets (≥ 44×44 CSS px, WCAG 2.5.5 / Apple HIG) ---------- */
 .erp-touch {
@@ -76,21 +73,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  touch-action: manipulation;       /* removes the 300 ms double-tap-zoom delay */
+  touch-action: manipulation;
 }
-.erp-actions { display: inline-flex; gap: 8px; }   /* ≥ 8 px between adjacent targets */
+.erp-actions { display: inline-flex; gap: 8px; }
 
 /* ---------- 3. Inputs: 16 px font stops iOS Safari auto-zoom on focus ---------- */
 .erp-form input:not([type="checkbox"]):not([type="radio"]),
 .erp-form select,
 .erp-form textarea,
 input.erp-input, select.erp-input, textarea.erp-input {
-  font-size: 16px;                  /* < 16px triggers zoom on iOS; do NOT fix with user-scalable=no */
+  font-size: 16px;
   min-height: 44px;
   line-height: 1.4;
 }
 .erp-form textarea { overflow-wrap: anywhere; }
-/* long free text inside cards (BUG-042 notes overflow) */
 .erp-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 
 /* ---------- 4. Modal: fits 360 px, scrollable body, sticky footer, safe-area insets ---------- */
@@ -103,18 +99,22 @@ input.erp-input, select.erp-input, textarea.erp-input {
   justify-content: center;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
            max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(8px);
   overscroll-behavior: contain;
 }
 .erp-modal {
   display: flex;
   flex-direction: column;
   width: min(100%, 640px);
-  max-height: calc(100vh - 24px);   /* fallback for browsers without dvh */
-  max-height: calc(100dvh - 24px);  /* dvh tracks the on-screen keyboard / URL bar on mobile */
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;                 /* children scroll, not the shell */
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  background: rgba(15, 23, 42, 0.95);
+  color: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
 }
 .erp-modal__header {
   flex: 0 0 auto;
@@ -123,18 +123,19 @@ input.erp-input, select.erp-input, textarea.erp-input {
   justify-content: space-between;
   gap: 8px;
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.20);
+  background: rgba(11, 17, 32, 0.92);
 }
-.erp-modal__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.erp-modal__close { flex: 0 0 auto; }  /* never shrinks – the X stays visible at 360 px */
+.erp-modal__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: #ffffff; }
+.erp-modal__close { flex: 0 0 auto; }
 .erp-modal__body {
   flex: 1 1 auto;
-  min-height: 0;                    /* REQUIRED: lets a flex child shrink and scroll */
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: 16px;
-  scroll-padding-bottom: 96px;      /* focused inputs scroll above the sticky footer */
+  scroll-padding-bottom: 96px;
 }
 .erp-modal__footer {
   flex: 0 0 auto;
@@ -145,23 +146,54 @@ input.erp-input, select.erp-input, textarea.erp-input {
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  border-top: 1px solid rgba(148, 163, 184, 0.20);
+  background: rgba(11, 17, 32, 0.95);
 }
 @media (max-width: 480px) {
-  .erp-modal-backdrop { align-items: flex-end; padding: 0; }      /* bottom sheet on phones */
-  .erp-modal { width: 100%; max-height: 100vh; max-height: 100dvh; border-radius: 12px 12px 0 0; }
-  .erp-modal__footer > * { flex: 1 1 0; min-height: 44px; }          /* full-width primary/secondary buttons */
+  .erp-modal-backdrop { align-items: flex-end; padding: 0; }
+  .erp-modal { width: 100%; max-height: 100vh; max-height: 100dvh; border-radius: 14px 14px 0 0; }
+  .erp-modal__footer > * { flex: 1 1 0; min-height: 44px; }
   .erp-table th, .erp-table td { max-width: 200px; }
 }
-/* lock page scroll behind an open modal (toggle on <html>) */
 html.erp-modal-open, html.erp-modal-open body { overflow: hidden; }
+
+/* ---------- 6. Cross-Device Viewport, Touch & Tablet/Mobile Polish ---------- */
+html, body, #root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.table-responsive-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 768px) {
+  .ent-header-bar,
+  .ent-filter-bar,
+  .ent-toolbar {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .ent-stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  }
+  .modal-overlay > div:not(.printable-area):not(.print-a4-sheet),
+  .modal-overlay > form,
+  .modal-backdrop > div:not(.printable-area):not(.print-a4-sheet),
+  .modal-backdrop > form {
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 24px) !important;
+  }
+}
 
 /* ---------- 5. Print (invoice / challan / work order) ---------- */
 @media print {
   .erp-table-wrap { overflow: visible; max-height: none; border: 0; }
   .erp-table { width: 100%; }
-  .erp-table thead { display: table-header-group; } /* header repeats on every printed page */
+  .erp-table thead { display: table-header-group; }
   .erp-table tr { break-inside: avoid; }
   .erp-table thead th, .erp-table .erp-col-actions, .erp-table .erp-col-key { position: static; box-shadow: none; }
   .erp-no-print { display: none !important; }

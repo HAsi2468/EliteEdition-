@@ -237,12 +237,225 @@ const deleteChallan = async (req, res) => {
   }
 };
 
+// ── Shared Helper: Render Stitching Challan Page (Original = 100% Color, Duplicate = 50% Lighter Color) ──
+function renderDynamicStitchingChallanPage(doc, challan, isOriginalCopy, logoPath) {
+  const {
+    getCompanyBrandColor,
+    tintColor,
+    getDuplicateLighterColor,
+    isMeaningfulValue
+  } = require('../utils/departmentThemeHelper');
+
+  const PW = 595, PH = 842, ML = 35, MR = 35;
+  const contentWidth = PW - ML - MR;
+
+  const resolvedCompany = isMeaningfulValue(challan.companyEntity)
+    ? String(challan.companyEntity).trim()
+    : (isMeaningfulValue(challan.department) ? String(challan.department).trim() : 'Elite Stitching');
+  const baseBrandColor = getCompanyBrandColor(resolvedCompany);
+
+  // Original Copy = 100% department color; Duplicate Copy = 50% lighter department color
+  const primaryColor = isOriginalCopy ? baseBrandColor : getDuplicateLighterColor(baseBrandColor);
+  const borderLineColor = primaryColor;
+  const mutedColor = isOriginalCopy ? '#475569' : tintColor('#475569', 0.45);
+  const darkText = isOriginalCopy ? '#0f172a' : tintColor('#0f172a', 0.40);
+  const rowAltBg = tintColor(primaryColor, 0.94);
+  const copyBadge = isOriginalCopy ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
+
+  const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  }) : '';
+
+  // Top Header & Outer Box
+  doc.strokeColor(borderLineColor).lineWidth(1.2)
+     .rect(ML, 25, contentWidth, PH - 50).stroke();
+
+  // Copy label & Company Header
+  doc.fillColor(primaryColor).fontSize(7.5).font('Helvetica-Bold')
+     .text(copyBadge, ML, 15, { width: contentWidth, align: 'right' });
+
+  doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold')
+     .text('GARMENT DELIVERY CHALLAN', ML + 10, 32);
+
+  doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold')
+     .text(resolvedCompany.toUpperCase(), ML, 32, { width: contentWidth, align: 'center' });
+
+  if (isMeaningfulValue(challan.companyPhone)) {
+    doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica')
+       .text(`Mo. ${challan.companyPhone}`, ML, 32, { width: contentWidth - 10, align: 'right' });
+  }
+
+  doc.strokeColor(tintColor(primaryColor, 0.70)).lineWidth(0.5)
+     .moveTo(ML, 46).lineTo(PW - MR, 46).stroke();
+
+  // Logo image display
+  if (fs.existsSync(logoPath)) {
+    if (!isOriginalCopy) doc.save().fillOpacity(0.55);
+    doc.image(logoPath, ML + (contentWidth - 140) / 2, 52, { width: 140 });
+    if (!isOriginalCopy) doc.restore();
+  } else {
+    doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold')
+       .text(resolvedCompany.toUpperCase(), ML, 60, { width: contentWidth, align: 'center' });
+  }
+
+  const companySubLine = [
+    isMeaningfulValue(challan.companyAddress) ? String(challan.companyAddress).trim() : null,
+    isMeaningfulValue(challan.companyGstin) ? `GSTIN: ${String(challan.companyGstin).trim()}` : null
+  ].filter(Boolean).join(' | ');
+
+  if (companySubLine) {
+    doc.fillColor(mutedColor).fontSize(8).font('Helvetica')
+       .text(companySubLine, ML, 102, { width: contentWidth, align: 'center' });
+  }
+
+  doc.strokeColor(borderLineColor).lineWidth(1)
+     .moveTo(ML, 116).lineTo(PW - MR, 116).stroke();
+
+  // Dynamic Challan Header Metadata Box (only render populated fields)
+  let curY = 122;
+  const row1Left = isMeaningfulValue(challan.challanNo) ? `CHALLAN NO: ${challan.challanNo}` : '';
+  const row1Right = isMeaningfulValue(formattedDate) ? `DATE: ${formattedDate}` : '';
+  if (row1Left || row1Right) {
+    doc.fillColor(darkText).fontSize(9).font('Helvetica-Bold');
+    if (row1Left) doc.text(row1Left, ML + 8, curY);
+    if (row1Right) doc.text(row1Right, ML + 350, curY);
+    curY += 16;
+  }
+
+  const hasParty = isMeaningfulValue(challan.partyName);
+  const hasTransport = isMeaningfulValue(challan.deliveryBy);
+  if (hasParty || hasTransport) {
+    doc.fillColor(darkText).fontSize(9);
+    if (hasParty) {
+      doc.font('Helvetica-Bold').text('PARTY NAME: ', ML + 8, curY);
+      doc.font('Helvetica').text(String(challan.partyName).trim(), ML + 85, curY);
+    }
+    if (hasTransport) {
+      doc.font('Helvetica-Bold').text('TRANSPORT / BY: ', ML + 350, curY);
+      doc.font('Helvetica').text(String(challan.deliveryBy).trim(), ML + 440, curY);
+    }
+    curY += 16;
+  }
+
+  const hasBillTo = isMeaningfulValue(challan.billTo);
+  const hasShipTo = isMeaningfulValue(challan.shipTo);
+  if (hasBillTo || hasShipTo) {
+    doc.fillColor(darkText).fontSize(9);
+    if (hasBillTo) {
+      doc.font('Helvetica-Bold').text('BILL TO: ', ML + 8, curY);
+      doc.font('Helvetica').text(String(challan.billTo).trim(), ML + 60, curY);
+    }
+    if (hasShipTo) {
+      doc.font('Helvetica-Bold').text('SHIP TO: ', ML + 350, curY);
+      doc.font('Helvetica').text(String(challan.shipTo).trim(), ML + 405, curY);
+    }
+    curY += 16;
+  }
+
+  curY += 6;
+  doc.strokeColor(tintColor(primaryColor, 0.65)).lineWidth(0.5)
+     .moveTo(ML, curY).lineTo(PW - MR, curY).stroke();
+
+  // Dynamic Item Table Columns
+  curY += 4;
+  const tableTop = curY;
+  const items = challan.items || [];
+  const hasAnyDesignNo = items.some(it => isMeaningfulValue(it.designNo));
+  const hasAnyRateOrAmt = items.some(it => Number(it.rate) > 0 || Number(it.amount) > 0) || Number(challan.totalAmount) > 0;
+
+  const cols = [
+    { key: 'sr', name: 'SR', x: ML + 5, w: 25 },
+    ...(hasAnyDesignNo ? [{ key: 'designNo', name: 'DESIGN NO', x: ML + 32, w: 105 }] : []),
+    {
+      key: 'particulars',
+      name: 'PARTICULARS / DESCRIPTION',
+      x: hasAnyDesignNo ? ML + 140 : ML + 32,
+      w: (hasAnyDesignNo ? 220 : 328) + (hasAnyRateOrAmt ? 0 : 100)
+    },
+    {
+      key: 'pcs',
+      name: 'PCS (QTY)',
+      x: hasAnyRateOrAmt ? ML + 365 : ML + 455,
+      w: 60,
+      align: 'right'
+    },
+    ...(hasAnyRateOrAmt ? [
+      { key: 'rate', name: 'RATE (₹)', x: ML + 425, w: 45, align: 'right' },
+      { key: 'amount', name: 'AMOUNT (₹)', x: ML + 475, w: 45, align: 'right' }
+    ] : [])
+  ];
+
+  // Draw Table Header Row
+  doc.fillColor(primaryColor).rect(ML, tableTop, contentWidth, 18).fill();
+  cols.forEach(c => {
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold')
+       .text(c.name, c.x, tableTop + 5, { width: c.w, align: c.align || 'left' });
+  });
+
+  curY = tableTop + 20;
+
+  items.forEach((it, index) => {
+    const rowBg = index % 2 === 0 ? rowAltBg : '#ffffff';
+    doc.fillColor(rowBg).rect(ML, curY, contentWidth, 16).fill();
+
+    doc.fillColor(darkText).fontSize(8).font('Helvetica');
+    cols.forEach(col => {
+      if (col.key === 'sr') {
+        doc.font('Helvetica').text(String(index + 1), col.x, curY + 4, { width: col.w });
+      } else if (col.key === 'designNo') {
+        doc.font('Helvetica-Bold').text(isMeaningfulValue(it.designNo) ? String(it.designNo) : '', col.x, curY + 4, { width: col.w });
+      } else if (col.key === 'particulars') {
+        doc.font('Helvetica').text(isMeaningfulValue(it.particulars) ? String(it.particulars) : '', col.x, curY + 4, { width: col.w });
+      } else if (col.key === 'pcs') {
+        doc.font('Helvetica').text(Number(it.pcs) > 0 ? String(it.pcs) : '', col.x, curY + 4, { width: col.w, align: 'right' });
+      } else if (col.key === 'rate') {
+        doc.font('Helvetica').text(Number(it.rate) > 0 ? `₹${Number(it.rate).toFixed(2)}` : '', col.x, curY + 4, { width: col.w, align: 'right' });
+      } else if (col.key === 'amount') {
+        doc.font('Helvetica-Bold').text(Number(it.amount) > 0 ? `₹${Number(it.amount).toFixed(2)}` : '', col.x, curY + 4, { width: col.w, align: 'right' });
+      }
+    });
+
+    curY += 16;
+  });
+
+  // Table Summary Line
+  doc.strokeColor(borderLineColor).lineWidth(1)
+     .moveTo(ML, curY + 2).lineTo(PW - MR, curY + 2).stroke();
+
+  curY += 6;
+  if (Number(challan.totalPcs) > 0) {
+    doc.fillColor(darkText).fontSize(9.5).font('Helvetica-Bold')
+       .text(`TOTAL PIECES: ${challan.totalPcs} Pcs`, ML + 10, curY);
+  }
+
+  if (Number(challan.totalAmount) > 0) {
+    doc.fillColor(primaryColor).fontSize(9.5).font('Helvetica-Bold')
+       .text(`TOTAL AMOUNT: ₹${Number(challan.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, ML + 300, curY, { width: contentWidth - 310, align: 'right' });
+  }
+
+  if (isMeaningfulValue(challan.notes)) {
+    curY += 18;
+    doc.fillColor(mutedColor).fontSize(8).font('Helvetica-Oblique')
+       .text(`Notes / Instructions: ${String(challan.notes).trim()}`, ML + 10, curY, { width: contentWidth - 20 });
+  }
+
+  // Signature Footer Blocks
+  const footerY = PH - 90;
+  doc.strokeColor(tintColor(primaryColor, 0.65)).lineWidth(0.5)
+     .moveTo(ML, footerY).lineTo(PW - MR, footerY).stroke();
+
+  doc.fillColor(mutedColor).fontSize(8).font('Helvetica-Bold');
+  doc.text("PREPARED BY", ML + 20, footerY + 50);
+  doc.text("RECEIVER'S SIGNATURE", ML + 210, footerY + 50);
+  doc.fillColor(primaryColor).font('Helvetica-Bold').text(`FOR ${resolvedCompany.toUpperCase()}`, ML + 360, footerY + 12);
+  doc.fillColor(mutedColor).font('Helvetica').text("(Authorized Signatory)", ML + 360, footerY + 50);
+}
+
 // ── GET /stitching-challan/:id/pdf ───────────────────────────────────────────
-// Page 1: Original in Company Brand Color; Page 2: Duplicate in Black & White
+// Page 1: Original in 100% Department Brand Color; Page 2: Duplicate in 50% Lighter Brand Color
 const downloadChallanPdf = async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
-    const { getCompanyBrandColor } = require('../services/tallyInvoicePdfService');
 
     const challan = await db.StitchingChallan.findById(req.params.id).lean();
     if (!challan) {
@@ -254,159 +467,14 @@ const downloadChallanPdf = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Stitching_Challan_${challan.challanNo || 'PCH'}.pdf"`);
     doc.pipe(res);
 
-    const PW = 595, PH = 842, ML = 35, MR = 35;
-    const contentWidth = PW - ML - MR;
     const logoPath = path.join(__dirname, 'Logo.png');
 
-    const resolvedCompany = challan.companyEntity || 'Elite Stitching';
-    const companyBrandColor = getCompanyBrandColor(resolvedCompany);
+    // Page 1: Original in 100% Company Brand Color
+    renderDynamicStitchingChallanPage(doc, challan, true, logoPath);
 
-    const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
-      day: '2-digit', month: '2-digit', year: 'numeric'
-    }) : '—';
-
-    const renderChallanPage = (isColor) => {
-      const primaryColor = isColor ? companyBrandColor : '#000000';
-      const borderLineColor = isColor ? companyBrandColor : '#000000';
-      const mutedColor = isColor ? '#475569' : '#555555';
-      const copyBadge = isColor ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
-
-      // Top Header & Outer Box
-      doc.strokeColor(borderLineColor).lineWidth(1.2)
-         .rect(ML, 25, contentWidth, PH - 50).stroke();
-
-      // Copy label & Company Header
-      doc.fillColor(primaryColor).fontSize(7.5).font('Helvetica-Bold')
-         .text(copyBadge, ML, 16, { width: contentWidth, align: 'right' });
-
-      doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold')
-         .text('GARMENT DELIVERY CHALLAN', ML + 10, 32);
-      
-      doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold')
-         .text(resolvedCompany.toUpperCase(), ML, 32, { width: contentWidth, align: 'center' });
-
-      doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica')
-         .text('Mo. +91 99098 66667', ML, 32, { width: contentWidth - 10, align: 'right' });
-
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
-         .moveTo(ML, 46).lineTo(PW - MR, 46).stroke();
-
-      // Logo image display
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, ML + (contentWidth - 140) / 2, 52, { width: 140 });
-      } else {
-        doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold')
-           .text(resolvedCompany.toUpperCase(), ML, 60, { width: contentWidth, align: 'center' });
-      }
-
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica')
-         .text('Plot No-B/37, Siddheshwar Soc., Punagam Main Road, Surat | GSTIN: 24AANFE0044M1ZG', ML, 102, { width: contentWidth, align: 'center' });
-
-      doc.strokeColor(borderLineColor).lineWidth(1)
-         .moveTo(ML, 116).lineTo(PW - MR, 116).stroke();
-
-      // Challan Header Metadata Box
-      let curY = 122;
-      doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
-         .text(`CHALLAN NO: ${challan.challanNo}`, ML + 8, curY);
-      doc.text(`DATE: ${formattedDate}`, ML + 350, curY);
-
-      curY += 16;
-      doc.font('Helvetica-Bold').text('PARTY NAME: ', ML + 8, curY);
-      doc.font('Helvetica').text(challan.partyName || '—', ML + 85, curY);
-
-      if (challan.deliveryBy) {
-        doc.font('Helvetica-Bold').text('TRANSPORT / BY: ', ML + 350, curY);
-        doc.font('Helvetica').text(challan.deliveryBy, ML + 440, curY);
-      }
-
-      curY += 16;
-      if (challan.billTo) {
-        doc.font('Helvetica-Bold').text('BILL TO: ', ML + 8, curY);
-        doc.font('Helvetica').text(challan.billTo, ML + 60, curY);
-      }
-      if (challan.shipTo) {
-        doc.font('Helvetica-Bold').text('SHIP TO: ', ML + 350, curY);
-        doc.font('Helvetica').text(challan.shipTo, ML + 405, curY);
-      }
-
-      curY += 22;
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
-         .moveTo(ML, curY).lineTo(PW - MR, curY).stroke();
-
-      // Item Table
-      curY += 4;
-      const tableTop = curY;
-      const cols = [
-        { name: 'SR', x: ML + 5, w: 25 },
-        { name: 'DESIGN NO', x: ML + 32, w: 105 },
-        { name: 'PARTICULARS / DESCRIPTION', x: ML + 140, w: 220 },
-        { name: 'PCS (QTY)', x: ML + 365, w: 55, align: 'right' },
-        { name: 'RATE (₹)', x: ML + 425, w: 45, align: 'right' },
-        { name: 'AMOUNT (₹)', x: ML + 475, w: 45, align: 'right' },
-      ];
-
-      // Draw Table Header Row
-      doc.fillColor(primaryColor).rect(ML, tableTop, contentWidth, 18).fill();
-      cols.forEach(c => {
-        doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold')
-           .text(c.name, c.x, tableTop + 5, { width: c.w, align: c.align || 'left' });
-      });
-
-      curY = tableTop + 20;
-      const items = challan.items || [];
-
-      items.forEach((it, index) => {
-        const rowBg = index % 2 === 0 ? '#f8fafc' : '#ffffff';
-        doc.fillColor(rowBg).rect(ML, curY, contentWidth, 16).fill();
-
-        doc.fillColor('#0f172a').fontSize(8).font('Helvetica');
-        doc.text(String(index + 1), cols[0].x, curY + 4, { width: cols[0].w });
-        doc.font('Helvetica-Bold').text(it.designNo || '—', cols[1].x, curY + 4, { width: cols[1].w });
-        doc.font('Helvetica').text(it.particulars || 'Garment Stitching', cols[2].x, curY + 4, { width: cols[2].w });
-        doc.text(String(it.pcs || 0), cols[3].x, curY + 4, { width: cols[3].w, align: 'right' });
-        doc.text(it.rate ? `₹${it.rate.toFixed(2)}` : '—', cols[4].x, curY + 4, { width: cols[4].w, align: 'right' });
-        doc.font('Helvetica-Bold').text(it.amount ? `₹${it.amount.toFixed(2)}` : '—', cols[5].x, curY + 4, { width: cols[5].w, align: 'right' });
-
-        curY += 16;
-      });
-
-      // Table Summary Line
-      doc.strokeColor(borderLineColor).lineWidth(1)
-         .moveTo(ML, curY + 2).lineTo(PW - MR, curY + 2).stroke();
-
-      curY += 6;
-      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
-         .text(`TOTAL PIECES: ${challan.totalPcs || 0} Pcs`, ML + 10, curY);
-
-      if (challan.totalAmount > 0) {
-        doc.text(`TOTAL AMOUNT: ₹${(challan.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, ML + 300, curY, { width: contentWidth - 310, align: 'right' });
-      }
-
-      if (challan.notes) {
-        curY += 18;
-        doc.fillColor(mutedColor).fontSize(8).font('Helvetica-Oblique')
-           .text(`Notes / Instructions: ${challan.notes}`, ML + 10, curY, { width: contentWidth - 20 });
-      }
-
-      // Signature Footer Blocks
-      const footerY = PH - 90;
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
-         .moveTo(ML, footerY).lineTo(PW - MR, footerY).stroke();
-
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica-Bold');
-      doc.text("PREPARED BY", ML + 20, footerY + 50);
-      doc.text("RECEIVER'S SIGNATURE", ML + 210, footerY + 50);
-      doc.fillColor(primaryColor).font('Helvetica-Bold').text(`FOR ${resolvedCompany.toUpperCase()}`, ML + 360, footerY + 12);
-      doc.fillColor(mutedColor).font('Helvetica').text("(Authorized Signatory)", ML + 360, footerY + 50);
-    };
-
-    // Page 1: Original in Company Brand Color
-    renderChallanPage(true);
-
-    // Page 2: Duplicate in Black & White
+    // Page 2: Duplicate in 50% Lighter Company Brand Color
     doc.addPage({ margin: 28, size: 'A4' });
-    renderChallanPage(false);
+    renderDynamicStitchingChallanPage(doc, challan, false, logoPath);
 
     doc.end();
   } catch (error) {
@@ -441,135 +509,21 @@ const downloadBulkChallansPdf = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Combined_Stitching_Challans_${challans.length}_Items.pdf"`);
     doc.pipe(res);
 
-    const PW = 595, PH = 842, ML = 35, MR = 35;
-    const contentWidth = PW - ML - MR;
     const logoPath = path.join(__dirname, 'Logo.png');
+    const includeDuplicate = req.query?.duplicate !== 'false';
 
     for (let cIdx = 0; cIdx < challans.length; cIdx++) {
       const challan = challans[cIdx];
       if (cIdx > 0) doc.addPage({ margin: 28, size: 'A4' });
 
-      const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
-        day: '2-digit', month: '2-digit', year: 'numeric'
-      }) : '—';
+      // Page 1: Original Copy (100% Department Brand Color)
+      renderDynamicStitchingChallanPage(doc, challan, true, logoPath);
 
-      doc.strokeColor('#2563eb').lineWidth(1.2)
-         .rect(ML, 25, contentWidth, PH - 50).stroke();
-
-      doc.fillColor('#1e40af').fontSize(9).font('Helvetica-Bold')
-         .text('GARMENT DELIVERY CHALLAN', ML + 10, 32);
-      
-      doc.fillColor('#1e3a8a').fontSize(10).font('Helvetica-Bold')
-         .text('ELITE EDITION', ML, 32, { width: contentWidth, align: 'center' });
-
-      doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-         .text('Mo. +91 99098 66667', ML, 32, { width: contentWidth - 10, align: 'right' });
-
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
-         .moveTo(ML, 46).lineTo(PW - MR, 46).stroke();
-
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, ML + (contentWidth - 140) / 2, 52, { width: 140 });
-      } else {
-        doc.fillColor('#1e3a8a').fontSize(20).font('Helvetica-Bold')
-           .text('ELITE EDITION', ML, 60, { width: contentWidth, align: 'center' });
+      // Page 2: Duplicate Copy (50% Lighter Department Brand Color)
+      if (includeDuplicate) {
+        doc.addPage({ margin: 28, size: 'A4' });
+        renderDynamicStitchingChallanPage(doc, challan, false, logoPath);
       }
-
-      doc.fillColor('#475569').fontSize(8).font('Helvetica')
-         .text('Plot No-B/37, Siddheshwar Soc., Punagam Main Road, Surat | GSTIN: 24AANFE0044M1ZG', ML, 102, { width: contentWidth, align: 'center' });
-
-      doc.strokeColor('#1e40af').lineWidth(1)
-         .moveTo(ML, 116).lineTo(PW - MR, 116).stroke();
-
-      let curY = 122;
-      doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
-         .text(`CHALLAN NO: ${challan.challanNo}`, ML + 8, curY);
-      doc.text(`DATE: ${formattedDate}`, ML + 350, curY);
-
-      curY += 16;
-      doc.font('Helvetica-Bold').text('PARTY NAME: ', ML + 8, curY);
-      doc.font('Helvetica').text(challan.partyName || '—', ML + 85, curY);
-
-      if (challan.deliveryBy) {
-        doc.font('Helvetica-Bold').text('TRANSPORT / BY: ', ML + 350, curY);
-        doc.font('Helvetica').text(challan.deliveryBy, ML + 440, curY);
-      }
-
-      curY += 16;
-      if (challan.billTo) {
-        doc.font('Helvetica-Bold').text('BILL TO: ', ML + 8, curY);
-        doc.font('Helvetica').text(challan.billTo, ML + 60, curY);
-      }
-      if (challan.shipTo) {
-        doc.font('Helvetica-Bold').text('SHIP TO: ', ML + 350, curY);
-        doc.font('Helvetica').text(challan.shipTo, ML + 405, curY);
-      }
-
-      curY += 22;
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
-         .moveTo(ML, curY).lineTo(PW - MR, curY).stroke();
-
-      curY += 4;
-      const tableTop = curY;
-      const cols = [
-        { name: 'SR', x: ML + 5, w: 25 },
-        { name: 'DESIGN NO', x: ML + 32, w: 105 },
-        { name: 'PARTICULARS / DESCRIPTION', x: ML + 140, w: 220 },
-        { name: 'PCS (QTY)', x: ML + 365, w: 55, align: 'right' },
-        { name: 'RATE (₹)', x: ML + 425, w: 45, align: 'right' },
-        { name: 'AMOUNT (₹)', x: ML + 475, w: 45, align: 'right' },
-      ];
-
-      doc.fillColor('#1e40af').rect(ML, tableTop, contentWidth, 18).fill();
-      cols.forEach(c => {
-        doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold')
-           .text(c.name, c.x, tableTop + 5, { width: c.w, align: c.align || 'left' });
-      });
-
-      curY = tableTop + 20;
-      const items = challan.items || [];
-
-      items.forEach((it, index) => {
-        const rowBg = index % 2 === 0 ? '#f8fafc' : '#ffffff';
-        doc.fillColor(rowBg).rect(ML, curY, contentWidth, 16).fill();
-
-        doc.fillColor('#0f172a').fontSize(8).font('Helvetica');
-        doc.text(String(index + 1), cols[0].x, curY + 4, { width: cols[0].w });
-        doc.font('Helvetica-Bold').text(it.designNo || '—', cols[1].x, curY + 4, { width: cols[1].w });
-        doc.font('Helvetica').text(it.particulars || 'Garment Stitching', cols[2].x, curY + 4, { width: cols[2].w });
-        doc.text(String(it.pcs || 0), cols[3].x, curY + 4, { width: cols[3].w, align: 'right' });
-        doc.text(it.rate ? `₹${it.rate.toFixed(2)}` : '—', cols[4].x, curY + 4, { width: cols[4].w, align: 'right' });
-        doc.font('Helvetica-Bold').text(it.amount ? `₹${it.amount.toFixed(2)}` : '—', cols[5].x, curY + 4, { width: cols[5].w, align: 'right' });
-
-        curY += 16;
-      });
-
-      doc.strokeColor('#1e40af').lineWidth(1)
-         .moveTo(ML, curY + 2).lineTo(PW - MR, curY + 2).stroke();
-
-      curY += 6;
-      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
-         .text(`TOTAL PIECES: ${challan.totalPcs || 0} Pcs`, ML + 10, curY);
-
-      if (challan.totalAmount > 0) {
-        doc.text(`TOTAL AMOUNT: ₹${(challan.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, ML + 300, curY, { width: contentWidth - 310, align: 'right' });
-      }
-
-      if (challan.notes) {
-        curY += 18;
-        doc.fillColor('#475569').fontSize(8).font('Helvetica-Oblique')
-           .text(`Notes / Instructions: ${challan.notes}`, ML + 10, curY, { width: contentWidth - 20 });
-      }
-
-      const footerY = PH - 90;
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
-         .moveTo(ML, footerY).lineTo(PW - MR, footerY).stroke();
-
-      doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold');
-      doc.text("PREPARED BY", ML + 20, footerY + 50);
-      doc.text("RECEIVER'S SIGNATURE", ML + 210, footerY + 50);
-      doc.text("FOR ELITE EDITION", ML + 380, footerY + 12);
-      doc.font('Helvetica').text("(Authorized Signatory)", ML + 380, footerY + 50);
     }
 
     doc.end();

@@ -72,13 +72,47 @@ export default defineConfig({
     },
     proxy: {
       '/v1': {
-        target: 'http://127.0.0.1:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:3001',
         changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: '',
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, res) => {
+            console.warn('[Vite Dev Proxy Warning]', err?.message || err);
+            if (res && !res.headersSent && res.writeHead) {
+              try {
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'PROXY_GATEWAY_ERROR', message: err?.message || 'Proxy error' }));
+              } catch (e) {}
+            }
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            const csrfHeader = req.headers['x-csrf-token'] || req.headers['x-xsrf-token'];
+            const rawCookie = proxyReq.getHeader('cookie') || '';
+            const cookieStr = Array.isArray(rawCookie) ? rawCookie.join('; ') : String(rawCookie);
+            if (csrfHeader && !cookieStr.includes('XSRF-TOKEN=')) {
+              const newCookie = cookieStr ? `${cookieStr}; XSRF-TOKEN=${csrfHeader}` : `XSRF-TOKEN=${csrfHeader}`;
+              proxyReq.setHeader('cookie', newCookie);
+            }
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            const sc = proxyRes.headers['set-cookie'];
+            if (sc) {
+              proxyRes.headers['set-cookie'] = sc.map((header) =>
+                header
+                  .replace(/;\s*Secure/gi, '')
+                  .replace(/;\s*SameSite=None/gi, '; SameSite=Lax')
+                  .replace(/Domain=[^;]+/gi, '')
+              );
+            }
+          });
+        },
       },
       '/socket.io': {
-        target: 'http://127.0.0.1:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:3001',
         ws: true,
         changeOrigin: true,
+        secure: false,
       }
     }
   },

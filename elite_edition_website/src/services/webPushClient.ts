@@ -113,18 +113,34 @@ export class WebPushClientManager {
       const registration = await navigator.serviceWorker.ready;
 
       // 3. Fetch public VAPID key from backend
-      const vapidResponse = await fetch('/v1/notifications/vapid-key');
+      const vapidResponse = await fetch('/v1/notifications/vapid-key', { credentials: 'include' });
       if (!vapidResponse.ok) {
         throw new Error(`Failed to retrieve VAPID key: HTTP ${vapidResponse.status}`);
       }
       const { publicKey } = await vapidResponse.json();
 
-      // 4. Convert key to Uint8Array and subscribe with PushManager
+      // 4. Convert key to Uint8Array and subscribe with PushManager (recover cleanly from stale VAPID key)
       const convertedVapidKey = urlBase64ToUint8Array(publicKey);
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true, // Guarantees all pushes display a user-visible notification
-        applicationServerKey: convertedVapidKey as unknown as BufferSource,
-      });
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        try {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedVapidKey as unknown as BufferSource,
+          });
+        } catch (subErr: any) {
+          if (subErr?.name === 'InvalidStateError') {
+            const existing = await registration.pushManager.getSubscription();
+            if (existing) await existing.unsubscribe();
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: convertedVapidKey as unknown as BufferSource,
+            });
+          } else {
+            throw subErr;
+          }
+        }
+      }
 
       // 5. Send subscription payload to backend database
       const userStr = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_user') : null;
@@ -147,10 +163,10 @@ export class WebPushClientManager {
       const subJson = subscription.toJSON();
       const currentEndpoint = subJson.endpoint;
 
-      // Push Subscription Guard: Avoid redundant network requests if already registered
+      // Push Subscription Guard: Avoid redundant network requests within the same browser session
       try {
-        const storedEndpoint = localStorage.getItem('elite_push_endpoint');
-        const storedUserId = localStorage.getItem('elite_push_user_id');
+        const storedEndpoint = sessionStorage.getItem('elite_push_endpoint');
+        const storedUserId = sessionStorage.getItem('elite_push_user_id');
         if (storedEndpoint && currentEndpoint && storedEndpoint === currentEndpoint && String(storedUserId || '') === String(effectiveUserId || '')) {
           this.initSmartFocusListeners(effectiveUserId);
           return { success: true, subscription };
@@ -181,8 +197,8 @@ export class WebPushClientManager {
       }
 
       try {
-        if (currentEndpoint) localStorage.setItem('elite_push_endpoint', currentEndpoint);
-        if (effectiveUserId) localStorage.setItem('elite_push_user_id', String(effectiveUserId));
+        if (currentEndpoint) sessionStorage.setItem('elite_push_endpoint', currentEndpoint);
+        if (effectiveUserId) sessionStorage.setItem('elite_push_user_id', String(effectiveUserId));
       } catch (e) {}
 
       this.initSmartFocusListeners(effectiveUserId);

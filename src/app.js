@@ -104,6 +104,11 @@ app.use(
 					'https://*.tenor.com',
 					'https://media.tenor.com',
 					'https://tenor.com',
+					'https://*.myntassets.com',
+					'https://*.flixcart.com',
+					'https://*.media-amazon.com',
+					'https://*.unicommerce.com',
+					'https://*.cloudfront.net',
 				],
 				connectSrc: [
 					"'self'",

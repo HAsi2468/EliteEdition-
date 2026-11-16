@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { Plus, ChevronDown, FileText, Truck, Receipt, BarChart3, Calculator, X } from 'lucide-react';
 
+const MENU_WIDTH = 270;
+const VIEWPORT_MARGIN = 8;
+
 export default function QuickActionMenu({
+  items,
   onNewInvoice,
   onNewChallan,
   onExpenseEntry,
@@ -13,7 +18,10 @@ export default function QuickActionMenu({
   const [isMobileView, setIsMobileView] = useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   });
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, maxHeight: 400 });
   const menuRef = useRef(null);
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -23,16 +31,48 @@ export default function QuickActionMenu({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target) && !isMobileView) {
-        setIsOpen(false);
-      }
+  // Position the portaled dropdown relative to the trigger (viewport coordinates)
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const left = Math.min(
+      Math.max(VIEWPORT_MARGIN, rect.right - MENU_WIDTH),
+      vw - MENU_WIDTH - VIEWPORT_MARGIN
+    );
+    const top = rect.bottom + 6;
+    setMenuPos({ top, left, maxHeight: Math.max(200, vh - top - VIEWPORT_MARGIN) });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen || isMobileView) return undefined;
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, isMobileView, updatePosition]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleClickOutside = (e) => {
+      if (isMobileView) return;
+      const inTrigger = menuRef.current && menuRef.current.contains(e.target);
+      const inDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+      if (!inTrigger && !inDropdown) setIsOpen(false);
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, isMobileView]);
 
   const handleAction = (callback) => {
@@ -40,58 +80,65 @@ export default function QuickActionMenu({
     if (callback) callback();
   };
 
-  const menuItems = [
-    {
+  const defaultItems = [
+    ...(onNewInvoice ? [{
       id: 'invoice',
       icon: FileText,
       label: 'New Invoice',
       subtitle: 'Create GST or standard sales tax invoice',
-      iconColor: '#2563eb',
-      iconBg: '#eff6ff',
+      iconColor: '#38bdf8',
+      iconBg: 'rgba(56, 189, 248, 0.16)',
       action: onNewInvoice
-    },
+    }] : []),
     ...(onNewChallan ? [{
       id: 'challan',
       icon: Truck,
       label: 'New Challan',
       subtitle: 'Generate dispatch or job work delivery challan',
-      iconColor: '#0284c7',
-      iconBg: '#f0f9ff',
+      iconColor: '#34d399',
+      iconBg: 'rgba(52, 211, 153, 0.16)',
       action: onNewChallan
     }] : []),
-    {
+    ...(onExpenseEntry ? [{
       id: 'expense',
       icon: Receipt,
       label: 'Expense Entry',
       subtitle: 'Log factory operational expense or payout',
-      iconColor: '#d97706',
-      iconBg: '#fffbeb',
+      iconColor: '#fbbf24',
+      iconBg: 'rgba(251, 191, 36, 0.16)',
       action: onExpenseEntry
-    },
-    {
+    }] : []),
+    ...(onLedgerReports ? [{
       id: 'ledger',
       icon: BarChart3,
       label: 'Ledger Reports',
       subtitle: 'View party statement of accounts & costing',
-      iconColor: '#059669',
-      iconBg: '#ecfdf5',
+      iconColor: '#c084fc',
+      iconBg: 'rgba(192, 132, 252, 0.16)',
       action: onLedgerReports
-    },
+    }] : []),
     ...(onGstReports ? [{
       id: 'gst',
       icon: Calculator,
       label: 'GST Summary',
       subtitle: 'Sales GST, Purchase GST Credit & TDS',
-      iconColor: '#7c3aed',
-      iconBg: '#f5f3ff',
+      iconColor: '#f87171',
+      iconBg: 'rgba(248, 113, 113, 0.16)',
       action: onGstReports
     }] : [])
   ];
+
+  const menuItems = (items && items.length > 0 ? items : defaultItems).filter(Boolean);
+
+  if (menuItems.length === 0) {
+    return null;
+  }
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }} ref={menuRef}>
       {/* Primary Consolidated Action Trigger */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
         style={{
@@ -106,7 +153,7 @@ export default function QuickActionMenu({
           display: 'inline-flex',
           alignItems: 'center',
           gap: '6px',
-          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
           transition: 'all 0.15s ease',
           minHeight: '38px',
           whiteSpace: 'nowrap'
@@ -114,24 +161,31 @@ export default function QuickActionMenu({
         aria-haspopup="true"
         aria-expanded={isOpen}
       >
-        <Plus size={16} strokeWidth={2.5} />
+        <span style={{ fontSize: '0.95rem' }}>⚡</span>
         <span>{buttonText}</span>
         <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </button>
 
-      {/* Desktop Popover Dropdown (>= 1024px) */}
-      {isOpen && !isMobileView && (
+      {/* Desktop Popover Dropdown (>= 1024px) — portaled to <body> so no parent stacking context can cover it */}
+      {isOpen && !isMobileView && typeof document !== 'undefined' && ReactDOM.createPortal(
         <div
+          ref={dropdownRef}
+          className="quick-action-dropdown"
+          role="menu"
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
-            width: '270px',
-            background: '#ffffff',
+            position: 'fixed',
+            top: `${menuPos.top}px`,
+            left: `${menuPos.left}px`,
+            width: `${MENU_WIDTH}px`,
+            maxHeight: `${menuPos.maxHeight}px`,
+            overflowY: 'auto',
+            background: 'rgba(15, 23, 42, 0.97)',
             borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-            zIndex: 1000,
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            boxShadow: '0 16px 40px -6px rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            zIndex: 100000,
             padding: '6px',
             display: 'flex',
             flexDirection: 'column',
@@ -159,7 +213,7 @@ export default function QuickActionMenu({
                   width: '100%',
                   transition: 'background 0.12s ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <div
@@ -178,17 +232,18 @@ export default function QuickActionMenu({
                   <Icon size={16} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#ffffff' }}>
                     {item.label}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.subtitle}
                   </div>
                 </div>
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Mobile / Tablet Bottom-Sheet Modal (< 1024px) */}
@@ -200,8 +255,8 @@ export default function QuickActionMenu({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.45)',
-            backdropFilter: 'blur(2px)',
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
             zIndex: 99999,
             display: 'flex',
             alignItems: 'flex-end',
@@ -211,29 +266,29 @@ export default function QuickActionMenu({
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'rgba(15, 23, 42, 0.98)',
               width: '100%',
               maxWidth: '500px',
               borderRadius: '16px 16px 0 0',
-              borderTop: '1px solid #e2e8f0',
+              borderTop: '1px solid rgba(255, 255, 255, 0.16)',
               padding: '16px 18px calc(18px + env(safe-area-inset-bottom, 0px))',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              boxShadow: '0 -10px 25px rgba(0,0,0,0.1)',
+              boxShadow: '0 -10px 25px rgba(0,0,0,0.5)',
               animation: 'slideUpSheet 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onClick={e => e.stopPropagation()}
           >
             {/* Sheet Handle & Header */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '38px', height: '4px', borderRadius: '2px', background: '#cbd5e1' }} />
+              <div style={{ width: '38px', height: '4px', borderRadius: '2px', background: 'rgba(255, 255, 255, 0.25)' }} />
               <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>Quick Actions</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff' }}>Quick Actions</span>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+                  style={{ background: 'transparent', border: 'none', color: 'rgba(255, 255, 255, 0.7)', cursor: 'pointer', padding: '4px' }}
                 >
                   <X size={18} />
                 </button>
@@ -250,8 +305,8 @@ export default function QuickActionMenu({
                     type="button"
                     onClick={() => handleAction(item.action)}
                     style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.14)',
                       borderRadius: '10px',
                       padding: '12px 14px',
                       minHeight: '48px',
@@ -280,10 +335,10 @@ export default function QuickActionMenu({
                       <Icon size={18} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' }}>
                         {item.label}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '1px' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.68)', marginTop: '1px' }}>
                         {item.subtitle}
                       </div>
                     </div>
@@ -300,9 +355,9 @@ export default function QuickActionMenu({
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                background: '#f1f5f9',
-                color: '#475569',
-                border: '1px solid #cbd5e1',
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
                 fontSize: '0.88rem',
                 fontWeight: 600,
                 cursor: 'pointer',

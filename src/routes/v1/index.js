@@ -92,6 +92,7 @@ router.use('/gst', require('./gst.route'));
 router.use('/document-templates', require('./documentTemplate.route'));
 router.use('/chat', require('./chat.route'));
 router.use('/ledger-reconciliation', require('./ledgerReconciliation.route'));
+router.use('/admin-control', require('./adminControl.route'));
 
 module.exports = router;
 

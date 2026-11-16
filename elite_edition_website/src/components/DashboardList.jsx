@@ -69,89 +69,98 @@ export function DashboardList({
   const getStockBadge = (stock) => {
     if (stock === 0) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-700 border border-rose-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, background: 'rgba(239, 68, 68, 0.16)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.35)' }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444' }} />
           0 Left (Out of Stock)
         </span>
       );
     }
     if (stock <= 5) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, background: 'rgba(245, 158, 11, 0.16)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }} />
           {stock} Left (Critical)
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, background: 'rgba(56, 189, 248, 0.16)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
         {stock} Left
       </span>
     );
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto my-3 px-2 sm:px-4">
+    <div style={{ width: '100%', margin: '0.75rem 0' }}>
       {/* Container Card */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+      <div className="glass-card" style={{ borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.14)', background: 'rgba(15, 23, 42, 0.75)', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.28)' }}>
         
         {/* Header Strip with Integrated Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50/70 border-b border-slate-200/80">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shadow-sm border border-amber-200">
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '1rem 1.25rem', background: 'rgba(15, 23, 42, 0.65)', borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', height: '36px', width: '36px', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.18)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
               <AlertTriangle size={18} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
                   {title}
                 </h3>
-                <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-extrabold text-rose-700 border border-rose-200">
+                <span style={{ borderRadius: '6px', background: 'rgba(239, 68, 68, 0.18)', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 800, color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.35)' }}>
                   {filteredItems.length} Warnings
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)' }}>
                 Real-time stock alerts and replenishment warnings
               </p>
             </div>
           </div>
 
           {/* Action Tools & Filters */}
-          <div className="flex items-center flex-wrap gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             {/* Search Input */}
-            <div className="relative min-w-[180px]">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div style={{ position: 'relative', minWidth: '190px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.5)' }} />
               <input
                 type="text"
                 placeholder="Filter item or SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 font-medium"
+                style={{ width: '100%', padding: '6px 10px 6px 28px', fontSize: '0.76rem', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(255, 255, 255, 0.18)', borderRadius: '8px', color: '#ffffff', fontWeight: 500, boxSizing: 'border-box' }}
               />
             </div>
 
             {/* Threshold Input */}
             {onThresholdChange && (
-              <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-600">
-                <span className="font-semibold">Threshold:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(255, 255, 255, 0.18)', borderRadius: '8px', padding: '4px 10px', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                <span style={{ fontWeight: 600 }}>Threshold:</span>
                 <input
                   type="number"
                   min="1"
                   value={threshold}
                   onChange={(e) => onThresholdChange(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-10 text-center font-bold text-slate-900 bg-transparent border-none p-0 focus:outline-none"
+                  style={{ width: '42px', textAlign: 'center', fontWeight: 800, color: '#ffffff', background: 'transparent', border: 'none', padding: 0 }}
                 />
               </div>
             )}
 
             {/* View Mode Switcher */}
-            <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+            <div style={{ display: 'flex', alignItems: 'center', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.16)', background: 'rgba(15, 23, 42, 0.75)', padding: '2px', gap: '2px' }}>
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  viewMode === 'table' ? 'bg-slate-100 text-blue-600' : 'text-slate-400 hover:text-slate-700'
-                }`}
+                style={{
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  background: viewMode === 'table' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                  color: viewMode === 'table' ? '#38bdf8' : 'rgba(255, 255, 255, 0.65)',
+                  border: viewMode === 'table' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
                 title="Dense Table View"
               >
                 <LayoutList size={14} />
@@ -159,9 +168,18 @@ export function DashboardList({
               <button
                 type="button"
                 onClick={() => setViewMode('cards')}
-                className={`p-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  viewMode === 'cards' ? 'bg-slate-100 text-blue-600' : 'text-slate-400 hover:text-slate-700'
-                }`}
+                style={{
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  background: viewMode === 'cards' ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                  color: viewMode === 'cards' ? '#38bdf8' : 'rgba(255, 255, 255, 0.65)',
+                  border: viewMode === 'cards' ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
                 title="Compact Card View"
               >
                 <LayoutGrid size={14} />
@@ -171,40 +189,55 @@ export function DashboardList({
         </div>
 
         {/* Filter Chips Bar */}
-        <div className="flex items-center gap-1.5 px-4 py-2 bg-white border-b border-slate-100 overflow-x-auto text-xs">
-          <span className="text-slate-400 font-bold mr-1 flex items-center gap-1">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', background: 'rgba(15, 23, 42, 0.45)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', overflowX: 'auto', fontSize: '0.75rem' }}>
+          <span style={{ color: 'rgba(255, 255, 255, 0.68)', fontWeight: 700, marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Filter size={12} /> View:
           </span>
           <button
             type="button"
             onClick={() => setFilterMode('all')}
-            className={`px-2.5 py-1 rounded-full font-bold transition-all ${
-              filterMode === 'all'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '999px',
+              fontWeight: 700,
+              fontSize: '0.74rem',
+              cursor: 'pointer',
+              background: filterMode === 'all' ? 'rgba(56, 189, 248, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+              color: filterMode === 'all' ? '#ffffff' : 'rgba(255, 255, 255, 0.72)',
+              border: filterMode === 'all' ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.14)'
+            }}
           >
             All Items ({safeItems.length})
           </button>
           <button
             type="button"
             onClick={() => setFilterMode('zero')}
-            className={`px-2.5 py-1 rounded-full font-bold transition-all ${
-              filterMode === 'zero'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-            }`}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '999px',
+              fontWeight: 700,
+              fontSize: '0.74rem',
+              cursor: 'pointer',
+              background: filterMode === 'zero' ? 'rgba(239, 68, 68, 0.28)' : 'rgba(239, 68, 68, 0.12)',
+              color: filterMode === 'zero' ? '#ffffff' : '#f87171',
+              border: filterMode === 'zero' ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(239, 68, 68, 0.3)'
+            }}
           >
             Out of Stock ({zeroCount})
           </button>
           <button
             type="button"
             onClick={() => setFilterMode('critical')}
-            className={`px-2.5 py-1 rounded-full font-bold transition-all ${
-              filterMode === 'critical'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-            }`}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '999px',
+              fontWeight: 700,
+              fontSize: '0.74rem',
+              cursor: 'pointer',
+              background: filterMode === 'critical' ? 'rgba(245, 158, 11, 0.28)' : 'rgba(245, 158, 11, 0.12)',
+              color: filterMode === 'critical' ? '#ffffff' : '#fbbf24',
+              border: filterMode === 'critical' ? '1px solid rgba(245, 158, 11, 0.6)' : '1px solid rgba(245, 158, 11, 0.3)'
+            }}
           >
             Critical ≤5 ({criticalCount})
           </button>
@@ -212,23 +245,23 @@ export function DashboardList({
 
         {/* Content View: Dense Table (Recommended for Wide Screens) */}
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto max-h-[500px]">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-700 font-extrabold uppercase tracking-wider">
+          <div style={{ overflowX: 'auto', maxHeight: '500px' }}>
+            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              <thead>
                 <tr>
-                  <th className="py-2.5 px-4 w-12 text-center text-slate-400">#</th>
-                  <th className="py-2.5 px-4 min-w-[200px]">Item & SKU</th>
-                  <th className="py-2.5 px-4 min-w-[140px]">Party / Vendor</th>
-                  <th className="py-2.5 px-4 w-24">Size</th>
-                  <th className="py-2.5 px-4 min-w-[180px]">Stock Status (Grouped)</th>
-                  <th className="py-2.5 px-4 w-24 text-center">Action</th>
+                  <th style={{ padding: '10px 16px', width: '48px', textAlign: 'center' }}>#</th>
+                  <th style={{ padding: '10px 16px', minWidth: '200px' }}>Item & SKU</th>
+                  <th style={{ padding: '10px 16px', minWidth: '140px' }}>Party / Vendor</th>
+                  <th style={{ padding: '10px 16px', width: '96px' }}>Size</th>
+                  <th style={{ padding: '10px 16px', minWidth: '180px' }}>Stock Status (Grouped)</th>
+                  <th style={{ padding: '10px 16px', width: '96px', textAlign: 'center' }}>Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-slate-400 font-medium">
-                      <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-500 opacity-80" />
+                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500 }}>
+                      <CheckCircle2 size={32} style={{ margin: '0 auto 8px', color: '#34d399', opacity: 0.85 }} />
                       <div>All stock levels within healthy thresholds.</div>
                     </td>
                   </tr>
@@ -238,47 +271,46 @@ export function DashboardList({
                     return (
                       <tr 
                         key={item._id || idx}
-                        className="even:bg-slate-50/50 odd:bg-white hover:bg-blue-50/50 transition-colors group cursor-pointer"
+                        style={{ cursor: 'pointer', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
                         onClick={() => onItemClick && onItemClick(item)}
                       >
                         {/* Number */}
-                        <td className="py-2.5 px-4 text-center font-bold text-slate-400">
+                        <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)' }}>
                           {idx + 1}
                         </td>
 
                         {/* Item & SKU (Grouped together closely) */}
-                        <td className="py-2.5 px-4">
-                          <div className="font-extrabold text-slate-900 group-hover:text-blue-700 transition-colors">
+                        <td style={{ padding: '10px 16px' }}>
+                          <div style={{ fontWeight: 800, color: '#ffffff' }}>
                             {item.itemName}
                           </div>
                           {item.itemSKUCode && (
-                            <div className="text-[11px] font-mono text-slate-500">
+                            <div style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: 'rgba(255, 255, 255, 0.65)' }}>
                               SKU: {item.itemSKUCode}
                             </div>
                           )}
                         </td>
 
                         {/* Party / Vendor */}
-                        <td className="py-2.5 px-4 text-slate-700 font-medium">
+                        <td style={{ padding: '10px 16px', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>
                           {item.party || '—'}
                         </td>
 
                         {/* Size */}
-                        <td className="py-2.5 px-4">
-                          <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[11px]">
+                        <td style={{ padding: '10px 16px' }}>
+                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', fontWeight: 700, fontSize: '0.7rem', border: '1px solid rgba(255, 255, 255, 0.16)' }}>
                             {item.size || 'STD'}
                           </span>
                         </td>
 
-                        {/* Stock Remaining & Badge - Kept in fixed column to stop horizontal eye jump */}
-                        <td className="py-2.5 px-4">
-                          <div className="flex items-center gap-2">
+                        {/* Stock Remaining & Badge */}
+                        <td style={{ padding: '10px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {getStockBadge(stock)}
                             {stock > 0 && (
-                              <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden hidden sm:block">
+                              <div style={{ width: '64px', height: '6px', background: 'rgba(255, 255, 255, 0.14)', borderRadius: '999px', overflow: 'hidden' }}>
                                 <div 
-                                  className={`h-full rounded-full ${stock <= 5 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                                  style={{ width: `${Math.min(100, (stock / (threshold || 10)) * 100)}%` }}
+                                  style={{ height: '100%', borderRadius: '999px', background: stock <= 5 ? '#f59e0b' : '#38bdf8', width: `${Math.min(100, (stock / (threshold || 10)) * 100)}%` }}
                                 />
                               </div>
                             )}
@@ -286,7 +318,7 @@ export function DashboardList({
                         </td>
 
                         {/* Action Column */}
-                        <td className="py-2.5 px-4 text-center">
+                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -294,7 +326,19 @@ export function DashboardList({
                               if (onQuickInward) onQuickInward(item);
                               else if (onItemClick) onItemClick(item);
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-bold transition-all text-xs"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              background: 'rgba(56, 189, 248, 0.16)',
+                              color: '#38bdf8',
+                              border: '1px solid rgba(56, 189, 248, 0.35)',
+                              fontWeight: 700,
+                              fontSize: '0.74rem',
+                              cursor: 'pointer'
+                            }}
                             title="Quick Inward / Edit Item"
                           >
                             <span>Action</span>
@@ -309,11 +353,11 @@ export function DashboardList({
             </table>
           </div>
         ) : (
-          /* Ergonomic Compact Cards Mode: Constrained Width to Avoid Edge-to-Edge Scanning */
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[520px] overflow-y-auto">
+          /* Ergonomic Compact Cards Mode */
+          <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.85rem', maxHeight: '520px', overflowY: 'auto' }}>
             {filteredItems.length === 0 ? (
-              <div className="col-span-full py-10 text-center text-slate-400 font-medium">
-                <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-500 opacity-80" />
+              <div style={{ gridColumn: '1 / -1', padding: '2.5rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500 }}>
+                <CheckCircle2 size={32} style={{ margin: '0 auto 8px', color: '#34d399', opacity: 0.85 }} />
                 <div>No items currently low in stock.</div>
               </div>
             ) : (
@@ -323,29 +367,28 @@ export function DashboardList({
                   <div
                     key={item._id || idx}
                     onClick={() => onItemClick && onItemClick(item)}
-                    className="p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+                    style={{ padding: '0.9rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.14)', background: 'rgba(15, 23, 42, 0.65)', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
                   >
                     <div>
-                      {/* Title & Badge grouped close together at top */}
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <div className="font-extrabold text-slate-900 text-xs sm:text-sm leading-snug">
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
+                        <div style={{ fontWeight: 800, color: '#ffffff', fontSize: '0.85rem' }}>
                           {item.itemName}
                         </div>
                         {getStockBadge(stock)}
                       </div>
 
-                      <div className="text-[11px] text-slate-500 font-mono mb-2">
+                      <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.65)', fontFamily: 'monospace', marginBottom: '8px' }}>
                         SKU: {item.itemSKUCode || 'N/A'}
                       </div>
 
-                      <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                        <span>Party: <strong>{item.party || 'Standard'}</strong></span>
-                        <span>Size: <strong>{item.size || 'STD'}</strong></span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)', background: 'rgba(255, 255, 255, 0.06)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <span>Party: <strong style={{ color: '#ffffff' }}>{item.party || 'Standard'}</strong></span>
+                        <span>Size: <strong style={{ color: '#ffffff' }}>{item.size || 'STD'}</strong></span>
                       </div>
                     </div>
 
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-end">
-                      <span className="text-xs font-bold text-blue-600 inline-flex items-center gap-1 hover:underline">
+                    <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         Manage Item <ArrowRight size={12} />
                       </span>
                     </div>
@@ -357,9 +400,9 @@ export function DashboardList({
         )}
 
         {/* Footer Summary Strip */}
-        <div className="px-4 py-2.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+        <div style={{ padding: '0.65rem 1.25rem', background: 'rgba(15, 23, 42, 0.65)', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)' }}>
           <span>Showing {filteredItems.length} of {safeItems.length} total tracked items</span>
-          <span className="text-slate-400">Ergonomic ERP Layout • WCAG AAA Readable</span>
+          <span style={{ color: 'rgba(255, 255, 255, 0.55)' }}>Ergonomic ERP Layout • WCAG AAA Readable</span>
         </div>
 
       </div>

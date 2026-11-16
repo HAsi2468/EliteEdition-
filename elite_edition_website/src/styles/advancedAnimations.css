@@ -1,0 +1,656 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELITE EDITION ERP — APPLE LIQUID GLASS & 60FPS CROSS-DEVICE MOTION SYSTEM
+   GPU-composited Apple Expo-Out & Spring Physics, Liquid Glass vibrancy,
+   segmented pill transitions, scroll-linked reveals, tactile touch feedback,
+   and responsive mobile/tablet/desktop + reduced-motion safeguards.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --anim-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --anim-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --anim-ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --apple-glass-blur: blur(20px) saturate(180%);
+  --apple-glass-blur-sm: blur(12px) saturate(160%);
+  --apple-specular-top: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --apple-glass-shadow: 0 18px 44px -12px rgba(2, 6, 23, 0.55), var(--apple-specular-top);
+}
+
+/* ── 1. GLOBAL INTERACTION ERGONOMICS (All Devices: Touch + Mouse) ─────── */
+button,
+[role="button"],
+a,
+.company-segment-pill,
+.phoenix-filter-tab,
+.ent-tab-btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── 2. APPLE KEYFRAMES (GPU-Composited transform / opacity) ───────────── */
+@keyframes erpViewReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpViewRevealMobile {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpCardCascade {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.972);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpRowSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpBackdropFade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes erpModalPop {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.935);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpDrawerSlideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpPopoverDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpMsgSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpReactionPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes erpIslandMorph {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.88);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes erpStatusPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(56, 189, 248, 0);
+  }
+}
+
+@keyframes erpGlassShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ── 3. APPLE LIQUID GLASS SURFACES (Safari-safe: no nested backdrop-filter) */
+.glass-panel,
+.ent-stat-card,
+.stat-card,
+.metric-card,
+.glass-calc-card,
+.fusing-metric-card,
+.glass-card-item,
+.task-kanban-col {
+  box-shadow: var(--apple-glass-shadow);
+}
+
+/* Specular shimmer for loading skeletons */
+.erp-skeleton,
+.skeleton-box,
+[class*="skeleton"] {
+  background-image: linear-gradient(
+    110deg,
+    rgba(30, 41, 59, 0.55) 25%,
+    rgba(148, 163, 184, 0.16) 45%,
+    rgba(30, 41, 59, 0.55) 65%
+  );
+  background-size: 200% 100%;
+  animation: erpGlassShimmer 1.6s linear infinite;
+}
+
+/* ── 4. SCREEN, WORKSPACE & TAB VIEW REVEALS ────────────────────────────── */
+.ent-screen-container,
+.workspace-container > div:not(.modal-overlay):not(.modal-backdrop),
+.erp-main-viewport > div:not(.modal-overlay):not(.modal-backdrop),
+[role="tabpanel"] {
+  animation: erpViewReveal 0.36s var(--anim-ease-out-expo) backwards;
+}
+
+/* ── 5. SEGMENTED PILLS & NAVIGATION TABS (iOS / macOS Glide) ──────────── */
+.company-segment-pill,
+.phoenix-filter-tab,
+.ent-tab-btn,
+[role="tab"] {
+  transition: transform 0.18s var(--anim-ease-spring),
+              background-color 0.24s var(--anim-ease-out-expo),
+              color 0.2s ease,
+              box-shadow 0.24s var(--anim-ease-out-expo),
+              border-color 0.2s ease !important;
+}
+
+/* ── 6. STAGGERED BENTO GRID STAT CARDS & KANBAN COLUMNS ────────────────── */
+.ent-stat-card,
+.stat-card,
+.metric-card,
+.glass-calc-card,
+.fusing-metric-card,
+.glass-card-item,
+.task-kanban-col {
+  animation: erpCardCascade 0.44s var(--anim-ease-smooth) backwards;
+  transition: transform 0.28s var(--anim-ease-out-expo),
+              box-shadow 0.28s var(--anim-ease-out-expo),
+              border-color 0.22s ease,
+              background-color 0.22s ease;
+}
+
+.ent-stat-card:nth-child(1), .stat-card:nth-child(1), .metric-card:nth-child(1), .task-kanban-col:nth-child(1) { animation-delay: 20ms; }
+.ent-stat-card:nth-child(2), .stat-card:nth-child(2), .metric-card:nth-child(2), .task-kanban-col:nth-child(2) { animation-delay: 55ms; }
+.ent-stat-card:nth-child(3), .stat-card:nth-child(3), .metric-card:nth-child(3), .task-kanban-col:nth-child(3) { animation-delay: 90ms; }
+.ent-stat-card:nth-child(4), .stat-card:nth-child(4), .metric-card:nth-child(4), .task-kanban-col:nth-child(4) { animation-delay: 125ms; }
+.ent-stat-card:nth-child(5), .stat-card:nth-child(5), .metric-card:nth-child(5), .task-kanban-col:nth-child(5) { animation-delay: 160ms; }
+.ent-stat-card:nth-child(6), .stat-card:nth-child(6), .metric-card:nth-child(6), .task-kanban-col:nth-child(6) { animation-delay: 195ms; }
+
+/* Kanban & Task Cards */
+.task-card,
+.job-card-item,
+.complaint-modern-card {
+  animation: erpCardCascade 0.36s var(--anim-ease-smooth) backwards;
+  transition: transform 0.24s var(--anim-ease-out-expo),
+              box-shadow 0.24s var(--anim-ease-out-expo),
+              border-color 0.2s ease;
+}
+
+/* Progressive scroll-driven reveal on modern browsers */
+@supports (animation-timeline: view()) {
+  .erp-scroll-reveal {
+    animation: erpCardCascade linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 26%;
+  }
+}
+
+/* ── 7. DATA TABLE ROW STAGGER & GLASSY HOVER ───────────────────────────── */
+table:not(.printable-area table):not(.a4-invoice-sheet table) tbody tr {
+  transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s var(--anim-ease-out-expo);
+  animation: erpRowSlideIn 0.28s var(--anim-ease-out-expo) backwards;
+}
+
+table:not(.printable-area table) tbody tr:nth-child(1) { animation-delay: 15ms; }
+table:not(.printable-area table) tbody tr:nth-child(2) { animation-delay: 30ms; }
+table:not(.printable-area table) tbody tr:nth-child(3) { animation-delay: 45ms; }
+table:not(.printable-area table) tbody tr:nth-child(4) { animation-delay: 60ms; }
+table:not(.printable-area table) tbody tr:nth-child(5) { animation-delay: 75ms; }
+table:not(.printable-area table) tbody tr:nth-child(6) { animation-delay: 90ms; }
+table:not(.printable-area table) tbody tr:nth-child(7) { animation-delay: 105ms; }
+table:not(.printable-area table) tbody tr:nth-child(8) { animation-delay: 120ms; }
+table:not(.printable-area table) tbody tr:nth-child(9) { animation-delay: 135ms; }
+table:not(.printable-area table) tbody tr:nth-child(10) { animation-delay: 150ms; }
+table:not(.printable-area table) tbody tr:nth-child(n+11) { animation-delay: 165ms; }
+
+/* ── 8. FLOATING APPLE FOCUS GLOW ON INPUTS & SELECTS ───────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not(.phoenix-search-input),
+select,
+textarea:not(.phoenix-chat-textarea) {
+  transition: border-color 0.18s ease, box-shadow 0.22s var(--anim-ease-out-expo), background-color 0.18s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not(.phoenix-search-input):focus,
+select:focus,
+textarea:not(.phoenix-chat-textarea):focus {
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22), 0 4px 16px rgba(15, 23, 42, 0.28);
+}
+
+/* ── 9. MODALS, BACKDROPS, DRAWERS, POPOVERS & DYNAMIC ISLAND PILLS ─────── */
+.modal-overlay,
+.modal-backdrop {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: erpBackdropFade 0.22s ease-out backwards;
+}
+
+.modal-overlay > div:not(.printable-area):not(.print-a4-sheet),
+.modal-overlay > form,
+.modal-backdrop > div:not(.printable-area):not(.print-a4-sheet),
+.modal-backdrop > form,
+.modal-content,
+[role="dialog"]:not(.erp-drawer),
+.shortcut-modal-dialog,
+.erp-cheat-sheet-modal,
+.cgi-modal-dialog,
+.ql-modal-card,
+.rpcb-modal {
+  animation: erpModalPop 0.34s var(--anim-ease-spring) backwards;
+}
+
+.erp-drawer,
+.hud-drawer-panel,
+.changelog-drawer {
+  animation: erpDrawerSlideRight 0.3s var(--anim-ease-out-expo) backwards;
+}
+
+.ufp-popover,
+.entity-switcher-dropdown,
+.fap-popover,
+.tfb-dropdown,
+.sag-dropdown-menu,
+.smart-thumb-popover,
+.quick-action-dropdown {
+  transform-origin: top center;
+  animation: erpPopoverDrop 0.22s var(--anim-ease-spring) backwards;
+}
+
+.erp-island-toast {
+  animation: erpIslandMorph 0.36s var(--anim-ease-spring) backwards;
+}
+
+/* Sticky top header scroll vibrancy reaction */
+header,
+.ent-header,
+.top-nav {
+  transition: backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+body.erp-page-scrolled header,
+body.erp-page-scrolled .ent-header,
+body.erp-page-scrolled .top-nav {
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  backdrop-filter: var(--apple-glass-blur);
+  box-shadow: 0 10px 30px -10px rgba(2, 6, 23, 0.55);
+}
+
+/* Smooth checkbox / radio / details-accordion spring */
+input[type="checkbox"],
+input[type="radio"] {
+  transition: transform 0.16s var(--anim-ease-spring), box-shadow 0.18s ease;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  animation: erpReactionPop 0.24s var(--anim-ease-spring);
+}
+
+details[open] > *:not(summary) {
+  animation: erpMsgSlide 0.24s var(--anim-ease-out-expo);
+}
+
+/* ── 15. VIEW TRANSITIONS, SCROLL RIBBON, SPOTLIGHT GLOW & TYPING WAVE ──── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: var(--anim-ease-out-expo);
+}
+
+.erp-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  z-index: 99999;
+  pointer-events: none;
+  transform-origin: left center;
+  transform: scaleX(var(--erp-scroll-progress, 0));
+  background: linear-gradient(90deg, var(--entity-accent, #38bdf8), #818cf8, #38bdf8);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.55);
+  transition: transform 60ms linear;
+}
+
+/* VisionOS / macOS Cursor Spotlight on Glass & KPI Cards (Desktop only) */
+@media (hover: hover) and (pointer: fine) {
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .glass-calc-card,
+  .fusing-metric-card,
+  .glass-card-item {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ent-stat-card::before,
+  .stat-card::before,
+  .metric-card::before,
+  .glass-calc-card::before,
+  .fusing-metric-card::before,
+  .glass-card-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    background: radial-gradient(
+      260px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(255, 255, 255, 0.11),
+      transparent 65%
+    );
+  }
+
+  .ent-stat-card:hover::before,
+  .stat-card:hover::before,
+  .metric-card:hover::before,
+  .glass-calc-card:hover::before,
+  .fusing-metric-card:hover::before,
+  .glass-card-item:hover::before {
+    opacity: 1;
+  }
+}
+
+/* Animated SVG Checkmark Draw */
+@keyframes erpCheckDraw {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.erp-check-draw path,
+.erp-check-draw polyline {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: erpCheckDraw 0.36s var(--anim-ease-out-expo) forwards;
+}
+
+/* iMessage Fluid 3-Dot Typing Wave */
+@keyframes erpTypingWave {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.erp-typing-wave span,
+.typing-dots span {
+  display: inline-block;
+  animation: erpTypingWave 1.2s ease-in-out infinite;
+}
+
+.erp-typing-wave span:nth-child(2),
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.erp-typing-wave span:nth-child(3),
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Spotlight Search & Mobile Bottom Dock */
+.erp-spotlight-modal,
+[class*="spotlight"] {
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  backdrop-filter: var(--apple-glass-blur);
+  animation: erpModalPop 0.28s var(--anim-ease-spring) backwards;
+}
+
+.mobile-bottom-nav button,
+.bottom-nav button {
+  transition: transform 0.2s var(--anim-ease-spring), color 0.18s ease;
+}
+
+.mobile-bottom-nav button:active,
+.bottom-nav button:active {
+  transform: scale(0.9);
+}
+
+/* Full-Screen Morphing Brand Curtain (Company Switch) */
+@keyframes erpCurtainIn {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0 round 0 0 28px 28px);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0);
+  }
+}
+
+@keyframes erpCurtainOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes erpCurtainCardIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.erp-brand-curtain.is-entering {
+  animation: erpCurtainIn 0.34s var(--anim-ease-out-expo) forwards;
+}
+
+.erp-brand-curtain.is-leaving {
+  animation: erpCurtainOut 0.28s var(--anim-ease-out-expo) forwards;
+}
+
+.erp-brand-curtain-card {
+  animation: erpCurtainCardIn 0.36s var(--anim-ease-spring) backwards;
+}
+
+/* ── 10. TACTILE PRESS MICRO-INTERACTIONS (All Devices) ─────────────────── */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+.btn:not(:disabled),
+.ent-btn:not(:disabled) {
+  transition: transform 0.18s var(--anim-ease-out-expo),
+              box-shadow 0.2s var(--anim-ease-out-expo),
+              background-color 0.18s ease,
+              border-color 0.18s ease,
+              filter 0.18s ease,
+              color 0.18s ease;
+}
+
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+.btn:not(:disabled):active,
+.ent-btn:not(:disabled):active {
+  transform: scale(0.962);
+  transition-duration: 65ms;
+}
+
+/* ── 11. POINTER-ONLY HOVER LIFT (Prevents sticky hover on iOS/Android) ─── */
+@media (hover: hover) and (pointer: fine) {
+  .ent-stat-card:hover,
+  .stat-card:hover,
+  .metric-card:hover,
+  .glass-calc-card:hover,
+  .fusing-metric-card:hover,
+  .glass-card-item:hover {
+    transform: translateY(-4px) scale(1.006);
+    border-color: rgba(56, 189, 248, 0.38);
+    box-shadow: 0 22px 48px -12px rgba(2, 6, 23, 0.65), var(--apple-specular-top);
+  }
+
+  .task-card:hover,
+  .job-card-item:hover,
+  .complaint-modern-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .btn-primary:not(:disabled):hover,
+  .ent-btn-primary:not(:disabled):hover,
+  .glass-btn-primary:not(:disabled):hover,
+  .fusing-btn-primary:not(:disabled):hover,
+  .task-btn-primary:not(:disabled):hover {
+    transform: translateY(-1.5px);
+    filter: brightness(1.08);
+  }
+
+  aside button:not(:disabled):hover,
+  nav button:not(:disabled):hover,
+  .erp-sidebar-item:not(:disabled):hover {
+    transform: translateX(2px);
+  }
+
+  table:not(.printable-area table):not(.a4-invoice-sheet table) tbody tr:hover {
+    background-color: rgba(56, 189, 248, 0.08);
+  }
+}
+
+/* ── 12. CHAT MODULE APPLE ANIMATIONS ───────────────────────────────────── */
+.wa-msg-row,
+.chat-message-row,
+.phoenix-msg-row {
+  animation: erpMsgSlide 0.24s var(--anim-ease-out-expo) backwards;
+}
+
+.wa-reaction-pill,
+.chat-reaction-chip {
+  animation: erpReactionPop 0.32s var(--anim-ease-spring) backwards;
+}
+
+/* Live indicator pulse */
+.live-status-dot,
+.erp-live-pulse {
+  animation: erpStatusPulse 2.2s ease-in-out infinite;
+}
+
+/* ── 13. MOBILE & TABLET GPU OPTIMIZATION (< 768px) ─────────────────────── */
+@media (max-width: 768px) {
+  .ent-screen-container,
+  .workspace-container > div:not(.modal-overlay):not(.modal-backdrop),
+  .erp-main-viewport > div:not(.modal-overlay):not(.modal-backdrop),
+  [role="tabpanel"] {
+    animation: erpViewRevealMobile 0.24s var(--anim-ease-out-expo) backwards;
+  }
+
+  .glass-panel,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .glass-calc-card,
+  .fusing-metric-card,
+  .glass-card-item,
+  .task-kanban-col {
+    -webkit-backdrop-filter: var(--apple-glass-blur-sm);
+    backdrop-filter: var(--apple-glass-blur-sm);
+  }
+
+  /* Cap table row stagger on mobile for snappy scrolling */
+  table:not(.printable-area table) tbody tr:nth-child(n+6) {
+    animation-delay: 80ms;
+  }
+}
+
+/* ── 14. PRINT & REDUCED MOTION SAFEGUARDS ───────────────────────────────── */
+@media print {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

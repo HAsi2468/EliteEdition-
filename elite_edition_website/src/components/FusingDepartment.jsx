@@ -16,6 +16,9 @@ import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
 import { SmartThumbnail } from './common/SmartThumbnail';
+import QuickActionMenu from './common/QuickActionMenu';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import { Table, LayoutGrid } from 'lucide-react';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -137,6 +140,7 @@ export default function FusingDepartment() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('table');
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -1677,136 +1681,235 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── SCREEN HEADER (Clean & Minimal) ── */}
-      <header className="fusing-header-section">
-        <div className="fusing-title-row">
-          <div className="fusing-title-group">
-            <div className="fusing-title-icon" aria-hidden="true">
-              <Flame size={20} />
-            </div>
-            <div>
-              <h1 className="fusing-main-title">Jobcards Fusing Log</h1>
-            </div>
+      {/* ── TIER 1: UNIFIED GLASS SCREEN HEADER (Rule 5 & Rule 3 Blueprint) ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon">
+            <Flame size={16} color="#fff" />
           </div>
+          <span className="glass-screen-title">Fusing Department</span>
+          <EntityBrandBadge entityId="digital_print" />
+        </div>
 
-          <div className="fusing-header-actions">
+        {/* Quick Action Menu */}
+        <div className="ent-header-actions">
+          <QuickActionMenu
+            buttonText="+ Quick Action"
+            items={[
+              {
+                id: 'new_entry',
+                icon: PlusCircle,
+                label: 'New Fusing Entry',
+                subtitle: 'Record batch or single job heat press log',
+                iconColor: '#38bdf8',
+                iconBg: 'rgba(56, 189, 248, 0.16)',
+                action: () => {
+                  setActiveFusingTab('entry');
+                  setIsFormExpanded(true);
+                }
+              },
+              {
+                id: 'inward_butter',
+                icon: Layers,
+                label: 'Inward Butter Paper',
+                subtitle: 'Log raw roll weight and shipment details',
+                iconColor: '#34d399',
+                iconBg: 'rgba(52, 211, 153, 0.16)',
+                action: () => setShowButterPaperInwardModal(true)
+              },
+              {
+                id: 'report',
+                icon: Zap,
+                label: 'Fusing Analytics Report',
+                subtitle: 'Shift yield and plant utilization stats',
+                iconColor: '#fbbf24',
+                iconBg: 'rgba(251, 191, 36, 0.16)',
+                action: () => setShowReportModal(true)
+              },
+              {
+                id: 'export',
+                icon: Download,
+                label: 'Export CSV',
+                subtitle: 'Download complete dataset to spreadsheet',
+                iconColor: '#c084fc',
+                iconBg: 'rgba(192, 132, 252, 0.16)',
+                action: handleExportCSV
+              },
+              {
+                id: 'refresh',
+                icon: RefreshCw,
+                label: 'Refresh Records',
+                subtitle: 'Synchronize production database in real time',
+                iconColor: '#38bdf8',
+                iconBg: 'rgba(56, 189, 248, 0.16)',
+                action: fetchData
+              }
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* ── TIER 2: SUB-SCREEN NAVIGATION BUTTONS ── */}
+      <div className="glass-subtabs-bar" role="tablist" style={{ marginBottom: '0.85rem' }}>
+        {[
+          { id: 'queue', label: 'Ready Queue', count: eligibleFusingCards.length, icon: Clock },
+          { id: 'runs', label: 'Fusing Runs History', count: fusingLogs.length, icon: Zap },
+          { id: 'entry', label: 'New Fusing Entry', icon: Flame }
+        ].map(t => {
+          const isActive = activeFusingTab === t.id;
+          return (
             <button
+              key={t.id}
               type="button"
-              className="fusing-btn-secondary"
-              onClick={fetchData}
-              disabled={loading}
-              aria-label="Refresh fusing records"
-              title="Refresh fusing logs data"
+              role="tab"
+              aria-selected={isActive}
+              className={`glass-subtab-btn ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveFusingTab(t.id)}
             >
-              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-              <span>Refresh</span>
+              <t.icon size={13} style={{ marginRight: 5 }} />
+              <span>{t.label}</span>
+              {t.count !== undefined && (
+                <span style={{ marginLeft: 5, opacity: 0.85, fontSize: '0.72rem' }}>
+                  ({t.count})
+                </span>
+              )}
             </button>
-            <button
-              type="button"
-              className="fusing-btn-accent"
-              onClick={() => setShowButterPaperInwardModal(true)}
-              aria-label="Inward Butter Paper rolls"
-            >
-              <PlusCircle size={14} />
-              <span>Inward Butter Paper</span>
-            </button>
-            <button
-              type="button"
-              className="fusing-btn-secondary"
-              onClick={() => setShowReportModal(true)}
-              aria-label="Generate comprehensive fusing report"
-            >
-              <Zap size={14} />
-              <span>Report</span>
-            </button>
-            <button
-              type="button"
-              className="fusing-btn-primary"
-              onClick={handleExportCSV}
-              aria-label="Download CSV report"
-            >
-              <Download size={14} />
-              <span>Export CSV</span>
-            </button>
+          );
+        })}
+      </div>
+
+      {/* ── TIER 3: SIDE SCROLLING CALCULATION / KPI CARDS TRACK ── */}
+      <div className="glass-scroll-track" style={{ marginBottom: '1rem', display: 'flex', gap: '0.85rem', overflowX: 'auto', paddingBottom: '6px' }}>
+        <div className="ent-stat-card" style={{
+          minWidth: '220px', flex: '0 0 auto',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderLeft: '4px solid #38bdf8',
+          borderRadius: 10, padding: '0.9rem 1rem',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(12px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Fused Fresh</span>
+            <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', fontSize: '0.75rem' }}>🔥</span>
+          </div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', marginTop: 4 }}>
+            {stats.totalFreshMtr.toLocaleString('en-IN')} <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#38bdf8' }}>Mtr</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: 4, fontWeight: 700 }}>
+            {stats.todayFreshMtr > 0 ? `${stats.todayFreshMtr} Mtr fused today` : 'Factory heat-press yield'}
           </div>
         </div>
-      </header>
 
-      {/* ── NAVIGATION SUBTABS ── */}
-      <div className="fusing-subnav-bar" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFusingTab === 'entry'}
-          className={`fusing-subnav-btn ${activeFusingTab === 'entry' ? 'active' : ''}`}
-          onClick={() => setActiveFusingTab('entry')}
-          aria-label="Production Logs tab"
-        >
-          <Flame size={15} />
-          <span>Production Logs</span>
-        </button>
+        <div className="ent-stat-card" style={{
+          minWidth: '220px', flex: '0 0 auto',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderLeft: '4px solid #34d399',
+          borderRadius: 10, padding: '0.9rem 1rem',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(12px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Completed Jobs</span>
+            <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(52, 211, 153, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399', fontSize: '0.75rem' }}>✓</span>
+          </div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>
+            {stats.doneCount} <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#34d399' }}>cards</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 4, fontWeight: 700 }}>
+            Fusing batch completed
+          </div>
+        </div>
 
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFusingTab === 'runs'}
-          className={`fusing-subnav-btn ${activeFusingTab === 'runs' ? 'active' : ''}`}
-          onClick={() => setActiveFusingTab('runs')}
-          aria-label="Fusing Runs Log History"
-        >
-          <Zap size={15} />
-          <span>Fusing Runs History</span>
-          <span className="fusing-count-badge">
-            {fusingLogs.length}
-          </span>
-        </button>
+        <div className="ent-stat-card" style={{
+          minWidth: '220px', flex: '0 0 auto',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderLeft: '4px solid #fbbf24',
+          borderRadius: 10, padding: '0.9rem 1rem',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(12px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Ready for Fusing</span>
+            <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(251, 191, 36, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24', fontSize: '0.75rem' }}>⏳</span>
+          </div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+            {stats.readyForFusingCount} <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#fbbf24' }}>cards</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: 4, fontWeight: 700 }}>
+            Printed &amp; awaiting press
+          </div>
+        </div>
 
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFusingTab === 'queue'}
-          className={`fusing-subnav-btn ${activeFusingTab === 'queue' ? 'active' : ''}`}
-          onClick={() => setActiveFusingTab('queue')}
-          aria-label="Ready for Fusing Queue tab"
-        >
-          <Clock size={15} />
-          <span>Ready Queue</span>
-          <span className="fusing-count-badge">
-            {eligibleFusingCards.length}
-          </span>
-        </button>
+        <div className="ent-stat-card" style={{
+          minWidth: '220px', flex: '0 0 auto',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderLeft: '4px solid #2dd4bf',
+          borderRadius: 10, padding: '0.9rem 1rem',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(12px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Paper Yield Ratio</span>
+            <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(45, 212, 191, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2dd4bf', fontSize: '0.75rem' }}>⚡</span>
+          </div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#2dd4bf', marginTop: 4 }}>
+            {stats.yieldRatio || '14.2'} <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#2dd4bf' }}>m/kg</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#2dd4bf', marginTop: 4, fontWeight: 700 }}>
+            Optimal sublimation efficiency
+          </div>
+        </div>
+
+        <div className="ent-stat-card" style={{
+          minWidth: '220px', flex: '0 0 auto',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderLeft: '4px solid #f87171',
+          borderRadius: 10, padding: '0.9rem 1rem',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(12px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.72)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>Plant Wastage Loss</span>
+            <span style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(248, 113, 113, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171', fontSize: '0.75rem' }}>🚨</span>
+          </div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>
+            {stats.totalWastageMtr.toLocaleString('en-IN')} <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f87171' }}>Mtr</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: stats.totalWastageMtr > 0 ? '#f87171' : '#34d399', marginTop: 4, fontWeight: 700 }}>
+            {stats.totalWastageMtr > 0 ? `${((stats.totalWastageMtr / (stats.totalFreshMtr + stats.totalWastageMtr || 1)) * 100).toFixed(1)}% plant loss` : '✓ Zero wastage recorded'}
+          </div>
+        </div>
       </div>
 
       {/* ── TAB 1: PRODUCTION ENTRY & LOGS ── */}
       {activeFusingTab === 'entry' && (
       <>
-      {/* ── TOP SECTION: NEW FUSING ENTRY FORM CARD (Matches User Reference Image) ── */}
+      {/* ── TOP SECTION: NEW FUSING ENTRY FORM CARD (Dark Frosted Glass) ── */}
       <div className="glass-panel fusing-entry-card">
         {/* Form Card Header */}
-        <div className="fusing-entry-header-row" style={{ marginBottom: isFormExpanded ? '1.25rem' : '0.5rem' }}>
+        <div className="fusing-entry-header-row" style={{ marginBottom: isFormExpanded ? '1rem' : '0.4rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <div style={{
               width: 30, height: 30, borderRadius: '50%',
-              background: topForm.logId ? '#fef3c7' : '#e0f2fe',
+              background: topForm.logId ? 'rgba(245, 158, 11, 0.18)' : 'rgba(56, 189, 248, 0.18)',
+              border: `1px solid ${topForm.logId ? 'rgba(245, 158, 11, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: topForm.logId ? '#d97706' : '#0284c7'
+              color: topForm.logId ? '#fbbf24' : '#38bdf8'
             }}>
               {topForm.logId ? <Edit2 size={16} /> : <PlusCircle size={18} />}
             </div>
-            <div>
-              <h3 style={{
-                fontSize: '1.05rem', fontWeight: 900,
-                color: topForm.logId ? '#b45309' : '#0284c7',
-                margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em'
-              }}>
-                {topForm.logId ? `EDIT FUSING RUN #${String(topForm.logId).slice(-6)}` : 'NEW FUSING ENTRY'}
-              </h3>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                {topForm.logId
-                  ? 'Modifying an existing fusing run record (Edit Action)'
-                  : 'Logging a fresh production run (New Entry - Not an Edit)'}
-              </div>
-            </div>
+            <h3 style={{
+              fontSize: '1rem', fontWeight: 900,
+              color: topForm.logId ? '#fbbf24' : '#38bdf8',
+              margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em'
+            }}>
+              {topForm.logId ? `EDIT FUSING RUN #${String(topForm.logId).slice(-6)}` : 'NEW FUSING ENTRY'}
+            </h3>
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1818,9 +1921,9 @@ export default function FusingDepartment() {
                   triggerPushNotification('Switched to New Entry', 'Now in New Entry mode.', 'info');
                 }}
                 style={{
-                  background: '#fef3c7',
-                  border: '1px solid #fde68a',
-                  color: '#92400e',
+                  background: 'rgba(245, 158, 11, 0.16)',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  color: '#fbbf24',
                   borderRadius: '6px',
                   padding: '5px 12px',
                   fontSize: '0.78rem',
@@ -1835,13 +1938,13 @@ export default function FusingDepartment() {
               type="button"
               onClick={() => setIsFormExpanded(prev => !prev)}
               style={{
-                background: '#f1f5f9',
-                border: '1px solid #cbd5e1',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.18)',
                 borderRadius: '6px',
                 padding: '5px 12px',
                 fontSize: '0.78rem',
                 fontWeight: 800,
-                color: '#0369a1',
+                color: '#38bdf8',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -1866,19 +1969,19 @@ export default function FusingDepartment() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: '#f8fafc',
+            background: 'rgba(11, 17, 32, 0.65)',
             padding: '0.75rem 1rem',
             borderRadius: '8px',
-            border: '1px dashed #94a3b8'
+            border: '1px dashed rgba(255, 255, 255, 0.22)'
           }}>
-            <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700 }}>
-              {topForm.jobCardId ? `Active Selection: ${formatJobCardNo(topForm.jobNo)} (${topForm.printedMtr || 0} mtr)` : 'Fusing Entry Form is minimized. Click expand to enter production log.'}
+            <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 700 }}>
+              {topForm.jobCardId ? `Active Selection: ${formatJobCardNo(topForm.jobNo)} (${topForm.printedMtr || 0} mtr)` : 'Fusing Entry Form is minimized.'}
             </span>
             <button
               type="button"
               onClick={() => setIsFormExpanded(true)}
               style={{
-                background: '#0284c7',
+                background: '#2563eb',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '6px',
@@ -1897,7 +2000,7 @@ export default function FusingDepartment() {
           {/* Row 1: DATE, SHIFT, ON TIME, OFF TIME */}
           <div className="fusing-entry-row-time">
             <div className="fusing-field-col">
-              <label className="fusing-field-label" style={{ color: '#475569' }}>
+              <label className="fusing-field-label" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>
                 DATE *
               </label>
               <input
@@ -1910,7 +2013,7 @@ export default function FusingDepartment() {
             </div>
 
             <div className="fusing-field-col">
-              <label className="fusing-field-label" style={{ color: '#475569' }}>
+              <label className="fusing-field-label" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>
                 SHIFT *
               </label>
               <select
@@ -1926,8 +2029,8 @@ export default function FusingDepartment() {
             </div>
 
             <div className="fusing-field-col">
-              <label className="fusing-field-label" style={{ color: '#16a34a' }}>
-                <Clock size={13} color="#16a34a" /> START TIME
+              <label className="fusing-field-label" style={{ color: '#34d399' }}>
+                <Clock size={13} color="#34d399" /> START TIME
               </label>
               <input
                 type="time"
@@ -1938,8 +2041,8 @@ export default function FusingDepartment() {
             </div>
 
             <div className="fusing-field-col">
-              <label className="fusing-field-label" style={{ color: '#dc2626' }}>
-                <Clock size={13} color="#dc2626" /> END TIME
+              <label className="fusing-field-label" style={{ color: '#f87171' }}>
+                <Clock size={13} color="#f87171" /> END TIME
               </label>
               <input
                 type="time"
@@ -1955,10 +2058,10 @@ export default function FusingDepartment() {
               display: 'flex',
               flexDirection: 'column',
               gap: '1rem',
-              background: '#f8fafc',
+              background: 'rgba(11, 17, 32, 0.65)',
               padding: '1.15rem 1.25rem',
               borderRadius: '14px',
-              border: '1.5px solid #cbd5e1',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
               width: '100%',
               boxSizing: 'border-box'
             }}>
@@ -1968,16 +2071,16 @@ export default function FusingDepartment() {
                 {/* 1. JOB TYPE / JOBCARD NO. - Searchable & Filtered to Printing Done & Fusing Pending */}
                 <div ref={jobDropdownRef} className="fusing-field-col" style={{ position: 'relative' }}>
                   <div className="fusing-field-label-between">
-                    <label className="fusing-field-label" style={{ color: '#0284c7', margin: 0 }}>
+                    <label className="fusing-field-label" style={{ color: '#38bdf8', margin: 0 }}>
                       JOB TYPE / JOBCARD NO. *
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowAllCardsFilter(prev => !prev)}
                       style={{
-                        background: showAllCardsFilter ? '#e0f2fe' : '#f0fdf4',
-                        color: showAllCardsFilter ? '#0369a1' : '#15803d',
-                        border: `1px solid ${showAllCardsFilter ? '#7dd3fc' : '#86efac'}`,
+                        background: showAllCardsFilter ? 'rgba(56, 189, 248, 0.16)' : 'rgba(16, 185, 129, 0.16)',
+                        color: showAllCardsFilter ? '#38bdf8' : '#34d399',
+                        border: `1px solid ${showAllCardsFilter ? 'rgba(56, 189, 248, 0.35)' : 'rgba(16, 185, 129, 0.35)'}`,
                         padding: '2px 8px',
                         borderRadius: '6px',
                         fontSize: '0.7rem',
@@ -1990,13 +2093,13 @@ export default function FusingDepartment() {
                       title="Toggle between only Ready for Fusing jobs vs All Job Cards"
                     >
                       <span>{showAllCardsFilter ? '🔍 Showing All Cards' : `⚡ Ready Queue (${eligibleFusingCards.length})`}</span>
-                      <span style={{ textDecoration: 'underline', opacity: 0.8 }}>({showAllCardsFilter ? 'Show Ready' : 'Show All'})</span>
+                      <span style={{ textDecoration: 'underline', opacity: 0.85 }}>({showAllCardsFilter ? 'Show Ready' : 'Show All'})</span>
                     </button>
                   </div>
 
                   {/* Search Input Box with Clear & Dropdown Caret */}
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <Search size={16} color="#0284c7" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
+                    <Search size={16} color="#38bdf8" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
                     <input
                       type="text"
                       required
@@ -2014,8 +2117,8 @@ export default function FusingDepartment() {
                       style={{
                         paddingLeft: '2.2rem',
                         paddingRight: '2.8rem',
-                        border: '2px solid #38bdf8',
-                        color: '#0369a1',
+                        border: '1.5px solid #38bdf8',
+                        color: '#ffffff',
                         fontWeight: 800
                       }}
                     />
@@ -2030,8 +2133,8 @@ export default function FusingDepartment() {
                             setShowJobDropdown(true);
                           }}
                           style={{
-                            background: '#fee2e2',
-                            color: '#dc2626',
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            color: '#f87171',
                             border: 'none',
                             borderRadius: '4px',
                             width: '22px',
@@ -2054,7 +2157,7 @@ export default function FusingDepartment() {
                         style={{
                           background: 'transparent',
                           border: 'none',
-                          color: '#0284c7',
+                          color: '#38bdf8',
                           cursor: 'pointer',
                           padding: '4px',
                           display: 'flex',
@@ -2076,10 +2179,11 @@ export default function FusingDepartment() {
                       right: 0,
                       maxHeight: '280px',
                       overflowY: 'auto',
-                      background: '#ffffff',
-                      border: '2px solid #38bdf8',
+                      background: 'rgba(11, 17, 32, 0.96)',
+                      backdropFilter: 'blur(24px)',
+                      border: '1.5px solid #38bdf8',
                       borderRadius: '10px',
-                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.2)',
+                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5)',
                       zIndex: 1000,
                       marginTop: '4px'
                     }}>
@@ -2087,9 +2191,9 @@ export default function FusingDepartment() {
                         padding: '6px 12px',
                         fontSize: '0.72rem',
                         fontWeight: 800,
-                        color: '#64748b',
-                        background: '#f8fafc',
-                        borderBottom: '1px solid #e2e8f0',
+                        color: 'rgba(255, 255, 255, 0.75)',
+                        background: 'rgba(15, 23, 42, 0.95)',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center'
@@ -2097,13 +2201,13 @@ export default function FusingDepartment() {
                         <span>
                           {showAllCardsFilter ? 'ALL JOBCARDS' : 'PRINTING DONE & FUSING PENDING'} ({searchMatchingCards.length})
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#38bdf8' }}>
                           Click card to select
                         </span>
                       </div>
 
                       {searchMatchingCards.length === 0 ? (
-                        <div style={{ padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                        <div style={{ padding: '1.25rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
                           <p style={{ margin: 0, fontWeight: 700 }}>No matching job cards found.</p>
                           {!showAllCardsFilter && (
                             <button
@@ -2111,9 +2215,9 @@ export default function FusingDepartment() {
                               onClick={() => setShowAllCardsFilter(true)}
                               style={{
                                 marginTop: '0.5rem',
-                                background: '#eff6ff',
-                                color: '#2563eb',
-                                border: '1px solid #bfdbfe',
+                                background: 'rgba(56, 189, 248, 0.16)',
+                                color: '#38bdf8',
+                                border: '1px solid rgba(56, 189, 248, 0.35)',
                                 borderRadius: '6px',
                                 padding: '0.3rem 0.75rem',
                                 fontSize: '0.75rem',
@@ -2138,28 +2242,28 @@ export default function FusingDepartment() {
                               }}
                               style={{
                                 padding: '8px 12px',
-                                borderBottom: '1px solid #f1f5f9',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                background: isSelected ? '#e0f2fe' : '#ffffff',
+                                background: isSelected ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
                                 transition: 'background 0.15s ease'
                               }}
-                              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f0fdf4'; }}
-                              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '#ffffff'; }}
+                              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                             >
                               <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                  <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.9rem' }}>
+                                  <span style={{ fontWeight: 900, color: '#38bdf8', fontSize: '0.9rem' }}>
                                     {formatJobCardNo(c.jobNo)}
                                   </span>
-                                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                                  <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.85rem' }}>
                                     {c.party || 'Party'}
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  Design: <strong style={{ color: '#475569' }}>{c.designName || '—'}</strong> • Fabric: <strong>{c.fabric || '—'} ({cardPanna})</strong>
+                                <div style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.72)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  Design: <strong style={{ color: '#ffffff' }}>{c.designName || '—'}</strong> • Fabric: <strong>{c.fabric || '—'} ({cardPanna})</strong>
                                 </div>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
@@ -2168,9 +2272,9 @@ export default function FusingDepartment() {
                                   borderRadius: '4px',
                                   fontSize: '0.7rem',
                                   fontWeight: 800,
-                                  background: '#dcfce7',
-                                  color: '#15803d',
-                                  border: '1px solid #bbf7d0'
+                                  background: 'rgba(16, 185, 129, 0.18)',
+                                  color: '#34d399',
+                                  border: '1px solid rgba(16, 185, 129, 0.35)'
                                 }}>
                                   🖨️ {getCardPrintedMeters(c) || 0}m Printed
                                 </span>
@@ -2179,8 +2283,8 @@ export default function FusingDepartment() {
                                   borderRadius: '4px',
                                   fontSize: '0.68rem',
                                   fontWeight: 800,
-                                  background: c.fusingStatus === 'Fusing Done' ? '#f1f5f9' : (c.fusingStatus === 'Fusing In Progress' ? '#e0f2fe' : '#fef3c7'),
-                                  color: c.fusingStatus === 'Fusing Done' ? '#64748b' : (c.fusingStatus === 'Fusing In Progress' ? '#0369a1' : '#b45309')
+                                  background: c.fusingStatus === 'Fusing Done' ? 'rgba(255, 255, 255, 0.1)' : (c.fusingStatus === 'Fusing In Progress' ? 'rgba(56, 189, 248, 0.18)' : 'rgba(245, 158, 11, 0.18)'),
+                                  color: c.fusingStatus === 'Fusing Done' ? 'rgba(255, 255, 255, 0.7)' : (c.fusingStatus === 'Fusing In Progress' ? '#38bdf8' : '#fbbf24')
                                 }}>
                                   {c.fusingStatus === 'Fusing Done' ? '✓ Complete' : (c.fusingStatus === 'Fusing In Progress' ? '⏳ Partial' : '⏸️ Pending')}
                                 </span>
@@ -2195,21 +2299,21 @@ export default function FusingDepartment() {
 
                 {/* 2. PRINTED METERS (DISPLAYED REFERENCE) */}
                 <div className="fusing-field-col">
-                  <label className="fusing-field-label" style={{ color: '#0369a1' }}>
+                  <label className="fusing-field-label" style={{ color: '#38bdf8' }}>
                     🖨️ PRINTED METERS
                   </label>
                   <div className="fusing-field-input" style={{
-                    border: '1.5px solid #bae6fd',
-                    background: '#f0f9ff',
-                    color: '#0284c7',
+                    border: '1.5px solid rgba(56, 189, 248, 0.35)',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    color: '#38bdf8',
                     fontWeight: 900,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
                   }}>
-                    <span>{topForm.printedMtr ? `${topForm.printedMtr} mtr` : <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>Select Job Card</span>}</span>
+                    <span>{topForm.printedMtr ? `${topForm.printedMtr} mtr` : <span style={{ color: 'rgba(255, 255, 255, 0.55)', fontSize: '0.82rem', fontWeight: 600 }}>Select Job Card</span>}</span>
                     {topForm.printedMtr && (
-                      <span style={{ fontSize: '0.68rem', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.68rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.18)', padding: '1px 6px', borderRadius: '4px' }}>
                         Base Roll
                       </span>
                     )}
@@ -2219,8 +2323,8 @@ export default function FusingDepartment() {
                 {/* 3. FRESH FUSED OUTPUT (MTR) — Auto-Calculated as (Printed - Total Wastage) & Editable */}
                 <div className="fusing-field-col">
                   <div className="fusing-field-label-between">
-                    <label className="fusing-field-label" style={{ color: '#15803d', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <CheckCircle2 size={13} color="#15803d" /> FRESH FUSED (MTR) *
+                    <label className="fusing-field-label" style={{ color: '#34d399', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={13} color="#34d399" /> FRESH FUSED (MTR) *
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <button
@@ -2231,21 +2335,20 @@ export default function FusingDepartment() {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '3px',
-                          background: '#eff6ff',
-                          border: '1px solid #bfdbfe',
-                          color: '#2563eb',
+                          background: 'rgba(56, 189, 248, 0.16)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                          color: '#38bdf8',
                           borderRadius: '4px',
                           padding: '2px 7px',
                           fontSize: '0.67rem',
                           fontWeight: 700,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 2px rgba(37,99,235,0.1)'
+                          cursor: 'pointer'
                         }}
                       >
                         <Sparkles size={11} /> AI Yield
                       </button>
                       {parseFloat(topForm.printedMtr) > 0 && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34d399', background: 'rgba(16, 185, 129, 0.18)', padding: '1px 6px', borderRadius: '4px' }}>
                           {(((parseFloat(topForm.freshMtr) || 0) / parseFloat(topForm.printedMtr)) * 100).toFixed(0)}% yield
                         </span>
                       )}
@@ -2262,14 +2365,14 @@ export default function FusingDepartment() {
                     onBlur={e => handleFreshMtrBlur(e.target.value)}
                     className="fusing-field-input"
                     style={{
-                      border: '2px solid #4ade80',
-                      background: '#f0fdf4',
-                      color: '#15803d',
+                      border: '1.5px solid #34d399',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      color: '#34d399',
                       fontWeight: 900,
                       fontSize: '0.95rem'
                     }}
                   />
-                  <div style={{ fontSize: '0.64rem', color: '#16a34a', marginTop: '3px', fontWeight: 700 }}>
+                  <div style={{ fontSize: '0.64rem', color: '#34d399', marginTop: '3px', fontWeight: 700 }}>
                     Accepted decimals: .00, .25, .50, .75 only
                   </div>
                 </div>
@@ -2280,33 +2383,28 @@ export default function FusingDepartment() {
                 {/* Wastage Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#ffe4e6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(244, 63, 94, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}>
                       <Trash2 size={16} />
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#9f1239', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>Wastage Breakdown</span>
-                        <span style={{ fontSize: '0.7rem', color: '#be123c', background: '#ffe4e6', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>4 Fault Categories</span>
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        Enter loss per fault category — automatically deducted from Fresh Output
-                      </div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Wastage Breakdown</span>
+                      <span style={{ fontSize: '0.7rem', color: '#f87171', background: 'rgba(244, 63, 94, 0.18)', border: '1px solid rgba(244, 63, 94, 0.35)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>4 Fault Categories</span>
                     </div>
                   </div>
 
                   {/* Badges & Reset Button */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <div style={{
-                      background: parseFloat(totalTopWastageMtr) > 0 ? '#fee2e2' : '#f1f5f9',
-                      border: `1px solid ${parseFloat(totalTopWastageMtr) > 0 ? '#fca5a5' : '#e2e8f0'}`,
+                      background: parseFloat(totalTopWastageMtr) > 0 ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255, 255, 255, 0.08)',
+                      border: `1px solid ${parseFloat(totalTopWastageMtr) > 0 ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.16)'}`,
                       borderRadius: '8px',
                       padding: '4px 10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px'
                     }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Wastage:</span>
-                      <strong style={{ fontSize: '0.9rem', color: parseFloat(totalTopWastageMtr) > 0 ? '#b91c1c' : '#475569' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.75)', textTransform: 'uppercase' }}>Total Wastage:</span>
+                      <strong style={{ fontSize: '0.9rem', color: parseFloat(totalTopWastageMtr) > 0 ? '#f87171' : '#ffffff' }}>
                         {totalTopWastageMtr} mtr
                       </strong>
                     </div>
@@ -2316,9 +2414,9 @@ export default function FusingDepartment() {
                         type="button"
                         onClick={handleResetWastage}
                         style={{
-                          background: '#fff1f2',
-                          border: '1px solid #fda4af',
-                          color: '#e11d48',
+                          background: 'rgba(244, 63, 94, 0.18)',
+                          border: '1px solid rgba(244, 63, 94, 0.4)',
+                          color: '#f87171',
                           borderRadius: '6px',
                           padding: '4px 9px',
                           fontSize: '0.72rem',
@@ -2339,9 +2437,9 @@ export default function FusingDepartment() {
                 {/* 4 Wastage Inputs Grid */}
                 <div className="fusing-wastage-grid">
                   {/* 1. Fabric Fault (Mtr) */}
-                  <div className="fusing-wastage-card" style={{ background: '#fff5f5', border: '1px solid #fed7d7' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c53030' }}>
+                  <div className="fusing-wastage-card" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.32)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#f87171' }}>
                         🧵 1. Fabric Fault
                       </span>
                       <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
@@ -2351,13 +2449,13 @@ export default function FusingDepartment() {
                             type="button"
                             onClick={() => handleFaultChange('fabricFaultMtr', val)}
                             style={{
-                              background: String(topForm.fabricFaultMtr) === val ? '#fed7d7' : '#ffffff',
-                              border: `1px solid ${String(topForm.fabricFaultMtr) === val ? '#e53e3e' : '#feb2b2'}`,
+                              background: String(topForm.fabricFaultMtr) === val ? 'rgba(239, 68, 68, 0.35)' : 'rgba(255, 255, 255, 0.08)',
+                              border: `1px solid ${String(topForm.fabricFaultMtr) === val ? '#f87171' : 'rgba(255, 255, 255, 0.18)'}`,
                               borderRadius: '3px',
                               padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
-                              color: '#9b2c2c',
+                              color: '#ffffff',
                               cursor: 'pointer'
                             }}
                           >
@@ -2365,9 +2463,6 @@ export default function FusingDepartment() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Weaving holes, yarn defects, oil stains
                     </div>
                     <input
                       type="number"
@@ -2377,28 +2472,22 @@ export default function FusingDepartment() {
                       value={topForm.fabricFaultMtr}
                       onChange={e => handleFaultChange('fabricFaultMtr', e.target.value)}
                       onBlur={e => handleFaultBlur('fabricFaultMtr', e.target.value)}
+                      className="fusing-field-input"
                       style={{
-                        width: '100%',
                         height: '38px',
                         padding: '0.45rem 0.65rem',
-                        borderRadius: '6px',
-                        border: '1.5px solid #feb2b2',
+                        border: '1.5px solid rgba(239, 68, 68, 0.45)',
                         fontSize: '0.92rem',
                         fontWeight: 900,
-                        background: '#ffffff',
-                        color: '#9b2c2c',
-                        boxSizing: 'border-box'
+                        color: '#ffffff'
                       }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#c53030', marginTop: '2px', fontWeight: 600 }}>
-                      Decimals: .00, .25, .50, .75
-                    </div>
                   </div>
 
                   {/* 2. Fusing Fault (Mtr) */}
-                  <div className="fusing-wastage-card" style={{ background: '#fffaf0', border: '1px solid #feebc8' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c05621' }}>
+                  <div className="fusing-wastage-card" style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.32)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fbbf24' }}>
                         🔥 2. Fusing Fault
                       </span>
                       <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
@@ -2408,13 +2497,13 @@ export default function FusingDepartment() {
                             type="button"
                             onClick={() => handleFaultChange('fusingFaultMtr', val)}
                             style={{
-                              background: String(topForm.fusingFaultMtr) === val ? '#feebc8' : '#ffffff',
-                              border: `1px solid ${String(topForm.fusingFaultMtr) === val ? '#dd6b20' : '#fbd38d'}`,
+                              background: String(topForm.fusingFaultMtr) === val ? 'rgba(245, 158, 11, 0.35)' : 'rgba(255, 255, 255, 0.08)',
+                              border: `1px solid ${String(topForm.fusingFaultMtr) === val ? '#fbbf24' : 'rgba(255, 255, 255, 0.18)'}`,
                               borderRadius: '3px',
                               padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
-                              color: '#9c4221',
+                              color: '#ffffff',
                               cursor: 'pointer'
                             }}
                           >
@@ -2422,9 +2511,6 @@ export default function FusingDepartment() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Heat crease, paper jam, roll marks
                     </div>
                     <input
                       type="number"
@@ -2434,28 +2520,22 @@ export default function FusingDepartment() {
                       value={topForm.fusingFaultMtr}
                       onChange={e => handleFaultChange('fusingFaultMtr', e.target.value)}
                       onBlur={e => handleFaultBlur('fusingFaultMtr', e.target.value)}
+                      className="fusing-field-input"
                       style={{
-                        width: '100%',
                         height: '38px',
                         padding: '0.45rem 0.65rem',
-                        borderRadius: '6px',
-                        border: '1.5px solid #fbd38d',
+                        border: '1.5px solid rgba(245, 158, 11, 0.45)',
                         fontSize: '0.92rem',
                         fontWeight: 900,
-                        background: '#ffffff',
-                        color: '#9c4221',
-                        boxSizing: 'border-box'
+                        color: '#ffffff'
                       }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#c05621', marginTop: '2px', fontWeight: 600 }}>
-                      Decimals: .00, .25, .50, .75
-                    </div>
                   </div>
 
                   {/* 3. Print Fault (Mtr) */}
-                  <div className="fusing-wastage-card" style={{ background: '#ebf8ff', border: '1px solid #bee3f8' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2b6cb0' }}>
+                  <div className="fusing-wastage-card" style={{ background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.32)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8' }}>
                         🖨️ 3. Print Fault
                       </span>
                       <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
@@ -2465,13 +2545,13 @@ export default function FusingDepartment() {
                             type="button"
                             onClick={() => handleFaultChange('printFaultMtr', val)}
                             style={{
-                              background: String(topForm.printFaultMtr) === val ? '#bee3f8' : '#ffffff',
-                              border: `1px solid ${String(topForm.printFaultMtr) === val ? '#3182ce' : '#90cdf4'}`,
+                              background: String(topForm.printFaultMtr) === val ? 'rgba(56, 189, 248, 0.35)' : 'rgba(255, 255, 255, 0.08)',
+                              border: `1px solid ${String(topForm.printFaultMtr) === val ? '#38bdf8' : 'rgba(255, 255, 255, 0.18)'}`,
                               borderRadius: '3px',
                               padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
-                              color: '#2a4365',
+                              color: '#ffffff',
                               cursor: 'pointer'
                             }}
                           >
@@ -2479,9 +2559,6 @@ export default function FusingDepartment() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Banding, color bleed, head strikes
                     </div>
                     <input
                       type="number"
@@ -2491,28 +2568,22 @@ export default function FusingDepartment() {
                       value={topForm.printFaultMtr}
                       onChange={e => handleFaultChange('printFaultMtr', e.target.value)}
                       onBlur={e => handleFaultBlur('printFaultMtr', e.target.value)}
+                      className="fusing-field-input"
                       style={{
-                        width: '100%',
                         height: '38px',
                         padding: '0.45rem 0.65rem',
-                        borderRadius: '6px',
-                        border: '1.5px solid #90cdf4',
+                        border: '1.5px solid rgba(56, 189, 248, 0.45)',
                         fontSize: '0.92rem',
                         fontWeight: 900,
-                        background: '#ffffff',
-                        color: '#2a4365',
-                        boxSizing: 'border-box'
+                        color: '#ffffff'
                       }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#2b6cb0', marginTop: '2px', fontWeight: 600 }}>
-                      Decimals: .00, .25, .50, .75
-                    </div>
                   </div>
 
                   {/* 4. Genuine Fault / Joint (Mtr) */}
-                  <div className="fusing-wastage-card" style={{ background: '#faf5ff', border: '1px solid #e9d8fd' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6b46c1' }}>
+                  <div className="fusing-wastage-card" style={{ background: 'rgba(168, 85, 247, 0.12)', border: '1px solid rgba(168, 85, 247, 0.32)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c084fc' }}>
                         ✂️ 4. Genuine / Joint
                       </span>
                       <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
@@ -2522,13 +2593,13 @@ export default function FusingDepartment() {
                             type="button"
                             onClick={() => handleFaultChange('genuineFaultMtr', val)}
                             style={{
-                              background: String(topForm.genuineFaultMtr) === val ? '#e9d8fd' : '#ffffff',
-                              border: `1px solid ${String(topForm.genuineFaultMtr) === val ? '#805ad5' : '#d6bcfa'}`,
+                              background: String(topForm.genuineFaultMtr) === val ? 'rgba(168, 85, 247, 0.35)' : 'rgba(255, 255, 255, 0.08)',
+                              border: `1px solid ${String(topForm.genuineFaultMtr) === val ? '#c084fc' : 'rgba(255, 255, 255, 0.18)'}`,
                               borderRadius: '3px',
                               padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
-                              color: '#44337a',
+                              color: '#ffffff',
                               cursor: 'pointer'
                             }}
                           >
@@ -2536,9 +2607,6 @@ export default function FusingDepartment() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Leader fabric, roll joint, cutting trim
                     </div>
                     <input
                       type="number"
@@ -2548,22 +2616,16 @@ export default function FusingDepartment() {
                       value={topForm.genuineFaultMtr}
                       onChange={e => handleFaultChange('genuineFaultMtr', e.target.value)}
                       onBlur={e => handleFaultBlur('genuineFaultMtr', e.target.value)}
+                      className="fusing-field-input"
                       style={{
-                        width: '100%',
                         height: '38px',
                         padding: '0.45rem 0.65rem',
-                        borderRadius: '6px',
-                        border: '1.5px solid #d6bcfa',
+                        border: '1.5px solid rgba(168, 85, 247, 0.45)',
                         fontSize: '0.92rem',
                         fontWeight: 900,
-                        background: '#ffffff',
-                        color: '#44337a',
-                        boxSizing: 'border-box'
+                        color: '#ffffff'
                       }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#6b46c1', marginTop: '2px', fontWeight: 600 }}>
-                      Decimals: .00, .25, .50, .75
-                    </div>
                   </div>
                 </div>
 
@@ -2577,24 +2639,25 @@ export default function FusingDepartment() {
                     gap: '8px',
                     padding: '0.55rem 0.85rem',
                     borderRadius: '8px',
-                    background: '#f8fafc',
-                    border: '1px dashed #cbd5e1',
+                    background: 'rgba(11, 17, 32, 0.65)',
+                    border: '1px dashed rgba(255, 255, 255, 0.22)',
                     fontSize: '0.78rem'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ color: '#64748b', fontWeight: 700 }}>Meter Balance:</span>
-                      <span style={{ color: '#0369a1', fontWeight: 800 }}>🖨️ {topForm.printedMtr || 0}m Printed</span>
-                      <span style={{ color: '#94a3b8' }}>=</span>
-                      <span style={{ color: '#15803d', fontWeight: 900 }}>✨ {topForm.freshMtr || 0}m Fresh Output</span>
-                      <span style={{ color: '#94a3b8' }}>+</span>
-                      <span style={{ color: '#dc2626', fontWeight: 900 }}>🗑️ {totalTopWastageMtr}m Total Wastage</span>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.72)', fontWeight: 700 }}>Meter Balance:</span>
+                      <span style={{ color: '#38bdf8', fontWeight: 800 }}>🖨️ {topForm.printedMtr || 0}m Printed</span>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>=</span>
+                      <span style={{ color: '#34d399', fontWeight: 900 }}>✨ {topForm.freshMtr || 0}m Fresh Output</span>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>+</span>
+                      <span style={{ color: '#f87171', fontWeight: 900 }}>🗑️ {totalTopWastageMtr}m Total Wastage</span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       {parseFloat(totalTopWastageMtr) > 0 ? (
                         <span style={{
-                          color: '#b91c1c',
-                          background: '#fee2e2',
+                          color: '#f87171',
+                          background: 'rgba(239, 68, 68, 0.18)',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontWeight: 800,
@@ -2604,8 +2667,9 @@ export default function FusingDepartment() {
                         </span>
                       ) : (
                         <span style={{
-                          color: '#15803d',
-                          background: '#dcfce7',
+                          color: '#34d399',
+                          background: 'rgba(16, 185, 129, 0.18)',
+                          border: '1px solid rgba(16, 185, 129, 0.35)',
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontWeight: 800,
@@ -2623,8 +2687,8 @@ export default function FusingDepartment() {
               <div className="fusing-params-grid">
                 {/* 5. FUSING TEMPERATURE */}
                 <div className="fusing-field-col">
-                  <label className="fusing-field-label" style={{ color: '#d97706' }}>
-                    <Thermometer size={14} color="#d97706" /> FUSING TEMP (°C) *
+                  <label className="fusing-field-label" style={{ color: '#fbbf24' }}>
+                    <Thermometer size={14} color="#fbbf24" /> FUSING TEMP (°C) *
                   </label>
                   <input
                     type="text"
@@ -2633,21 +2697,21 @@ export default function FusingDepartment() {
                     value={topForm.fusingTemp}
                     onChange={e => setTopForm(f => ({ ...f, fusingTemp: e.target.value }))}
                     className="fusing-field-input"
-                    style={{ border: '2px solid #fde68a', background: '#fffbe6', color: '#92400e', fontWeight: 900 }}
+                    style={{ border: '1.5px solid rgba(245, 158, 11, 0.45)', color: '#fbbf24', fontWeight: 900 }}
                   />
                 </div>
 
                 {/* 6. FUSING SPEED */}
                 <div className="fusing-field-col">
-                  <label className="fusing-field-label" style={{ color: '#2563eb' }}>
-                    <Gauge size={14} color="#2563eb" /> FUSING SPEED (m/min) *
+                  <label className="fusing-field-label" style={{ color: '#38bdf8' }}>
+                    <Gauge size={14} color="#38bdf8" /> FUSING SPEED (m/min) *
                   </label>
                   <select
                     required
                     value={topForm.fusingSpeed || '80'}
                     onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
                     className="fusing-field-input"
-                    style={{ border: '2px solid #bfdbfe', background: '#eff6ff', color: '#1e40af', cursor: 'pointer', fontWeight: 900 }}
+                    style={{ border: '1.5px solid rgba(56, 189, 248, 0.45)', color: '#38bdf8', cursor: 'pointer', fontWeight: 900 }}
                   >
                     {topForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(topForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
                       <option value={topForm.fusingSpeed}>{topForm.fusingSpeed}</option>
@@ -2663,13 +2727,13 @@ export default function FusingDepartment() {
                 {/* 7. PANNA */}
                 <div className="fusing-field-col">
                   <div className="fusing-field-label-between">
-                    <label className="fusing-field-label" style={{ color: '#0284c7', margin: 0 }}>
-                      <Layers size={14} color="#0284c7" /> PANNA *
+                    <label className="fusing-field-label" style={{ color: '#38bdf8', margin: 0 }}>
+                      <Layers size={14} color="#38bdf8" /> PANNA *
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowPannaManagerModal(true)}
-                      style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', fontWeight: 800 }}
+                      style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', fontWeight: 800 }}
                     >
                       <Settings size={12} /> Edit
                     </button>
@@ -2679,7 +2743,7 @@ export default function FusingDepartment() {
                     value={topForm.panna}
                     onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
                     className="fusing-field-input"
-                    style={{ border: '1px solid #cbd5e1', color: '#0369a1', cursor: 'pointer', fontWeight: 800 }}
+                    style={{ cursor: 'pointer', fontWeight: 800 }}
                   >
                     {pannaOptions.map(p => (
                       <option key={p} value={p}>{p}</option>
@@ -2689,8 +2753,8 @@ export default function FusingDepartment() {
 
                 {/* 8. BUTTER PAPER USED? */}
                 <div className="fusing-field-col">
-                  <label className="fusing-field-label" style={{ color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b' }}>
-                    <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b'} /> BUTTER PAPER USED? *
+                  <label className="fusing-field-label" style={{ color: topForm.useButterPaper === 'Yes' ? '#c084fc' : 'rgba(255, 255, 255, 0.7)' }}>
+                    <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#c084fc' : '#94a3b8'} /> BUTTER PAPER USED? *
                   </label>
                   <select
                     value={topForm.useButterPaper}
@@ -2704,9 +2768,8 @@ export default function FusingDepartment() {
                     }}
                     className="fusing-field-input"
                     style={{
-                      border: `2px solid ${topForm.useButterPaper === 'Yes' ? '#8b5cf6' : '#cbd5e1'}`,
-                      background: topForm.useButterPaper === 'Yes' ? '#f5f3ff' : '#ffffff',
-                      color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#475569',
+                      border: `1.5px solid ${topForm.useButterPaper === 'Yes' ? 'rgba(168, 85, 247, 0.5)' : 'rgba(255, 255, 255, 0.18)'}`,
+                      color: topForm.useButterPaper === 'Yes' ? '#c084fc' : '#ffffff',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
@@ -2719,8 +2782,8 @@ export default function FusingDepartment() {
                 {/* 9. BUTTER PAPER WEIGHT (KG) - Shown when Yes */}
                 {topForm.useButterPaper === 'Yes' ? (
                   <div className="fusing-field-col">
-                    <label className="fusing-field-label" style={{ color: '#6d28d9' }}>
-                      <Scale size={14} color="#6d28d9" /> BUTTER PAPER (KG)
+                    <label className="fusing-field-label" style={{ color: '#c084fc' }}>
+                      <Scale size={14} color="#c084fc" /> BUTTER PAPER (KG)
                     </label>
                     <input
                       type="number"
@@ -2731,9 +2794,8 @@ export default function FusingDepartment() {
                       onChange={e => setTopForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
                       className="fusing-field-input"
                       style={{
-                        border: '2px solid #c4b5fd',
-                        background: '#f5f3ff',
-                        color: '#6d28d9',
+                        border: '1.5px solid rgba(168, 85, 247, 0.5)',
+                        color: '#c084fc',
                         fontWeight: 800
                       }}
                     />
@@ -2743,14 +2805,14 @@ export default function FusingDepartment() {
                 {/* 10. ROLL COMPLETED? */}
                 <div className="fusing-field-col">
                   <label className="fusing-field-label" style={{
-                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#16a34a' : (topForm.rollCompleted === 'Partial Complete' ? '#0284c7' : '#ea580c')
+                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#34d399' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fbbf24')
                   }}>
                     {(topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? (
-                      <CheckCircle2 size={14} color="#16a34a" />
+                      <CheckCircle2 size={14} color="#34d399" />
                     ) : topForm.rollCompleted === 'Partial Complete' ? (
-                      <Clock size={14} color="#0284c7" />
+                      <Clock size={14} color="#38bdf8" />
                     ) : (
-                      <AlertCircle size={14} color="#ea580c" />
+                      <AlertCircle size={14} color="#fbbf24" />
                     )}
                     ROLL COMPLETED? *
                   </label>
@@ -2759,11 +2821,10 @@ export default function FusingDepartment() {
                     onChange={e => setTopForm(f => ({ ...f, rollCompleted: e.target.value }))}
                     className="fusing-field-input"
                     style={{
-                      border: `2px solid ${
-                        (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#4ade80' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fb923c')
+                      border: `1.5px solid ${
+                        (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#34d399' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fbbf24')
                       }`,
-                      background: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#f0fdf4' : (topForm.rollCompleted === 'Partial Complete' ? '#f0f9ff' : '#fff7ed'),
-                      color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#15803d' : (topForm.rollCompleted === 'Partial Complete' ? '#0369a1' : '#c2410c'),
+                      color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#34d399' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fbbf24'),
                       cursor: 'pointer',
                       fontWeight: 800
                     }}
@@ -2785,18 +2846,18 @@ export default function FusingDepartment() {
                   gap: '8px',
                   padding: '0.6rem 0.95rem',
                   borderRadius: '8px',
-                  background: isHeatWarning ? '#fff1f2' : '#f0fdf4',
-                  border: `1.5px solid ${isHeatWarning ? '#fda4af' : '#86efac'}`,
+                  background: isHeatWarning ? 'rgba(239, 68, 68, 0.16)' : 'rgba(16, 185, 129, 0.14)',
+                  border: `1.5px solid ${isHeatWarning ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.38)'}`,
                   fontSize: '0.82rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Thermometer size={16} color={isHeatWarning ? '#e11d48' : '#16a34a'} />
-                    <span style={{ color: isHeatWarning ? '#9f1239' : '#166534', fontWeight: 800 }}>
+                    <Thermometer size={16} color={isHeatWarning ? '#f87171' : '#34d399'} />
+                    <span style={{ color: isHeatWarning ? '#f87171' : '#34d399', fontWeight: 800 }}>
                       {activeSelectedCard?.fabric || 'Fabric'} Thermal Guard: Recommended {activeFabricPreset.temp} @ {activeFabricPreset.speed} m/min ({activeFabricPreset.note})
                     </span>
                   </div>
                   {isHeatWarning ? (
-                    <span style={{ color: '#e11d48', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                    <span style={{ color: '#f87171', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
                       <AlertTriangle size={15} /> ⚠️ High Temperature Warning! Delicate fabric risk.
                     </span>
                   ) : (
@@ -2810,9 +2871,9 @@ export default function FusingDepartment() {
                         }));
                       }}
                       style={{
-                        background: '#dcfce7',
-                        color: '#15803d',
-                        border: '1px solid #86efac',
+                        background: 'rgba(16, 185, 129, 0.2)',
+                        color: '#34d399',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
                         padding: '3px 10px',
                         borderRadius: '6px',
                         fontSize: '0.74rem',
@@ -2830,7 +2891,7 @@ export default function FusingDepartment() {
           {/* Row 3: OPERATOR NAME, REMARKS / NOTES */}
           <div className="fusing-remarks-grid">
             <div className="fusing-field-col">
-              <label className="fusing-field-label" style={{ color: '#475569' }}>
+              <label className="fusing-field-label" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>
                 OPERATOR NAME *
               </label>
               <input
@@ -2844,7 +2905,7 @@ export default function FusingDepartment() {
             </div>
 
             <div className="fusing-field-col">
-              <label className="fusing-field-label" style={{ color: '#475569' }}>
+              <label className="fusing-field-label" style={{ color: 'rgba(255, 255, 255, 0.85)' }}>
                 REMARKS / NOTES
               </label>
               <input
@@ -2856,7 +2917,7 @@ export default function FusingDepartment() {
                 style={{ fontWeight: 500 }}
               />
               <div className="fusing-chips-tray">
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Quick Tag:</span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>Quick Tag:</span>
                 {['Heat Crease', 'Fabric Shrinkage', 'Paper Jam', 'Color Bleed', 'Roller Mark'].map(tag => (
                   <button
                     key={tag}
@@ -2903,103 +2964,12 @@ export default function FusingDepartment() {
         )}
       </div>
 
-      {/* ── ENTERPRISE SUMMARY KPI METRICS GRID ── */}
-      <section className="fusing-metrics-grid" aria-label="Fusing production KPI metrics">
-        {/* Today Fresh Output */}
-        <div className="fusing-metric-card">
-          <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Today Fresh Output</span>
-            <Flame size={18} color="#1E40AF" />
-          </div>
-          <div className="fusing-metric-val" style={{ color: '#1E40AF' }}>
-            {stats.todayFreshMtr.toLocaleString('en-IN')}
-            <span className="fusing-metric-unit">meters</span>
-          </div>
-          <div className="fusing-metric-subtitle">Fused & ready for dispatch</div>
-        </div>
-
-        {/* Total Butter Paper Consumed */}
-        <div className="fusing-metric-card accent-purple">
-          <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Butter Paper Used</span>
-            <Scale size={18} color="#7C3AED" />
-          </div>
-          <div className="fusing-metric-val" style={{ color: '#7C3AED' }}>
-            {stats.totalButterPaperKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-            <span className="fusing-metric-unit">kg</span>
-          </div>
-          <div className="fusing-metric-subtitle">
-            Stock Balance: {stats.butterPaperBalanceKg >= 0 ? `${stats.butterPaperBalanceKg.toFixed(1)} kg available` : 'Low / Reorder'}
-          </div>
-        </div>
-
-        {/* Paper Yield Efficiency */}
-        <div className="fusing-metric-card accent-teal">
-          <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Paper Yield Ratio</span>
-            <Zap size={18} color="#0D9488" />
-          </div>
-          <div className="fusing-metric-val" style={{ color: '#0D9488' }}>
-            {stats.yieldRatio}
-            <span className="fusing-metric-unit">m/kg</span>
-          </div>
-          <div className="fusing-metric-subtitle" style={{ color: Number(stats.yieldRatio) >= 12 ? '#059669' : '#D97706' }}>
-            {Number(stats.yieldRatio) >= 12 ? '✓ Optimal Paper Yield' : Number(stats.yieldRatio) > 0 ? '⚠️ High Paper Usage' : 'Awaiting Output'}
-          </div>
-        </div>
-
-        {/* Completed Jobs */}
-        <div className="fusing-metric-card accent-emerald">
-          <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Completed Jobs</span>
-            <CheckCircle2 size={18} color="#059669" />
-          </div>
-          <div className="fusing-metric-val" style={{ color: '#059669' }}>
-            {stats.doneCount}
-            <span className="fusing-metric-unit">cards</span>
-          </div>
-          <div className="fusing-metric-subtitle">
-            {stats.totalFreshMtr.toLocaleString('en-IN')} total meters fused
-          </div>
-        </div>
-
-        {/* Total Fabric Wastage */}
-        <div className="fusing-metric-card accent-rose">
-          <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Total Fabric Wastage</span>
-            <Trash2 size={18} color="#E11D48" />
-          </div>
-          <div className="fusing-metric-val" style={{ color: '#E11D48' }}>
-            {stats.totalWastageMtr.toLocaleString('en-IN')}
-            <span className="fusing-metric-unit">meters</span>
-          </div>
-          <div className="fusing-metric-subtitle" style={{ color: stats.totalWastageMtr > 0 ? '#BE123C' : '#059669' }}>
-            {stats.totalWastageMtr > 0 ? `${((stats.totalWastageMtr / (stats.totalFreshMtr + stats.totalWastageMtr || 1)) * 100).toFixed(1)}% plant wastage loss` : '✓ Zero wastage recorded'}
-          </div>
-        </div>
-
-        {/* Ready for Fusing (reconciled with Dashboard Pipeline) */}
-        <div className="fusing-metric-card accent-amber">
-          <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Ready for Fusing</span>
-            <Clock size={18} color="#D97706" />
-          </div>
-          <div className="fusing-metric-val" style={{ color: '#D97706' }}>
-            {stats.readyForFusingCount}
-            <span className="fusing-metric-unit">cards</span>
-          </div>
-          <div className="fusing-metric-subtitle">
-            Printed & awaiting heat press ({stats.pendingCount} total un-fused)
-          </div>
-        </div>
-      </section>
-
-      {/* ── QUICK FILTERS & SEARCH TOOLBAR ── */}
-      <section className="fusing-filters-wrapper" aria-label="Job card filtering controls">
-        <div className="fusing-filters-main-row">
+      {/* ── QUICK FILTERS & SEARCH TOOLBAR WITH VIEW TOGGLE ── */}
+      <section className="fusing-filters-wrapper" aria-label="Job card filtering controls" style={{ marginTop: '0.5rem' }}>
+        <div className="fusing-filters-main-row" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           
           {/* Debounced Search */}
-          <div className="fusing-search-box">
+          <div className="fusing-search-box" style={{ flex: '1 1 240px' }}>
             <Search size={15} className="fusing-search-icon" aria-hidden="true" />
             <input
               type="text"
@@ -3031,10 +3001,30 @@ export default function FusingDepartment() {
             onChange={(filters) => { setFusingFilters(filters); setCurrentPage(1); }}
             placeholder="Filters"
           />
+
+          {/* Segmented View Mode Toggle: Table vs Cards */}
+          <div className="glass-view-toggle" style={{ marginLeft: 'auto' }}>
+            <button
+              type="button"
+              className={viewMode === 'table' ? 'active' : ''}
+              onClick={() => setViewMode('table')}
+              title="Table View (List)"
+            >
+              <Table size={13} /> Table
+            </button>
+            <button
+              type="button"
+              className={viewMode === 'cards' ? 'active' : ''}
+              onClick={() => setViewMode('cards')}
+              title="Card View (Grid)"
+            >
+              <LayoutGrid size={13} /> Cards
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* ── MAIN FUSING PRODUCTION LEDGER (DUAL VIEW: DESKTOP TABLE & MOBILE CARDS) ── */}
+      {/* ── MAIN FUSING PRODUCTION LEDGER (DUAL VIEW: TABLE & CARDS) ── */}
       <section aria-label="Fusing production job cards ledger">
         {loading && cards.length === 0 ? (
           <div>
@@ -3054,17 +3044,14 @@ export default function FusingDepartment() {
             </div>
           </div>
         ) : filteredCards.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
-            <Flame size={32} color="#94A3B8" style={{ margin: '0 auto 8px', display: 'block' }} />
-            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: 'var(--ee-fusing-text-primary)' }}>No Fusing Records Found</h3>
-            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ee-fusing-text-muted)' }}>
-              No job cards match the current search keyword or filter selection. Try clearing filters.
-            </p>
+          <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'rgba(15, 23, 42, 0.75)', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
+            <Flame size={32} color="#38bdf8" style={{ margin: '0 auto 8px', display: 'block' }} />
+            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: '#ffffff' }}>No Fusing Records Found</h3>
           </div>
         ) : (
           <>
-            {/* 1. DESKTOP HIGH-DENSITY DATA TABLE (>= 1024px) */}
-            <div className="fusing-desktop-table-wrapper">
+            {/* 1. DATA TABLE VIEW */}
+            <div className="fusing-desktop-table-wrapper" style={{ display: viewMode === 'table' ? 'block' : 'none' }}>
               <div className="fusing-table-scroll">
                 <table className="fusing-table" role="table">
                   <thead>
@@ -3116,12 +3103,12 @@ export default function FusingDepartment() {
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.88rem', fontWeight: 900, color: 'var(--ee-fusing-brand-navy)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#38bdf8', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
                                   {c.jobNo || 'JOB'}
                                 </span>
-                                <Gauge size={12} color="#1E40AF" />
+                                <Gauge size={12} color="#38bdf8" />
                                 {c.pass && (
-                                  <span style={{ fontSize: '0.65rem', background: '#EFF6FF', color: '#1E40AF', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                  <span style={{ fontSize: '0.65rem', background: 'rgba(56, 189, 248, 0.16)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
                                     {c.pass}
                                   </span>
                                 )}
@@ -3144,7 +3131,7 @@ export default function FusingDepartment() {
                                 {c.designName || c.designNo || '—'}
                               </span>
                               {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
-                                <span style={{ padding: '1px 5px', borderRadius: 4, background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', fontSize: '0.68rem', fontWeight: 800 }}>
+                                <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.16)', border: '1px solid rgba(52, 211, 153, 0.35)', color: '#34d399', fontSize: '0.68rem', fontWeight: 800 }}>
                                   ⚡ Print Ready
                                 </span>
                               )}
@@ -3152,7 +3139,7 @@ export default function FusingDepartment() {
                             <div style={{ fontSize: '0.75rem', color: 'var(--ee-fusing-text-secondary)', marginTop: 2 }}>
                               {c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}
                             </div>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: 3, padding: '1px 6px', borderRadius: 4, background: '#FEF3C7', border: '1px solid #FDE68A', fontSize: '0.68rem', color: '#92400E', fontWeight: 700 }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: 3, padding: '1px 6px', borderRadius: 4, background: 'rgba(245, 158, 11, 0.16)', border: '1px solid rgba(251, 191, 36, 0.35)', fontSize: '0.68rem', color: '#fbbf24', fontWeight: 700 }}>
                               <Flame size={10} /> Preset: {preset.temp} @ {preset.speed}
                             </div>
                           </td>
@@ -3163,11 +3150,11 @@ export default function FusingDepartment() {
                               {c.fusingOperator || '—'}
                             </div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--ee-fusing-text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                              <span style={{ padding: '1px 5px', borderRadius: 4, background: '#f1f5f9', border: '1px solid #e2e8f0', fontWeight: 700, color: '#334155' }}>
+                              <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(30, 41, 59, 0.85)', border: '1px solid rgba(148, 163, 184, 0.25)', fontWeight: 700, color: '#cbd5e1' }}>
                                 {c.shift || 'Morning'}
                               </span>
                               {c.fusingMachine && (
-                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                                   • {c.fusingMachine.replace(/\s*\(.*?\)/, '')}
                                 </span>
                               )}
@@ -3231,15 +3218,15 @@ export default function FusingDepartment() {
                           </td>
 
                           {/* Printed Meters */}
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#0369a1', fontSize: '0.88rem' }}>
+                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#38bdf8', fontSize: '0.88rem' }}>
                             {printedMtr > 0 ? `${printedMtr.toLocaleString('en-IN')} m` : '—'}
                           </td>
 
                           {/* Fresh Output */}
-                          <td style={{ textAlign: 'right', fontWeight: 900, color: '#059669', fontSize: '0.92rem' }}>
+                          <td style={{ textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.92rem' }}>
                             <div>{fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}</div>
                             {printedMtr > 0 && fresh > 0 && (
-                              <div style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>
+                              <div style={{ fontSize: '0.68rem', color: '#6ee7b7', fontWeight: 700 }}>
                                 {((fresh / printedMtr) * 100).toFixed(0)}% yield
                               </div>
                             )}
@@ -3250,9 +3237,9 @@ export default function FusingDepartment() {
                             {waste > 0 ? (
                               <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
                                 <span style={{
-                                  background: '#fee2e2',
-                                  color: '#b91c1c',
-                                  border: '1px solid #fca5a5',
+                                  background: 'rgba(239, 68, 68, 0.18)',
+                                  color: '#f87171',
+                                  border: '1px solid rgba(248, 113, 113, 0.40)',
                                   padding: '2px 8px',
                                   borderRadius: '5px',
                                   fontWeight: 900,
@@ -3260,7 +3247,7 @@ export default function FusingDepartment() {
                                 }}>
                                   ⚠️ {waste} m
                                 </span>
-                                <span style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.68rem', color: '#fca5a5', fontWeight: 700 }}>
                                   {printedMtr > 0 
                                     ? `${((waste / printedMtr) * 100).toFixed(1)}% waste`
                                     : (fresh + waste > 0 ? `${((waste / (fresh + waste)) * 100).toFixed(1)}% waste` : '')}
@@ -3319,8 +3306,8 @@ export default function FusingDepartment() {
               </div>
             </div>
 
-            {/* 2. MOBILE SCANNABLE SHOP-FLOOR CARDS (< 1024px) */}
-            <div className="fusing-mobile-cards-wrapper" role="feed" aria-label="Job cards mobile feed">
+            {/* 2. CARDS GRID VIEW */}
+            <div className="fusing-mobile-cards-wrapper" style={{ display: viewMode === 'cards' ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }} role="feed" aria-label="Job cards feed">
               {paginatedCards.map((c) => {
                 const isDone = c.fusingStatus === 'Fusing Done';
                 const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
@@ -3508,74 +3495,56 @@ export default function FusingDepartment() {
 
       {/* ── TAB 2: FUSING RUNS HISTORY (INDIVIDUAL RUNS LEDGER) ── */}
       {activeFusingTab === 'runs' && (
-        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Runs Toolbar */}
-          <div style={{
+          <div className="fusing-filters-wrapper" style={{
             display: 'flex',
+            flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '12px',
-            background: '#ffffff',
-            padding: '1rem 1.25rem',
-            borderRadius: '12px',
-            border: '1.5px solid var(--ee-fusing-border)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            gap: '12px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1d4ed8' }}>
-                <Zap size={20} />
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                <Zap size={18} />
               </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                  Fusing Runs Log History
-                </h3>
-                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                  Individual machine meterage entries. Each run is a New Entry; updates are Edits.
-                </span>
-              </div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#ffffff' }}>
+                Fusing Runs History
+              </h3>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', minWidth: '260px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <div className="fusing-search-box" style={{ minWidth: '240px' }}>
+                <Search size={14} className="fusing-search-icon" />
                 <input
                   type="text"
+                  className="fusing-search-input"
                   value={runsSearch}
                   onChange={e => setRunsSearch(e.target.value)}
                   placeholder="Filter by Job #, Machine, Operator..."
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem 0.5rem 2.2rem',
-                    borderRadius: '8px',
-                    border: '1.5px solid #cbd5e1',
-                    fontSize: '0.84rem'
-                  }}
                 />
               </div>
 
               <span style={{
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                border: '1px solid #bfdbfe',
+                background: 'rgba(56, 189, 248, 0.16)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
                 padding: '6px 12px',
                 borderRadius: '8px',
                 fontSize: '0.82rem',
                 fontWeight: 900
               }}>
-                ⚡ {filteredFusingRuns.length} Runs Logged
+                ⚡ {filteredFusingRuns.length} Runs
               </span>
             </div>
           </div>
 
           {/* Runs Table */}
           {filteredFusingRuns.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
-              <Zap size={36} color="#94A3B8" style={{ margin: '0 auto 10px', display: 'block' }} />
-              <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 900, color: 'var(--ee-fusing-text-primary)' }}>No Fusing Runs Found</h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--ee-fusing-text-muted)' }}>
-                {runsSearch ? 'No individual runs match your search query.' : 'No individual fusing runs logged yet. Use the Production Logs form above to log runs!'}
-              </p>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'rgba(15, 23, 42, 0.75)', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
+              <Zap size={36} color="#38bdf8" style={{ margin: '0 auto 10px', display: 'block' }} />
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#ffffff' }}>No Fusing Runs Found</h3>
             </div>
           ) : (
             <div className="fusing-desktop-table-wrapper">
@@ -3606,33 +3575,33 @@ export default function FusingDepartment() {
                       return (
                         <tr key={run._id || run.id}>
                           <td>
-                            <div style={{ fontWeight: 800, color: '#0f172a' }}>{runDateStr}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Shift: {run.shift || 'Morning'}</div>
+                            <div style={{ fontWeight: 800, color: '#ffffff' }}>{runDateStr}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.68)', fontWeight: 600 }}>Shift: {run.shift || 'Morning'}</div>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 900, color: '#2563eb' }}>{formatJobCardNo(run.jobNo)}</div>
+                            <div style={{ fontWeight: 900, color: '#38bdf8' }}>{formatJobCardNo(run.jobNo)}</div>
                             {matchingCard && (
-                              <div style={{ fontSize: '0.72rem', color: '#475569', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.72)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {matchingCard.party || ''} • {matchingCard.fabric || ''}
                               </div>
                             )}
                           </td>
                           <td>
-                            <div style={{ fontWeight: 800, color: '#0f172a' }}>{run.fusingMachine || '—'}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>👤 {run.operatorName || '—'}</div>
+                            <div style={{ fontWeight: 800, color: '#ffffff' }}>{run.fusingMachine || '—'}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.68)' }}>👤 {run.operatorName || '—'}</div>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 700, fontSize: '0.8rem' }}>{run.panna || '58"'}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#ffffff' }}>{run.panna || '58"'}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 600 }}>
                               {run.fusingTemp || '210°C'} @ {run.fusingSpeed || '80'}
                             </div>
                           </td>
                           <td style={{ textAlign: 'right' }}>
                             <span style={{
                               display: 'inline-block',
-                              background: '#ecfdf5',
-                              color: '#047857',
-                              border: '1px solid #a7f3d0',
+                              background: 'rgba(16, 185, 129, 0.16)',
+                              color: '#34d399',
+                              border: '1px solid rgba(16, 185, 129, 0.35)',
                               padding: '2px 8px',
                               borderRadius: '5px',
                               fontWeight: 900,
@@ -3646,9 +3615,9 @@ export default function FusingDepartment() {
                               <span
                                 style={{
                                   display: 'inline-block',
-                                  background: '#fff1f2',
-                                  color: '#b91c1c',
-                                  border: '1px solid #fca5a5',
+                                  background: 'rgba(239, 68, 68, 0.16)',
+                                  color: '#f87171',
+                                  border: '1px solid rgba(239, 68, 68, 0.35)',
                                   padding: '2px 8px',
                                   borderRadius: '5px',
                                   fontWeight: 900,
@@ -3659,7 +3628,7 @@ export default function FusingDepartment() {
                                 ⚠️ {wMtr} m
                               </span>
                             ) : (
-                              <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>0 m</span>
+                              <span style={{ color: 'rgba(255, 255, 255, 0.55)', fontSize: '0.82rem', fontWeight: 600 }}>0 m</span>
                             )}
                           </td>
                           <td style={{ textAlign: 'center' }}>
@@ -3669,9 +3638,9 @@ export default function FusingDepartment() {
                               borderRadius: '6px',
                               fontSize: '0.74rem',
                               fontWeight: 800,
-                              background: run.rollCompleted === 'Complete' ? '#f0fdf4' : '#f0f9ff',
-                              color: run.rollCompleted === 'Complete' ? '#15803d' : '#0369a1',
-                              border: `1px solid ${run.rollCompleted === 'Complete' ? '#86efac' : '#7dd3fc'}`
+                              background: run.rollCompleted === 'Complete' ? 'rgba(16, 185, 129, 0.16)' : 'rgba(56, 189, 248, 0.16)',
+                              color: run.rollCompleted === 'Complete' ? '#34d399' : '#38bdf8',
+                              border: `1px solid ${run.rollCompleted === 'Complete' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(56, 189, 248, 0.35)'}`
                             }}>
                               {run.rollCompleted || 'Complete'}
                             </span>
@@ -3691,7 +3660,7 @@ export default function FusingDepartment() {
                                 type="button"
                                 onClick={() => handleDeleteFusingLog(run._id || run.id, run.jobNo)}
                                 className="fusing-btn-secondary"
-                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.74rem', minHeight: '30px', color: '#dc2626', borderColor: '#fca5a5' }}
+                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.74rem', minHeight: '30px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
                                 title="Delete this run record"
                               >
                                 <Trash2 size={12} />
@@ -3712,27 +3681,9 @@ export default function FusingDepartment() {
       {/* ── TAB 3: READY FOR FUSING QUEUE ── */}
       {activeFusingTab === 'queue' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Queue Header & Filters Banner */}
-          <div className="fusing-header-section" style={{ borderLeft: '4px solid var(--ee-fusing-brand-navy)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'var(--ee-fusing-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Zap size={20} color="#1E40AF" />
-                  Ready for Fusing Queue (Handoff from Printing)
-                </h2>
-                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--ee-fusing-text-muted)', fontWeight: 500 }}>
-                  Jobs that completed printing and are ready for heat press sublimation. Batch identical fabrics to optimize temperature stability.
-                </p>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className="fusing-badge done" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
-                  🔥 <strong>{eligibleFusingCards.length}</strong> Jobs In Queue
-                </span>
-              </div>
-            </div>
-
-            {/* Filter Toolbar */}
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          {/* Queue Filter Toolbar */}
+          <div className="fusing-filters-wrapper">
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <div className="fusing-search-box" style={{ flex: '1 1 240px' }}>
                 <Search size={15} className="fusing-search-icon" aria-hidden="true" />
                 <input
@@ -3756,22 +3707,38 @@ export default function FusingDepartment() {
                   <option key={fab} value={fab}>{fab}</option>
                 ))}
               </select>
+
+              <div className="glass-view-toggle" style={{ marginLeft: 'auto' }}>
+                <button
+                  type="button"
+                  className={viewMode === 'table' ? 'active' : ''}
+                  onClick={() => setViewMode('table')}
+                  title="Table View (List)"
+                >
+                  <Table size={13} /> Table
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === 'cards' ? 'active' : ''}
+                  onClick={() => setViewMode('cards')}
+                  title="Card View (Grid)"
+                >
+                  <LayoutGrid size={13} /> Cards
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Dual Layout for Queue */}
           {filteredQueueCards.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
-              <Flame size={32} color="#94A3B8" style={{ margin: '0 auto 8px', display: 'block' }} />
-              <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: 'var(--ee-fusing-text-primary)' }}>No Jobs Waiting in Fusing Queue</h3>
-              <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ee-fusing-text-muted)' }}>
-                Completed prints will automatically flow into this queue for heat press processing.
-              </p>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'rgba(15, 23, 42, 0.75)', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
+              <Flame size={32} color="#38bdf8" style={{ margin: '0 auto 8px', display: 'block' }} />
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#ffffff' }}>No Jobs Waiting in Fusing Queue</h3>
             </div>
           ) : (
             <>
-              {/* Desktop Table for Queue (>= 1024px) */}
-              <div className="fusing-desktop-table-wrapper">
+              {/* Desktop Table for Queue */}
+              <div className="fusing-desktop-table-wrapper" style={{ display: viewMode === 'table' ? 'block' : 'none' }}>
                 <div className="fusing-table-scroll">
                   <table className="fusing-table" role="table">
                     <thead>
@@ -3791,18 +3758,18 @@ export default function FusingDepartment() {
                         const preset = getFabricFusingPreset(c.fabric);
                         return (
                           <tr key={c._id || c.id || idx}>
-                            <td style={{ fontWeight: 900, color: 'var(--ee-fusing-brand-navy)' }}>
+                            <td style={{ fontWeight: 900, color: '#38bdf8' }}>
                               {formatJobCardNo(c.jobNo)}
                             </td>
-                            <td style={{ fontWeight: 700, color: 'var(--ee-fusing-text-primary)' }}>
+                            <td style={{ fontWeight: 700, color: '#ffffff' }}>
                               {c.party || c.clientName || '—'}
                             </td>
-                            <td style={{ color: 'var(--ee-fusing-text-secondary)', fontWeight: 600 }}>
+                            <td style={{ color: 'rgba(255, 255, 255, 0.85)', fontWeight: 600 }}>
                               {c.designName || c.designNo || '—'}
                             </td>
                             <td>
-                              <span style={{ fontWeight: 800, color: 'var(--ee-fusing-text-primary)' }}>{c.fabric || '—'}</span>
-                              <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'var(--ee-fusing-text-muted)', background: '#F1F5F9', padding: '2px 6px', borderRadius: '4px' }}>
+                              <span style={{ fontWeight: 800, color: '#ffffff' }}>{c.fabric || '—'}</span>
+                              <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.75)', background: 'rgba(255, 255, 255, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
                                 {c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"'}
                               </span>
                             </td>
@@ -3811,7 +3778,7 @@ export default function FusingDepartment() {
                                 <Thermometer size={12} /> {preset.temp} @ {preset.speed} m/min
                               </span>
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 900, color: '#059669', fontSize: '0.92rem' }}>
+                            <td style={{ textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.92rem' }}>
                               {pMtr ? `${pMtr} m` : (c.totalMtr || c.consumption || '—')}
                             </td>
                             <td className="fusing-sticky-col-cell">
@@ -3838,8 +3805,8 @@ export default function FusingDepartment() {
                 </div>
               </div>
 
-              {/* Mobile Cards for Queue (< 1024px) */}
-              <div className="fusing-mobile-cards-wrapper" role="feed" aria-label="Ready for fusing queue mobile cards">
+              {/* Cards Grid for Queue */}
+              <div className="fusing-mobile-cards-wrapper" style={{ display: viewMode === 'cards' ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }} role="feed" aria-label="Ready for fusing queue mobile cards">
                 {filteredQueueCards.map((c, idx) => {
                   const pMtr = getCardPrintedMeters(c);
                   const preset = getFabricFusingPreset(c.fabric);
@@ -3922,32 +3889,28 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── MODAL 1: EDIT FUSING ENTRY & WASTAGE MODAL ── */}
+      {/* ── MODAL 1: EDIT FUSING ENTRY & WASTAGE MODAL (Dark Frosted Glass) ── */}
       {showFormModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            background: '#ffffff', width: '100%', maxWidth: '640px', maxHeight: '90vh',
-            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #cbd5e1', overflow: 'hidden', display: 'flex', flexDirection: 'column'
+            background: 'rgba(15, 23, 42, 0.96)', width: '100%', maxWidth: '640px', maxHeight: '90vh',
+            borderRadius: '16px', boxShadow: '0 28px 64px rgba(0, 0, 0, 0.70)',
+            border: '1px solid rgba(148, 163, 184, 0.26)', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            color: '#ffffff'
           }}>
             {/* Modal Header */}
-            <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1rem 1.25rem', background: 'rgba(11, 17, 32, 0.94)', borderBottom: '1px solid rgba(148, 163, 184, 0.20)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Flame size={22} color={form.logId ? '#d97706' : '#2563eb'} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                    {form.logId ? `Edit Fusing Run #${String(form.logId).slice(-6)}` : 'Edit Fusing Master Card'} — {formatJobCardNo(form.jobNo)}
-                  </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    {form.logId ? 'Modifying this specific machine run log record' : 'Verify Fresh Output, 4-Fault Wastage breakdown & calculate Total Fabric Used'}
-                  </span>
-                </div>
+                <Flame size={22} color={form.logId ? '#fbbf24' : '#38bdf8'} />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                  {form.logId ? `Edit Fusing Run #${String(form.logId).slice(-6)}` : 'Edit Fusing Master Card'} — {formatJobCardNo(form.jobNo)}
+                </h3>
               </div>
-              <button type="button" onClick={() => setShowFormModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+              <button type="button" onClick={() => setShowFormModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={20} />
               </button>
             </div>
@@ -3960,14 +3923,14 @@ export default function FusingDepartment() {
                 const cardRuns = getCardLogs(selectedCard);
                 if (cardRuns.length > 0) {
                   return (
-                    <div style={{ background: '#f0f9ff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #bae6fd', fontSize: '0.78rem' }}>
-                      <div style={{ fontWeight: 800, color: '#0369a1', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.35)', fontSize: '0.78rem' }}>
+                      <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>⚡ Production Runs for Job #{selectedCard?.jobNo} ({cardRuns.length}):</span>
                         {form.logId && (
                           <button
                             type="button"
                             onClick={() => openFusingModal(selectedCard, null)}
-                            style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}
+                            style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(148, 163, 184, 0.30)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', color: '#e2e8f0' }}
                           >
                             Switch to Master Card Edit
                           </button>
@@ -3980,9 +3943,9 @@ export default function FusingDepartment() {
                             type="button"
                             onClick={() => openFusingModal(selectedCard, run)}
                             style={{
-                              background: form.logId === (run._id || run.id) ? '#0284c7' : '#ffffff',
-                              color: form.logId === (run._id || run.id) ? '#ffffff' : '#0369a1',
-                              border: form.logId === (run._id || run.id) ? '1px solid #0284c7' : '1px solid #7dd3fc',
+                              background: form.logId === (run._id || run.id) ? '#0284c7' : 'rgba(15, 23, 42, 0.85)',
+                              color: form.logId === (run._id || run.id) ? '#ffffff' : '#38bdf8',
+                              border: form.logId === (run._id || run.id) ? '1px solid #38bdf8' : '1px solid rgba(56, 189, 248, 0.35)',
                               borderRadius: '6px',
                               padding: '3px 8px',
                               fontSize: '0.74rem',
@@ -4005,7 +3968,7 @@ export default function FusingDepartment() {
                 
                 {/* 1. Fresh Output (Net Usable MTR) */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#34d399', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
                     Fresh Output (Net Usable MTR) *
                   </label>
                   <input
@@ -4020,89 +3983,89 @@ export default function FusingDepartment() {
                     style={{
                       width: '100%', padding: '0.55rem', borderRadius: '8px',
                       border: '2px solid #10b981', fontWeight: 900, fontSize: '0.95rem',
-                      background: '#ecfdf5', color: '#047857'
+                      background: 'rgba(16, 185, 129, 0.15)', color: '#34d399'
                     }}
                   />
-                  <div style={{ fontSize: '0.64rem', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                  <div style={{ fontSize: '0.64rem', color: '#6ee7b7', marginTop: '2px', fontWeight: 600 }}>
                     Accepted decimals: .00, .25, .50, .75 only
                   </div>
                 </div>
 
                 {/* 2. Total Fabric Used (Fresh MTR + Total Wastage) */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 900, color: '#0284c7', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 900, color: '#38bdf8', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
                     Total Fabric Used (MTR)
                   </label>
                   <div style={{
-                    width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '2px solid #0284c7',
-                    fontWeight: 900, fontSize: '1rem', background: '#f0f9ff', color: '#0369a1',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                    width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '2px solid rgba(56, 189, 248, 0.55)',
+                    fontWeight: 900, fontSize: '1rem', background: 'rgba(56, 189, 248, 0.14)', color: '#ffffff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px'
                   }}>
                     <span>{calculatedTotalFabricUsedMtr} Mtr</span>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 6px', borderRadius: '4px' }}>
-                      Total = Fresh MTR + Total Wastage
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#38bdf8', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '2px 6px', borderRadius: '4px' }}>
+                      Total = Fresh + Wastage
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* 4 Wastage Fault Breakdown */}
-              <div style={{ background: '#fff1f2', padding: '0.9rem 1rem', borderRadius: '10px', border: '1px solid #fecdd3' }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#be123c', textTransform: 'uppercase', marginBottom: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ background: 'rgba(239, 68, 68, 0.12)', padding: '0.9rem 1rem', borderRadius: '10px', border: '1px solid rgba(248, 113, 113, 0.38)' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fca5a5', textTransform: 'uppercase', marginBottom: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Wastage Breakdown (4 Fault Types)</span>
-                  <span style={{ background: '#ffe4e6', padding: '2px 8px', borderRadius: '6px' }}>Total Wastage: <b>{calculatedWastageMtr} Mtr</b></span>
+                  <span style={{ background: 'rgba(239, 68, 68, 0.25)', color: '#ffffff', border: '1px solid rgba(248, 113, 113, 0.45)', padding: '2px 10px', borderRadius: '6px' }}>Total Wastage: <b>{calculatedWastageMtr} Mtr</b></span>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem' }}>
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>1. Fabric Fault (Mtr)</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fca5a5', marginBottom: '0.2rem', display: 'block' }}>1. Fabric Fault (Mtr)</label>
                     <input
                       type="number" step="0.25" min="0"
                       value={form.fabricFaultMtr}
                       onChange={e => setForm(f => ({ ...f, fabricFaultMtr: sanitizeQuarterInput(e.target.value) }))}
                       onBlur={e => setForm(f => ({ ...f, fabricFaultMtr: finalizeQuarterBlur(e.target.value) }))}
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(248, 113, 113, 0.40)', fontSize: '0.9rem', fontWeight: 800, background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px', fontWeight: 600 }}>
                       Decimals: .00, .25, .50, .75
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>2. Fusing Fault (Mtr)</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fca5a5', marginBottom: '0.2rem', display: 'block' }}>2. Fusing Fault (Mtr)</label>
                     <input
                       type="number" step="0.25" min="0"
                       value={form.fusingFaultMtr}
                       onChange={e => setForm(f => ({ ...f, fusingFaultMtr: sanitizeQuarterInput(e.target.value) }))}
                       onBlur={e => setForm(f => ({ ...f, fusingFaultMtr: finalizeQuarterBlur(e.target.value) }))}
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(248, 113, 113, 0.40)', fontSize: '0.9rem', fontWeight: 800, background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px', fontWeight: 600 }}>
                       Decimals: .00, .25, .50, .75
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>3. Print Fault (Mtr)</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fca5a5', marginBottom: '0.2rem', display: 'block' }}>3. Print Fault (Mtr)</label>
                     <input
                       type="number" step="0.25" min="0"
                       value={form.printFaultMtr}
                       onChange={e => setForm(f => ({ ...f, printFaultMtr: sanitizeQuarterInput(e.target.value) }))}
                       onBlur={e => setForm(f => ({ ...f, printFaultMtr: finalizeQuarterBlur(e.target.value) }))}
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(248, 113, 113, 0.40)', fontSize: '0.9rem', fontWeight: 800, background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px', fontWeight: 600 }}>
                       Decimals: .00, .25, .50, .75
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>4. Genuine Fault (Mtr)</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fca5a5', marginBottom: '0.2rem', display: 'block' }}>4. Genuine Fault (Mtr)</label>
                     <input
                       type="number" step="0.25" min="0"
                       value={form.genuineFaultMtr}
                       onChange={e => setForm(f => ({ ...f, genuineFaultMtr: sanitizeQuarterInput(e.target.value) }))}
                       onBlur={e => setForm(f => ({ ...f, genuineFaultMtr: finalizeQuarterBlur(e.target.value) }))}
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(248, 113, 113, 0.40)', fontSize: '0.9rem', fontWeight: 800, background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                     />
-                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px', fontWeight: 600 }}>
                       Decimals: .00, .25, .50, .75
                     </div>
                   </div>
@@ -4112,7 +4075,7 @@ export default function FusingDepartment() {
               {/* Butter Paper Specs */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#c084fc', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
                     Butter Paper Used?
                   </label>
                   <select
@@ -4121,7 +4084,7 @@ export default function FusingDepartment() {
                       const val = e.target.value;
                       setForm(f => ({ ...f, useButterPaper: val, butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg }));
                     }}
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #d8b4fe', fontWeight: 800, fontSize: '0.88rem', background: '#f5f3ff', color: '#6d28d9' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(192, 132, 252, 0.40)', fontWeight: 800, fontSize: '0.88rem', background: 'rgba(168, 85, 247, 0.14)', color: '#c084fc' }}
                   >
                     <option value="Yes">✓ YES (Used Butter Paper)</option>
                     <option value="No">✕ NO (No Butter Paper)</option>
@@ -4129,7 +4092,7 @@ export default function FusingDepartment() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#c084fc', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
                     Butter Paper Weight (KG)
                   </label>
                   <input
@@ -4139,7 +4102,7 @@ export default function FusingDepartment() {
                     value={form.butterPaperWeightKg}
                     onChange={e => setForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
                     placeholder="e.g. 12.50 kg"
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.88rem', background: form.useButterPaper === 'No' ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontWeight: 700, fontSize: '0.88rem', background: form.useButterPaper === 'No' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                   />
                 </div>
               </div>
@@ -4147,32 +4110,32 @@ export default function FusingDepartment() {
               {/* Machine Specs: Panna, Temp, Speed, Status */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Panna</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Panna</label>
                   <select
                     value={form.panna}
                     onChange={e => setForm(f => ({ ...f, panna: e.target.value }))}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                   >
                     {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#d97706', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Temp (°C)</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#fbbf24', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Temp (°C)</label>
                   <input
                     type="text"
                     value={form.fusingTemp}
                     onChange={e => setForm(f => ({ ...f, fusingTemp: e.target.value }))}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #fde68a', fontSize: '0.85rem', fontWeight: 800, background: '#fffbe6', color: '#92400e' }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(251, 191, 36, 0.40)', fontSize: '0.85rem', fontWeight: 800, background: 'rgba(245, 158, 11, 0.14)', color: '#fbbf24' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Speed</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Speed</label>
                   <select
                     value={form.fusingSpeed}
                     onChange={e => setForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '0.85rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af', cursor: 'pointer' }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.40)', fontSize: '0.85rem', fontWeight: 800, background: 'rgba(56, 189, 248, 0.14)', color: '#38bdf8', cursor: 'pointer' }}
                   >
                     {FUSING_SPEED_OPTIONS.map(spd => (
                       <option key={spd} value={spd}>{spd} m/min</option>
@@ -4181,7 +4144,7 @@ export default function FusingDepartment() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Status</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Status</label>
                   <select
                     value={form.fusingStatus}
                     onChange={e => setForm(f => ({ ...f, fusingStatus: e.target.value }))}
@@ -4189,8 +4152,8 @@ export default function FusingDepartment() {
                       width: '100%', padding: '0.5rem', borderRadius: '8px',
                       border: form.fusingStatus === 'Fusing Done' ? '2px solid #10b981' : (form.fusingStatus === 'Fusing In Progress' ? '2px solid #38bdf8' : '2px solid #f59e0b'),
                       fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
-                      background: form.fusingStatus === 'Fusing Done' ? '#f0fdf4' : (form.fusingStatus === 'Fusing In Progress' ? '#f0f9ff' : '#fffbe5'),
-                      color: form.fusingStatus === 'Fusing Done' ? '#15803d' : (form.fusingStatus === 'Fusing In Progress' ? '#0369a1' : '#b45309')
+                      background: form.fusingStatus === 'Fusing Done' ? 'rgba(16, 185, 129, 0.16)' : (form.fusingStatus === 'Fusing In Progress' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(245, 158, 11, 0.16)'),
+                      color: form.fusingStatus === 'Fusing Done' ? '#34d399' : (form.fusingStatus === 'Fusing In Progress' ? '#38bdf8' : '#fbbf24')
                     }}
                   >
                     <option value="Fusing Done">✓ Complete</option>
@@ -4203,25 +4166,25 @@ export default function FusingDepartment() {
               {/* Operator Name & Remarks */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Operator Name</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Operator Name</label>
                   <input
                     type="text"
                     value={form.fusingOperator}
                     onChange={e => setForm(f => ({ ...f, fusingOperator: e.target.value }))}
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                   />
                 </div>
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '4px' }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fusing Remarks / Notes</label>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#cbd5e1', textTransform: 'uppercase' }}>Fusing Remarks / Notes</label>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {['Heat Crease', 'Fabric Shrinkage', 'Paper Jam', 'Color Bleed', 'Roller Mark'].map(tag => (
                         <button
                           key={tag}
                           type="button"
                           onClick={() => setForm(f => ({ ...f, notes: f.notes ? `${f.notes}, [${tag}]` : `[${tag}]` }))}
-                          style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', fontSize: '0.66rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
+                          className="fusing-chip-btn"
                         >
                           +{tag}
                         </button>
@@ -4233,7 +4196,7 @@ export default function FusingDepartment() {
                     value={form.notes}
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="Optional notes e.g. Butter Paper Roll #2..."
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.85rem', background: 'rgba(15, 23, 42, 0.85)', color: '#ffffff' }}
                   />
                 </div>
               </div>
@@ -4243,7 +4206,7 @@ export default function FusingDepartment() {
                 <button
                   type="button"
                   onClick={() => setShowFormModal(false)}
-                  style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
+                  style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', background: 'rgba(30, 41, 59, 0.85)', color: '#e2e8f0', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -4253,13 +4216,13 @@ export default function FusingDepartment() {
                   style={{
                     padding: '0.6rem 1.35rem',
                     borderRadius: '8px',
-                    background: form.logId ? '#d97706' : '#2563eb',
+                    background: form.logId ? '#d97706' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                     color: '#ffffff',
                     fontWeight: 800,
                     fontSize: '0.9rem',
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: form.logId ? '0 4px 12px rgba(217, 119, 6, 0.25)' : '0 4px 12px rgba(37, 99, 235, 0.25)'
+                    boxShadow: form.logId ? '0 4px 12px rgba(217, 119, 6, 0.35)' : '0 4px 14px rgba(37, 99, 235, 0.35)'
                   }}
                 >
                   {submitting ? 'Saving...' : (form.logId ? 'Update Fusing Run (Edit)' : 'Update Master Fusing Record')}
@@ -4270,26 +4233,27 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── MODAL 2: GENERATE REPORT MODAL ── */}
+      {/* ── MODAL 2: GENERATE REPORT MODAL (Dark Frosted Glass) ── */}
       {showReportModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            background: '#ffffff', width: '100%', maxWidth: '840px', maxHeight: '90vh',
-            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #cbd5e1', overflow: 'hidden', display: 'flex', flexDirection: 'column'
+            background: 'rgba(15, 23, 42, 0.96)', width: '100%', maxWidth: '840px', maxHeight: '90vh',
+            borderRadius: '16px', boxShadow: '0 28px 64px rgba(0, 0, 0, 0.70)',
+            border: '1px solid rgba(148, 163, 184, 0.26)', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            color: '#ffffff'
           }}>
-            <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1rem 1.25rem', background: 'rgba(11, 17, 32, 0.94)', borderBottom: '1px solid rgba(148, 163, 184, 0.20)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Zap size={20} color="#059669" />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
+                <Zap size={20} color="#34d399" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#ffffff' }}>
                   Fusing Production &amp; Butter Paper Report
                 </h3>
               </div>
-              <button type="button" onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+              <button type="button" onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={20} />
               </button>
             </div>
@@ -4297,27 +4261,27 @@ export default function FusingDepartment() {
             <div style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               
               {/* Machine ON & OFF Timing Header Bar */}
-              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '0.75rem 1rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: '#0369a1', fontSize: '0.85rem' }}>
-                  <Clock size={16} color="#0284c7" /> Machine Shift Running Time
+              <div style={{ background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.32)', padding: '0.75rem 1rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: '#38bdf8', fontSize: '0.85rem' }}>
+                  <Clock size={16} color="#38bdf8" /> Machine Shift Running Time
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d' }}>🟢 ON TIME:</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#34d399' }}>🟢 ON TIME:</span>
                     <input
                       type="time"
                       value={reportForm.onTime}
                       onChange={e => setReportForm(rf => ({ ...rf, onTime: e.target.value }))}
-                      style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid #86efac', fontWeight: 800, fontSize: '0.82rem', background: '#ffffff', color: '#14532d' }}
+                      style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.40)', fontWeight: 800, fontSize: '0.82rem', background: 'rgba(15, 23, 42, 0.85)', color: '#34d399' }}
                     />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b91c1c' }}>🔴 OFF TIME:</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f87171' }}>🔴 OFF TIME:</span>
                     <input
                       type="time"
                       value={reportForm.offTime}
                       onChange={e => setReportForm(rf => ({ ...rf, offTime: e.target.value }))}
-                      style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid #fca5a5', fontWeight: 800, fontSize: '0.82rem', background: '#ffffff', color: '#7f1d1d' }}
+                      style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(248, 113, 113, 0.40)', fontWeight: 800, fontSize: '0.82rem', background: 'rgba(15, 23, 42, 0.85)', color: '#f87171' }}
                     />
                   </div>
                 </div>
@@ -4325,30 +4289,30 @@ export default function FusingDepartment() {
 
               {/* Row 1 KPI Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '0.85rem', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Meters Fused</div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: 2 }}>
+                <div style={{ background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(52, 211, 153, 0.35)', padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase' }}>Total Meters Fused</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>
                     {stats.totalFreshMtr.toLocaleString('en-IN')} m
                   </div>
                 </div>
 
-                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.85rem', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>Butter Paper IN (Stock Inward)</div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: 2 }}>
+                <div style={{ background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#7dd3fc', textTransform: 'uppercase' }}>Butter Paper IN (Stock Inward)</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
                     {stats.butterPaperInwardKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
                   </div>
                 </div>
 
-                <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '0.85rem', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase' }}>Butter Paper OUT (Fusing Consumed)</div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#7c3aed', marginTop: 2 }}>
+                <div style={{ background: 'rgba(168, 85, 247, 0.14)', border: '1px solid rgba(192, 132, 252, 0.35)', padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#d8b4fe', textTransform: 'uppercase' }}>Butter Paper OUT (Fusing Consumed)</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>
                     {stats.butterPaperOutwardKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
                   </div>
                 </div>
 
-                <div style={{ background: stats.butterPaperBalanceKg >= 0 ? '#f0fdf4' : '#fef2f2', border: `1px solid ${stats.butterPaperBalanceKg >= 0 ? '#bbf7d0' : '#fecaca'}`, padding: '0.85rem', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: stats.butterPaperBalanceKg >= 0 ? '#15803d' : '#b91c1c', textTransform: 'uppercase' }}>Butter Paper Stock Balance</div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: stats.butterPaperBalanceKg >= 0 ? '#16a34a' : '#dc2626', marginTop: 2 }}>
+                <div style={{ background: stats.butterPaperBalanceKg >= 0 ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.14)', border: `1px solid ${stats.butterPaperBalanceKg >= 0 ? 'rgba(52, 211, 153, 0.35)' : 'rgba(248, 113, 113, 0.35)'}`, padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: stats.butterPaperBalanceKg >= 0 ? '#6ee7b7' : '#fca5a5', textTransform: 'uppercase' }}>Butter Paper Stock Balance</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: stats.butterPaperBalanceKg >= 0 ? '#34d399' : '#f87171', marginTop: 2 }}>
                     {stats.butterPaperBalanceKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
                   </div>
                 </div>
@@ -4358,16 +4322,16 @@ export default function FusingDepartment() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
                 
                 {/* Table 1: PAPER INWARD (STOCK IN) */}
-                <div style={{ background: '#ffffff', border: '2px solid #3b82f6', borderRadius: '12px', padding: '0.85rem', boxShadow: '0 4px 12px rgba(59,130,246,0.08)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid #eff6ff', paddingBottom: '0.4rem' }}>
-                    <span style={{ fontWeight: 900, color: '#1d4ed8', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <div style={{ background: 'rgba(11, 17, 32, 0.85)', border: '1.5px solid rgba(56, 189, 248, 0.40)', borderRadius: '12px', padding: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid rgba(148, 163, 184, 0.18)', paddingBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 900, color: '#38bdf8', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       📜 PAPER INWARD (STOCK IN)
                     </span>
                     <button
                       type="button"
                       onClick={handleAddInwardRow}
                       className="btn-secondary"
-                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem', color: '#2563eb', border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: '6px', fontWeight: 800 }}
+                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', background: 'rgba(56, 189, 248, 0.15)', borderRadius: '6px', fontWeight: 800 }}
                     >
                       + Add Row
                     </button>
@@ -4375,41 +4339,37 @@ export default function FusingDepartment() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                     {reportForm.inwardRows.map((row, idx) => (
-                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 65px 75px 24px', gap: '0.4rem', alignItems: 'center', background: '#f8fafc', padding: '4px 6px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#3b82f6' }}>#{idx + 1}</span>
+                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 65px 75px 24px', gap: '0.4rem', alignItems: 'center', background: 'rgba(15, 23, 42, 0.85)', padding: '4px 6px', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8' }}>#{idx + 1}</span>
                         
-                        {/* Panna Selector */}
                         <select
                           value={row.panna}
                           onChange={e => handleInwardRowChange(row.id, 'panna', e.target.value)}
-                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, color: '#0369a1', background: '#ffffff' }}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', background: 'rgba(11, 17, 32, 0.90)' }}
                         >
                           {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
                         </select>
 
-                        {/* Rolls Qty */}
                         <input
                           type="number"
                           min="1"
                           placeholder="Rolls"
                           value={row.rolls}
                           onChange={e => handleInwardRowChange(row.id, 'rolls', e.target.value)}
-                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, width: '100%', background: '#ffffff' }}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.78rem', fontWeight: 700, width: '100%', background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
                         />
 
-                        {/* Roll Weight (KG) */}
                         <input
                           type="number"
                           step="0.01"
                           placeholder="Weight Kg"
                           value={row.weightKg}
                           onChange={e => handleInwardRowChange(row.id, 'weightKg', e.target.value)}
-                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, width: '100%', color: '#1d4ed8', background: '#ffffff' }}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.78rem', fontWeight: 800, width: '100%', color: '#38bdf8', background: 'rgba(11, 17, 32, 0.90)' }}
                         />
 
-                        {/* Remove Row Button */}
                         {reportForm.inwardRows.length > 1 ? (
-                          <Trash2 size={13} style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => handleRemoveInwardRow(row.id)} />
+                          <Trash2 size={13} style={{ cursor: 'pointer', color: '#f87171' }} onClick={() => handleRemoveInwardRow(row.id)} />
                         ) : <span />}
                       </div>
                     ))}
@@ -4417,16 +4377,16 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* Table 2: PAPER USAGE (CONSUMPTION) */}
-                <div style={{ background: '#ffffff', border: '2px solid #8b5cf6', borderRadius: '12px', padding: '0.85rem', boxShadow: '0 4px 12px rgba(139,92,246,0.08)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid #f5f3ff', paddingBottom: '0.4rem' }}>
-                    <span style={{ fontWeight: 900, color: '#6d28d9', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <div style={{ background: 'rgba(11, 17, 32, 0.85)', border: '1.5px solid rgba(192, 132, 252, 0.40)', borderRadius: '12px', padding: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid rgba(148, 163, 184, 0.18)', paddingBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 900, color: '#c084fc', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       📜 PAPER USAGE (CONSUMPTION)
                     </span>
                     <button
                       type="button"
                       onClick={handleAddUsageRow}
                       className="btn-secondary"
-                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem', color: '#7c3aed', border: '1px solid #ddd6fe', background: '#f5f3ff', borderRadius: '6px', fontWeight: 800 }}
+                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem', color: '#c084fc', border: '1px solid rgba(192, 132, 252, 0.35)', background: 'rgba(168, 85, 247, 0.15)', borderRadius: '6px', fontWeight: 800 }}
                     >
                       + Add Row
                     </button>
@@ -4434,41 +4394,37 @@ export default function FusingDepartment() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                     {reportForm.usageRows.map((row, idx) => (
-                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 65px 75px 24px', gap: '0.4rem', alignItems: 'center', background: '#fcfaff', padding: '4px 6px', borderRadius: '6px', border: '1px solid #ede9fe' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7c3aed' }}>#{idx + 1}</span>
+                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 65px 75px 24px', gap: '0.4rem', alignItems: 'center', background: 'rgba(15, 23, 42, 0.85)', padding: '4px 6px', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c084fc' }}>#{idx + 1}</span>
                         
-                        {/* Panna Selector */}
                         <select
                           value={row.panna}
                           onChange={e => handleUsageRowChange(row.id, 'panna', e.target.value)}
-                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, color: '#5b21b6', background: '#ffffff' }}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.78rem', fontWeight: 800, color: '#c084fc', background: 'rgba(11, 17, 32, 0.90)' }}
                         >
                           {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
                         </select>
 
-                        {/* Rolls Qty */}
                         <input
                           type="number"
                           min="1"
                           placeholder="Rolls"
                           value={row.rolls}
                           onChange={e => handleUsageRowChange(row.id, 'rolls', e.target.value)}
-                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, width: '100%', background: '#ffffff' }}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.78rem', fontWeight: 700, width: '100%', background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
                         />
 
-                        {/* Roll Weight (KG) */}
                         <input
                           type="number"
                           step="0.01"
                           placeholder="Weight Kg"
                           value={row.weightKg}
                           onChange={e => handleUsageRowChange(row.id, 'weightKg', e.target.value)}
-                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, width: '100%', color: '#6d28d9', background: '#ffffff' }}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.78rem', fontWeight: 800, width: '100%', color: '#c084fc', background: 'rgba(11, 17, 32, 0.90)' }}
                         />
 
-                        {/* Remove Row Button */}
                         {reportForm.usageRows.length > 1 ? (
-                          <Trash2 size={13} style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => handleRemoveUsageRow(row.id)} />
+                          <Trash2 size={13} style={{ cursor: 'pointer', color: '#f87171' }} onClick={() => handleRemoveUsageRow(row.id)} />
                         ) : <span />}
                       </div>
                     ))}
@@ -4478,19 +4434,19 @@ export default function FusingDepartment() {
               </div>
 
               {/* Butter Paper Panna-wise Consumption Summary */}
-              <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.82rem' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ background: 'rgba(11, 17, 32, 0.85)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.22)', fontSize: '0.82rem' }}>
+                <div style={{ fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span>🧈 Butter Paper Consumption Summary by Panna</span>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Weight in KG</span>
+                  <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Weight in KG</span>
                 </div>
                 {Object.keys(stats.pannaButterKgMap).length === 0 ? (
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>No Panna-wise Butter Paper consumption logged yet.</div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
                     {Object.entries(stats.pannaButterKgMap).map(([pannaName, kgVal]) => (
-                      <div key={pannaName} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 800, color: '#0284c7' }}>{pannaName}</span>
-                        <span style={{ fontWeight: 900, color: '#6d28d9' }}>{kgVal.toFixed(2)} kg</span>
+                      <div key={pannaName} style={{ background: 'rgba(15, 23, 42, 0.90)', border: '1px solid rgba(148, 163, 184, 0.25)', padding: '6px 10px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 800, color: '#38bdf8' }}>{pannaName}</span>
+                        <span style={{ fontWeight: 900, color: '#c084fc' }}>{kgVal.toFixed(2)} kg</span>
                       </div>
                     ))}
                   </div>
@@ -4502,7 +4458,6 @@ export default function FusingDepartment() {
                 <button
                   type="button"
                   onClick={async () => {
-                    // Log raw material transactions for inward & usage rows
                     try {
                       for (const r of reportForm.inwardRows) {
                         if (r.weightKg && Number(r.weightKg) > 0) {
@@ -4549,29 +4504,30 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── MODAL 3: INLINE QUICK PANNA DROPDOWN MANAGER ── */}
+      {/* ── MODAL 3: INLINE QUICK PANNA DROPDOWN MANAGER (Dark Frosted Glass) ── */}
       {showPannaManagerModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            background: '#ffffff', width: '100%', maxWidth: '480px',
-            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #cbd5e1', overflow: 'hidden', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem'
+            background: 'rgba(15, 23, 42, 0.96)', width: '100%', maxWidth: '480px',
+            borderRadius: '16px', boxShadow: '0 28px 64px rgba(0, 0, 0, 0.70)',
+            border: '1px solid rgba(148, 163, 184, 0.26)', overflow: 'hidden', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem',
+            color: '#ffffff'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0369a1', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Gauge size={18} color="#0284c7" /> Manage Panna / Paper Width Dropdown
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.20)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Gauge size={18} color="#38bdf8" /> Manage Panna / Paper Width Dropdown
               </h3>
-              <button type="button" onClick={() => setShowPannaManagerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+              <button type="button" onClick={() => setShowPannaManagerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={18} />
               </button>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '0.35rem' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.35rem' }}>
                 Add New Panna Width (e.g. 72" or 38")
               </label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -4581,7 +4537,7 @@ export default function FusingDepartment() {
                   value={newPannaInput}
                   onChange={e => setNewPannaInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddPannaOption())}
-                  style={{ flex: 1, padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                  style={{ flex: 1, padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.88rem', fontWeight: 700, background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
                 />
                 <button type="button" onClick={handleAddPannaOption} className="btn-primary" style={{ padding: '0.5rem 1rem', background: '#0284c7', borderColor: '#0284c7' }}>
                   + Add Panna
@@ -4590,20 +4546,20 @@ export default function FusingDepartment() {
             </div>
 
             <div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.5rem' }}>
                 Currently Active Panna Width Options ({pannaOptions.length}):
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', maxHeight: '180px', overflowY: 'auto' }}>
                 {pannaOptions.map(p => (
-                  <span key={p} style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', padding: '4px 12px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span key={p} style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '4px 12px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                     {p}
-                    <Trash2 size={13} style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => handleRemovePannaOption(p)} title={`Remove ${p} Panna`} />
+                    <Trash2 size={13} style={{ cursor: 'pointer', color: '#f87171' }} onClick={() => handleRemovePannaOption(p)} title={`Remove ${p} Panna`} />
                   </span>
                 ))}
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(148, 163, 184, 0.20)', paddingTop: '0.75rem' }}>
               <button type="button" onClick={() => setShowPannaManagerModal(false)} className="btn-primary" style={{ padding: '0.5rem 1.25rem' }}>
                 Done
               </button>
@@ -4612,45 +4568,46 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── MODAL 4: INWARD BUTTER PAPER ROLL ENTRY MODAL ── */}
+      {/* ── MODAL 4: INWARD BUTTER PAPER ROLL ENTRY MODAL (Dark Frosted Glass) ── */}
       {showButterPaperInwardModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <form onSubmit={handleButterPaperInwardSubmit} style={{
-            background: '#ffffff', width: '100%', maxWidth: '500px',
-            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #cbd5e1', overflow: 'hidden', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem'
+            background: 'rgba(15, 23, 42, 0.96)', width: '100%', maxWidth: '500px',
+            borderRadius: '16px', boxShadow: '0 28px 64px rgba(0, 0, 0, 0.70)',
+            border: '1px solid rgba(148, 163, 184, 0.26)', overflow: 'hidden', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem',
+            color: '#ffffff'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <PlusCircle size={20} color="#0284c7" /> 📦 Butter Paper Roll Inward Entry
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.20)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <PlusCircle size={20} color="#38bdf8" /> 📦 Butter Paper Roll Inward Entry
               </h3>
-              <button type="button" onClick={() => setShowButterPaperInwardModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+              <button type="button" onClick={() => setShowButterPaperInwardModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={18} />
               </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>INWARD DATE *</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.3rem' }}>INWARD DATE *</label>
                 <input
                   type="date"
                   required
                   value={inwardButterForm.date}
                   onChange={e => setInwardButterForm(f => ({ ...f, date: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.88rem', fontWeight: 700, background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>PANNA WIDTH *</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.3rem' }}>PANNA WIDTH *</label>
                 <select
                   value={inwardButterForm.panna}
                   onChange={e => setInwardButterForm(f => ({ ...f, panna: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800, color: '#0369a1' }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.88rem', fontWeight: 800, color: '#38bdf8', background: 'rgba(11, 17, 32, 0.90)' }}
                 >
                   {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
                 </select>
@@ -4659,7 +4616,7 @@ export default function FusingDepartment() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>NO. OF ROLLS *</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.3rem' }}>NO. OF ROLLS *</label>
                 <input
                   type="number"
                   min="1"
@@ -4667,12 +4624,12 @@ export default function FusingDepartment() {
                   placeholder="e.g. 2"
                   value={inwardButterForm.rolls}
                   onChange={e => setInwardButterForm(f => ({ ...f, rolls: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800 }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.88rem', fontWeight: 800, background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem' }}>TOTAL WEIGHT (KG) *</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#c084fc', marginBottom: '0.3rem' }}>TOTAL WEIGHT (KG) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -4681,34 +4638,34 @@ export default function FusingDepartment() {
                   placeholder="e.g. 45.5"
                   value={inwardButterForm.weightKg}
                   onChange={e => setInwardButterForm(f => ({ ...f, weightKg: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '2px solid #8b5cf6', fontSize: '0.92rem', fontWeight: 900, color: '#6d28d9', background: '#f5f3ff' }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '2px solid rgba(192, 132, 252, 0.50)', fontSize: '0.92rem', fontWeight: 900, color: '#c084fc', background: 'rgba(168, 85, 247, 0.14)' }}
                 />
               </div>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>SUPPLIER / VENDOR NAME</label>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.3rem' }}>SUPPLIER / VENDOR NAME</label>
               <input
                 type="text"
                 placeholder="e.g. Paramount Papers / Self Purchase"
                 value={inwardButterForm.vendorName}
                 onChange={e => setInwardButterForm(f => ({ ...f, vendorName: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600 }}
+                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.88rem', fontWeight: 600, background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>REMARKS / NOTES</label>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '0.3rem' }}>REMARKS / NOTES</label>
               <input
                 type="text"
                 placeholder="Optional notes..."
                 value={inwardButterForm.notes}
                 onChange={e => setInwardButterForm(f => ({ ...f, notes: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 500 }}
+                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', fontSize: '0.88rem', fontWeight: 500, background: 'rgba(11, 17, 32, 0.90)', color: '#ffffff' }}
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(148, 163, 184, 0.20)', paddingTop: '0.85rem' }}>
               <button type="button" onClick={() => setShowButterPaperInwardModal(false)} className="btn-secondary" style={{ padding: '0.55rem 1.25rem' }}>
                 Cancel
               </button>
@@ -4720,55 +4677,50 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── MODAL: QUICK FUSING SPEED & TEMPERATURE UPDATE ── */}
+      {/* ── MODAL: QUICK FUSING SPEED & TEMPERATURE UPDATE (Dark Frosted Glass) ── */}
       {showSpeedTempModal && speedTempCard && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+          background: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(8px)',
           zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            background: '#ffffff', width: '100%', maxWidth: '520px',
-            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #bae6fd', overflow: 'hidden'
+            background: 'rgba(15, 23, 42, 0.96)', width: '100%', maxWidth: '520px',
+            borderRadius: '16px', boxShadow: '0 28px 64px rgba(0, 0, 0, 0.70)',
+            border: '1px solid rgba(56, 189, 248, 0.35)', overflow: 'hidden', color: '#ffffff'
           }}>
             {/* Modal Header */}
-            <div style={{ padding: '1.1rem 1.35rem', background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.1rem 1.35rem', background: 'rgba(11, 17, 32, 0.94)', borderBottom: '1px solid rgba(148, 163, 184, 0.20)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Gauge size={20} color="#ffffff" />
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.20)', border: '1px solid rgba(56, 189, 248, 0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Gauge size={20} color="#38bdf8" />
                 </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
-                    Job #{speedTempCard.jobNo || 'JOB'} — Fusing Specs
-                  </h3>
-                  <span style={{ fontSize: '0.74rem', color: '#e0f2fe', fontWeight: 600 }}>
-                    Change Fusing Machine Temperature &amp; Speed
-                  </span>
-                </div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                  Job #{speedTempCard.jobNo || 'JOB'} — Fusing Specs
+                </h3>
               </div>
-              <button type="button" onClick={() => setShowSpeedTempModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ffffff' }}>
+              <button type="button" onClick={() => setShowSpeedTempModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={20} />
               </button>
             </div>
 
             {/* Card Information Summary Badge */}
-            <div style={{ padding: '0.85rem 1.35rem', background: '#f0f9ff', borderBottom: '1px solid #e0f2fe', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div style={{ padding: '0.85rem 1.35rem', background: 'rgba(30, 41, 59, 0.65)', borderBottom: '1px solid rgba(148, 163, 184, 0.18)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PARTY</span>
-                <strong style={{ color: '#0f172a', fontWeight: 800 }}>{speedTempCard.party || '—'}</strong>
+                <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PARTY</span>
+                <strong style={{ color: '#ffffff', fontWeight: 800 }}>{speedTempCard.party || '—'}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>DESIGN</span>
-                <strong style={{ color: '#0284c7', fontWeight: 800 }}>{speedTempCard.designName || speedTempCard.designNo || '—'}</strong>
+                <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>DESIGN</span>
+                <strong style={{ color: '#38bdf8', fontWeight: 800 }}>{speedTempCard.designName || speedTempCard.designNo || '—'}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>FABRIC &amp; PANNA</span>
-                <strong style={{ color: '#0f172a', fontWeight: 700 }}>{speedTempCard.fabric || 'Fabric'} {speedTempCard.panna ? `(${speedTempCard.panna}")` : ''}</strong>
+                <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>FABRIC &amp; PANNA</span>
+                <strong style={{ color: '#ffffff', fontWeight: 700 }}>{speedTempCard.fabric || 'Fabric'} {speedTempCard.panna ? `(${speedTempCard.panna}")` : ''}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PRINTED METERS</span>
-                <strong style={{ color: '#059669', fontWeight: 800 }}>{getCardPrintedMeters(speedTempCard) || '0'} mtr</strong>
+                <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PRINTED METERS</span>
+                <strong style={{ color: '#34d399', fontWeight: 800 }}>{getCardPrintedMeters(speedTempCard) || '0'} mtr</strong>
               </div>
             </div>
 
@@ -4777,13 +4729,13 @@ export default function FusingDepartment() {
               
               {/* 1. Fusing Machine */}
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
                   <Cpu size={14} /> FUSING MACHINE *
                 </label>
                 <select
                   value={speedTempForm.fusingMachine}
                   onChange={e => setSpeedTempForm(f => ({ ...f, fusingMachine: e.target.value }))}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(148, 163, 184, 0.28)', fontSize: '0.9rem', fontWeight: 800, background: 'rgba(11, 17, 32, 0.90)', color: '#38bdf8', cursor: 'pointer' }}
                 >
                   {DEFAULT_FUSING_MACHINES.map(m => (
                     <option key={m} value={m}>{m}</option>
@@ -4793,7 +4745,7 @@ export default function FusingDepartment() {
 
               {/* 2. Fusing Temperature */}
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#d97706', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
                   <Thermometer size={14} /> FUSING TEMPERATURE (°C) *
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
@@ -4803,7 +4755,7 @@ export default function FusingDepartment() {
                     value={speedTempForm.fusingTemp}
                     onChange={e => setSpeedTempForm(f => ({ ...f, fusingTemp: e.target.value }))}
                     placeholder="e.g. 210°C"
-                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #fde68a', fontSize: '0.92rem', fontWeight: 800, background: '#fffbe6', color: '#92400e' }}
+                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(251, 191, 36, 0.40)', fontSize: '0.92rem', fontWeight: 800, background: 'rgba(245, 158, 11, 0.14)', color: '#fbbf24' }}
                   />
                 </div>
                 {/* Preset Chips */}
@@ -4815,9 +4767,9 @@ export default function FusingDepartment() {
                       onClick={() => setSpeedTempForm(f => ({ ...f, fusingTemp: temp }))}
                       style={{
                         padding: '2px 8px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px', cursor: 'pointer',
-                        background: speedTempForm.fusingTemp === temp ? '#d97706' : '#fef3c7',
-                        color: speedTempForm.fusingTemp === temp ? '#ffffff' : '#92400e',
-                        border: '1px solid #fde68a', transition: 'all 0.1s'
+                        background: speedTempForm.fusingTemp === temp ? '#d97706' : 'rgba(245, 158, 11, 0.16)',
+                        color: speedTempForm.fusingTemp === temp ? '#ffffff' : '#fbbf24',
+                        border: '1px solid rgba(251, 191, 36, 0.40)', transition: 'all 0.1s'
                       }}
                     >
                       {temp}
@@ -4828,7 +4780,7 @@ export default function FusingDepartment() {
 
               {/* 3. Fusing Speed */}
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
                   <Gauge size={14} /> FUSING MACHINE SPEED (m/min) *
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
@@ -4836,7 +4788,7 @@ export default function FusingDepartment() {
                     required
                     value={speedTempForm.fusingSpeed || '80'}
                     onChange={e => setSpeedTempForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af', cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(56, 189, 248, 0.40)', fontSize: '0.92rem', fontWeight: 800, background: 'rgba(56, 189, 248, 0.14)', color: '#38bdf8', cursor: 'pointer' }}
                   >
                     {speedTempForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(speedTempForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
                       <option value={speedTempForm.fusingSpeed}>{speedTempForm.fusingSpeed}</option>
@@ -4857,9 +4809,9 @@ export default function FusingDepartment() {
                       onClick={() => setSpeedTempForm(f => ({ ...f, fusingSpeed: String(spd) }))}
                       style={{
                         padding: '2px 8px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px', cursor: 'pointer',
-                        background: String(speedTempForm.fusingSpeed) === String(spd) ? '#2563eb' : '#dbeafe',
-                        color: String(speedTempForm.fusingSpeed) === String(spd) ? '#ffffff' : '#1e40af',
-                        border: '1px solid #bfdbfe', transition: 'all 0.1s'
+                        background: String(speedTempForm.fusingSpeed) === String(spd) ? '#2563eb' : 'rgba(56, 189, 248, 0.16)',
+                        color: String(speedTempForm.fusingSpeed) === String(spd) ? '#ffffff' : '#38bdf8',
+                        border: '1px solid rgba(56, 189, 248, 0.40)', transition: 'all 0.1s'
                       }}
                     >
                       {spd}
@@ -4873,7 +4825,7 @@ export default function FusingDepartment() {
                 <button
                   type="button"
                   onClick={() => setShowSpeedTempModal(false)}
-                  style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                  style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.28)', background: 'rgba(30, 41, 59, 0.85)', color: '#e2e8f0', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -4882,9 +4834,9 @@ export default function FusingDepartment() {
                   disabled={submitting}
                   style={{
                     padding: '0.6rem 1.4rem', borderRadius: '8px', border: 'none',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     color: '#ffffff', fontWeight: 900, fontSize: '0.88rem', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+                    display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)'
                   }}
                 >
                   {submitting ? <RefreshCw size={16} className="spin-loader" /> : <Zap size={16} />}

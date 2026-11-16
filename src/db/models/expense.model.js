@@ -25,6 +25,20 @@ const expenseSchema = new mongoose.Schema(
       set: normalizeIsoDateString
     },
     type: { type: String, required: true, enum: ['IN', 'OUT'], default: 'OUT' },
+    entryType: { type: String, enum: ['general', 'contra'], default: 'general', index: true },
+    contraDetails: {
+      type: {
+        contraMode: { type: String, default: 'bank_to_cash' }, // 'bank_to_cash' | 'cash_to_bank' | 'bank_to_bank' | 'party_offset'
+        fromAccount: { type: String, default: '' },
+        toAccount: { type: String, default: '' },
+        debitParty: { type: String, default: '' },
+        creditParty: { type: String, default: '' },
+        referenceNo: { type: String, default: '' },
+        narration: { type: String, default: '' },
+      },
+      default: null,
+      _id: false,
+    },
     category: { type: String, required: true, default: 'Miscellaneous', trim: true },
     title: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },

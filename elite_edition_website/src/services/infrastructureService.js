@@ -66,15 +66,17 @@ export async function settleBill(billId, paymentData = {}) {
 /**
  * Download official Tax Invoice PDF directly in browser
  */
-export async function downloadInvoicePdf(billId, month = 'Month') {
+export async function downloadInvoicePdf(billId, month = 'Month', platform = 'aws') {
   const res = await apiClient.get(getEndpoint(`/billing/${billId}/invoice`), {
+    params: { platform },
     responseType: 'blob',
   });
   const blob = new Blob([res.data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Invoice-Infrastructure-${month.replace(/\s+/g, '-')}.pdf`;
+  const prefix = platform === 'aws' ? 'AWS-Tax-Invoice' : platform === 'mongodb' ? 'MongoDB-Atlas-Tax-Invoice' : platform === 'cloudflare' ? 'Cloudflare-R2-Invoice' : 'Cloud-Infrastructure-Invoice';
+  link.download = `${prefix}-${month.replace(/\s+/g, '-')}.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

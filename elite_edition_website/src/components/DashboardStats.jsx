@@ -1,6 +1,8 @@
 import React, { useState, useMemo, memo } from 'react';
 import { Package, TrendingUp, IndianRupee, AlertTriangle, Layers, ShoppingBag, MapPin, Activity, PieChart, BarChart3 } from 'lucide-react';
 import DashboardList from './DashboardList';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import QuickActionMenu from './common/QuickActionMenu';
 
 function DashboardStats({ items = [], sales = [] }) {
   const safeItems = Array.isArray(items) ? items : [];
@@ -194,42 +196,83 @@ function DashboardStats({ items = [], sales = [] }) {
 
   // threshold is interactive state — kept outside useMemo
   const [threshold, setThreshold] = useState(10);
+  const [activeSubTab, setActiveSubTab] = useState('overview');
   const lowStockItems = safeItems.filter(item => (item.currentlyAvailableStock || 0) <= threshold);
 
   return (
     <div style={styles.container}>
-      
-      {/* SECTION 1: SALES PERFORMANCE SUMMARY */}
-      <div>
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>Sales Performance</h2>
+      {/* ── TIER 1: CLEAN HEADER (No Extra Text, Quick Action on Right) ── */}
+      <div className="glass-screen-header">
+        <div className="glass-title-capsule">
+          <div className="glass-title-icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #2563eb)' }}>
+            <Activity size={16} color="#ffffff" />
+          </div>
+          <span className="glass-screen-title">E-Commerce &amp; Inventory Hub</span>
+          <EntityBrandBadge entityId="Elite Online" />
         </div>
-        <div className="stats-grid" style={styles.statsGrid}>
-          <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardValue}>
-              Rs. {totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </div>
-            <div style={styles.cardTitle}>Sales Revenue</div>
-          </div>
 
-          <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardValue}>{totalOrders}</div>
-            <div style={styles.cardTitle}>Total Orders</div>
-          </div>
+        <div className="ent-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <QuickActionMenu />
+        </div>
+      </div>
 
-          <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardValue}>
-              Rs. {avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </div>
-            <div style={styles.cardTitle}>Avg Order Value</div>
-          </div>
+      {/* ── TIER 2: SUB-SCREEN BUTTONS BAR (Under Header) ── */}
+      <div className="glass-subtabs-bar">
+        {[
+          { id: 'overview', label: 'Overview & Analytics' },
+          { id: 'inventory', label: `Inventory (${totalUnique})` },
+          { id: 'orders', label: `Orders (${totalOrders})` },
+          { id: 'low_stock', label: `Low Stock (${lowStockItems.length})` },
+        ].map(st => (
+          <button
+            key={st.id}
+            type="button"
+            className={`glass-subtab-btn ${activeSubTab === st.id ? 'active' : ''}`}
+            onClick={() => setActiveSubTab(st.id)}
+          >
+            <span>{st.label}</span>
+          </button>
+        ))}
+      </div>
 
-          <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardValue}>
-              {deliveredOrders}
-            </div>
-            <div style={styles.cardTitle}>Delivered Orders</div>
-          </div>
+      {/* ── TIER 3: SIDE SCROLLING CALCULATION & KPI CARDS TRACK ── */}
+      <div className="glass-scroll-track">
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Sales Revenue</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
+            ₹{totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          </span>
+          <span className="glass-calc-sub">Gross E-Commerce Sales</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Total Orders</span>
+          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{totalOrders}</span>
+          <span className="glass-calc-sub">{deliveredOrders} Delivered Orders</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Avg Order Value</span>
+          <span className="glass-calc-value" style={{ color: '#c084fc' }}>
+            ₹{avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          </span>
+          <span className="glass-calc-sub">Per Customer Order</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Available Stock</span>
+          <span className="glass-calc-value" style={{ color: '#34d399' }}>
+            {totalStock.toLocaleString('en-IN')} Pcs
+          </span>
+          <span className="glass-calc-sub">Across {totalUnique} SKUs</span>
+        </div>
+
+        <div className="glass-calc-card">
+          <span className="glass-calc-title">Potential Profit</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
+            ₹{potentialProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          </span>
+          <span className="glass-calc-sub">{averageMargin}% Avg Margin</span>
         </div>
       </div>
 
@@ -381,8 +424,8 @@ function DashboardStats({ items = [], sales = [] }) {
                     />
                   ))}
                   {/* Center Text */}
-                  <text x="80" y="75" textAnchor="middle" fill="var(--text-muted)" fontSize="8" fontWeight="600" letterSpacing="0.05em">TOTAL</text>
-                  <text x="80" y="93" textAnchor="middle" fill="#0f172a" fontSize="13" fontWeight="bold">{new Intl.NumberFormat('en-IN').format(totalCatItems)}</text>
+                  <text x="80" y="75" textAnchor="middle" fill="rgba(255, 255, 255, 0.72)" fontSize="8" fontWeight="600" letterSpacing="0.05em">TOTAL</text>
+                  <text x="80" y="93" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="bold">{new Intl.NumberFormat('en-IN').format(totalCatItems)}</text>
                 </svg>
                 
                 {/* Donut Legend */}
@@ -432,7 +475,7 @@ function DashboardStats({ items = [], sales = [] }) {
                       <text 
                         x={paddingLeft - 10} 
                         y={y + 12} 
-                        fill="var(--text-muted)" 
+                        fill="rgba(255, 255, 255, 0.85)" 
                         fontSize="9" 
                         fontWeight="600" 
                         textAnchor="end"
@@ -445,7 +488,7 @@ function DashboardStats({ items = [], sales = [] }) {
                         y={y} 
                         width={maxBarWidth} 
                         height={barHeight} 
-                        fill="rgba(255, 255, 255, 0.02)" 
+                        fill="rgba(255, 255, 255, 0.08)" 
                         rx="3" 
                       />
                       {/* Filled Bar */}
@@ -461,7 +504,7 @@ function DashboardStats({ items = [], sales = [] }) {
                       <text 
                         x={paddingLeft + barWidth + 8} 
                         y={y + 12} 
-                        fill="#0f172a" 
+                        fill="#ffffff" 
                         fontSize="9" 
                         fontWeight="bold"
                       >
@@ -513,13 +556,13 @@ function DashboardStats({ items = [], sales = [] }) {
                         y1={y} 
                         x2={500 - paddingRight} 
                         y2={y} 
-                        stroke="rgba(255, 255, 255, 0.04)" 
+                        stroke="rgba(255, 255, 255, 0.08)" 
                         strokeWidth="1" 
                       />
                       <text 
                         x={paddingLeft - 8} 
                         y={y + 3} 
-                        fill="var(--text-muted)" 
+                        fill="rgba(255, 255, 255, 0.72)" 
                         fontSize="8" 
                         textAnchor="end"
                       >
@@ -591,7 +634,7 @@ function DashboardStats({ items = [], sales = [] }) {
                       <text 
                         x={xCenter} 
                         y={220 - paddingBottom + 16} 
-                        fill="#0f172a" 
+                        fill="#ffffff" 
                         fontSize="8" 
                         fontWeight="600" 
                         textAnchor="middle"
@@ -601,7 +644,7 @@ function DashboardStats({ items = [], sales = [] }) {
                       <text 
                         x={xCenter} 
                         y={220 - paddingBottom + 26} 
-                        fill="var(--text-muted)" 
+                        fill="rgba(255, 255, 255, 0.72)" 
                         fontSize="7" 
                         textAnchor="middle"
                       >
@@ -822,7 +865,7 @@ const styles = {
     flexShrink: 0,
   },
   legendName: {
-    color: '#1e293b',
+    color: '#ffffff',
     fontWeight: '600',
     flex: 1,
     overflow: 'hidden',
@@ -831,7 +874,7 @@ const styles = {
     maxWidth: '100px',
   },
   legendPct: {
-    color: 'var(--text-muted)',
+    color: 'rgba(255, 255, 255, 0.72)',
     fontWeight: '600',
     marginLeft: '8px',
   },
@@ -846,7 +889,7 @@ const styles = {
     fontSize: '0.8rem',
   },
   itemNameText: {
-    color: '#0f172a',
+    color: '#ffffff',
     fontWeight: '600',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -854,7 +897,7 @@ const styles = {
     maxWidth: '160px',
   },
   itemSizeText: {
-    color: 'var(--text-muted)',
+    color: 'rgba(255, 255, 255, 0.72)',
     marginLeft: '4px',
   },
   barWrapper: {
@@ -868,8 +911,8 @@ const styles = {
   },
   barValue: {
     fontSize: '0.8rem',
-    fontWeight: '600',
-    color: 'var(--primary)',
+    fontWeight: '700',
+    color: '#38bdf8',
   },
   alertList: {
     display: 'flex',

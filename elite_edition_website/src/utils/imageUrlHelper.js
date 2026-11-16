@@ -6,6 +6,84 @@
 export const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
 /**
+ * Extracts a usable product image URL from any EON / API product, inventory, or sale order object.
+ */
+export function extractApiProductImage(item) {
+  if (!item) return '';
+  if (typeof item === 'string') return item.trim();
+  if (typeof item !== 'object') return '';
+
+  const directCandidates = [
+    item.imageUrl,
+    item.productImage,
+    item.image_url,
+    item.itemTypeImageUrl,
+    item.image,
+    item.photo,
+    item.thumbnail,
+    item.imgUrl,
+    item.imageUrl1,
+    Array.isArray(item.imageUrls) ? item.imageUrls[0] : null,
+    Array.isArray(item.images) ? item.images[0] : null,
+  ];
+
+  for (const cand of directCandidates) {
+    if (cand && typeof cand === 'string') {
+      const t = cand.trim();
+      if (t && t.toLowerCase() !== 'null' && t.toLowerCase() !== 'undefined' && !t.includes('placeholder')) {
+        return t;
+      }
+    }
+  }
+
+  // Check Unicommerce customFieldValues or itemDetailFieldDTOList
+  const customLists = [item.customFieldValues, item.itemDetailFieldDTOList];
+  for (const list of customLists) {
+    if (Array.isArray(list)) {
+      for (const entry of list) {
+        if (!entry || typeof entry !== 'object') continue;
+        const val = entry.fieldValue || entry.value || entry.imageUrl || '';
+        if (typeof val === 'string' && /^https?:\/\/.+/i.test(val.trim())) {
+          return val.trim();
+        }
+      }
+    } else if (list && typeof list === 'object') {
+      for (const val of Object.values(list)) {
+        if (typeof val === 'string' && /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)/i.test(val.trim())) {
+          return val.trim();
+        }
+      }
+    }
+  }
+
+  if (typeof item.productPageUrl === 'string' && /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(item.productPageUrl.trim())) {
+    return item.productPageUrl.trim();
+  }
+
+  return '';
+}
+
+function isExternalCdnUrl(raw) {
+  if (!raw || typeof raw !== 'string') return false;
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return false;
+  try {
+    const parsed = new URL(trimmed);
+    const host = (parsed.hostname || '').toLowerCase();
+    return !(
+      host === '3.7.174.180' ||
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.endsWith('eliteedition.in') ||
+      host.endsWith('.r2.dev') ||
+      host.endsWith('.r2.cloudflarestorage.com')
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Extracts a clean relative filename from any raw URL or string.
  * Strips query parameters, hashes, leading slashes, and decodes any existing percent-encoding
  * so that subsequent encoding does not produce double-encoded (%2520) URLs.
@@ -14,6 +92,7 @@ export function extractCleanFilename(raw) {
   if (!raw || typeof raw !== 'string') return '';
   let str = raw.trim();
   if (str.startsWith('data:')) return '';
+  if (isExternalCdnUrl(str)) return '';
 
   if (str.includes('/sample_reference/')) {
     str = 'sample_reference/' + str.split('/sample_reference/')[1];
@@ -197,6 +276,11 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     return [raw];
   }
 
+  // Strict mode for EON Inventory: never guess R2/design URLs if no explicit Uniware/product URL exists
+  if (options.strictDirectOnly && !raw) {
+    return [];
+  }
+
   // 2. TIFF files: browsers cannot decode TIFF natively in <img> tags.
   // Prioritize server-side on-the-fly Sharp conversion to JPEG.
   if (isTiffFile(raw)) {
@@ -230,27 +314,47 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
 
   const rawFilename = extractCleanFilename(raw);
   const cleanDesign = (dName || '').replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
+  const isCatalogOrInv = options.category === 'catalog' || options.category === 'inventory';
 
   // Collect all valid text identifiers (sku, brand codes, designName, etc.)
   const nameSet = new Set();
   const addNameCandidate = (val) => {
     if (!val || typeof val !== 'string') return;
     const trimmed = val.trim();
-    if (!trimmed) return;
+    if (!trimmed || trimmed.length > 40 || trimmed.includes('—')) return;
     const upper = trimmed.toUpperCase();
-    if (upper === 'UNNAMED PRODUCT' || upper === 'PRODUCT' || upper === 'ITEM' || upper === 'DEFAULT' || upper === 'N/A') return;
+    if (
+      upper === 'UNNAMED PRODUCT' ||
+      upper === 'UNIWARE SKU' ||
+      upper === 'PRODUCT' ||
+      upper === 'ITEM' ||
+      upper === 'SKU' ||
+      upper === 'DEFAULT' ||
+      upper === 'N/A' ||
+      upper === 'KURTA SET' ||
+      upper === 'APPAREL'
+    ) {
+      return;
+    }
     nameSet.add(trimmed);
   };
 
-  addNameCandidate(cleanDesign);
   if (options.sku) addNameCandidate(options.sku);
+  addNameCandidate(cleanDesign);
   if (Array.isArray(options.identifiers)) {
     options.identifiers.forEach(addNameCandidate);
   }
 
-  // 4. Direct absolute HTTP/HTTPS URL (Cloudflare R2 / CDN link / user-provided URL)
-  // When an explicit URL is provided, it is the actual designated image and MUST be prioritized.
+  // 4. Direct absolute HTTP/HTTPS URL (API product image link / Marketplace CDN / Cloudflare R2)
+  // When an explicit URL is provided from the API, prioritize it immediately!
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    if (isExternalCdnUrl(raw)) {
+      const httpsRaw = raw.startsWith('http://') ? raw.replace(/^http:\/\//i, 'https://') : raw;
+      add(httpsRaw);
+      add(`/v1/upload/preview?url=${encodeURIComponent(httpsRaw)}&w=${width}`);
+      if (raw !== httpsRaw) add(raw);
+      return candidates;
+    }
     add(raw);
     if (raw.includes('/designs/')) {
       add(raw.replace('/designs/', '/sample_reference/'));
@@ -272,12 +376,14 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
       add(`${R2_PUBLIC_BASE}/${rawFilename}`);
     } else {
       add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(rawFilename)}`);
-      add(`${R2_PUBLIC_BASE}/sample_reference/${encodeURIComponent(rawFilename)}`);
-      add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(rawFilename)}`);
-      add(`/uploads/${encodeURIComponent(rawFilename)}`);
+      if (!isCatalogOrInv) {
+        add(`${R2_PUBLIC_BASE}/sample_reference/${encodeURIComponent(rawFilename)}`);
+        add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(rawFilename)}`);
+        add(`/uploads/${encodeURIComponent(rawFilename)}`);
+      }
     }
 
-    if (!rawFilename.startsWith('image-') && !rawFilename.startsWith('blob-')) {
+    if (!isCatalogOrInv && !rawFilename.startsWith('image-') && !rawFilename.startsWith('blob-')) {
       const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
       if (baseWithoutExt) {
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
@@ -293,6 +399,11 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   for (const ident of nameSet) {
     const cleanIdent = ident.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '').trim();
     if (!cleanIdent) continue;
+
+    // For EON catalog/inventory items without an explicit API image URL, do not fire speculative 404 R2 requests.
+    if (isCatalogOrInv) {
+      break;
+    }
 
     // Direct match with common image extensions
     add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanIdent)}.jpg`);
@@ -392,7 +503,12 @@ export function getOptimizedThumbnailUrl(src, options = {}) {
     return clean.startsWith('/') ? clean : `/${clean}`;
   }
 
-  // 5. Default return
+  // 5. External HTTP CDN URLs -> upgrade to HTTPS so browsers never block mixed content
+  if (clean.startsWith('http://') && isExternalCdnUrl(clean)) {
+    return clean.replace(/^http:\/\//i, 'https://');
+  }
+
+  // 6. Default return
   return clean;
 }
 

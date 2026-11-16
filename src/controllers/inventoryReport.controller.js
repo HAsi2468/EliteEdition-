@@ -602,38 +602,78 @@ const groupInventoryItems = (rawItems, qtyField = 'currentlyAvailableStock') => 
 // Shared: enrich missing images from InventoryProduct
 // ─────────────────────────────────────────────────────────────
 const enrichImages = async (items) => {
-  const needImageSkus = items.filter(i => !i.imageUrl).map(i => i.sku);
+  const { normalizeImageUrl, extractApiImageUrl } = require('../utils/imageUrlHelper');
+  const needImageSkus = items.filter(i => !i.imageUrl).map(i => i.sku || i.skuCode).filter(Boolean);
   if (needImageSkus.length === 0) return;
 
-  const baseSkus = [...new Set(needImageSkus.map(s => extractBaseSku(s)))];
+  const baseSkus = [...new Set(needImageSkus.map(s => extractBaseSku(s)).filter(Boolean))];
   const regexes = baseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+  const designCandidates = [...new Set(baseSkus.flatMap(s => {
+    const clean = s.replace(/^(?:\d+|[A-Z]{1,4})[-_]/i, '').replace(/[_-]\d+$/, '').trim().toUpperCase();
+    return clean ? [s.toUpperCase(), clean, `ED-${clean}`] : [s.toUpperCase()];
+  }))];
 
-  const [productDocs, masterProducts] = await Promise.all([
-    db.InventoryProduct.find({
-      skuCode: { $in: regexes },
-      imageUrl: { $exists: true, $nin: [null, ''] }
-    }).lean(),
-    db.Product.find({
-      skuCode: { $in: regexes },
-      imageUrl: { $exists: true, $nin: [null, ''] }
-    }).lean()
+  const [productDocs, masterProducts, designs] = await Promise.all([
+    db.InventoryProduct.find(
+      { $or: [{ skuCode: { $in: regexes } }, { 'brandCodes.code': { $in: regexes } }] },
+      { skuCode: 1, imageUrl: 1, brandCodes: 1, customFieldValues: 1, itemDetailFieldDTOList: 1 }
+    ).lean().catch(() => []),
+    db.Product ? db.Product.find(
+      { $or: [{ skuCode: { $in: regexes } }, { 'brandCodes.code': { $in: regexes } }] },
+      { skuCode: 1, imageUrl: 1, brandCodes: 1, customFieldValues: 1, itemDetailFieldDTOList: 1 }
+    ).lean().catch(() => []) : Promise.resolve([]),
+    db.Design ? db.Design.find(
+      { $or: [{ designName: { $in: designCandidates } }, { designNo: { $in: designCandidates } }] },
+      { designNo: 1, designName: 1, imageUrl: 1 }
+    ).lean().catch(() => []) : Promise.resolve([])
   ]);
 
-  const allProductDocs = [...productDocs, ...masterProducts];
+  const imageMap = new Map();
+  const registerImg = (key, img) => {
+    if (!key || !img) return;
+    const k = String(key).trim().toUpperCase();
+    if (k && !imageMap.has(k)) imageMap.set(k, img);
+  };
 
-  const imageMap = {};
-  allProductDocs.forEach(p => {
-    const base = p.skuCode ? extractBaseSku(p.skuCode) : null;
-    if (base && p.imageUrl) {
-      if (!imageMap[base]) imageMap[base] = p.imageUrl;
-      if (!imageMap[p.skuCode]) imageMap[p.skuCode] = p.imageUrl;
+  [...productDocs, ...masterProducts].forEach(p => {
+    const cleanImg = normalizeImageUrl(extractApiImageUrl(p) || p.imageUrl);
+    if (!cleanImg) return;
+    if (p.skuCode) {
+      registerImg(p.skuCode, cleanImg);
+      registerImg(extractBaseSku(p.skuCode), cleanImg);
     }
+    if (Array.isArray(p.brandCodes)) {
+      p.brandCodes.forEach(bc => {
+        const code = typeof bc === 'string' ? bc : (bc?.code || bc?.brandCode);
+        if (code) {
+          registerImg(code, cleanImg);
+          registerImg(extractBaseSku(code), cleanImg);
+        }
+      });
+    }
+  });
+
+  designs.forEach(d => {
+    const cleanImg = normalizeImageUrl(d?.imageUrl);
+    if (!cleanImg) return;
+    [d.designName, d.designNo].filter(Boolean).forEach(dn => {
+      registerImg(dn, cleanImg);
+      const numOnly = String(dn).trim().toUpperCase().replace(/^ED[-_]?/i, '');
+      if (numOnly) registerImg(numOnly, cleanImg);
+    });
   });
 
   items.forEach(item => {
     if (!item.imageUrl) {
-      const base = extractBaseSku(item.sku);
-      item.imageUrl = imageMap[item.sku] || imageMap[base] || '';
+      const sku = (item.sku || item.skuCode || '').trim();
+      const fullK = sku.toUpperCase();
+      const baseK = extractBaseSku(sku).toUpperCase();
+      const coreNum = baseK.replace(/^(?:\d+|[A-Z]{1,4})[-_]/i, '').replace(/[_-]\d+$/, '').trim();
+      item.imageUrl =
+        imageMap.get(fullK) ||
+        imageMap.get(baseK) ||
+        (coreNum ? (imageMap.get(coreNum) || imageMap.get(`ED-${coreNum}`)) : '') ||
+        '';
     }
   });
 };
@@ -1252,6 +1292,18 @@ const getStockOutwardData = async (req, res) => {
     }
 
     const stockOutLogs = await db.StockOut.find(query).sort({ created_date_time: -1 }).lean();
+    const uniqueSkus = [...new Set(stockOutLogs.map(l => l.skuCode).filter(Boolean))];
+    const invDocs = uniqueSkus.length > 0
+      ? await db.Inventory.find(
+          { skuCode: { $in: uniqueSkus } },
+          { skuCode: 1, itemName: 1, party: 1, facility: 1, size: 1, purchasePrice: 1, salePrice: 1, imageUrl: 1 }
+        ).lean()
+      : [];
+    const invMap = new Map();
+    invDocs.forEach(doc => {
+      if (doc?.skuCode && !invMap.has(doc.skuCode)) invMap.set(doc.skuCode, doc);
+    });
+
     let totalQty = 0;
     let totalPurchase = 0;
     let totalSell = 0;
@@ -1259,7 +1311,7 @@ const getStockOutwardData = async (req, res) => {
 
     const items = [];
     for (const log of stockOutLogs) {
-      const inv = await db.Inventory.findOne({ skuCode: log.skuCode }).lean();
+      const inv = invMap.get(log.skuCode);
       const qty = Number(log.qtyOut || 1);
       const buyPrice = Number(inv?.purchasePrice || 0);
       const sellPrice = Number(inv?.salePrice || 0);

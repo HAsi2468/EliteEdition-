@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- Strict Content Security Policy with sha256 hash (SEC-005) -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-2rNJVazXbqeMKdNnCcimF1zyeQMLJbCiPoyDRdxUpPA=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.r2.dev https://*.cloudflarestorage.com https://*.s3.amazonaws.com https://*.amazonaws.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://drive.google.com; connect-src 'self' https://erp.eliteedition.in wss://erp.eliteedition.in ws://localhost:3001 http://localhost:3001 https://*.r2.dev https://*.cloudflarestorage.com https://*.s3.amazonaws.com; media-src 'self' blob: data: https://*.r2.dev; object-src 'self' blob: data:; frame-src 'self' blob: data: chrome-extension:; child-src 'self' blob: data: chrome-extension:; upgrade-insecure-requests;" />
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.r2.dev https://*.cloudflarestorage.com https://*.s3.amazonaws.com https://*.amazonaws.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://drive.google.com https://*.myntassets.com https://*.flixcart.com https://*.media-amazon.com https://*.unicommerce.com https://*.cloudfront.net https://*.giphy.com https://*.tenor.com; connect-src 'self' https://erp.eliteedition.in wss://erp.eliteedition.in ws://* http://* https://* wss://*; media-src 'self' blob: data: https://*.r2.dev; object-src 'self' blob: data:; frame-src 'self' blob: data: chrome-extension:; child-src 'self' blob: data: chrome-extension:;" />
     <script>
       (function() {
         var h = window.location.hostname;
@@ -24,15 +24,16 @@
         }
       })();
     </script>
-    <link rel="icon" type="image/png" href="/Logo.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon-glass.svg" />
+    <link rel="alternate icon" type="image/png" href="/Logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Elite ERP" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#090f1d" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
@@ -41,13 +42,13 @@
     <link rel="preload" href="/fonts/inter-500.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin />
 
-    <!-- Zero-CLS Critical CSS Placeholder & Light Theme Background -->
+    <!-- Zero-CLS Critical CSS Placeholder & Glass Theme Background -->
     <style>
       html, body {
         margin: 0;
         padding: 0;
-        background-color: #ffffff;
-        color: #0f172a;
+        background-color: #090f1d;
+        color: #ffffff;
         font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         overscroll-behavior: contain;
         overflow-x: hidden;
@@ -57,7 +58,7 @@
       }
       #root {
         min-height: 100dvh;
-        background-color: #ffffff;
+        background: transparent;
         display: flex;
         flex-direction: column;
         width: 100%;
@@ -112,7 +113,7 @@
     <!-- JsBarcode library loaded asynchronously (Non-render blocking) -->
     <script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   </head>
-  <body>
+  <body class="notranslate glass-theme-active" translate="no">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

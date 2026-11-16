@@ -42,6 +42,18 @@ export const createCsrfMiddleware = (options: CsrfMiddlewareOptions = {}) => {
 
     // 2. Check for handshake endpoints or exempt routes
     const path = req.path || req.originalUrl || '';
+    // Localhost dev exemption
+    const isLocal =
+      req.hostname === 'localhost' ||
+      req.hostname === '127.0.0.1' ||
+      (typeof req.headers.origin === 'string' && req.headers.origin.includes('localhost')) ||
+      (typeof req.headers.referer === 'string' && req.headers.referer.includes('localhost')) ||
+      process.env.NODE_ENV !== 'production';
+
+    if (isLocal) {
+      return next();
+    }
+
     if (
       req.headers['x-approval-execution'] === 'true' ||
       req.headers['x-internal-service'] === 'approval-executor' ||

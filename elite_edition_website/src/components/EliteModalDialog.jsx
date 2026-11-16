@@ -129,36 +129,36 @@ export default function EliteModalDialog() {
 
   const statusConfig = isDanger
     ? {
-        icon: <XCircle size={22} color="#dc2626" />,
-        badgeBg: '#fef2f2',
-        badgeBorder: '#fecaca',
-        titleColor: '#991b1b',
+        icon: <XCircle size={22} color="#f87171" />,
+        badgeBg: 'rgba(239, 68, 68, 0.2)',
+        badgeBorder: 'rgba(248, 113, 113, 0.45)',
+        titleColor: '#fca5a5',
         confirmBtnBg: 'linear-gradient(135deg, #ef4444, #dc2626)',
         confirmBtnColor: '#ffffff'
       }
     : isWarning
     ? {
-        icon: <AlertTriangle size={22} color="#d97706" />,
-        badgeBg: '#fffbeb',
-        badgeBorder: '#fde68a',
-        titleColor: '#92400e',
+        icon: <AlertTriangle size={22} color="#fbbf24" />,
+        badgeBg: 'rgba(245, 158, 11, 0.2)',
+        badgeBorder: 'rgba(251, 191, 36, 0.45)',
+        titleColor: '#fcd34d',
         confirmBtnBg: 'linear-gradient(135deg, #f59e0b, #d97706)',
         confirmBtnColor: '#ffffff'
       }
     : isSuccess
     ? {
-        icon: <CheckCircle2 size={22} color="#16a34a" />,
-        badgeBg: '#f0fdf4',
-        badgeBorder: '#bbf7d0',
-        titleColor: '#166534',
+        icon: <CheckCircle2 size={22} color="#34d399" />,
+        badgeBg: 'rgba(16, 185, 129, 0.2)',
+        badgeBorder: 'rgba(52, 211, 153, 0.45)',
+        titleColor: '#6ee7b7',
         confirmBtnBg: 'linear-gradient(135deg, #10b981, #059669)',
         confirmBtnColor: '#ffffff'
       }
     : {
-        icon: <Info size={22} color="#2563eb" />,
-        badgeBg: '#eff6ff',
-        badgeBorder: '#bfdbfe',
-        titleColor: '#1e40af',
+        icon: <Info size={22} color="#60a5fa" />,
+        badgeBg: 'rgba(59, 130, 246, 0.2)',
+        badgeBorder: 'rgba(96, 165, 250, 0.45)',
+        titleColor: '#93c5fd',
         confirmBtnBg: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
         confirmBtnColor: '#ffffff'
       };
@@ -173,9 +173,9 @@ export default function EliteModalDialog() {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
+        background: 'rgba(2, 6, 23, 0.72)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         zIndex: 9999999,
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
@@ -189,10 +189,10 @@ export default function EliteModalDialog() {
         style={{
           width: '100%',
           maxWidth: isMobile ? '560px' : '460px',
-          background: '#ffffff',
-          borderRadius: isMobile ? '20px 20px 0 0' : '14px',
-          border: isMobile ? 'none' : '1px solid #e2e8f0',
-          boxShadow: isMobile ? '0 -8px 30px rgba(0,0,0,0.22)' : '0 20px 40px -10px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.05)',
+          background: 'rgba(15, 23, 42, 0.94)',
+          borderRadius: isMobile ? '20px 20px 0 0' : '18px',
+          border: `1px solid ${statusConfig.badgeBorder}`,
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -213,14 +213,14 @@ export default function EliteModalDialog() {
               justifyContent: 'center',
               padding: '8px 0 4px',
               cursor: 'grab',
-              backgroundColor: '#ffffff'
+              backgroundColor: 'transparent'
             }}
           >
             <div
               style={{
                 width: '40px',
                 height: '4px',
-                backgroundColor: '#cbd5e1',
+                backgroundColor: 'rgba(148, 163, 184, 0.45)',
                 borderRadius: '999px'
               }}
             />
@@ -237,7 +237,7 @@ export default function EliteModalDialog() {
             display: 'flex',
             alignItems: 'flex-start',
             gap: '0.85rem',
-            borderBottom: '1px solid #f1f5f9'
+            borderBottom: '1px solid rgba(148, 163, 184, 0.18)'
           }}
         >
           <div
@@ -261,7 +261,7 @@ export default function EliteModalDialog() {
               style={{
                 fontSize: '1.05rem',
                 fontWeight: 700,
-                color: '#0f172a',
+                color: statusConfig.titleColor || '#f8fafc',
                 margin: 0,
                 lineHeight: 1.3
               }}
@@ -274,16 +274,16 @@ export default function EliteModalDialog() {
             onClick={handleCancel}
             aria-label="Close"
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
+              background: 'rgba(148, 163, 184, 0.14)',
+              border: '1px solid rgba(148, 163, 184, 0.25)',
+              color: '#cbd5e1',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               width: '32px',
               height: '32px',
-              borderRadius: '6px',
+              borderRadius: '8px',
               padding: 0,
               flexShrink: 0
             }}
@@ -298,7 +298,7 @@ export default function EliteModalDialog() {
             <p
               style={{
                 fontSize: '0.88rem',
-                color: '#475569',
+                color: '#e2e8f0',
                 lineHeight: 1.55,
                 margin: 0,
                 whiteSpace: 'pre-wrap',
@@ -321,7 +321,9 @@ export default function EliteModalDialog() {
                   width: '100%',
                   padding: '0.65rem 0.85rem',
                   fontSize: '0.88rem',
-                  border: '1px solid #cbd5e1',
+                  background: 'rgba(11, 17, 32, 0.85)',
+                  color: '#f8fafc',
+                  border: '1px solid rgba(148, 163, 184, 0.35)',
                   borderRadius: '8px',
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -336,8 +338,8 @@ export default function EliteModalDialog() {
           style={{
             padding: '0.85rem 1.25rem',
             paddingBottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 1.1rem)' : '1.1rem',
-            background: '#f8fafc',
-            borderTop: '1px solid #f1f5f9',
+            background: 'rgba(11, 17, 32, 0.72)',
+            borderTop: '1px solid rgba(148, 163, 184, 0.18)',
             display: 'flex',
             gap: '0.65rem',
             justifyContent: 'flex-end'
@@ -349,9 +351,9 @@ export default function EliteModalDialog() {
               style={{
                 padding: '0.55rem 1.1rem',
                 borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#475569',
+                border: '1px solid rgba(148, 163, 184, 0.35)',
+                background: 'rgba(30, 41, 59, 0.85)',
+                color: '#e2e8f0',
                 fontSize: '0.85rem',
                 fontWeight: 600,
                 cursor: 'pointer',

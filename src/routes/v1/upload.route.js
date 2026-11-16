@@ -240,7 +240,13 @@ function isSafeImageUrl(targetUrl) {
     hostname === 'giphy.com' ||
     hostname.endsWith('.gph.is') ||
     hostname.endsWith('.tenor.com') ||
-    hostname === 'tenor.com';
+    hostname === 'tenor.com' ||
+    hostname === 'myntassets.com' ||
+    hostname.endsWith('.myntassets.com') ||
+    hostname.endsWith('.flixcart.com') ||
+    hostname.endsWith('.media-amazon.com') ||
+    hostname.endsWith('.unicommerce.com') ||
+    hostname.endsWith('.cloudfront.net');
 
   return isAllowedDomain;
 }
@@ -302,8 +308,12 @@ router.get('/preview', async (req, res) => {
         const resp = await axios.get(targetUrl, {
           responseType: 'arraybuffer',
           timeout: 10000,
-          maxRedirects: 0, // Prevent redirect SSRF bypass
+          maxRedirects: 2,
           maxContentLength: 50 * 1024 * 1024,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          },
         });
         imageBuffer = Buffer.from(resp.data);
       }
