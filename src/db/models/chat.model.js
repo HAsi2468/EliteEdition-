@@ -23,7 +23,7 @@ const chatRoomSchema = new mongoose.Schema(
     },
     e2eeEnabled: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     members: [
       {

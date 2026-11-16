@@ -4704,7 +4704,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     let encryptedPayload = undefined;
     let isEncrypted = false;
-    if (activeGroup?.e2eeEnabled && messageText) {
+    if (activeGroup?.e2eeEnabled !== false && messageText) {
       const enc = await encryptRoomMessage(messageText, activeGroup._id);
       if (enc) {
         isEncrypted = true;
@@ -5944,7 +5944,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           gap: '4px'
                         }}>
                           {group.type === 'broadcast' && <Radio size={12} color="#f59e0b" title="Broadcast List" />}
-                          {group.e2eeEnabled && <Shield size={12} color="#22c55e" title="End-to-End Encrypted" />}
+                          {group.e2eeEnabled !== false && <Shield size={12} color="#22c55e" title="End-to-End Encrypted" />}
                           {Array.isArray(group.lockedBy) && group.lockedBy.some((l) => String(l.userId || l) === String(currentUser?._id || currentUser?.id || '')) && (
                             <Lock size={11} color="#fbbf24" title="PIN Locked Chat" />
                           )}

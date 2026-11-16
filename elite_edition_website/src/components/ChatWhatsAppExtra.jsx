@@ -138,7 +138,7 @@ const btn = {
 
 /* 1. E2EE Security Code & Toggle Modal */
 export const E2EEVerifyModal = ({ group, onUpdated, onClose }) => {
-  const [enabled, setEnabled] = useState(Boolean(group?.e2eeEnabled));
+  const [enabled, setEnabled] = useState(group?.e2eeEnabled !== false);
   const [safetyNumbers, setSafetyNumbers] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -157,7 +157,7 @@ export const E2EEVerifyModal = ({ group, onUpdated, onClose }) => {
   };
 
   useEffect(() => {
-    syncE2EE(Boolean(group?.e2eeEnabled));
+    syncE2EE(group?.e2eeEnabled !== false);
   }, [group?._id]);
 
   return (
