@@ -761,9 +761,10 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                         padding: '1px 5px',
                         fontSize: '10px',
                         fontFamily: 'monospace',
-                        color: '#64748b',
-                        backgroundColor: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
+                        fontWeight: 700,
+                        color: '#e2e8f0',
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
                         borderRadius: '4px'
                       }}
                     >
@@ -773,11 +774,11 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                   <span
                     style={{
                       fontSize: '10px',
-                      backgroundColor: '#f1f5f9',
-                      border: '1px solid #e2e8f0',
+                      backgroundColor: 'rgba(30, 41, 59, 0.75)',
+                      border: '1px solid rgba(148, 163, 184, 0.25)',
                       borderRadius: '4px',
                       padding: '2px 5px',
-                      color: '#475569',
+                      color: '#cbd5e1',
                       fontWeight: 500
                     }}
                   >
@@ -794,23 +795,23 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
         <div
           style={{
             padding: '8px 16px',
-            backgroundColor: '#f8fafc',
-            borderTop: '1px solid #e2e8f0',
+            backgroundColor: 'rgba(11, 17, 32, 0.92)',
+            borderTop: '1px solid rgba(148, 163, 184, 0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: '11px',
-            color: '#64748b'
+            color: '#94a3b8'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>↑↓</kbd> Navigate</span>
-            <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>↵</kbd> Select</span>
-            <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>Tab</kbd> Switch Tab</span>
-            <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>esc</kbd> Dismiss</span>
+            <span><kbd style={{ padding: '1px 4px', background: 'rgba(30, 41, 59, 0.9)', color: '#e2e8f0', border: '1px solid rgba(148, 163, 184, 0.35)', borderRadius: '3px', fontWeight: 700 }}>↑↓</kbd> Navigate</span>
+            <span><kbd style={{ padding: '1px 4px', background: 'rgba(30, 41, 59, 0.9)', color: '#e2e8f0', border: '1px solid rgba(148, 163, 184, 0.35)', borderRadius: '3px', fontWeight: 700 }}>↵</kbd> Select</span>
+            <span><kbd style={{ padding: '1px 4px', background: 'rgba(30, 41, 59, 0.9)', color: '#e2e8f0', border: '1px solid rgba(148, 163, 184, 0.35)', borderRadius: '3px', fontWeight: 700 }}>Tab</kbd> Switch Tab</span>
+            <span><kbd style={{ padding: '1px 4px', background: 'rgba(30, 41, 59, 0.9)', color: '#e2e8f0', border: '1px solid rgba(148, 163, 184, 0.35)', borderRadius: '3px', fontWeight: 700 }}>esc</kbd> Dismiss</span>
           </div>
           <div>
-            <span style={{ fontWeight: 600, color: '#334155' }}>⌘K Palette</span>
+            <span style={{ fontWeight: 600, color: '#93c5fd' }}>⌘K Palette</span>
           </div>
         </div>
       </div>
