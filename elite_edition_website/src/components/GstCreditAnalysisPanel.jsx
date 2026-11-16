@@ -22,13 +22,18 @@ import {
   Percent,
   Layers,
   ChevronDown,
-  Truck
+  Truck,
+  Clock,
+  Download
 } from 'lucide-react';
+import { api } from '../services/api';
+import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { normalizeCompanyId } from '../config/companiesConfig';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import Gstr1Table12Panel from './Gstr1Table12Panel';
 import GtaFreightRcmPanel from './GtaFreightRcmPanel';
+import PartyAgeingDashboard from './PartyAgeingDashboard';
 
 // Indian currency formatter
 const fmtINR = (val) => {
@@ -1241,7 +1246,8 @@ export default function GstCreditAnalysisPanel({
           ...(SHOW_GTA_FREIGHT_RCM_TAB ? [{ id: 'gta_rcm', label: '🚚 Freight GTA RCM (Sec 9(3))', icon: Truck }] : []),
           { id: 'outward', label: `🧾 Sales Bills (${filteredInvoices.length})`, icon: ArrowUpRight },
           { id: 'inward', label: `📦 Purchase Bills (${filteredPurchases.length})`, icon: ArrowDownLeft },
-          { id: 'tds', label: `💳 TDS List (${tdsLedger.length})`, icon: ShieldCheck }
+          { id: 'tds', label: `💳 TDS List (${tdsLedger.length})`, icon: ShieldCheck },
+          { id: 'ageing', label: '⏱️ Party Ageing & Reminders', icon: Clock }
         ].map((tab) => {
           const active = activeTab === tab.id;
           const TabIcon = tab.icon;
@@ -1279,6 +1285,62 @@ export default function GstCreditAnalysisPanel({
             </button>
           );
         })}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.45rem', paddingBottom: '4px', flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const qs = new URLSearchParams({ companyEntity: companyEntity || 'ALL' }).toString();
+                await api.downloadAuthenticatedFile(`/gst/export-gstr1-json?${qs}`, `GSTR1_${companyEntity || 'ALL'}.json`);
+                triggerPushNotification('GSTR-1 JSON Exported', 'GST Portal JSON downloaded successfully', 'success');
+              } catch (e) {
+                triggerPushNotification('Export Failed', e.message || 'GSTR-1 JSON export failed', 'error');
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.42rem 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(16, 185, 129, 0.45)',
+              background: 'rgba(16, 185, 129, 0.16)',
+              color: '#6ee7b7',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <Download size={13} /> GSTR-1 JSON
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const qs = new URLSearchParams({ companyEntity: companyEntity || 'ALL' }).toString();
+                await api.downloadAuthenticatedFile(`/gst/export-tally-xml?${qs}`, `TallyPrime_Vouchers_${companyEntity || 'ALL'}.xml`);
+                triggerPushNotification('Tally XML Exported', 'Tally Prime XML vouchers downloaded', 'success');
+              } catch (e) {
+                triggerPushNotification('Export Failed', e.message || 'Tally XML export failed', 'error');
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.42rem 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(56, 189, 248, 0.45)',
+              background: 'rgba(56, 189, 248, 0.16)',
+              color: '#93c5fd',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <Download size={13} /> Tally Prime XML
+          </button>
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -2141,6 +2203,11 @@ export default function GstCreditAnalysisPanel({
             </table>
           </div>
         </div>
+      )}
+
+      {/* VIEW: PARTY AGEING & PAYMENT REMINDERS */}
+      {activeTab === 'ageing' && (
+        <PartyAgeingDashboard companyEntity={companyEntity} allowCompanyFilter={false} />
       )}
     </div>
   );

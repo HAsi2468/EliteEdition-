@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, RefreshCw, CheckCircle2, XCircle, Lock, Megaphone,
-  ShieldCheck, Clock, Users, Server, Sparkles, LogOut, HardDrive, TrendingUp
+  ShieldCheck, Clock, Users, Server, Sparkles, LogOut, HardDrive, TrendingUp,
+  Cloud, Download, Mail, Database
 } from 'lucide-react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
+import PartyAgeingDashboard from './PartyAgeingDashboard';
 
 const cardStyle = {
   background: 'rgba(15, 23, 42, 0.78)',
@@ -61,13 +63,20 @@ export default function AdminControlCenter({ users = [], onRefreshUsers }) {
   const [chatStorage, setChatStorage] = useState(null);
   const [cleaningChat, setCleaningChat] = useState(false);
 
+  const [dailyBackups, setDailyBackups] = useState([]);
+  const [r2Backups, setR2Backups] = useState([]);
+  const [backingUpR2, setBackingUpR2] = useState(false);
+  const [emailingBackup, setEmailingBackup] = useState(false);
+
   const loadOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const [res, finRes, chatRes] = await Promise.all([
+      const [res, finRes, chatRes, dailyRes, r2Res] = await Promise.all([
         api.getAdminControlOverview(),
         api.getAdminCompanyFinancials().catch(() => null),
         api.getAdminChatStorage().catch(() => null),
+        api.listBackupHistory().catch(() => null),
+        api.listR2Backups().catch(() => null),
       ]);
       if (res?.success && res.data) {
         setData(res.data);
@@ -76,6 +85,8 @@ export default function AdminControlCenter({ users = [], onRefreshUsers }) {
       }
       if (finRes?.success && Array.isArray(finRes.data)) setCompanyFinancials(finRes.data);
       if (chatRes?.success && chatRes.data) setChatStorage(chatRes.data);
+      if (dailyRes?.success && Array.isArray(dailyRes.backups)) setDailyBackups(dailyRes.backups);
+      if (r2Res?.success && Array.isArray(r2Res.backups)) setR2Backups(r2Res.backups);
     } catch (e) {
       triggerPushNotification('Control Center', e.message || 'Failed to load overview', 'error');
     } finally {
@@ -465,6 +476,138 @@ export default function AdminControlCenter({ users = [], onRefreshUsers }) {
           </div>
         </div>
       )}
+
+      {/* Automated Scheduled Backups to Cloud (S3/R2) & Restore UI */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Cloud size={18} color="#38bdf8" />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#f8fafc' }}>
+                Automated Cloud Backups (R2 / S3) &amp; Restore
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                {dailyBackups.length} local daily snapshot(s) · {r2Backups.length} Cloudflare R2 cloud snapshot(s)
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={backingUpR2}
+              onClick={async () => {
+                setBackingUpR2(true);
+                try {
+                  const res = await api.triggerR2Backup();
+                  triggerPushNotification('Cloud Backup', res?.message || 'Database snapshot uploaded to R2', 'success');
+                  loadOverview();
+                } catch (e) {
+                  triggerPushNotification('Backup Error', e.message || 'R2 backup failed', 'error');
+                } finally {
+                  setBackingUpR2(false);
+                }
+              }}
+              style={btnPrimary}
+            >
+              <Database size={14} /> {backingUpR2 ? 'Uploading to R2...' : 'Backup Now to R2'}
+            </button>
+            <button
+              type="button"
+              disabled={emailingBackup}
+              onClick={async () => {
+                setEmailingBackup(true);
+                try {
+                  const res = await api.sendBackupEmail();
+                  triggerPushNotification('DR Email Sent', res?.message || 'Backup email dispatched', 'success');
+                } catch (e) {
+                  triggerPushNotification('Email Failed', e.message || 'Could not email backup', 'error');
+                } finally {
+                  setEmailingBackup(false);
+                }
+              }}
+              style={{ ...btnPrimary, background: 'rgba(16, 185, 129, 0.22)', borderColor: 'rgba(16, 185, 129, 0.45)', color: '#6ee7b7' }}
+            >
+              <Mail size={14} /> {emailingBackup ? 'Sending...' : 'Email DR Snapshot'}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto', maxHeight: '230px', overflowY: 'auto' }}>
+          {dailyBackups.length === 0 && r2Backups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.82rem' }}>
+              No snapshots listed yet. Click <strong>Backup Now to R2</strong> to create an immediate full database snapshot.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.22)', color: '#94a3b8', textAlign: 'left' }}>
+                  <th style={{ padding: '0.45rem 0.5rem' }}>Snapshot File</th>
+                  <th style={{ padding: '0.45rem 0.5rem' }}>Storage</th>
+                  <th style={{ padding: '0.45rem 0.5rem', textAlign: 'right' }}>Size</th>
+                  <th style={{ padding: '0.45rem 0.5rem' }}>Created</th>
+                  <th style={{ padding: '0.45rem 0.5rem', textAlign: 'right' }}>Restore / Download</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyBackups.slice(0, 8).map((b) => (
+                  <tr key={`local-${b.fileName}`} style={{ borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', fontWeight: 600, color: '#f8fafc' }}>{b.fileName}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', color: '#93c5fd' }}>Daily + Cloud</td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: '#cbd5e1' }}>{b.sizeMB ? `${b.sizeMB} MB` : '—'}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', color: '#94a3b8' }}>
+                      {b.modifiedAt ? new Date(b.modifiedAt).toLocaleString('en-IN') : '—'}
+                    </td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.downloadAuthenticatedFile(`/backup/download-archive/${encodeURIComponent(b.fileName)}`, b.fileName);
+                          } catch (e) {
+                            triggerPushNotification('Download Failed', e.message || 'Could not download archive', 'error');
+                          }
+                        }}
+                        style={{ ...btnPrimary, padding: '0.28rem 0.6rem', fontSize: '0.72rem', background: 'rgba(56, 189, 248, 0.16)' }}
+                      >
+                        <Download size={12} /> Download
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {r2Backups.slice(0, 6).map((r) => (
+                  <tr key={`r2-${r.key || r.fileName}`} style={{ borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', fontWeight: 600, color: '#f8fafc' }}>{r.fileName || r.key}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', color: '#6ee7b7' }}>Cloudflare R2</td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: '#cbd5e1' }}>
+                      {r.size ? `${(r.size / (1024 * 1024)).toFixed(2)} MB` : '—'}
+                    </td>
+                    <td style={{ padding: '0.45rem 0.5rem', color: '#94a3b8' }}>
+                      {r.lastModified ? new Date(r.lastModified).toLocaleString('en-IN') : '—'}
+                    </td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right' }}>
+                      {r.url ? (
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ ...btnPrimary, padding: '0.28rem 0.6rem', fontSize: '0.72rem', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.2)' }}
+                        >
+                          <Download size={12} /> R2 Link
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Synced</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Cross-Company Party Ageing & Automated Payment Reminders */}
+      <PartyAgeingDashboard allowCompanyFilter={true} />
     </div>
   );
 }

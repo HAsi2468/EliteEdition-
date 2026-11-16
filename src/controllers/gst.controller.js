@@ -785,3 +785,322 @@ exports.exportFreightRcmExcel = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+function escapeXml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function fmtTallyDate(d) {
+  const dt = new Date(d || Date.now());
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+function fmtGstDate(d) {
+  const dt = new Date(d || Date.now());
+  const day = String(dt.getDate()).padStart(2, '0');
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const y = dt.getFullYear();
+  return `${day}-${m}-${y}`;
+}
+
+function buildInvoiceDateQuery({ companyEntity, startDate, endDate }) {
+  const query = { invoiceStatus: { $ne: 'CANCELLED' } };
+  if (companyEntity && companyEntity !== 'ALL') {
+    query.companyEntity = companyEntity;
+  }
+  if (startDate || endDate) {
+    query.invoiceDate = {};
+    if (startDate) query.invoiceDate.$gte = new Date(`${startDate}T00:00:00.000Z`);
+    if (endDate) query.invoiceDate.$lte = new Date(`${endDate}T23:59:59.999Z`);
+  }
+  return query;
+}
+
+/**
+ * GET /v1/gst/export-gstr1-json
+ * Exports official Indian GST Portal GSTR-1 JSON (B2B, B2CL, B2CS, HSN Table 12).
+ */
+exports.exportGstr1Json = async (req, res) => {
+  try {
+    const { companyEntity = 'ALL', startDate, endDate, gstin = '24AANFE0044M1ZG' } = req.query;
+    const supplierGstin = String(gstin || '24AANFE0044M1ZG').trim().toUpperCase();
+    const supplierStateCode = supplierGstin.slice(0, 2) || '24';
+
+    const invoices = await db.BillingInvoice.find(buildInvoiceDateQuery({ companyEntity, startDate, endDate }))
+      .sort({ invoiceDate: 1 })
+      .lean();
+
+    const refDate = startDate ? new Date(startDate) : (invoices[0]?.invoiceDate ? new Date(invoices[0].invoiceDate) : new Date());
+    const fp = `${String(refDate.getMonth() + 1).padStart(2, '0')}${refDate.getFullYear()}`;
+
+    const b2bMap = new Map();
+    const b2csMap = new Map();
+    const b2clMap = new Map();
+    const hsnMap = new Map();
+
+    for (const inv of invoices) {
+      const custGstin = String(inv.customer?.gstin || '').trim().toUpperCase();
+      const pos = String(inv.customer?.stateCode || custGstin.slice(0, 2) || supplierStateCode).padStart(2, '0');
+      const isInterState = inv.taxType === 'IGST' || pos !== supplierStateCode;
+      const splyTy = isInterState ? 'INTER' : 'INTRA';
+      const grandTotal = Number(inv.grandTotal || 0);
+      const idt = fmtGstDate(inv.invoiceDate);
+
+      // Group line items by tax rate
+      const rateBuckets = new Map();
+      const items = Array.isArray(inv.items) && inv.items.length > 0
+        ? inv.items
+        : [{ hsnCode: '998821', itemName: 'Textile Printing / Goods', unit: 'Meters', qty: 1, unitPrice: inv.subtotal || grandTotal, taxRate: 5, taxAmount: inv.totalTax || 0, totalAmount: grandTotal }];
+
+      for (const it of items) {
+        const rt = Number(it.taxRate ?? 5);
+        const qty = Number(it.qty || 0);
+        const lineSub = Number((qty * Number(it.unitPrice || 0) - Number(it.discountAmt || 0)).toFixed(2));
+        const txval = lineSub > 0 ? lineSub : Number((Number(it.totalAmount || 0) - Number(it.taxAmount || 0)).toFixed(2));
+        const taxAmt = Number(it.taxAmount || ((txval * rt) / 100));
+        const iamt = isInterState ? taxAmt : 0;
+        const camt = isInterState ? 0 : taxAmt / 2;
+        const samt = isInterState ? 0 : taxAmt / 2;
+
+        if (!rateBuckets.has(rt)) rateBuckets.set(rt, { rt, txval: 0, iamt: 0, camt: 0, samt: 0 });
+        const rb = rateBuckets.get(rt);
+        rb.txval += txval;
+        rb.iamt += iamt;
+        rb.camt += camt;
+        rb.samt += samt;
+
+        // HSN Table 12 aggregation
+        const hsnSc = String(it.hsnCode || '998821').trim() || '998821';
+        const uqc = normalizeUqc(it.unit, hsnSc);
+        const hsnKey = `${hsnSc}__${uqc}__${rt}`;
+        if (!hsnMap.has(hsnKey)) {
+          hsnMap.set(hsnKey, {
+            hsn_sc: hsnSc,
+            desc: HSN_STANDARD_DESCRIPTIONS[hsnSc] || it.itemName || 'Textile Goods / Services',
+            uqc,
+            rt,
+            qty: 0,
+            val: 0,
+            txval: 0,
+            iamt: 0,
+            camt: 0,
+            samt: 0,
+            csamt: 0,
+          });
+        }
+        const hRow = hsnMap.get(hsnKey);
+        hRow.qty += qty;
+        hRow.val += Number(it.totalAmount || txval + taxAmt);
+        hRow.txval += txval;
+        hRow.iamt += iamt;
+        hRow.camt += camt;
+        hRow.samt += samt;
+      }
+
+      if (custGstin.length === 15) {
+        if (!b2bMap.has(custGstin)) b2bMap.set(custGstin, { ctin: custGstin, inv: [] });
+        const itms = Array.from(rateBuckets.values()).map((r, idx) => ({
+          num: (idx + 1) * 100 + Math.round(r.rt),
+          itm_det: {
+            rt: r.rt,
+            txval: Number(r.txval.toFixed(2)),
+            ...(isInterState
+              ? { iamt: Number(r.iamt.toFixed(2)) }
+              : { camt: Number(r.camt.toFixed(2)), samt: Number(r.samt.toFixed(2)) }),
+            csamt: 0,
+          },
+        }));
+        b2bMap.get(custGstin).inv.push({
+          inum: inv.invoiceNo,
+          idt,
+          val: Number(grandTotal.toFixed(2)),
+          pos,
+          rchrg: 'N',
+          inv_typ: 'R',
+          itms,
+        });
+      } else if (isInterState && grandTotal > 250000) {
+        if (!b2clMap.has(pos)) b2clMap.set(pos, { pos, inv: [] });
+        b2clMap.get(pos).inv.push({
+          inum: inv.invoiceNo,
+          idt,
+          val: Number(grandTotal.toFixed(2)),
+          itms: Array.from(rateBuckets.values()).map((r, idx) => ({
+            num: (idx + 1) * 100 + Math.round(r.rt),
+            itm_det: { rt: r.rt, txval: Number(r.txval.toFixed(2)), iamt: Number(r.iamt.toFixed(2)), csamt: 0 },
+          })),
+        });
+      } else {
+        for (const r of rateBuckets.values()) {
+          const b2csKey = `${splyTy}__${pos}__${r.rt}`;
+          if (!b2csMap.has(b2csKey)) {
+            b2csMap.set(b2csKey, { sply_ty: splyTy, pos, typ: 'OE', rt: r.rt, txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0 });
+          }
+          const bRow = b2csMap.get(b2csKey);
+          bRow.txval += r.txval;
+          bRow.iamt += r.iamt;
+          bRow.camt += r.camt;
+          bRow.samt += r.samt;
+        }
+      }
+    }
+
+    const payload = {
+      gstin: supplierGstin,
+      fp,
+      version: 'GST3.0.4',
+      hash: 'hash',
+      b2b: Array.from(b2bMap.values()),
+      b2cl: Array.from(b2clMap.values()),
+      b2cs: Array.from(b2csMap.values()).map((r) => ({
+        ...r,
+        txval: Number(r.txval.toFixed(2)),
+        iamt: Number(r.iamt.toFixed(2)),
+        camt: Number(r.camt.toFixed(2)),
+        samt: Number(r.samt.toFixed(2)),
+      })),
+      hsn: {
+        data: Array.from(hsnMap.values()).map((h, i) => ({
+          num: i + 1,
+          hsn_sc: h.hsn_sc,
+          desc: h.desc.slice(0, 30),
+          uqc: h.uqc,
+          qty: Number(h.qty.toFixed(2)),
+          val: Number(h.val.toFixed(2)),
+          txval: Number(h.txval.toFixed(2)),
+          iamt: Number(h.iamt.toFixed(2)),
+          camt: Number(h.camt.toFixed(2)),
+          samt: Number(h.samt.toFixed(2)),
+          csamt: 0,
+        })),
+      },
+    };
+
+    const safeCo = String(companyEntity || 'ALL').replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="GSTR1_${safeCo}_${fp}.json"`);
+    return res.status(200).send(JSON.stringify(payload, null, 2));
+  } catch (err) {
+    logger.error('Error in exportGstr1Json: %o', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+/**
+ * GET /v1/gst/export-tally-xml
+ * Exports Sales Vouchers in Tally Prime XML Import Format.
+ */
+exports.exportTallyXml = async (req, res) => {
+  try {
+    const { companyEntity = 'ALL', startDate, endDate } = req.query;
+    const invoices = await db.BillingInvoice.find(buildInvoiceDateQuery({ companyEntity, startDate, endDate }))
+      .sort({ invoiceDate: 1 })
+      .lean();
+
+    const messages = invoices.map((inv) => {
+      const partyName = escapeXml(inv.customer?.businessName || inv.customer?.name || 'Cash / Sundry Debtor');
+      const partyGstin = escapeXml(inv.customer?.gstin || '');
+      const stateName = escapeXml(inv.customer?.state || 'Gujarat');
+      const vDate = fmtTallyDate(inv.invoiceDate);
+      const vNo = escapeXml(inv.invoiceNo);
+      const grandTotal = Number(inv.grandTotal || 0);
+      const taxable = Number((Number(inv.subtotal || 0) - Number(inv.discountTotal || 0)).toFixed(2));
+      const cgst = Number(inv.cgstAmount || 0);
+      const sgst = Number(inv.sgstAmount || 0);
+      const igst = Number(inv.igstAmount || 0);
+      const roundOff = Number(inv.roundOff || 0);
+
+      const ledgerEntries = [
+        `<ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>${partyName}</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+          <AMOUNT>-${grandTotal.toFixed(2)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>`,
+        `<ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>Sales Account</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+          <AMOUNT>${taxable.toFixed(2)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>`,
+      ];
+
+      if (cgst > 0) {
+        ledgerEntries.push(`<ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>Output CGST</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+          <AMOUNT>${cgst.toFixed(2)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>`);
+      }
+      if (sgst > 0) {
+        ledgerEntries.push(`<ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>Output SGST</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+          <AMOUNT>${sgst.toFixed(2)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>`);
+      }
+      if (igst > 0) {
+        ledgerEntries.push(`<ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>Output IGST</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+          <AMOUNT>${igst.toFixed(2)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>`);
+      }
+      if (Math.abs(roundOff) > 0.001) {
+        ledgerEntries.push(`<ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>Round Off</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>${roundOff < 0 ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
+          <AMOUNT>${roundOff.toFixed(2)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>`);
+      }
+
+      return `<TALLYMESSAGE xmlns:UDF="TallyUDF">
+      <VOUCHER VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+        <DATE>${vDate}</DATE>
+        <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+        <VOUCHERNUMBER>${vNo}</VOUCHERNUMBER>
+        <PARTYLEDGERNAME>${partyName}</PARTYLEDGERNAME>
+        <PARTYGSTIN>${partyGstin}</PARTYGSTIN>
+        <STATENAME>${stateName}</STATENAME>
+        <PLACEOFSUPPLY>${stateName}</PLACEOFSUPPLY>
+        <NARRATION>Imported from Elite Edition ERP (${escapeXml(inv.companyEntity || companyEntity)})</NARRATION>
+        ${ledgerEntries.join('\n        ')}
+      </VOUCHER>
+    </TALLYMESSAGE>`;
+    });
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Vouchers</REPORTNAME>
+        <STATICVARIABLES>
+          <SVCURRENTCOMPANY>${escapeXml(companyEntity === 'ALL' ? 'Elite Edition ERP' : companyEntity)}</SVCURRENTCOMPANY>
+        </STATICVARIABLES>
+      </REQUESTDESC>
+      <REQUESTDATA>
+        ${messages.join('\n        ')}
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
+</ENVELOPE>`;
+
+    const safeCo = String(companyEntity || 'ALL').replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="TallyPrime_Vouchers_${safeCo}.xml"`);
+    return res.status(200).send(xml);
+  } catch (err) {
+    logger.error('Error in exportTallyXml: %o', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};

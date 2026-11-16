@@ -15,4 +15,8 @@ router.delete('/freight-rcm/:id', gstController.deleteFreightBill);
 router.post('/freight-rcm/generate-self-invoices', gstController.generateSelfInvoices);
 router.get('/freight-rcm/export-excel', gstController.exportFreightRcmExcel);
 
+// Tally Prime XML & GSTR-1 JSON Direct Exports
+router.get('/export-gstr1-json', gstController.exportGstr1Json);
+router.get('/export-tally-xml', gstController.exportTallyXml);
+
 module.exports = router;

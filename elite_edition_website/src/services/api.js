@@ -3058,6 +3058,67 @@ export const api = {
       });
     },
 
+  async getPartyAgeing(companyEntity = 'ALL') {
+      const qs = companyEntity && companyEntity !== 'ALL'
+        ? `?companyEntity=${encodeURIComponent(companyEntity)}`
+        : '';
+      return request(`/admin-control/party-ageing${qs}`);
+    },
+
+  async sendPaymentReminder(payload) {
+      return request('/admin-control/send-payment-reminder', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async listBackupHistory() {
+      return request('/backup/history');
+    },
+
+  async listR2Backups() {
+      return request('/backup/list-r2');
+    },
+
+  async triggerR2Backup() {
+      return request('/backup/trigger-r2', {
+        method: 'POST',
+      });
+    },
+
+  async sendBackupEmail(payload = {}) {
+      return request('/backup/send-email', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+  async downloadAuthenticatedFile(endpoint, fallbackFilename) {
+      const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token') || '';
+      const base = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/v1';
+      const url = `${base}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Download failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const match = cd.match(/filename="?([^";]+)"?/i);
+      const filename = match?.[1] || fallbackFilename || 'download';
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1500);
+      return { success: true, filename };
+    },
+
   async deleteCommunicationMessage(messageId) {
       return request(`/communication/messages/${messageId}`, {
         method: 'DELETE',

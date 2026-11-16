@@ -14,5 +14,7 @@ router.get('/company-financials', ctrl.getCompanyFinancials);
 router.post('/force-logout/:userId', ctrl.forceLogoutUser);
 router.get('/chat-storage', ctrl.getChatStorage);
 router.post('/chat-storage/cleanup', ctrl.cleanupChatStorage);
+router.get('/party-ageing', ctrl.getPartyAgeing);
+router.post('/send-payment-reminder', ctrl.sendPaymentReminder);
 
 module.exports = router;

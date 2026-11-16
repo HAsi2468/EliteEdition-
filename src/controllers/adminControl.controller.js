@@ -388,6 +388,211 @@ const cleanupChatStorage = async (req, res) => {
   }
 };
 
+/**
+ * GET /v1/admin-control/party-ageing
+ * Computes 0-30 / 31-60 / 61-90 / 90+ day overdue ageing buckets per party across companies.
+ */
+const getPartyAgeing = async (req, res) => {
+  try {
+    if (!db.BillingInvoice) {
+      return res.json({ success: true, summary: { totalDue: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, partyCount: 0 }, parties: [] });
+    }
+    const { companyEntity } = req.query;
+    const match = {
+      invoiceStatus: { $ne: 'CANCELLED' },
+      paymentStatus: { $ne: 'PAID' },
+    };
+    if (companyEntity && companyEntity !== 'ALL') {
+      match.companyEntity = companyEntity;
+    }
+
+    const invoices = await db.BillingInvoice.find(match)
+      .select('companyEntity invoiceNo invoiceDate dueDate grandTotal paidAmount balanceDue paymentStatus customer')
+      .lean();
+
+    const nowMs = Date.now();
+    const partyMap = new Map();
+    const summary = { totalDue: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, partyCount: 0 };
+
+    for (const inv of invoices) {
+      const grandTotal = Number(inv.grandTotal || 0);
+      const paidAmount = Number(inv.paidAmount || 0);
+      const due = inv.balanceDue !== undefined && inv.balanceDue !== null
+        ? Number(inv.balanceDue)
+        : Math.max(0, grandTotal - paidAmount);
+      if (due <= 0.01) continue;
+
+      const refDate = new Date(inv.dueDate || inv.invoiceDate || nowMs);
+      const daysOverdue = Math.max(0, Math.floor((nowMs - refDate.getTime()) / (24 * 60 * 60 * 1000)));
+      const partyName = String(inv.customer?.businessName || inv.customer?.name || 'Walk-in / Unknown').trim();
+      const company = String(inv.companyEntity || 'Elite Edition').trim();
+      const key = `${company}__${partyName.toLowerCase()}`;
+
+      if (!partyMap.has(key)) {
+        partyMap.set(key, {
+          partyName,
+          companyEntity: company,
+          phone: inv.customer?.phone || '',
+          email: inv.customer?.email || '',
+          gstin: inv.customer?.gstin || '',
+          invoiceCount: 0,
+          totalDue: 0,
+          b0_30: 0,
+          b31_60: 0,
+          b61_90: 0,
+          b90_plus: 0,
+          maxDaysOverdue: 0,
+          oldestInvoiceDate: refDate.toISOString(),
+          invoices: [],
+        });
+      }
+
+      const row = partyMap.get(key);
+      row.invoiceCount += 1;
+      row.totalDue += due;
+      if (!row.phone && inv.customer?.phone) row.phone = inv.customer.phone;
+      if (!row.email && inv.customer?.email) row.email = inv.customer.email;
+      if (!row.gstin && inv.customer?.gstin) row.gstin = inv.customer.gstin;
+      if (daysOverdue > row.maxDaysOverdue) row.maxDaysOverdue = daysOverdue;
+      if (refDate.toISOString() < row.oldestInvoiceDate) row.oldestInvoiceDate = refDate.toISOString();
+
+      if (daysOverdue <= 30) {
+        row.b0_30 += due;
+        summary.b0_30 += due;
+      } else if (daysOverdue <= 60) {
+        row.b31_60 += due;
+        summary.b31_60 += due;
+      } else if (daysOverdue <= 90) {
+        row.b61_90 += due;
+        summary.b61_90 += due;
+      } else {
+        row.b90_plus += due;
+        summary.b90_plus += due;
+      }
+      summary.totalDue += due;
+
+      if (row.invoices.length < 5) {
+        row.invoices.push({
+          invoiceNo: inv.invoiceNo,
+          invoiceDate: inv.invoiceDate,
+          daysOverdue,
+          balanceDue: Number(due.toFixed(2)),
+        });
+      }
+    }
+
+    const parties = Array.from(partyMap.values())
+      .map((p) => ({
+        ...p,
+        totalDue: Number(p.totalDue.toFixed(2)),
+        b0_30: Number(p.b0_30.toFixed(2)),
+        b31_60: Number(p.b31_60.toFixed(2)),
+        b61_90: Number(p.b61_90.toFixed(2)),
+        b90_plus: Number(p.b90_plus.toFixed(2)),
+      }))
+      .sort((a, b) => b.totalDue - a.totalDue);
+
+    summary.partyCount = parties.length;
+    summary.totalDue = Number(summary.totalDue.toFixed(2));
+    summary.b0_30 = Number(summary.b0_30.toFixed(2));
+    summary.b31_60 = Number(summary.b31_60.toFixed(2));
+    summary.b61_90 = Number(summary.b61_90.toFixed(2));
+    summary.b90_plus = Number(summary.b90_plus.toFixed(2));
+
+    return res.json({ success: true, summary, parties });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to compute party ageing' });
+  }
+};
+
+/**
+ * POST /v1/admin-control/send-payment-reminder
+ * Dispatches or logs a payment reminder via Email, WhatsApp link, or Team Chat broadcast.
+ */
+const sendPaymentReminder = async (req, res) => {
+  try {
+    const {
+      partyName,
+      phone = '',
+      email = '',
+      totalDue = 0,
+      maxDaysOverdue = 0,
+      companyEntity = 'Elite Edition',
+      channel = 'whatsapp',
+      customMessage = '',
+    } = req.body || {};
+
+    if (!partyName) return res.status(400).json({ error: 'partyName is required' });
+
+    const formattedDue = Number(totalDue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    const text = customMessage.trim() ||
+      `Hello ${partyName}, this is a polite payment reminder from ${companyEntity}. Your total outstanding balance is ₹${formattedDue}${maxDaysOverdue > 30 ? ` (oldest invoice ${maxDaysOverdue} days overdue)` : ''}. Kindly arrange payment at your earliest convenience. Thank you!`;
+
+    if (channel === 'email') {
+      if (!email) return res.status(400).json({ error: 'Party email address is missing' });
+      try {
+        const emailService = require('../services/email.service');
+        if (typeof emailService.sendGenericEmail === 'function') {
+          await emailService.sendGenericEmail({
+            to: email,
+            subject: `Payment Reminder — ${companyEntity} (₹${formattedDue} Due)`,
+            text,
+          });
+        } else if (emailService.transporter && typeof emailService.transporter.sendMail === 'function') {
+          await emailService.transporter.sendMail({
+            to: email,
+            subject: `Payment Reminder — ${companyEntity} (₹${formattedDue} Due)`,
+            text,
+          });
+        }
+      } catch (mailErr) {
+        return res.status(500).json({ error: mailErr.message || 'Email dispatch failed' });
+      }
+    }
+
+    if (channel === 'chat') {
+      const io = req.app?.get('io');
+      if (io) {
+        io.emit('system_broadcast', {
+          title: `Payment Follow-up: ${partyName}`,
+          message: text,
+          severity: maxDaysOverdue > 60 ? 'warning' : 'info',
+          sender: req.user?.username || 'Finance',
+          at: new Date().toISOString(),
+        });
+      }
+    }
+
+    if (db.ActivityLog) {
+      await db.ActivityLog.create({
+        action: 'PAYMENT_REMINDER_SENT',
+        module: 'Finance',
+        description: `Sent ${channel.toUpperCase()} payment reminder to ${partyName} (${companyEntity}) for ₹${formattedDue}`,
+        performedBy: req.user?.username || 'Admin',
+      }).catch(() => {});
+    }
+
+    const cleanDigits = String(phone || '').replace(/\D/g, '');
+    const waNumber = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const whatsappUrl = waNumber
+      ? `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+    return res.json({
+      success: true,
+      channel,
+      whatsappUrl,
+      message: channel === 'email'
+        ? `Payment reminder emailed to ${email}`
+        : channel === 'chat'
+        ? `Payment follow-up posted to team notifications for ${partyName}`
+        : `WhatsApp reminder prepared for ${partyName}`,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to send payment reminder' });
+  }
+};
+
 module.exports = {
   getOverview,
   approveSampleDesign,
@@ -400,4 +605,6 @@ module.exports = {
   forceLogoutUser,
   getChatStorage,
   cleanupChatStorage,
+  getPartyAgeing,
+  sendPaymentReminder,
 };
