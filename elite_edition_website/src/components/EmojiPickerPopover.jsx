@@ -1056,8 +1056,8 @@ export default function EmojiPickerPopover({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '4px 10px',
-                  borderBottom: '1px solid #f1f5f9',
-                  background: '#fafafa',
+                  borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+                  background: 'rgba(11, 17, 32, 0.9)',
                   boxSizing: 'border-box'
                 }}
               >
@@ -1125,11 +1125,11 @@ export default function EmojiPickerPopover({
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.04em',
-                        color: '#64748b',
+                        color: '#94a3b8',
                         padding: '4px 2px 6px 2px',
                         position: 'sticky',
                         top: 0,
-                        background: '#ffffff',
+                        background: 'rgba(15, 23, 42, 0.96)',
                         zIndex: 2
                       }}
                     >
@@ -1188,8 +1188,8 @@ export default function EmojiPickerPopover({
                 className="phoenix-pill-container"
                 style={{
                   padding: '8px 12px',
-                  borderBottom: '1px solid #f1f5f9',
-                  background: '#fafafa',
+                  borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+                  background: 'rgba(11, 17, 32, 0.9)',
                   boxSizing: 'border-box'
                 }}
               >
@@ -1369,8 +1369,8 @@ export default function EmojiPickerPopover({
             <div
               style={{
                 padding: '8px 12px',
-                borderBottom: '1px solid #f1f5f9',
-                background: '#fafafa',
+                borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+                background: 'rgba(11, 17, 32, 0.9)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1381,7 +1381,8 @@ export default function EmojiPickerPopover({
               <div
                 className="phoenix-pill-container"
                 style={{
-                  flex: 1
+                  flex: 1,
+                  minWidth: 0
                 }}
               >
                 {GIF_CATEGORIES.map((cat) => {
@@ -1421,13 +1422,13 @@ export default function EmojiPickerPopover({
                   type="button"
                   onClick={() => setShowCustomUrlInput(!showCustomUrlInput)}
                   style={{
-                    background: showCustomUrlInput ? '#eff6ff' : 'transparent',
-                    border: '1px solid #cbd5e1',
+                    background: showCustomUrlInput ? 'rgba(37, 99, 235, 0.28)' : 'rgba(30, 41, 59, 0.85)',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
                     borderRadius: '16px',
                     padding: '3px 8px',
                     fontSize: '0.7rem',
                     fontWeight: 700,
-                    color: showCustomUrlInput ? '#2563eb' : '#475569',
+                    color: showCustomUrlInput ? '#93c5fd' : '#e2e8f0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -1448,8 +1449,8 @@ export default function EmojiPickerPopover({
                 onSubmit={handleSendCustomGif}
                 style={{
                   padding: '8px 10px',
-                  background: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0',
+                  background: 'rgba(11, 17, 32, 0.92)',
+                  borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
