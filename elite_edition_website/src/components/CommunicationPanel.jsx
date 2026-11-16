@@ -1063,6 +1063,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
   const [showDesktopHeaderMenu, setShowDesktopHeaderMenu] = useState(false);
+  const [showChatInfoDrawer, setShowChatInfoDrawer] = useState(false);
+  const [dpViewerTarget, setDpViewerTarget] = useState(null);
 
   // ─── Real-Time Voice & Video Calling Suite State ───
   const [activeCall, setActiveCall] = useState(null); // { type: 'voice' | 'video', recipientName, recipientAvatar, status: 'calling' | 'connected' | 'ended', isMuted: false, isVideoOff: false, isSpeakerOn: true, isScreenSharing: false, error: null }
@@ -6132,9 +6134,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           </button>
                         )}
 
-                        {/* Avatar with Online Dot */}
+                        {/* Avatar with Online Dot (Click to view DP like WhatsApp) */}
                         <div
                           className="phoenix-avatar-wrap"
+                          role="button"
+                          tabIndex={0}
+                          title="Click to view profile photo (DP)"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const cId = colleague?._id || colleague?.id;
+                            const isOn = isDirect && cId ? onlineUserIds.has(String(cId)) : false;
+                            setDpViewerTarget({
+                              name: displayName,
+                              avatarUrl: isDirect ? (colleague?.avatarUrl || '') : (activeGroup?.avatarUrl || ''),
+                              subtitle: isDirect
+                                ? (colleague?.role || colleague?.department || colleague?.email || 'Team Member')
+                                : `Group • ${activeGroup?.members?.length || 0} members`,
+                              isOnline: isOn,
+                              isDirect,
+                            });
+                          }}
                           style={{
                             width: isMobileScreen ? 36 : 40,
                             height: isMobileScreen ? 36 : 40,
@@ -6146,6 +6165,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             justifyContent: 'center',
                             flexShrink: 0,
                             position: 'relative',
+                            cursor: 'pointer',
                             background: isDirect
                               ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
                               : `${deptCol}22`,
@@ -6186,7 +6206,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         <div style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                           <button
                             type="button"
-                            onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
+                            onClick={() => setShowChatInfoDrawer(true)}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -6201,7 +6221,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               minWidth: 0,
                               overflow: 'hidden'
                             }}
-                            title="Click for conversation options"
+                            title="Tap for Contact / Group Info & Settings"
                           >
                             <h3 style={{
                               margin: 0,
@@ -6335,7 +6355,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <MoreVertical size={isMobileScreen ? 14 : 16} />
                           </button>
 
-                          {/* Dropdown Menu */}
+                          {/* Compact WhatsApp-Style Dropdown Menu (6 Quick Actions + Info Drawer) */}
                           {showDesktopHeaderMenu && (
                             <>
                               <div
@@ -6346,162 +6366,58 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 position: 'absolute',
                                 top: 'calc(100% + 6px)',
                                 right: 0,
-                                background: 'var(--bg-card, #0f172a)',
-                                border: '1px solid var(--border-light, rgba(148,163,184,0.22))',
-                                borderRadius: '12px',
-                                boxShadow: '0 12px 30px rgba(0,0,0,0.35)',
+                                background: 'rgba(11, 17, 32, 0.97)',
+                                backdropFilter: 'blur(20px)',
+                                WebkitBackdropFilter: 'blur(20px)',
+                                border: '1px solid rgba(148, 163, 184, 0.25)',
+                                borderRadius: '14px',
+                                boxShadow: '0 16px 38px rgba(0, 0, 0, 0.55)',
                                 zIndex: 9999,
                                 padding: '6px',
-                                minWidth: '240px',
-                                maxHeight: '68vh',
-                                overflowY: 'auto',
+                                minWidth: '220px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '2px'
                               }}>
-                                {/* Start Voice Call */}
                                 <button
                                   type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); startCall('voice'); }}
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowChatInfoDrawer(true); }}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                    fontSize: '0.82rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
-                                  <Phone size={14} color="#2563eb" />
-                                  <span>Start Voice Call</span>
+                                  <Info size={14} color="#38bdf8" />
+                                  <span>{isDirect ? 'Contact Info & Settings' : 'Group Info & Settings'}</span>
                                 </button>
 
-                                {/* Start Video Call */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); startCall('video'); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Video size={14} color="#3b82f6" />
-                                  <span>Start Video Call</span>
-                                </button>
-
-                                <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
-
-                                {/* In-room Search */}
                                 <button
                                   type="button"
                                   onClick={() => { setShowDesktopHeaderMenu(false); setShowInRoomSearch(!showInRoomSearch); }}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                    fontSize: '0.82rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
-                                  <Search size={14} color="#3874ff" />
+                                  <Search size={14} color="#38bdf8" />
                                   <span>Search in Chat</span>
                                 </button>
 
-                                {/* Gallery */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowGalleryModal(true); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Folder size={14} color="#2563eb" />
-                                  <span>Shared Gallery</span>
-                                </button>
-
-                                {/* Create Task from chat */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); handleOpenTaskModalFromChat(); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <CheckSquare size={14} color="#10b981" />
-                                  <span>Create Task</span>
-                                </button>
-
-                                {/* Create Poll */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowPollModal(true); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <BarChart2 size={14} color="#059669" />
-                                  <span>Create Poll</span>
-                                </button>
-
-                                {/* Starred Messages */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowStarredModal(true); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Star size={14} color="#fbbf24" />
-                                  <span>Starred Messages</span>
-                                </button>
-
-                                {/* Schedule Message */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowScheduleModal(true); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Clock size={14} color="#38bdf8" />
-                                  <span>Schedule Message</span>
-                                </button>
-
-                                {/* Disappearing Messages */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowDisappearModal(true); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Timer size={14} color="#a78bfa" />
-                                  <span>Disappearing Timer</span>
-                                </button>
-
-                                {/* Multi-Select Messages */}
                                 <button
                                   type="button"
                                   onClick={() => { setShowDesktopHeaderMenu(false); setIsMultiSelectMode((v) => !v); setSelectedMsgIds([]); }}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                    fontSize: '0.82rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
                                   <CheckSquare size={14} color="#38bdf8" />
-                                  <span>{isMultiSelectMode ? 'Exit Multi-Select' : 'Select Messages'}</span>
+                                  <span>{isMultiSelectMode ? 'Exit Select Mode' : 'Select Messages'}</span>
                                 </button>
 
-                                {/* Mute Room */}
                                 <button
                                   type="button"
                                   onClick={async () => {
@@ -6513,314 +6429,70 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     fetchGroups(true);
                                   }}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                    fontSize: '0.82rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
                                   <VolumeX size={14} color="#f59e0b" />
-                                  <span>Mute / Unmute Chat</span>
+                                  <span>Mute / Unmute Notifications</span>
                                 </button>
 
-                                {/* Archive Room */}
                                 <button
                                   type="button"
-                                  onClick={async () => {
-                                    setShowDesktopHeaderMenu(false);
-                                    if (!activeGroup?._id) return;
-                                    const uid = String(currentUser?._id || currentUser?.id || '');
-                                    const isArch = Array.isArray(activeGroup.archivedBy) && activeGroup.archivedBy.some(id => String(id) === uid);
-                                    await api.toggleArchiveChatRoom(activeGroup._id, !isArch).catch(() => {});
-                                    fetchGroups(true);
-                                  }}
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowDisappearModal(true); }}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                    fontSize: '0.82rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
-                                  <Archive size={14} color="#94a3b8" />
-                                  <span>Archive / Unarchive</span>
-                                </button>
-
-                                {/* Share Record */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); handleOpenShareModal('jobcard'); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Share2 size={14} color="#9333ea" />
-                                  <span>Share Record Card</span>
-                                </button>
-
-                                {/* For Groups: Group Settings, Tasks & Members */}
-                                {!isDirect && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setShowDesktopHeaderMenu(false); handleOpenGroupSettings(); }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                      }}
-                                    >
-                                      <Settings size={14} color="#f59e0b" />
-                                      <span>Group Settings</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setShowDesktopHeaderMenu(false);
-                                        setTaskGroupFilter({
-                                          groupId: activeGroup._id,
-                                          name: activeGroup.name,
-                                          department: activeGroup.department,
-                                          members: activeGroup.members?.map(m => typeof m === 'object' ? (m._id || m.id) : m) || []
-                                        });
-                                        setMainTab('task');
-                                      }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                      }}
-                                    >
-                                      <CheckSquare size={14} color="#3874ff" />
-                                      <span>Group Tasks & Kanban</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => { setShowDesktopHeaderMenu(false); handleOpenMembers(); }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                      }}
-                                    >
-                                      <Users size={14} color="#0ea5e9" />
-                                      <span>Members ({activeGroup.members?.length || 0})</span>
-                                    </button>
-                                  </>
-                                )}
-
-                                {/* Sound Toggle */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowDesktopHeaderMenu(false);
-                                    const next = !chatSoundMuted;
-                                    setChatSoundMuted(next);
-                                    if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
-                                  }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  {chatSoundMuted ? <Volume2 size={14} color="#10b981" /> : <VolumeX size={14} color="#ef4444" />}
-                                  <span>{chatSoundMuted ? 'Unmute Sound' : 'Mute Sound'}</span>
-                                </button>
-
-                                {/* Export Chat Log */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); handleExportChatLog(); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <FileText size={14} color="#8b5cf6" />
-                                  <span>Export Chat Log</span>
-                                </button>
-
-                                {/* WhatsApp-Parity Room & Global Actions */}
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowDesktopHeaderMenu(false);
-                                    const res = await api.togglePinChatRoom(activeGroup._id);
-                                    if (res?.success) {
-                                      const myId = String(currentUser?._id || currentUser?.id || '');
-                                      setGroups((prev) => prev.map((g) => {
-                                        if (String(g._id) !== String(activeGroup._id)) return g;
-                                        const curr = Array.isArray(g.pinnedBy) ? g.pinnedBy : [];
-                                        const nextPinned = res.isPinned ? [...curr, myId] : curr.filter((id) => String(id) !== myId);
-                                        return { ...g, pinnedBy: nextPinned };
-                                      }));
-                                    }
-                                  }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Pin size={14} color="#f59e0b" />
-                                  <span>Pin / Unpin Chat to Top</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowDesktopHeaderMenu(false);
-                                    const res = await api.toggleMarkChatUnread(activeGroup._id, true);
-                                    if (res?.success) {
-                                      const myId = String(currentUser?._id || currentUser?.id || '');
-                                      setGroups((prev) => prev.map((g) => String(g._id) === String(activeGroup._id) ? { ...g, unreadBy: [...(g.unreadBy || []), myId] } : g));
-                                      setActiveGroup(null);
-                                    }
-                                  }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <MessageSquare size={14} color="#38bdf8" />
-                                  <span>Mark as Unread</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setLockModalState({ mode: 'manage', room: activeGroup }); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Lock size={14} color="#fbbf24" />
-                                  <span>Chat Lock (PIN)</span>
+                                  <Timer size={14} color="#a78bfa" />
+                                  <span>Disappearing Messages</span>
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() => { setShowDesktopHeaderMenu(false); setShowWallpaperModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                    fontSize: '0.82rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                  }}
                                 >
                                   <ImageIcon size={14} color="#38bdf8" />
                                   <span>Chat Wallpaper</span>
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowInviteModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Share2 size={14} color="#22c55e" />
-                                  <span>Group Invite Link & Join</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowBroadcastModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Radio size={14} color="#f59e0b" />
-                                  <span>New Broadcast List</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowChatSettingsModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Settings size={14} color="#94a3b8" />
-                                  <span>Privacy, Auto-Download & Storage</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowE2EEModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Shield size={14} color="#22c55e" />
-                                  <span>Encryption (E2EE) &amp; Security Code</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowToneModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Volume2 size={14} color="#38bdf8" />
-                                  <span>Custom Notification Tone</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowCommunityModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <Layers size={14} color="#a78bfa" />
-                                  <span>Communities &amp; Sub-Groups</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowCallLinkModal(true); }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-                                >
-                                  <PhoneCall size={14} color="#4ade80" />
-                                  <span>Create Shareable Call Link</span>
-                                </button>
-
-                                {/* Direct Chat or Admin Delete / Clear Options */}
-                                {isDirect ? (
+                                {(isDirect || currentUser?.role === 'admin') && (
                                   <>
-                                    <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
+                                    <div style={{ height: '1px', background: 'rgba(148, 163, 184, 0.2)', margin: '4px 0' }} />
                                     <button
                                       type="button"
                                       onClick={() => { setShowDesktopHeaderMenu(false); handleClearChat(activeGroup); }}
                                       style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: '#d97706', cursor: 'pointer', fontWeight: 600
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                        fontSize: '0.82rem', color: '#fbbf24', cursor: 'pointer', fontWeight: 600
                                       }}
                                     >
-                                      <Eraser size={14} color="#d97706" />
+                                      <Eraser size={14} color="#fbbf24" />
                                       <span>Clear Chat</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
                                       style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px',
+                                        background: 'rgba(239, 68, 68, 0.16)', border: 'none', borderRadius: '8px', textAlign: 'left',
+                                        fontSize: '0.82rem', color: '#fca5a5', cursor: 'pointer', fontWeight: 700
                                       }}
                                     >
-                                      <Trash2 size={14} color="#dc2626" />
-                                      <span>Delete Chat</span>
+                                      <Trash2 size={14} color="#f87171" />
+                                      <span>{isDirect ? 'Delete Chat' : 'Delete Group'}</span>
                                     </button>
                                   </>
-                                ) : currentUser?.role === 'admin' ? (
-                                  <>
-                                    <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
-                                    <button
-                                      type="button"
-                                      onClick={() => { setShowDesktopHeaderMenu(false); handleClearChat(activeGroup); }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: '#d97706', cursor: 'pointer', fontWeight: 600
-                                      }}
-                                    >
-                                      <Eraser size={14} color="#d97706" />
-                                      <span>Clear Chat</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700
-                                      }}
-                                    >
-                                      <Trash2 size={14} color="#dc2626" />
-                                      <span>Delete Group</span>
-                                    </button>
-                                  </>
-                                ) : null}
+                                )}
                               </div>
                             </>
                           )}
@@ -9119,16 +8791,62 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 borderRadius: '16px',
                                 boxShadow: '0 16px 40px rgba(2, 6, 23, 0.65)',
                                 zIndex: 9999,
-                                padding: '8px',
-                                minWidth: '240px',
-                                maxHeight: '62vh',
+                                padding: '10px',
+                                width: '320px',
+                                maxWidth: '88vw',
+                                maxHeight: '64vh',
                                 overflowY: 'auto',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '3px',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gap: '6px',
                                 animation: 'fadeIn 0.15s ease'
                               }}
                             >
+                              <button
+                                type="button"
+                                onClick={() => { setShowDesktopAttachMenu(false); setShowPollModal(true); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                                  background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '10px', textAlign: 'left',
+                                  fontSize: '0.78rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <BarChart2 size={14} color="#34d399" />
+                                </div>
+                                <span>Create Poll</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setShowDesktopAttachMenu(false); handleOpenTaskModalFromChat(); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                                  background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '10px', textAlign: 'left',
+                                  fontSize: '0.78rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <CheckSquare size={14} color="#38bdf8" />
+                                </div>
+                                <span>Create Task</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setShowDesktopAttachMenu(false); handleOpenShareModal('jobcard'); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                                  background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: '10px', textAlign: 'left',
+                                  fontSize: '0.78rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(168, 85, 247, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <Share2 size={14} color="#c084fc" />
+                                </div>
+                                <span>Share Record</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -9136,13 +8854,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   openFileDialog('image/*');
                                 }}
                                 style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                                  background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(148, 163, 184, 0.16)', borderRadius: '10px', textAlign: 'left',
+                                  fontSize: '0.78rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <ImageIcon size={16} color="#38bdf8" />
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <ImageIcon size={14} color="#38bdf8" />
                                 </div>
                                 <span>Photos & Media</span>
                               </button>
@@ -12938,6 +12656,304 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             </div>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp-Style Full Profile Photo (DP) Viewer */}
+      {dpViewerTarget && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <div
+          onClick={() => setDpViewerTarget(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100020,
+            background: 'rgba(4, 7, 16, 0.88)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.25rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(380px, 92vw)',
+              background: 'rgba(15, 23, 42, 0.96)',
+              border: '1px solid rgba(148, 163, 184, 0.28)',
+              borderRadius: '20px',
+              padding: '1.25rem',
+              textAlign: 'center',
+              color: '#f8fafc',
+              boxShadow: '0 28px 70px rgba(0, 0, 0, 0.72)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f8fafc' }}>{dpViewerTarget.name}</div>
+                <div style={{ fontSize: '0.74rem', color: dpViewerTarget.isOnline ? '#34d399' : '#94a3b8' }}>
+                  {dpViewerTarget.isDirect ? (dpViewerTarget.isOnline ? 'Online' : 'Offline') : ''} {dpViewerTarget.subtitle ? `· ${dpViewerTarget.subtitle}` : ''}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDpViewerTarget(null)}
+                style={{ background: 'rgba(148,163,184,0.16)', border: 'none', color: '#e2e8f0', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{
+              width: '260px',
+              height: '260px',
+              maxWidth: '72vw',
+              maxHeight: '72vw',
+              margin: '0 auto 1rem',
+              borderRadius: '22px',
+              overflow: 'hidden',
+              background: 'linear-gradient(135deg, #1e40af 0%, #38bdf8 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '4.5rem',
+              fontWeight: 900,
+              color: '#ffffff',
+              border: '2px solid rgba(56, 189, 248, 0.4)',
+            }}>
+              {dpViewerTarget.avatarUrl ? (
+                <img src={dpViewerTarget.avatarUrl} alt={dpViewerTarget.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                (dpViewerTarget.name || 'E').charAt(0).toUpperCase()
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.6rem' }}>
+              <button
+                type="button"
+                onClick={() => { setDpViewerTarget(null); startCall('voice'); }}
+                style={{ padding: '0.5rem 0.9rem', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.35)', background: 'rgba(37, 99, 235, 0.25)', color: '#93c5fd', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Phone size={14} /> Voice
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDpViewerTarget(null); startCall('video'); }}
+                style={{ padding: '0.5rem 0.9rem', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.35)', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Video size={14} /> Video
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDpViewerTarget(null); setShowChatInfoDrawer(true); }}
+                style={{ padding: '0.5rem 0.9rem', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.3)', background: 'rgba(30, 41, 59, 0.85)', color: '#f8fafc', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Info size={14} /> Info
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* WhatsApp-Style Contact / Group Info & Settings Drawer */}
+      {showChatInfoDrawer && activeGroup && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <>
+          <div
+            onClick={() => setShowChatInfoDrawer(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 100005, background: 'rgba(2, 6, 23, 0.58)', backdropFilter: 'blur(4px)' }}
+          />
+          <aside
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 'min(390px, 94vw)',
+              background: 'rgba(11, 17, 32, 0.97)',
+              backdropFilter: 'blur(22px)',
+              WebkitBackdropFilter: 'blur(22px)',
+              borderLeft: '1px solid rgba(148, 163, 184, 0.24)',
+              zIndex: 100006,
+              display: 'flex',
+              flexDirection: 'column',
+              color: '#f8fafc',
+              boxShadow: '-14px 0 40px rgba(0, 0, 0, 0.6)',
+            }}
+          >
+            {(() => {
+              const uid = String(currentUser?._id || currentUser?.id || '');
+              const isDirectChat = activeGroup.type === 'direct';
+              const peer = isDirectChat
+                ? (activeGroup.members || []).find((m) => String(typeof m === 'object' ? (m._id || m.id) : m) !== uid)
+                : null;
+              const peerObj = typeof peer === 'object' ? peer : null;
+              const titleName = isDirectChat
+                ? (peerObj?.name || peerObj?.username || activeGroup.name || 'Direct Chat')
+                : (activeGroup.name || 'Group');
+              const avatar = isDirectChat ? (peerObj?.avatarUrl || '') : (activeGroup.avatarUrl || '');
+              const isMuted = Array.isArray(activeGroup.mutedBy) && activeGroup.mutedBy.some((m) => String(m.userId) === uid);
+              const isArch = Array.isArray(activeGroup.archivedBy) && activeGroup.archivedBy.some((id) => String(id) === uid);
+
+              const infoBtn = (icon, label, onClick, accent = '#f8fafc') => (
+                <button
+                  type="button"
+                  onClick={() => { setShowChatInfoDrawer(false); onClick(); }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(148, 163, 184, 0.14)',
+                    background: 'rgba(15, 23, 42, 0.72)',
+                    color: accent,
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  {icon}
+                  <span>{label}</span>
+                </button>
+              );
+
+              return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.15rem', borderBottom: '1px solid rgba(148, 163, 184, 0.18)' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{isDirectChat ? 'Contact Info' : 'Group Info'}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowChatInfoDrawer(false)}
+                      style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* Profile Card with Clickable DP */}
+                    <div style={{ textAlign: 'center', padding: '0.75rem', borderRadius: '14px', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(148, 163, 184, 0.18)' }}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        title="Click to enlarge DP"
+                        onClick={() => setDpViewerTarget({
+                          name: titleName,
+                          avatarUrl: avatar,
+                          subtitle: isDirectChat ? (peerObj?.role || 'Team Member') : `${activeGroup.members?.length || 0} members`,
+                          isOnline: isDirectChat && peerObj?._id ? onlineUserIds.has(String(peerObj._id)) : false,
+                          isDirect: isDirectChat,
+                        })}
+                        style={{
+                          width: 86,
+                          height: 86,
+                          margin: '0 auto 0.65rem',
+                          borderRadius: '50%',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '2rem',
+                          fontWeight: 900,
+                          color: '#ffffff',
+                          border: '2px solid rgba(56, 189, 248, 0.45)',
+                        }}
+                      >
+                        {avatar ? (
+                          <img src={avatar} alt={titleName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          titleName.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#f8fafc' }}>{titleName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
+                        {isDirectChat ? (peerObj?.email || peerObj?.role || 'Direct Message') : `Group • ${activeGroup.members?.length || 0} members`}
+                      </div>
+                    </div>
+
+                    {/* Media & Messages */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Media &amp; Messages</div>
+                      {infoBtn(<Folder size={15} color="#38bdf8" />, 'Shared Gallery (Media, Docs, Links)', () => setShowGalleryModal(true))}
+                      {infoBtn(<Star size={15} color="#fbbf24" />, 'Starred Messages', () => setShowStarredModal(true))}
+                      {infoBtn(<FileText size={15} color="#a78bfa" />, 'Export Chat Log', () => handleExportChatLog())}
+                    </div>
+
+                    {/* Chat Controls */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Chat Preferences</div>
+                      {infoBtn(<Pin size={15} color="#f59e0b" />, 'Pin / Unpin Chat to Top', async () => {
+                        const res = await api.togglePinChatRoom(activeGroup._id);
+                        if (res?.success) {
+                          setGroups((prev) => prev.map((g) => {
+                            if (String(g._id) !== String(activeGroup._id)) return g;
+                            const curr = Array.isArray(g.pinnedBy) ? g.pinnedBy : [];
+                            return { ...g, pinnedBy: res.isPinned ? [...curr, uid] : curr.filter((id) => String(id) !== uid) };
+                          }));
+                        }
+                      })}
+                      {infoBtn(<MessageSquare size={15} color="#38bdf8" />, 'Mark as Unread', async () => {
+                        const res = await api.toggleMarkChatUnread(activeGroup._id, true);
+                        if (res?.success) {
+                          setGroups((prev) => prev.map((g) => String(g._id) === String(activeGroup._id) ? { ...g, unreadBy: [...(g.unreadBy || []), uid] } : g));
+                          setActiveGroup(null);
+                        }
+                      })}
+                      {infoBtn(<VolumeX size={15} color="#f59e0b" />, isMuted ? 'Unmute Chat Notifications' : 'Mute Chat Notifications', async () => {
+                        await api.toggleMuteChatRoom(activeGroup._id, !isMuted).catch(() => {});
+                        fetchGroups(true);
+                      })}
+                      {infoBtn(chatSoundMuted ? <Volume2 size={15} color="#10b981" /> : <VolumeX size={15} color="#ef4444" />, chatSoundMuted ? 'Unmute Sound' : 'Mute Sound', () => {
+                        const next = !chatSoundMuted;
+                        setChatSoundMuted(next);
+                        if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                      })}
+                      {infoBtn(<Archive size={15} color="#94a3b8" />, isArch ? 'Unarchive Chat' : 'Archive Chat', async () => {
+                        await api.toggleArchiveChatRoom(activeGroup._id, !isArch).catch(() => {});
+                        fetchGroups(true);
+                      })}
+                    </div>
+
+                    {/* Privacy & Security */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Privacy &amp; Security</div>
+                      {infoBtn(<Lock size={15} color="#fbbf24" />, 'Chat Lock (PIN)', () => setLockModalState({ mode: 'manage', room: activeGroup }))}
+                      {infoBtn(<Shield size={15} color="#22c55e" />, 'Encryption (E2EE) & Security Code', () => setShowE2EEModal(true))}
+                      {infoBtn(<Settings size={15} color="#94a3b8" />, 'Privacy, Auto-Download & Storage', () => setShowChatSettingsModal(true))}
+                      {infoBtn(<Volume2 size={15} color="#38bdf8" />, 'Custom Notification Tone', () => setShowToneModal(true))}
+                    </div>
+
+                    {/* Group & Broadcast Actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Groups &amp; Broadcasts</div>
+                      {!isDirectChat && infoBtn(<Settings size={15} color="#f59e0b" />, 'Group Settings', () => handleOpenGroupSettings())}
+                      {!isDirectChat && infoBtn(<Users size={15} color="#0ea5e9" />, `Members (${activeGroup.members?.length || 0})`, () => handleOpenMembers())}
+                      {!isDirectChat && infoBtn(<CheckSquare size={15} color="#3874ff" />, 'Group Tasks & Kanban', () => {
+                        setTaskGroupFilter({
+                          groupId: activeGroup._id,
+                          name: activeGroup.name,
+                          department: activeGroup.department,
+                          members: activeGroup.members?.map((m) => typeof m === 'object' ? (m._id || m.id) : m) || [],
+                        });
+                        setMainTab('task');
+                      })}
+                      {infoBtn(<Share2 size={15} color="#22c55e" />, 'Group Invite Link & Join', () => setShowInviteModal(true))}
+                      {infoBtn(<Layers size={15} color="#a78bfa" />, 'Communities & Sub-Groups', () => setShowCommunityModal(true))}
+                      {infoBtn(<Radio size={15} color="#f59e0b" />, 'New Broadcast List', () => setShowBroadcastModal(true))}
+                      {infoBtn(<PhoneCall size={15} color="#4ade80" />, 'Create Shareable Call Link', () => setShowCallLinkModal(true))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </aside>
+        </>,
+        document.body
       )}
 
       {/* WebRTC Remote Audio Player (auto-plays incoming voice on speaker) */}
