@@ -38,9 +38,8 @@ export default function DesignImage({
   const imgRef = useRef(null);
   const hoverTimerRef = useRef(null);
 
-  // Always mount <img> and rely on native browser loading="lazy" / "eager"
-  // (avoids IntersectionObserver getting stuck false inside scrolled/tabbed containers)
-  const isInView = true;
+  // Viewport intersection state: priority images render immediately; others defer until near viewport
+  const [isInView, setIsInView] = useState(priority);
 
   const candidates = useMemo(
     () => getImageCandidates(rawUrl, designName, { thumbnail, width, identifiers, category, strictDirectOnly }),
@@ -50,6 +49,46 @@ export default function DesignImage({
   const [candidateIdx, setCandidateIdx] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [allFailed, setAllFailed] = useState(false);
+
+  // Viewport Intersection Observer + bounding-rect safety check (never gets stuck false in Safari)
+  useEffect(() => {
+    if (priority || isInView) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry && (entry.isIntersecting || entry.intersectionRatio > 0)) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '350px 0px 350px 0px', threshold: 0 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    const safetyTimer = setTimeout(() => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.top < (window.innerHeight || 900) + 450 && rect.bottom > -200) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      }
+    }, 220);
+
+    return () => {
+      clearTimeout(safetyTimer);
+      observer.disconnect();
+    };
+  }, [priority, isInView]);
 
   // Reset state when candidate source changes
   useEffect(() => {

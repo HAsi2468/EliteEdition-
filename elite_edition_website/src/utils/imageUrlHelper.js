@@ -346,7 +346,7 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   }
 
   // 4. Direct absolute HTTP/HTTPS URL (API product image link / Marketplace CDN / Cloudflare R2)
-  // Prioritize lightweight resized preview for thumbnails so 5-20MB raw R2 photos load in <100ms.
+  // Load directly from Cloudflare R2 Edge CDN (zero EC2 bottleneck); only use /v1/upload/preview for TIFFs.
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     if (isExternalCdnUrl(raw)) {
       const httpsRaw = raw.startsWith('http://') ? raw.replace(/^http:\/\//i, 'https://') : raw;
@@ -354,9 +354,6 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
       add(`/v1/upload/preview?url=${encodeURIComponent(httpsRaw)}&w=${width}`);
       if (raw !== httpsRaw) add(raw);
       return candidates;
-    }
-    if (isThumb) {
-      add(`/v1/upload/preview?url=${encodeURIComponent(raw)}&w=${width}`);
     }
     add(raw);
     if (raw.includes('/designs/')) {

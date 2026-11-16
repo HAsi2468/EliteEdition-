@@ -1543,7 +1543,7 @@ export default function DesignCatalogue({ department: rawDepartment, companyEnti
           return (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
-                {filteredDesigns.map(d => {
+                {filteredDesigns.map((d, dIdx) => {
                   return (
                     <div
                       key={d._id}
@@ -1613,6 +1613,7 @@ export default function DesignCatalogue({ department: rawDepartment, companyEnti
                           designName={d.designName}
                           category={d.category}
                           identifiers={[d.designName, d.partySkuId].filter(Boolean)}
+                          priority={dIdx < 8}
                           thumbnail={true}
                           width={360}
                           onZoom={(src) => setZoomImg(src)}
