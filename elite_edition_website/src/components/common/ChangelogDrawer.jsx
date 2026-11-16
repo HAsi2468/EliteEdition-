@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Sparkles, X, CheckCircle, ExternalLink, Zap, Keyboard, Eye, ChevronRight } from 'lucide-react';
 import './ChangelogDrawer.css';
 
@@ -164,7 +165,7 @@ export function ChangelogDrawer({ triggerOnly = false }) {
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
         <>
           <div className="changelog-drawer-backdrop" onClick={handleClose} />
           <aside
@@ -229,7 +230,8 @@ export function ChangelogDrawer({ triggerOnly = false }) {
               ))}
             </div>
           </aside>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
