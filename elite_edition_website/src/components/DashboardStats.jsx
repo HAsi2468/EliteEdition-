@@ -235,9 +235,17 @@ function DashboardStats({ items = [], sales = [] }) {
         ))}
       </div>
 
-      {/* ── TIER 3: SIDE SCROLLING CALCULATION & KPI CARDS TRACK ── */}
-      <div className="glass-scroll-track">
-        <div className="glass-calc-card">
+      {/* ── TIER 3: RESPONSIVE KPI CARDS GRID (All 5 fit cleanly without right-edge clipping) ── */}
+      <div
+        className="eon-kpi-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))',
+          gap: '0.85rem',
+          width: '100%'
+        }}
+      >
+        <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Sales Revenue</span>
           <span className="glass-calc-value" style={{ color: '#38bdf8' }}>
             ₹{totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -245,13 +253,13 @@ function DashboardStats({ items = [], sales = [] }) {
           <span className="glass-calc-sub">Gross E-Commerce Sales</span>
         </div>
 
-        <div className="glass-calc-card">
+        <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Total Orders</span>
           <span className="glass-calc-value" style={{ color: '#ffffff' }}>{totalOrders}</span>
           <span className="glass-calc-sub">{deliveredOrders} Delivered Orders</span>
         </div>
 
-        <div className="glass-calc-card">
+        <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Avg Order Value</span>
           <span className="glass-calc-value" style={{ color: '#c084fc' }}>
             ₹{avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -259,7 +267,7 @@ function DashboardStats({ items = [], sales = [] }) {
           <span className="glass-calc-sub">Per Customer Order</span>
         </div>
 
-        <div className="glass-calc-card">
+        <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Available Stock</span>
           <span className="glass-calc-value" style={{ color: '#34d399' }}>
             {totalStock.toLocaleString('en-IN')} Pcs
@@ -267,7 +275,7 @@ function DashboardStats({ items = [], sales = [] }) {
           <span className="glass-calc-sub">Across {totalUnique} SKUs</span>
         </div>
 
-        <div className="glass-calc-card">
+        <div className="glass-calc-card" style={{ minWidth: 0 }}>
           <span className="glass-calc-title">Potential Profit</span>
           <span className="glass-calc-value" style={{ color: '#fbbf24' }}>
             ₹{potentialProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -727,7 +735,7 @@ const styles = {
   sectionTitle: {
     fontSize: '1rem',
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#f8fafc',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
@@ -948,7 +956,7 @@ const styles = {
   alertItemName: {
     fontSize: '0.8rem',
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#f8fafc',
   },
   alertMeta: {
     fontSize: '0.7rem',
@@ -993,6 +1001,10 @@ const styles = {
 // Inject responsive grid stylesheet
 const styleEl = document.createElement('style');
 styleEl.innerHTML = `
+  .eon-kpi-grid .glass-calc-card {
+    min-width: 0 !important;
+  }
+
   /* Interactive dot hovering effects in Line Graph */
   .chart-dot-group {
     cursor: pointer;

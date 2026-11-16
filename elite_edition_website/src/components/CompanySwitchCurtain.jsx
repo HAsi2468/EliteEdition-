@@ -26,9 +26,7 @@ export default function CompanySwitchCurtain({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1.25rem',
-        background: `radial-gradient(circle at 50% 38%, ${accent}26 0%, rgba(9, 15, 29, 0.94) 55%, rgba(5, 8, 17, 0.98) 100%)`,
-        WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-        backdropFilter: 'blur(18px) saturate(160%)',
+        background: `radial-gradient(circle at 50% 38%, ${accent}22 0%, rgba(8, 13, 27, 0.96) 55%, rgba(4, 7, 16, 0.98) 100%)`,
         pointerEvents: isLeaving ? 'none' : 'auto',
       }}
     >

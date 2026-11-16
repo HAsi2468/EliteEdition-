@@ -485,33 +485,30 @@ details[open] > *:not(summary) {
   transform: scale(0.9);
 }
 
-/* Full-Screen Morphing Brand Curtain (Company Switch) */
+/* Full-Screen Morphing Brand Curtain (Company Switch)
+   Safari-safe: animate opacity only on the fullscreen backdrop; animate transform on inner card only */
 @keyframes erpCurtainIn {
   0% {
     opacity: 0;
-    clip-path: inset(0 0 100% 0 round 0 0 28px 28px);
   }
   100% {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round 0);
   }
 }
 
 @keyframes erpCurtainOut {
   0% {
     opacity: 1;
-    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-14px);
   }
 }
 
 @keyframes erpCurtainCardIn {
   0% {
     opacity: 0;
-    transform: scale(0.94) translateY(10px);
+    transform: scale(0.95) translateY(8px);
   }
   100% {
     opacity: 1;
@@ -519,16 +516,35 @@ details[open] > *:not(summary) {
   }
 }
 
+@keyframes erpCurtainCardOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.97) translateY(-6px);
+  }
+}
+
+.erp-brand-curtain {
+  will-change: opacity;
+}
+
 .erp-brand-curtain.is-entering {
-  animation: erpCurtainIn 0.34s var(--anim-ease-out-expo) forwards;
+  animation: erpCurtainIn 0.24s ease-out forwards;
 }
 
 .erp-brand-curtain.is-leaving {
-  animation: erpCurtainOut 0.28s var(--anim-ease-out-expo) forwards;
+  animation: erpCurtainOut 0.26s ease-out forwards;
 }
 
 .erp-brand-curtain-card {
-  animation: erpCurtainCardIn 0.36s var(--anim-ease-spring) backwards;
+  animation: erpCurtainCardIn 0.3s var(--anim-ease-spring) backwards;
+}
+
+.erp-brand-curtain.is-leaving .erp-brand-curtain-card {
+  animation: erpCurtainCardOut 0.24s ease-out forwards;
 }
 
 /* ── 10. TACTILE PRESS MICRO-INTERACTIONS (All Devices) ─────────────────── */
