@@ -415,46 +415,55 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
               <div
                 style={{
                   width: '100%',
+                  height: '175px',
                   border: '1.2px solid #000',
                   marginTop: '2px',
-                  minHeight: '130px',
-                  maxHeight: '200px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
-                  background: '#f8fafc',
+                  background: '#ffffff',
                 }}
               >
                 {resolvedImages.imageUrl1 || resolvedImages.imageUrl2 ? (
                   <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
                     {resolvedImages.imageUrl1 && (
-                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', minHeight: '130px' }}>
-                        <DesignImage
-                          priority
-                          showShimmer={false}
-                          rawUrl={resolvedImages.imageUrl1}
-                          designName={card?.designName || card?.designNo || ''}
-                          thumbnail={true}
-                          width={450}
-                          style={{ width: '100%', height: '100%', maxHeight: '190px', background: 'transparent' }}
-                          imgStyle={{ objectFit: 'contain' }}
-                          showPlaceholderBadge={true}
+                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', overflow: 'hidden' }}>
+                        <img
+                          key={resolvedImages.imageUrl1}
+                          src={resolvedImages.imageUrl1}
+                          alt={card?.designName || card?.designNo || 'Design 1'}
+                          referrerPolicy="no-referrer"
+                          style={{ maxWidth: '100%', maxHeight: '165px', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            if (!el.dataset.proxyTried && /^https?:\/\//i.test(resolvedImages.imageUrl1)) {
+                              el.dataset.proxyTried = '1';
+                              el.src = `/v1/upload/preview?url=${encodeURIComponent(resolvedImages.imageUrl1)}&w=600`;
+                              return;
+                            }
+                            el.style.display = 'none';
+                          }}
                         />
                       </div>
                     )}
                     {resolvedImages.imageUrl2 && (
-                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderLeft: '1.2px solid #000', minHeight: '130px' }}>
-                        <DesignImage
-                          priority
-                          showShimmer={false}
-                          rawUrl={resolvedImages.imageUrl2}
-                          designName={`${card?.designName || card?.designNo || ''}-2`}
-                          thumbnail={true}
-                          width={450}
-                          style={{ width: '100%', height: '100%', maxHeight: '190px', background: 'transparent' }}
-                          imgStyle={{ objectFit: 'contain' }}
-                          showPlaceholderBadge={true}
+                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderLeft: '1.2px solid #000', overflow: 'hidden' }}>
+                        <img
+                          key={resolvedImages.imageUrl2}
+                          src={resolvedImages.imageUrl2}
+                          alt={card?.designName || card?.designNo || 'Design 2'}
+                          referrerPolicy="no-referrer"
+                          style={{ maxWidth: '100%', maxHeight: '165px', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            if (!el.dataset.proxyTried && /^https?:\/\//i.test(resolvedImages.imageUrl2)) {
+                              el.dataset.proxyTried = '1';
+                              el.src = `/v1/upload/preview?url=${encodeURIComponent(resolvedImages.imageUrl2)}&w=600`;
+                              return;
+                            }
+                            el.style.display = 'none';
+                          }}
                         />
                       </div>
                     )}
