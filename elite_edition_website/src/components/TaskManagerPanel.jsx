@@ -2038,13 +2038,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                     position: 'absolute',
                     top: 'calc(100% + 5px)',
                     right: 0,
-                    minWidth: '200px',
-                    background: 'rgba(15, 23, 42, 0.96)',
-                    backdropFilter: 'blur(20px)',
+                    minWidth: '210px',
+                    background: '#0b1120',
                     borderRadius: '10px',
-                    border: '1px solid rgba(148, 163, 184, 0.25)',
-                    boxShadow: '0 16px 36px rgba(2, 6, 23, 0.65)',
-                    zIndex: 1100,
+                    border: '1px solid rgba(148, 163, 184, 0.32)',
+                    boxShadow: '0 18px 42px rgba(2, 6, 23, 0.85)',
+                    zIndex: 9999,
                     padding: '6px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -2148,11 +2147,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                     top: 'calc(100% + 5px)',
                     right: 0,
                     minWidth: '230px',
-                    background: '#ffffff',
+                    background: '#0b1120',
                     borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
-                    zIndex: 1100,
+                    border: '1px solid rgba(148, 163, 184, 0.32)',
+                    boxShadow: '0 18px 42px rgba(2, 6, 23, 0.85)',
+                    zIndex: 9999,
                     padding: '6px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -2858,16 +2857,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
 
       {/* ── MAIN CONTENT AREA ── */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
         
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '280px', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading TaskOPad workforce board...</div>
           </div>
         ) : activeView === 'kanban' ? (
           
           /* ════ VIEW 1: KANBAN BOARD ════ */
-          <div className="task-kanban-board" style={{ flex: 1, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="task-kanban-board" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
             {/* Mobile Column Bar Switcher */}
             <div className="task-mobile-col-bar" style={{ flexShrink: 0 }}>
               <button
@@ -2905,10 +2904,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 gap: '0.75rem',
                 flex: 1,
                 minHeight: 0,
-                height: '100%',
                 overflowX: 'auto',
-                overflowY: 'hidden',
-                paddingBottom: '0.5rem'
+                overflowY: 'visible',
+                paddingBottom: '0.75rem'
               }}
             >
               {(mobileKanbanCol === 'all' ? KANBAN_COLUMNS : KANBAN_COLUMNS.filter(c => c.id === mobileKanbanCol)).map((col) => {
@@ -2944,9 +2942,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                       borderRadius: '12px',
                       display: 'flex',
                       flexDirection: 'column',
-                      height: '100%',
-                      minHeight: 0,
-                      maxHeight: '100%',
+                      minHeight: '320px',
+                      maxHeight: '72vh',
                       overflow: 'hidden',
                       transition: 'border 0.2s ease, background 0.2s ease'
                     }}

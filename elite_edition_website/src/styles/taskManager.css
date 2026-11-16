@@ -14,7 +14,9 @@
 
 /* ─── Unified Compact Header Bar ─────────────────────────────────────── */
 .task-unified-header {
-  background: rgba(15, 23, 42, 0.78) !important;
+  position: relative;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.84) !important;
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border: 1px solid rgba(148, 163, 184, 0.22) !important;
@@ -407,6 +409,8 @@ body.glass-theme-active .task-select {
 
 /* ─── Kanban Board Grid (4 Equal Columns Desktop) ────────────────────── */
 .task-kanban-board {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, minmax(260px, 1fr));
   gap: 14px;
