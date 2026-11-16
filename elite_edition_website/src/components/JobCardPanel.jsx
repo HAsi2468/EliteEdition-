@@ -247,12 +247,19 @@ function StatusBadge({ status }) {
 
 async function resolveImageToDataUrl(candidates) {
   if (!candidates || candidates.length === 0) return '';
+  const expanded = [];
   for (const url of candidates) {
     if (!url) continue;
     if (url.startsWith('data:')) return url;
+    expanded.push(url);
+    if (/^https?:\/\//i.test(url)) {
+      expanded.push(`/v1/upload/preview?url=${encodeURIComponent(url)}&w=800`);
+    }
+  }
+  for (const url of expanded) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
