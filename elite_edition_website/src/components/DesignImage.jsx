@@ -41,11 +41,15 @@ export default function DesignImage({
   // Viewport intersection state: priority images render immediately; others defer until near viewport
   const [isInView, setIsInView] = useState(priority);
 
+  const identifiersKey = Array.isArray(identifiers) ? identifiers.join('|') : '';
+
   const candidates = useMemo(
     () => getImageCandidates(rawUrl, designName, { thumbnail, width, identifiers, category, strictDirectOnly }),
-    [rawUrl, designName, thumbnail, width, identifiers, category, strictDirectOnly]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawUrl, designName, thumbnail, width, identifiersKey, category, strictDirectOnly]
   );
 
+  const candidatesKey = candidates.join('|');
   const [candidateIdx, setCandidateIdx] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [allFailed, setAllFailed] = useState(false);
@@ -90,19 +94,20 @@ export default function DesignImage({
     };
   }, [priority, isInView]);
 
-  // Reset state when candidate source changes
+  // Reset candidate index ONLY when the actual URL list string changes
   useEffect(() => {
     setCandidateIdx(0);
-    setHasLoaded(false);
     setAllFailed(false);
-  }, [candidates]);
+  }, [candidatesKey]);
 
   const currentSrc = candidates[candidateIdx] || '';
 
-  // Ensure already-cached images reveal immediately even if onLoad fires synchronously
+  // Reveal cached images immediately and reset loaded state only when currentSrc actually changes
   useEffect(() => {
     if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
       setHasLoaded(true);
+    } else {
+      setHasLoaded(false);
     }
   }, [currentSrc]);
 
