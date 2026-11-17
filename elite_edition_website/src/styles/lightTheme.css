@@ -639,7 +639,7 @@ body.light-theme-active :is(div, button, span, section, aside, input, select):no
 }
 
 /* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text */
-body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd, button, select):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.nav-item.active):not(.glass-subtab-btn.active):is(
+body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd, button, select):not(.printable-area *, .print-a4-sheet *, .a4-invoice-sheet *, .no-glass-override *, .btn-primary, .btn-primary *, .company-segment-pill.active, .nav-item.active, .glass-subtab-btn.active):is(
   [style*="color: rgb(255, 255, 255)"],
   [style*="color: rgba(255, 255, 255"],
   [style*="color:rgb(255,255,255)"],
@@ -677,9 +677,9 @@ body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(
 ) {
   color: #047857 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
-  [style*="color: #fcd34d"], [style*="color: #fde68a"], [style*="color: #fbbf24"],
-  [style*="color: rgb(252, 211, 77)"], [style*="color: rgb(253, 230, 138)"], [style*="color: rgb(251, 191, 36)"]
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *, .btn-primary):is(
+  [style*="color: #fcd34d"], [style*="color: #fde68a"], [style*="color: #fbbf24"], [style*="color: #fde047"], [style*="color: #facc15"], [style*="color: #fdba74"], [style*="color: #fb923c"],
+  [style*="color: rgb(252, 211, 77)"], [style*="color: rgb(253, 230, 138)"], [style*="color: rgb(251, 191, 36)"], [style*="color: rgb(253, 224, 71)"], [style*="color: rgb(250, 204, 21)"], [style*="color: rgb(253, 186, 116)"], [style*="color: rgb(251, 146, 60)"]
 ) {
   color: #b45309 !important;
 }
@@ -703,17 +703,17 @@ body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(
 }
 
 /* Preserve Crisp White Text on Solid Gradient / Primary / Colored Action Buttons & Badges */
-body.light-theme-active .btn-primary,
-body.light-theme-active .btn-primary *,
-body.light-theme-active .nav-item.active,
-body.light-theme-active .nav-item.active *,
-body.light-theme-active .glass-subtab-btn.active,
-body.light-theme-active .glass-subtab-btn.active *,
-body.light-theme-active aside#erp-sidebar-nav button.active,
-body.light-theme-active aside#erp-sidebar-nav button.active *,
-body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
-body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
-body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is(
+html[data-theme="light"] body.light-theme-active .btn-primary,
+html[data-theme="light"] body.light-theme-active .btn-primary *,
+html[data-theme="light"] body.light-theme-active .nav-item.active,
+html[data-theme="light"] body.light-theme-active .nav-item.active *,
+html[data-theme="light"] body.light-theme-active .glass-subtab-btn.active,
+html[data-theme="light"] body.light-theme-active .glass-subtab-btn.active *,
+html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.active,
+html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.active *,
+html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
+html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
+html[data-theme="light"] html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is(
   [style*="linear-gradient"],
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
@@ -737,7 +737,7 @@ body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([st
   [style*="background: rgb(245, 158, 11)"], [style*="background-color: rgb(245, 158, 11)"], [style*="background: #f59e0b"],
   [style*="background: rgb(100, 116, 139)"], [style*="background-color: rgb(100, 116, 139)"], [style*="background: #64748b"]
 ),
-body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is(
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is(
   [style*="linear-gradient"],
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
