@@ -233,6 +233,16 @@ body.light-theme-active aside#erp-sidebar-nav a.active * {
   color: #ffffff !important;
 }
 
+body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] svg,
+body.light-theme-active aside#erp-sidebar-nav button.active svg,
+body.light-theme-active aside#erp-sidebar-nav a.active svg,
+body.light-theme-active .nav-item.active svg,
+body.light-theme-active .btn-primary svg,
+body.light-theme-active .glass-subtab-btn.active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
 body.light-theme-active .dept-switcher-header {
   background: rgba(241, 245, 249, 0.78) !important;
   backdrop-filter: blur(12px) !important;
@@ -559,8 +569,12 @@ body.light-theme-active table td {
   border-bottom: 1px solid rgba(226, 232, 240, 0.80) !important;
 }
 
-body.light-theme-active table tbody tr:hover {
-  background: rgba(241, 245, 249, 0.75) !important;
+body.light-theme-active table tbody tr:hover,
+body.light-theme-active table tbody tr:hover td,
+body.light-theme-active table tr:hover td {
+  background: rgba(226, 232, 240, 0.55) !important;
+  background-color: rgba(226, 232, 240, 0.55) !important;
+  color: #0f172a !important;
 }
 
 /* Hardcoded Dark Inline Backgrounds -> Frosted Light Glass Surfaces */
