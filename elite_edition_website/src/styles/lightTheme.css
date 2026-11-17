@@ -1,26 +1,26 @@
 /**
- * Elite ERP - Daylight Frosted Glass Theme (Light Mode) & Small-Screen Readability Guardrails
+ * Elite ERP - Daylight Liquid Glass Theme (Light Mode) & Small-Screen Readability Guardrails
  *
  * Activated when <html data-theme="light"> and <body class="light-theme-active">.
- * Ensures 100% WCAG-readable dark-slate typography on crisp daylight glass surfaces
- * across all screens, modals, drawers, filter popovers, chat, task manager, and tables.
+ * Provides authentic frosted-glass translucency (backdrop-filter blur + specular inner highlights
+ * over an ambient brand-reactive daylight canvas) with strict WCAG-compliant dark-slate text.
  */
 
 html[data-theme="light"],
 body.light-theme-active,
 body.light-theme-active .glass-viewport {
-  --glass-canvas-bg: radial-gradient(circle at 10% 12%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.10) 0%, rgba(241, 245, 249, 0.96) 45%),
-                     radial-gradient(circle at 90% 85%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.08) 0%, rgba(248, 250, 252, 0.98) 52%),
-                     linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%);
-  --glass-bg-base: rgba(255, 255, 255, 0.88);
-  --glass-bg-card: rgba(255, 255, 255, 0.94);
-  --glass-bg-elevated: rgba(255, 255, 255, 0.98);
-  --glass-bg-hover: rgba(241, 245, 249, 0.96);
-  --glass-border: rgba(148, 163, 184, 0.35);
+  --glass-canvas-bg: radial-gradient(circle at 12% 14%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.14) 0%, rgba(238, 244, 255, 0.92) 42%),
+                     radial-gradient(circle at 88% 82%, rgba(14, 165, 233, 0.12) 0%, rgba(241, 245, 249, 0.95) 48%),
+                     linear-gradient(135deg, #e8eef8 0%, #f1f5f9 50%, #e6edf7 100%);
+  --glass-bg-base: rgba(255, 255, 255, 0.72);
+  --glass-bg-card: rgba(255, 255, 255, 0.76);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.88);
+  --glass-bg-hover: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(148, 163, 184, 0.34);
   --glass-border-subtle: rgba(148, 163, 184, 0.22);
   --glass-border-highlight: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.45);
-  --glass-shadow: 0 8px 28px -4px rgba(15, 23, 42, 0.08), 0 2px 8px -2px rgba(15, 23, 42, 0.04);
-  --glass-shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.06);
+  --glass-shadow: 0 10px 32px -6px rgba(15, 23, 42, 0.10), 0 2px 10px -2px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --glass-shadow-sm: 0 4px 16px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   --glass-text-main: #0f172a;
   --glass-text-muted: #475569;
   --glass-text-dim: #64748b;
@@ -31,50 +31,50 @@ body.light-theme-active .glass-viewport {
   --text-muted: #475569 !important;
   --text-light: #64748b !important;
   --text-table: #0f172a !important;
-  --border-color: #cbd5e1 !important;
-  --border-light: #e2e8f0 !important;
+  --border-color: rgba(148, 163, 184, 0.36) !important;
+  --border-light: rgba(148, 163, 184, 0.24) !important;
   --bg-main: transparent !important;
-  --bg-surface: rgba(255, 255, 255, 0.94) !important;
-  --bg-surface-elevated: #ffffff !important;
-  --bg-subtle: #f8fafc !important;
-  --bg-secondary: #f1f5f9 !important;
-  --bg-muted: #f1f5f9 !important;
-  --bg-hover: #e2e8f0 !important;
+  --bg-surface: rgba(255, 255, 255, 0.78) !important;
+  --bg-surface-elevated: rgba(255, 255, 255, 0.90) !important;
+  --bg-subtle: rgba(248, 250, 252, 0.80) !important;
+  --bg-secondary: rgba(241, 245, 249, 0.82) !important;
+  --bg-muted: rgba(241, 245, 249, 0.75) !important;
+  --bg-hover: rgba(226, 232, 240, 0.65) !important;
   --bg-active: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.12) !important;
-  --bg-input: #ffffff !important;
-  --bg-th: #f1f5f9 !important;
-  --bg-card: rgba(255, 255, 255, 0.95) !important;
-  --bg-card-hover: #ffffff !important;
-  --bg-modal: #ffffff !important;
-  --card-bg: rgba(255, 255, 255, 0.95) !important;
-  --input-bg: #ffffff !important;
-  --surface: rgba(255, 255, 255, 0.95) !important;
-  --surface-color: rgba(255, 255, 255, 0.95) !important;
-  --surface-subtle: #f8fafc !important;
+  --bg-input: rgba(255, 255, 255, 0.88) !important;
+  --bg-th: rgba(241, 245, 249, 0.90) !important;
+  --bg-card: rgba(255, 255, 255, 0.76) !important;
+  --bg-card-hover: rgba(255, 255, 255, 0.90) !important;
+  --bg-modal: rgba(255, 255, 255, 0.92) !important;
+  --card-bg: rgba(255, 255, 255, 0.76) !important;
+  --input-bg: rgba(255, 255, 255, 0.88) !important;
+  --surface: rgba(255, 255, 255, 0.78) !important;
+  --surface-color: rgba(255, 255, 255, 0.78) !important;
+  --surface-subtle: rgba(248, 250, 252, 0.80) !important;
   --primary-subtle: rgba(37, 99, 235, 0.10) !important;
   --primary-light: rgba(37, 99, 235, 0.14) !important;
-  --success-bg: #ecfdf5 !important;
+  --success-bg: rgba(236, 253, 245, 0.90) !important;
   --success-text: #047857 !important;
   --success-border: #a7f3d0 !important;
-  --warning-bg: #fffbeb !important;
+  --warning-bg: rgba(255, 251, 235, 0.90) !important;
   --warning-text: #b45309 !important;
   --warning-border: #fde68a !important;
-  --danger-bg: #fef2f2 !important;
+  --danger-bg: rgba(254, 242, 242, 0.90) !important;
   --danger-text: #b91c1c !important;
   --danger-border: #fecaca !important;
-  --info-bg: #eff6ff !important;
+  --info-bg: rgba(239, 246, 255, 0.90) !important;
   --info-text: #1d4ed8 !important;
   --info-border: #bfdbfe !important;
   --erp-bg-app: transparent !important;
-  --erp-border-color: #cbd5e1 !important;
-  --erp-sidebar-bg: rgba(255, 255, 255, 0.94) !important;
-  --erp-sidebar-border: #e2e8f0 !important;
+  --erp-border-color: rgba(148, 163, 184, 0.36) !important;
+  --erp-sidebar-bg: rgba(255, 255, 255, 0.74) !important;
+  --erp-sidebar-border: rgba(148, 163, 184, 0.30) !important;
   --erp-sidebar-text: #0f172a !important;
   --erp-text-main: #0f172a !important;
   --erp-text-muted: #475569 !important;
-  --split-menu-bg: #ffffff !important;
-  --split-menu-border: #cbd5e1 !important;
-  --split-menu-hover: #f1f5f9 !important;
+  --split-menu-bg: rgba(255, 255, 255, 0.94) !important;
+  --split-menu-border: rgba(148, 163, 184, 0.38) !important;
+  --split-menu-hover: rgba(241, 245, 249, 0.90) !important;
   --split-menu-text: #0f172a !important;
 
   background: var(--glass-canvas-bg) !important;
@@ -83,31 +83,61 @@ body.light-theme-active .glass-viewport {
   min-height: 100vh;
 }
 
+/* Soft Ambient Specular Glows for Daylight Frosted Glass Depth */
+body.light-theme-active::before,
+body.light-theme-active::after {
+  content: '';
+  position: fixed;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  filter: blur(110px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.22;
+}
+body.light-theme-active::before {
+  top: -120px;
+  left: -100px;
+  background: var(--entity-accent, #3b82f6);
+}
+body.light-theme-active::after {
+  bottom: -140px;
+  right: -100px;
+  background: #38bdf8;
+}
+
 body.light-theme-active #root {
   background: transparent !important;
   color: #0f172a;
 }
 
-/* Header, Sidebar & Glass Containers */
+/* Header, Sidebar & Liquid Glass Containers */
 body.light-theme-active .app-header {
-  background: rgba(255, 255, 255, 0.92) !important;
-  border-bottom: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06), inset 0 -1px 0 rgba(148, 163, 184, 0.25) !important;
   color: #0f172a !important;
 }
 
 body.light-theme-active .glass-panel,
 body.light-theme-active .glass-card {
-  background: rgba(255, 255, 255, 0.94) !important;
-  border-color: rgba(148, 163, 184, 0.35) !important;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07) !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.82) !important;
+  box-shadow: var(--glass-shadow) !important;
   color: #0f172a !important;
 }
 
 body.light-theme-active .glass-title-capsule {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.88) !important;
+  box-shadow: var(--glass-shadow-sm) !important;
   color: #0f172a !important;
 }
 
@@ -126,9 +156,11 @@ body.light-theme-active .glass-title-icon {
 }
 
 body.light-theme-active .glass-subtabs-bar {
-  background: rgba(255, 255, 255, 0.92) !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(18px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(170%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: var(--glass-shadow-sm) !important;
 }
 
 body.light-theme-active .glass-subtab-btn {
@@ -136,7 +168,7 @@ body.light-theme-active .glass-subtab-btn {
 }
 
 body.light-theme-active .glass-subtab-btn:hover {
-  background: #f1f5f9 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
   color: #0f172a !important;
 }
 
@@ -145,9 +177,11 @@ body.light-theme-active .glass-subtab-btn.active {
 }
 
 body.light-theme-active .glass-calc-card {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+  background: rgba(255, 255, 255, 0.76) !important;
+  backdrop-filter: blur(18px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(170%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: var(--glass-shadow-sm) !important;
 }
 
 body.light-theme-active .glass-calc-title {
@@ -165,9 +199,11 @@ body.light-theme-active .glass-calc-sub {
 /* Sidebar Navigation & Top Company Switcher */
 body.light-theme-active .sidebar-wrap,
 body.light-theme-active aside#erp-sidebar-nav {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: var(--glass-shadow) !important;
   color: #0f172a !important;
 }
 
@@ -179,7 +215,7 @@ body.light-theme-active aside#erp-sidebar-nav a {
 
 body.light-theme-active aside#erp-sidebar-nav button:hover,
 body.light-theme-active aside#erp-sidebar-nav a:hover {
-  background: #f1f5f9 !important;
+  background: rgba(255, 255, 255, 0.82) !important;
   color: #0f172a !important;
 }
 
@@ -198,8 +234,10 @@ body.light-theme-active aside#erp-sidebar-nav a.active * {
 }
 
 body.light-theme-active .dept-switcher-header {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
+  background: rgba(241, 245, 249, 0.78) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04) !important;
 }
 
@@ -211,16 +249,16 @@ body.light-theme-active .dept-switcher-btn {
 
 body.light-theme-active .company-segment-pill:hover,
 body.light-theme-active .dept-switcher-btn:hover {
-  background: #e2e8f0 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
   color: #0f172a !important;
 }
 
 body.light-theme-active .company-segment-pill.active,
 body.light-theme-active .dept-switcher-btn.active {
-  background: #ffffff !important;
+  background: rgba(255, 255, 255, 0.96) !important;
   color: var(--entity-accent, #2563eb) !important;
   border: 1px solid rgba(var(--entity-accent-rgb, 37, 99, 235), 0.35) !important;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
   font-weight: 700 !important;
 }
 
@@ -233,7 +271,7 @@ body.light-theme-active .nav-item {
 }
 
 body.light-theme-active .nav-item:hover {
-  background: #f1f5f9 !important;
+  background: rgba(255, 255, 255, 0.82) !important;
   color: #0f172a !important;
 }
 
@@ -245,10 +283,10 @@ body.light-theme-active .nav-item.active {
 body.light-theme-active input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not(.printable-area *),
 body.light-theme-active select:not(.printable-area *),
 body.light-theme-active textarea:not(.printable-area *) {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  background-color: rgba(255, 255, 255, 0.88) !important;
   color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  border-color: rgba(148, 163, 184, 0.45) !important;
 }
 
 body.light-theme-active input::placeholder,
@@ -262,13 +300,15 @@ body.light-theme-active select option {
 }
 
 body.light-theme-active .btn-secondary {
-  background: #ffffff !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
   color: #1e293b !important;
-  border: 1px solid #cbd5e1 !important;
+  border: 1px solid rgba(148, 163, 184, 0.40) !important;
 }
 
 body.light-theme-active .btn-secondary:hover {
-  background: #f1f5f9 !important;
+  background: #ffffff !important;
   color: #0f172a !important;
 }
 
@@ -277,21 +317,23 @@ body.light-theme-active .ufp-trigger-btn,
 body.light-theme-active .daterange-trigger-btn,
 body.light-theme-active .unified-filter-trigger,
 body.light-theme-active .changelog-trigger-btn {
-  background: #ffffff !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
   color: #0f172a !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  border: 1px solid rgba(148, 163, 184, 0.40) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05) !important;
 }
 
 body.light-theme-active .ufp-trigger-btn:hover,
 body.light-theme-active .daterange-trigger-btn:hover {
-  background: #f8fafc !important;
+  background: #ffffff !important;
   border-color: #3b82f6 !important;
   color: #0f172a !important;
 }
 
 body.light-theme-active .ufp-trigger-btn.ufp-active {
-  background: #eff6ff !important;
+  background: rgba(239, 246, 255, 0.92) !important;
   border-color: #3b82f6 !important;
   color: #1d4ed8 !important;
 }
@@ -320,10 +362,14 @@ body.light-theme-active .keyboard-shortcut-row,
 body.light-theme-active .keyboard-modal-footer,
 body.light-theme-active .shortcut-modal-dialog,
 body.light-theme-active .shortcut-search-bar,
-body.light-theme-active .selection-aggregate-dock {
-  background: rgba(255, 255, 255, 0.97) !important;
+body.light-theme-active .selection-aggregate-dock,
+body.light-theme-active .modal-content,
+body.light-theme-active [role="dialog"]:not(.printable-area) {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  border-color: rgba(148, 163, 184, 0.38) !important;
 }
 
 body.light-theme-active .ufp-sidebar,
@@ -331,9 +377,9 @@ body.light-theme-active .changelog-media-slot,
 body.light-theme-active .keyboard-modal-search-wrapper,
 body.light-theme-active kbd.keycap,
 body.light-theme-active .selection-dock-btn {
-  background: #f1f5f9 !important;
+  background: rgba(241, 245, 249, 0.88) !important;
   color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
 }
 
 body.light-theme-active .ufp-popover *,
@@ -343,7 +389,7 @@ body.light-theme-active .changelog-item-card * {
   color: #0f172a;
 }
 
-/* Task Manager, Communication, Fabric, Fusing, Infra & Myntra Modules */
+/* Task Manager, Communication, Fabric, Fusing, Infra, Myntra & Shared Frosted Surfaces */
 body.light-theme-active .task-unified-header,
 body.light-theme-active .task-kanban-col,
 body.light-theme-active .task-card-status-group,
@@ -378,35 +424,7 @@ body.light-theme-active .myntra-card-container,
 body.light-theme-active .myntra-stage-item,
 body.light-theme-active .myntra-table-container,
 body.light-theme-active .myntra-vault-banner,
-body.light-theme-active .myntra-modal {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
-}
-
-body.light-theme-active .task-col-count,
-body.light-theme-active .task-due-chip,
-body.light-theme-active .task-subtask-track,
-body.light-theme-active .task-card-status-select,
-body.light-theme-active .task-btn-secondary,
-body.light-theme-active .task-card-action-btn,
-body.light-theme-active .phoenix-search-box,
-body.light-theme-active .phoenix-tab-segmented,
-body.light-theme-active .phoenix-mobile-back-btn,
-body.light-theme-active .phoenix-action-btn-neutral,
-body.light-theme-active .phoenix-date-badge,
-body.light-theme-active .phoenix-msg-row.incoming .phoenix-msg-bubble,
-body.light-theme-active .phoenix-msg-quote,
-body.light-theme-active .phoenix-msg-actions,
-body.light-theme-active .fabric-tab-chip,
-body.light-theme-active .challan-mobile-tab-btn,
-body.light-theme-active .inward-tp-meta-banner,
-body.light-theme-active .inward-tp-tools-bar,
-body.light-theme-active .inward-tp-table-header,
-body.light-theme-active .infra-btn-secondary,
-body.light-theme-active .infra-badge-neutral,
-body.light-theme-active .myntra-btn-outline,
-body.light-theme-active .myntra-btn-subtle,
+body.light-theme-active .myntra-modal,
 body.light-theme-active .ent-stat-card,
 body.light-theme-active .complaint-modern-card,
 body.light-theme-active .smart-more-menu-dropdown,
@@ -446,11 +464,37 @@ body.light-theme-active .phoenix-reaction-pill,
 body.light-theme-active .phoenix-reply-banner,
 body.light-theme-active .phoenix-chat-input-pill,
 body.light-theme-active .phoenix-scroll-bottom-btn {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(18px) saturate(175%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(175%) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: var(--glass-shadow-sm) !important;
   color: #0f172a !important;
 }
 
+body.light-theme-active .task-col-count,
+body.light-theme-active .task-due-chip,
+body.light-theme-active .task-subtask-track,
+body.light-theme-active .task-card-status-select,
+body.light-theme-active .task-btn-secondary,
+body.light-theme-active .task-card-action-btn,
+body.light-theme-active .phoenix-search-box,
+body.light-theme-active .phoenix-tab-segmented,
+body.light-theme-active .phoenix-mobile-back-btn,
+body.light-theme-active .phoenix-action-btn-neutral,
+body.light-theme-active .phoenix-date-badge,
+body.light-theme-active .phoenix-msg-row.incoming .phoenix-msg-bubble,
+body.light-theme-active .phoenix-msg-quote,
+body.light-theme-active .phoenix-msg-actions,
+body.light-theme-active .fabric-tab-chip,
+body.light-theme-active .challan-mobile-tab-btn,
+body.light-theme-active .inward-tp-meta-banner,
+body.light-theme-active .inward-tp-tools-bar,
+body.light-theme-active .inward-tp-table-header,
+body.light-theme-active .infra-btn-secondary,
+body.light-theme-active .infra-badge-neutral,
+body.light-theme-active .myntra-btn-outline,
+body.light-theme-active .myntra-btn-subtle,
 body.light-theme-active .erp-hud-pill,
 body.light-theme-active .erp-cheat-sheet-key,
 body.light-theme-active .erp-cheat-sheet-search,
@@ -470,8 +514,8 @@ body.light-theme-active .ufp-search-input,
 body.light-theme-active .keyboard-modal-search-input,
 body.light-theme-active .shortcut-search-input,
 body.light-theme-active .shortcut-row:hover {
-  background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
+  background: rgba(241, 245, 249, 0.88) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
   color: #0f172a !important;
 }
 
@@ -486,36 +530,30 @@ body.light-theme-active .erp-modal * {
   color: #0f172a;
 }
 
-/* Translucent white glass borders/surfaces used in Dark Mode -> visible slate borders in Light Mode */
-body.light-theme-active :is(div, button, span, section, aside, input, select):not(.printable-area *):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is(
-  [style*="border: 1px solid rgba(255, 255, 255"],
-  [style*="border-color: rgba(255, 255, 255"]
-) {
-  border-color: #cbd5e1 !important;
-}
-
 /* Tables */
 body.light-theme-active .table-container {
-  background: rgba(255, 255, 255, 0.96) !important;
-  border-color: #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(18px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(170%) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
 }
 
 body.light-theme-active table th {
-  background: #f1f5f9 !important;
+  background: rgba(241, 245, 249, 0.90) !important;
   color: #0f172a !important;
-  border-bottom: 1px solid #cbd5e1 !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35) !important;
 }
 
 body.light-theme-active table td {
   color: #0f172a !important;
-  border-bottom: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.80) !important;
 }
 
 body.light-theme-active table tbody tr:hover {
-  background: rgba(241, 245, 249, 0.85) !important;
+  background: rgba(241, 245, 249, 0.75) !important;
 }
 
-/* Hardcoded Dark Inline Backgrounds -> Crisp Light Glass Surfaces */
+/* Hardcoded Dark Inline Backgrounds -> Frosted Light Glass Surfaces */
 body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is(
   [style*="15, 23, 42"],
   [style*="11, 17, 32"],
@@ -535,10 +573,20 @@ body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, 
   [style*="#020617"],
   [style*="#090f1d"]
 ) {
-  background: rgba(255, 255, 255, 0.94) !important;
-  background-color: rgba(255, 255, 255, 0.94) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  background-color: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(16px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(165%) !important;
   color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+}
+
+/* Translucent white glass borders used in Dark Mode -> visible frosted borders in Light Mode */
+body.light-theme-active :is(div, button, span, section, aside, input, select):not(.printable-area *):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is(
+  [style*="border: 1px solid rgba(255, 255, 255"],
+  [style*="border-color: rgba(255, 255, 255"]
+) {
+  border-color: rgba(148, 163, 184, 0.38) !important;
 }
 
 /* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text */
@@ -567,10 +615,10 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
   color: #0f172a !important;
 }
 
-/* Dark-mode pastel inline text colors -> high-contrast readable shades on light backgrounds */
+/* Dark-mode pastel inline text colors -> high-contrast readable shades on light frosted glass */
 body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
-  [style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"], [style*="color: #38bdf8"],
-  [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(125, 211, 252)"], [style*="color: rgb(186, 230, 253)"], [style*="color: rgb(56, 189, 248)"]
+  [style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"], [style*="color: #38bdf8"], [style*="color: #60a5fa"],
+  [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(125, 211, 252)"], [style*="color: rgb(186, 230, 253)"], [style*="color: rgb(56, 189, 248)"], [style*="color: rgb(96, 165, 250)"]
 ) {
   color: #1d4ed8 !important;
 }
@@ -593,14 +641,14 @@ body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(
   color: #b91c1c !important;
 }
 body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
-  [style*="color: #c4b5fd"], [style*="color: #ddd6fe"], [style*="color: #a78bfa"],
-  [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(167, 139, 250)"]
+  [style*="color: #c4b5fd"], [style*="color: #ddd6fe"], [style*="color: #a78bfa"], [style*="color: #c084fc"],
+  [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(167, 139, 250)"], [style*="color: rgb(192, 132, 252)"]
 ) {
   color: #6d28d9 !important;
 }
 body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #94a3b8"], [style*="color: rgb(148, 163, 184)"],
-  [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"], [style*="color: rgba(255, 255, 255, 0.5"]
+  [style*="color: rgba(255, 255, 255, 0.9"], [style*="color: rgba(255, 255, 255, 0.8"], [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"], [style*="color: rgba(255, 255, 255, 0.5"], [style*="color: rgba(255, 255, 255, 0.4"]
 ) {
   color: #475569 !important;
 }
@@ -627,10 +675,10 @@ body.light-theme-active button[style*="background: #2563eb"] * {
 
 /* Light Scrollbar */
 body.light-theme-active ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: rgba(241, 245, 249, 0.7);
 }
 body.light-theme-active ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
+  background: rgba(148, 163, 184, 0.7);
   border-radius: 6px;
 }
 body.light-theme-active ::-webkit-scrollbar-thumb:hover {
