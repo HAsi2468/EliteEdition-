@@ -316,7 +316,8 @@ body.light-theme-active select option {
   color: #0f172a !important;
 }
 
-body.light-theme-active .btn-secondary {
+body.light-theme-active .btn-secondary,
+body.light-theme-active .ent-btn-secondary {
   background: rgba(255, 255, 255, 0.82) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
@@ -324,7 +325,8 @@ body.light-theme-active .btn-secondary {
   border: 1px solid rgba(148, 163, 184, 0.40) !important;
 }
 
-body.light-theme-active .btn-secondary:hover {
+body.light-theme-active .btn-secondary:hover,
+body.light-theme-active .ent-btn-secondary:hover {
   background: #ffffff !important;
   color: #0f172a !important;
 }

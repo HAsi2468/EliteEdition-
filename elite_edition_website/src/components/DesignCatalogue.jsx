@@ -1325,20 +1325,6 @@ export default function DesignCatalogue({ department: rawDepartment, companyEnti
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={handleBulkAutoDetectColors}
-                disabled={bulkDetecting}
-                className="ent-btn ent-btn-secondary"
-                style={{ opacity: bulkDetecting ? 0.6 : 1, padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem' }}
-              >
-                {bulkDetecting ? (
-                  <><RefreshCw size={14} className="spin-loader" /> Processing...</>
-                ) : (
-                  <><Sparkles size={14} color="#8b5cf6" /> Auto-set Colours</>
-                )}
-              </button>
-
               {isMasterAdmin ? (
                 <button
                   type="button"
