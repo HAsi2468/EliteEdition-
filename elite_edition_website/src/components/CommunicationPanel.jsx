@@ -867,6 +867,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, []);
 
   const [editingMessage, setEditingMessage] = useState(null);
+  const [editDraftText, setEditDraftText] = useState('');
   const [deleteTargetMsg, setDeleteTargetMsg] = useState(null);
   const deleteTargetMsgId = deleteTargetMsg?.id || null;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -4704,6 +4705,38 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  const saveEditedMessage = () => {
+    if (!editingMessage) return;
+    const msgId = editingMessage._id;
+    const editedContent = editDraftText.trim();
+    if (!editedContent) return;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        String(m._id) === String(msgId)
+          ? { ...m, content: editedContent, isEdited: true }
+          : m
+      )
+    );
+
+    if (api.editCommunicationMessage) {
+      api.editCommunicationMessage(msgId, editedContent).catch((err) => {
+        console.warn('HTTP edit message error, socket fallback active:', err.message);
+      });
+    }
+
+    if (socket && activeGroup?._id) {
+      socket.emit('edit-message', {
+        messageId: msgId,
+        newContent: editedContent,
+        roomId: activeGroup._id
+      });
+    }
+
+    setEditingMessage(null);
+    setEditDraftText('');
+  };
+
   const handleSendMessage = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (uploadingFile) {
@@ -4711,38 +4744,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
     if ((!inputMessage.trim() && !attachedFile) || !activeGroup) return;
-
-    if (editingMessage) {
-      const msgId = editingMessage._id;
-      const editedContent = inputMessage.trim();
-      if (!editedContent) return;
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          String(m._id) === String(msgId)
-            ? { ...m, content: editedContent, isEdited: true }
-            : m
-        )
-      );
-
-      if (api.editCommunicationMessage) {
-        api.editCommunicationMessage(msgId, editedContent).catch((err) => {
-          console.warn('HTTP edit message error, socket fallback active:', err.message);
-        });
-      }
-
-      if (socket && activeGroup?._id) {
-        socket.emit('edit-message', {
-          messageId: msgId,
-          newContent: editedContent,
-          roomId: activeGroup._id
-        });
-      }
-
-      setEditingMessage(null);
-      setInputMessage('');
-      return;
-    }
 
     const senderId = currentUser?.id || currentUser?._id;
     if (!senderId) {
@@ -7213,23 +7214,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     <span>Select Message</span>
                                   </button>
 
-                                  {isSender && !msg.isDeleted && !isPollMsg && !isCallLog && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveMsgMenuId(null);
-                                        setEditingMessage(msg);
-                                        setInputMessage(msg.content || '');
-                                        if (chatTextareaRef.current) {
-                                          chatTextareaRef.current.focus();
-                                        }
-                                      }}
-                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
-                                    >
-                                      <Edit3 size={14} color="#38bdf8" />
-                                      <span>Edit Message</span>
-                                    </button>
-                                  )}
+                                  {(() => {
+                                    const msgCreatedMs = new Date(msg.createdAt || msg.timestamp || 0).getTime();
+                                    const within45Min = msgCreatedMs > 0 && (Date.now() - msgCreatedMs <= 45 * 60 * 1000);
+                                    if (!isSender || msg.isDeleted || isPollMsg || isCallLog || !msg.content || !within45Min) return null;
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveMsgMenuId(null);
+                                          setEditingMessage(msg);
+                                          setEditDraftText(msg.content || '');
+                                        }}
+                                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                      >
+                                        <Edit3 size={14} color="#38bdf8" />
+                                        <span>Edit Message</span>
+                                      </button>
+                                    );
+                                  })()}
 
                                   {msg.content && (
                                     <button
@@ -8566,41 +8569,142 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )}
 
-              {/* Editing Message Banner */}
+              {/* WhatsApp-Style Edit Message Modal (supports long multi-line messages) */}
               {editingMessage && (
                 <div
+                  onClick={() => {
+                    setEditingMessage(null);
+                    setEditDraftText('');
+                  }}
                   style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 99995,
+                    background: 'rgba(2, 6, 23, 0.55)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 12px',
-                    background: '#eff6ff',
-                    border: '1.5px solid #bfdbfe',
-                    borderRadius: '8px',
-                    marginBottom: '6px',
-                    fontSize: '0.8rem',
-                    color: '#1d4ed8',
-                    animation: 'fadeIn 0.15s ease'
+                    justifyContent: 'center',
+                    padding: '1rem',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                    <Edit3 size={14} color="#2563eb" />
-                    <span style={{ fontWeight: 800 }}>Editing:</span>
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px', color: '#475569' }}>
-                      {editingMessage.content}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingMessage(null);
-                      setInputMessage('');
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Edit Message"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: 'min(560px, 95vw)',
+                      background: 'rgba(15, 23, 42, 0.96)',
+                      border: '1px solid rgba(148, 163, 184, 0.28)',
+                      borderRadius: '18px',
+                      boxShadow: '0 24px 64px rgba(0, 0, 0, 0.55)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: '2px' }}
-                    title="Cancel editing"
                   >
-                    <X size={14} />
-                  </button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1.1rem', borderBottom: '1px solid rgba(148, 163, 184, 0.20)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.96rem', color: '#f8fafc' }}>
+                        <Edit3 size={16} color="#38bdf8" />
+                        <span>Edit Message</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingMessage(null);
+                          setEditDraftText('');
+                        }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '6px' }}
+                        title="Cancel editing"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* WhatsApp-style live bubble preview */}
+                    <div style={{ padding: '1rem 1.1rem', background: 'rgba(2, 6, 23, 0.28)', maxHeight: '190px', overflowY: 'auto', display: 'flex', justifyContent: 'flex-end' }}>
+                      <div style={{
+                        maxWidth: '88%',
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        padding: '0.6rem 0.85rem',
+                        borderRadius: '12px 12px 2px 12px',
+                        fontSize: '0.88rem',
+                        lineHeight: 1.45,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.28)',
+                      }}>
+                        {editDraftText || ' '}
+                      </div>
+                    </div>
+
+                    {/* Multi-line editor */}
+                    <div style={{ padding: '0.95rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                      <textarea
+                        autoFocus
+                        value={editDraftText}
+                        onChange={(e) => setEditDraftText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setEditingMessage(null);
+                            setEditDraftText('');
+                          } else if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            saveEditedMessage();
+                          }
+                        }}
+                        rows={5}
+                        placeholder="Edit your message..."
+                        style={{
+                          width: '100%',
+                          minHeight: '110px',
+                          maxHeight: '260px',
+                          resize: 'vertical',
+                          padding: '0.7rem 0.85rem',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(148, 163, 184, 0.35)',
+                          background: 'rgba(15, 23, 42, 0.72)',
+                          color: '#f8fafc',
+                          fontSize: '0.92rem',
+                          lineHeight: 1.5,
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                          Enter to save • Shift+Enter for new line • Esc to cancel
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => {
+                              setEditingMessage(null);
+                              setEditDraftText('');
+                            }}
+                            style={{ padding: '0.45rem 0.95rem', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            disabled={!editDraftText.trim()}
+                            onClick={saveEditedMessage}
+                            style={{ padding: '0.45rem 1.15rem', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 700, cursor: editDraftText.trim() ? 'pointer' : 'not-allowed', opacity: editDraftText.trim() ? 1 : 0.55 }}
+                          >
+                            ✓ Save
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

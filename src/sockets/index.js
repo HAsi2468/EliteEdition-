@@ -1020,11 +1020,10 @@ const setupSockets = (io) => {
         if (!msg || msg.isDeleted) return;
 
         const userId = socket.userId || socket.user?._id;
-        const isAdmin = socket.user && (socket.user.role === 'admin' || socket.user.role === 'super_admin' || socket.user.isMainAdmin || socket.user.isAdmin);
         const isSender = userId && String(msg.senderId) === String(userId);
-        const ageHours = (Date.now() - new Date(msg.createdAt).getTime()) / (1000 * 60 * 60);
+        const ageMinutes = (Date.now() - new Date(msg.createdAt).getTime()) / (1000 * 60);
 
-        if (!isAdmin && (!isSender || ageHours > 24)) {
+        if (!isSender || ageMinutes > 45) {
           console.warn(`[Socket Security] Unauthorized edit-message blocked for user ${userId} on message ${messageId}`);
           return;
         }

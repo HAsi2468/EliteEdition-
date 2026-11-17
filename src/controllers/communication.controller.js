@@ -1932,13 +1932,13 @@ const editMessage = async (req, res) => {
     }
 
     const isSender = String(message.senderId) === String(userId);
-    const messageAgeHours = (Date.now() - new Date(message.createdAt).getTime()) / (1000 * 60 * 60);
+    const messageAgeMinutes = (Date.now() - new Date(message.createdAt).getTime()) / (1000 * 60);
 
-    if (!isMasterAdmin && (!isSender || messageAgeHours > 24)) {
+    if (!isSender || messageAgeMinutes > 45) {
       return res.status(403).json({
         success: false,
         message: isSender
-          ? 'You can only edit messages within 24 hours of sending.'
+          ? 'You can only edit messages within 45 minutes of sending.'
           : 'You do not have permission to edit this message.'
       });
     }
