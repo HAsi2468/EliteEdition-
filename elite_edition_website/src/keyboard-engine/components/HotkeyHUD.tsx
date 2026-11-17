@@ -20,6 +20,25 @@ export const HotkeyHUD: React.FC<HotkeyHUDProps> = ({ defaultHints = [] }) => {
     return window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches;
   });
 
+  const [isHudHidden, setIsHudHidden] = useState<boolean>(() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem('elite_erp_hotkey_hud_hidden') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleHudVisibility = (hidden: boolean) => {
+    setIsHudHidden(hidden);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('elite_erp_hotkey_hud_hidden', hidden ? '1' : '0');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  };
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
@@ -29,6 +48,36 @@ export const HotkeyHUD: React.FC<HotkeyHUDProps> = ({ defaultHints = [] }) => {
   }, []);
 
   if (isMobile) return null;
+
+  if (isHudHidden) {
+    return (
+      <button
+        type="button"
+        className="erp-hud-pill"
+        onClick={() => toggleHudVisibility(false)}
+        title="Show Keyboard Shortcuts Bar"
+        aria-label="Show Keyboard Shortcuts Bar"
+        style={{
+          position: 'fixed',
+          bottom: '10px',
+          right: '14px',
+          zIndex: 900,
+          boxShadow: '0 6px 20px rgba(15, 23, 42, 0.22)',
+          padding: '5px 11px',
+          borderRadius: '999px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        <span className="erp-hud-indicator-dot" />
+        <span>Shortcuts</span>
+      </button>
+    );
+  }
 
   // Combine default fallback hints with dynamically registered context hints
   const displayHints = activeHudHints.length > 0 ? activeHudHints : defaultHints;
@@ -104,6 +153,17 @@ export const HotkeyHUD: React.FC<HotkeyHUDProps> = ({ defaultHints = [] }) => {
           <span className="erp-hud-indicator-dot" />
           <span>ZERO-MOUSE</span>
         </div>
+
+        <button
+          type="button"
+          className="erp-hud-pill"
+          onClick={() => toggleHudVisibility(true)}
+          title="Close Shortcuts Bar"
+          aria-label="Close Shortcuts Bar"
+          style={{ padding: '3px 8px', fontWeight: 700 }}
+        >
+          ✕
+        </button>
       </div>
     </footer>
   );
