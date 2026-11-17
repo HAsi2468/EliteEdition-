@@ -480,12 +480,33 @@ body.light-theme-active .phoenix-chat-item:hover,
 body.light-theme-active .phoenix-reaction-pill,
 body.light-theme-active .phoenix-reply-banner,
 body.light-theme-active .phoenix-chat-input-pill,
-body.light-theme-active .phoenix-scroll-bottom-btn {
+body.light-theme-active .phoenix-scroll-bottom-btn,
+body.light-theme-active .phoenix-card,
+body.light-theme-active .phoenix-kpi-card,
+body.light-theme-active .pipeline-stage-card,
+body.light-theme-active .factory-alert-strip {
   background: rgba(255, 255, 255, 0.78) !important;
   backdrop-filter: blur(18px) saturate(175%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(175%) !important;
   border-color: rgba(255, 255, 255, 0.85) !important;
   box-shadow: var(--glass-shadow-sm) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .phoenix-card:hover,
+body.light-theme-active .phoenix-kpi-card:hover,
+body.light-theme-active .pipeline-stage-card:hover {
+  background: rgba(255, 255, 255, 0.90) !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.38) !important;
+}
+
+body.light-theme-active .badge-phoenix,
+body.light-theme-active .badge-phoenix-primary,
+body.light-theme-active .phoenix-sticker-card,
+body.light-theme-active .phoenix-gif-card,
+body.light-theme-active .phoenix-pill-filter-chip {
+  background: rgba(241, 245, 249, 0.90) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
   color: #0f172a !important;
 }
 
@@ -558,8 +579,10 @@ body.light-theme-active .table-container {
   border-color: rgba(255, 255, 255, 0.85) !important;
 }
 
-body.light-theme-active table th {
-  background: rgba(241, 245, 249, 0.90) !important;
+body.light-theme-active th,
+body.light-theme-active table th,
+body.light-theme-active .table-container table th {
+  background: rgba(241, 245, 249, 0.92) !important;
   color: #0f172a !important;
   border-bottom: 1px solid rgba(148, 163, 184, 0.35) !important;
 }
