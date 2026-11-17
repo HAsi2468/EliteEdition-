@@ -5026,44 +5026,112 @@ export default function App() {
         parties={parties}
       />
 
-      {/* Live Admin Broadcast Dynamic Island Banner */}
+      {/* Live Centered Admin System Notice Modal */}
       {adminBroadcastBanner && (
         <div
-          className="erp-island-toast"
+          className="system-notice-backdrop"
+          onClick={() => setAdminBroadcastBanner(null)}
           style={{
             position: 'fixed',
-            top: '16px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            inset: 0,
             zIndex: 99999,
-            width: 'min(480px, 94vw)',
-            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98))',
-            border: '1px solid rgba(56, 189, 248, 0.55)',
-            borderRadius: '16px',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)',
-            padding: '0.85rem 1rem',
-            color: '#f8fafc',
             display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.25rem',
+            background: 'rgba(2, 6, 23, 0.45)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: '0.86rem', color: '#38bdf8' }}>
-              📢 {adminBroadcastBanner.title || 'Admin Announcement'}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={adminBroadcastBanner.title || 'System Notice'}
+            className="system-notice-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              width: 'min(540px, 94vw)',
+              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98))',
+              border: '1px solid rgba(56, 189, 248, 0.50)',
+              borderRadius: '22px',
+              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.65)',
+              padding: '1.85rem 1.75rem 1.5rem',
+              color: '#f8fafc',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.85rem',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setAdminBroadcastBanner(null)}
+              aria-label="Close System Notice"
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '999px',
+                background: 'rgba(148, 163, 184, 0.16)',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ✕
+            </button>
+
+            <div
+              className="system-notice-icon-ring"
+              style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '999px',
+                background: 'rgba(56, 189, 248, 0.16)',
+                border: '1px solid rgba(56, 189, 248, 0.42)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.5rem',
+              }}
+            >
+              📢
             </div>
-            <div style={{ fontSize: '0.82rem', color: '#e2e8f0', marginTop: '2px', wordBreak: 'break-word' }}>
+
+            <div className="system-notice-title" style={{ fontWeight: 800, fontSize: '1.35rem', letterSpacing: '-0.01em', color: '#38bdf8' }}>
+              {adminBroadcastBanner.title || 'System Notice'}
+            </div>
+
+            <div className="system-notice-message" style={{ fontSize: '1.08rem', lineHeight: 1.55, fontWeight: 500, color: '#e2e8f0', wordBreak: 'break-word', maxWidth: '460px' }}>
               {adminBroadcastBanner.message}
             </div>
+
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setAdminBroadcastBanner(null)}
+              style={{
+                marginTop: '0.4rem',
+                padding: '0.62rem 1.75rem',
+                borderRadius: '10px',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Got it
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setAdminBroadcastBanner(null)}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}
-          >
-            ✕
-          </button>
         </div>
       )}
 
