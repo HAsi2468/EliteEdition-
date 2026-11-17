@@ -797,30 +797,118 @@ export const ViewOnceViewerModal = ({ message, onClose }) => {
 /* 9. Inline Message Bubble Renderers for View-Once, Location, Contact & Video Note */
 export const LocationBubbleCard = ({ locationMeta }) => {
   if (!locationMeta) return null;
-  const mapUrl = `https://www.google.com/maps?q=${locationMeta.lat},${locationMeta.lng}`;
+  const lat = Number(locationMeta.lat || 0);
+  const lng = Number(locationMeta.lng || 0);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
+  const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+  const delta = 0.006;
+  const osmEmbedUrl = hasCoords
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${(lng - delta).toFixed(5)},${(lat - delta).toFixed(5)},${(lng + delta).toFixed(5)},${(lat + delta).toFixed(5)}&layer=mapnik&marker=${lat.toFixed(5)},${lng.toFixed(5)}`
+    : null;
   const isLiveActive = locationMeta.isLive && (!locationMeta.liveExpiresAt || new Date(locationMeta.liveExpiresAt) > new Date());
   return (
     <a
       href={mapUrl}
       target="_blank"
       rel="noreferrer"
+      className="no-glass-override phoenix-location-card"
       style={{
         display: 'block',
         textDecoration: 'none',
-        color: '#f8fafc',
-        background: 'rgba(15, 23, 42, 0.55)',
-        border: '1px solid rgba(34, 197, 94, 0.35)',
+        color: '#0f172a',
+        background: '#ffffff',
+        border: '1px solid rgba(148, 163, 184, 0.35)',
         borderRadius: '12px',
-        padding: '0.65rem 0.8rem',
-        minWidth: '220px',
+        overflow: 'hidden',
+        minWidth: '250px',
+        maxWidth: '300px',
+        boxShadow: '0 4px 14px rgba(15, 23, 42, 0.14)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, fontSize: '0.88rem', color: '#4ade80' }}>
-        <MapPin size={16} /> {locationMeta.label || 'Shared Location'}
+      {/* WhatsApp-style Map Preview */}
+      <div
+        style={{
+          position: 'relative',
+          height: '132px',
+          width: '100%',
+          background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #dcfce7 100%)',
+          overflow: 'hidden',
+        }}
+      >
+        {osmEmbedUrl ? (
+          <iframe
+            title={locationMeta.label || 'Location Map'}
+            src={osmEmbedUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              pointerEvents: 'none',
+              display: 'block',
+            }}
+            loading="lazy"
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0369a1' }}>
+            <MapPin size={32} />
+          </div>
+        )}
+        {isLiveActive && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 8px',
+              borderRadius: '999px',
+              background: '#16a34a',
+              color: '#ffffff',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#bbf7d0' }} />
+            LIVE
+          </div>
+        )}
       </div>
-      {locationMeta.address && <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '0.2rem' }}>{locationMeta.address}</div>}
-      <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-        <Clock size={12} /> {isLiveActive ? 'Live Location Active' : `${Number(locationMeta.lat).toFixed(4)}, ${Number(locationMeta.lng).toFixed(4)}`} • Open Map →
+
+      {/* Info Footer */}
+      <div style={{ padding: '0.6rem 0.75rem', background: '#ffffff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.86rem', color: '#0f172a' }}>
+          <MapPin size={15} color="#16a34a" style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {locationMeta.label || 'Shared Location'}
+          </span>
+        </div>
+        {locationMeta.address && (
+          <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem', lineHeight: 1.35 }}>
+            {locationMeta.address}
+          </div>
+        )}
+        <div
+          style={{
+            fontSize: '0.74rem',
+            color: '#2563eb',
+            fontWeight: 700,
+            marginTop: '0.35rem',
+            paddingTop: '0.35rem',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.35rem',
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b', fontWeight: 600 }}>
+            <Clock size={12} /> {isLiveActive ? 'Live Location' : `${lat.toFixed(4)}, ${lng.toFixed(4)}`}
+          </span>
+          <span>Open Map →</span>
+        </div>
       </div>
     </a>
   );

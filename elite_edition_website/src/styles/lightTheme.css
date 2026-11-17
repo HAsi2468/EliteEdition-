@@ -676,6 +676,14 @@ body.light-theme-active .phoenix-chat-item.active .phoenix-chat-item-name {
   color: #1d4ed8 !important;
 }
 
+body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble {
+  color: #ffffff !important;
+}
+
+body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble > div:not(.phoenix-location-card):not([class*="card"]) {
+  color: #ffffff;
+}
+
 body.light-theme-active .erp-hotkey-hud *,
 body.light-theme-active .erp-cheat-sheet-modal *,
 body.light-theme-active .ent-stat-card *,
