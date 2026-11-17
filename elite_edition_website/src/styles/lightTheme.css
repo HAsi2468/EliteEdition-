@@ -1385,6 +1385,51 @@ body.light-theme-active .smart-icon-btn.purple {
   color: #7c3aed !important;
 }
 
+/* Mobile Drawer & Bottom Navigation (iOS / Android / Tablet Light Glass) */
+body.light-theme-active .mobile-drawer-overlay {
+  background: rgba(15, 23, 42, 0.35) !important;
+}
+
+body.light-theme-active .mobile-drawer-content {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-right: 1px solid rgba(148, 163, 184, 0.36) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .mobile-drawer-item {
+  color: #1e293b !important;
+}
+
+body.light-theme-active .mobile-drawer-item:hover,
+body.light-theme-active .mobile-drawer-item:active {
+  background: rgba(241, 245, 249, 0.90) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .mobile-drawer-item.active {
+  background: linear-gradient(135deg, var(--entity-accent, #2563eb), #1d4ed8) !important;
+  color: #ffffff !important;
+}
+
+body.light-theme-active .mobile-bottom-nav,
+body.light-theme-active .erp-mobile-bottom-nav {
+  background: rgba(255, 255, 255, 0.86) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.32) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .erp-mobile-nav-tab {
+  color: #475569 !important;
+}
+
+body.light-theme-active .erp-mobile-nav-tab.active {
+  color: var(--entity-accent, #2563eb) !important;
+}
+
 body.light-theme-active .quicklook-viewport,
 body.light-theme-active .smart-lightbox-body {
   background: rgba(241, 245, 249, 0.86) !important;
@@ -1488,6 +1533,12 @@ body.light-theme-active textarea:focus {
    SMALL SCREEN / MOBILE TYPOGRAPHY & READABILITY GUARDRAILS (BOTH THEMES)
    ============================================================================ */
 @media (max-width: 768px) {
+  html[data-theme="light"],
+  body.light-theme-active,
+  body.light-theme-active .glass-viewport {
+    background-attachment: scroll !important;
+  }
+
   body {
     font-size: 14px;
     line-height: 1.45;

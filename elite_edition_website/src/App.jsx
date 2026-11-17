@@ -762,23 +762,6 @@ export default function App() {
     }
   });
 
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const root = document.documentElement;
-    root.setAttribute('data-theme', themeMode);
-    root.style.colorScheme = themeMode;
-    if (themeMode === 'light') {
-      document.body.classList.remove('glass-theme-active');
-      document.body.classList.add('light-theme-active');
-    } else {
-      document.body.classList.add('glass-theme-active');
-      document.body.classList.remove('light-theme-active');
-    }
-    try {
-      localStorage.setItem('elite_erp_theme', themeMode);
-    } catch (e) {}
-  }, [themeMode]);
-
   const applyThemeDom = (mode) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
@@ -791,7 +774,18 @@ export default function App() {
       document.body.classList.add('glass-theme-active');
       document.body.classList.remove('light-theme-active');
     }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', mode === 'light' ? '#e2ebf8' : '#090f1d');
+    }
   };
+
+  useEffect(() => {
+    applyThemeDom(themeMode);
+    try {
+      localStorage.setItem('elite_erp_theme', themeMode);
+    } catch (e) {}
+  }, [themeMode]);
 
   const toggleThemeMode = (e) => {
     const nextTheme = themeMode === 'dark' ? 'light' : 'dark';
