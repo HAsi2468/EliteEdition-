@@ -20,7 +20,7 @@
 }
 
 /* ============================================================================
-   VIEW TRANSITIONS API — SILKY CIRCULAR THEME SWITCH RIPPLE
+   VIEW TRANSITIONS API — EYE-COMFORT VELVET CROSS-DISSOLVE ON THEME SWITCH
    ============================================================================ */
 ::view-transition-old(root),
 ::view-transition-new(root) {
@@ -30,20 +30,40 @@
 
 ::view-transition-old(root) {
   z-index: 1;
+  animation: liquidThemeFadeOut 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 ::view-transition-new(root) {
   z-index: 9999;
-  animation: liquidThemeRipple 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: liquidThemeFadeIn 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-@keyframes liquidThemeRipple {
+@keyframes liquidThemeFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes liquidThemeFadeIn {
   from {
-    clip-path: circle(0px at var(--vt-x, 50vw) var(--vt-y, 50vh));
+    opacity: 0;
+    filter: blur(2px);
   }
   to {
-    clip-path: circle(150vmax at var(--vt-x, 50vw) var(--vt-y, 50vh));
+    opacity: 1;
+    filter: blur(0px);
   }
+}
+
+/* Smooth fallback color/surface glide when View Transitions API is unavailable */
+html.theme-switching,
+html.theme-switching body,
+html.theme-switching body * {
+  transition:
+    background-color 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.42s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 /* ============================================================================

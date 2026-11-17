@@ -779,6 +779,20 @@ export default function App() {
     } catch (e) {}
   }, [themeMode]);
 
+  const applyThemeDom = (mode) => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.setAttribute('data-theme', mode);
+    root.style.colorScheme = mode;
+    if (mode === 'light') {
+      document.body.classList.remove('glass-theme-active');
+      document.body.classList.add('light-theme-active');
+    } else {
+      document.body.classList.add('glass-theme-active');
+      document.body.classList.remove('light-theme-active');
+    }
+  };
+
   const toggleThemeMode = (e) => {
     const nextTheme = themeMode === 'dark' ? 'light' : 'dark';
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -789,9 +803,20 @@ export default function App() {
       document.documentElement.style.setProperty('--vt-x', `${Math.round(x)}px`);
       document.documentElement.style.setProperty('--vt-y', `${Math.round(y)}px`);
       document.startViewTransition(() => {
-        setThemeMode(nextTheme);
+        applyThemeDom(nextTheme);
+        if (typeof ReactDOM.flushSync === 'function') {
+          ReactDOM.flushSync(() => setThemeMode(nextTheme));
+        } else {
+          setThemeMode(nextTheme);
+        }
       });
       return;
+    }
+    if (typeof document !== 'undefined' && !reduceMotion) {
+      document.documentElement.classList.add('theme-switching');
+      window.setTimeout(() => {
+        document.documentElement.classList.remove('theme-switching');
+      }, 520);
     }
     setThemeMode(nextTheme);
   };
