@@ -6933,7 +6933,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             zIndex: activeMsgMenuId === msg._id ? 100 : 1
                           }}
                         >
-                          {!isMe && (
+                          {!isMe && activeGroup?.type !== 'direct' && (
                             <div
                               className="phoenix-avatar-wrap"
                               style={{
