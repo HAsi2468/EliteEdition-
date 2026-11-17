@@ -2607,3 +2607,15 @@ table tbody tr:hover td {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* Hide native browser number input spinner arrows project-wide */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+

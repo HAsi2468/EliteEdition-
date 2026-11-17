@@ -857,6 +857,26 @@ export default function App() {
     };
   }, []);
 
+  // Prevent mouse-wheel / trackpad scrolling from accidentally changing focused <input type="number"> values project-wide
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onWheel = (ev) => {
+      const active = document.activeElement;
+      if (
+        active &&
+        active.tagName === 'INPUT' &&
+        active.type === 'number' &&
+        (ev.target === active || active.contains?.(ev.target))
+      ) {
+        active.blur();
+      }
+    };
+    document.addEventListener('wheel', onWheel, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener('wheel', onWheel, { capture: true });
+    };
+  }, []);
+
   // Dynamically bind Multi-Entity Visual Accents to document :root
   useEffect(() => {
     const comp = getCompanyById(activeDepartment);
