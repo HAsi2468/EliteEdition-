@@ -1,0 +1,361 @@
+/**
+ * Elite ERP - Daylight Frosted Glass Theme (Light Mode) & Small-Screen Readability Guardrails
+ *
+ * Activated when <html data-theme="light"> and <body class="light-theme-active">.
+ * Ensures 100% WCAG-readable dark-slate typography on crisp daylight glass surfaces,
+ * including overrides for components with hardcoded dark inline styles.
+ */
+
+html[data-theme="light"],
+body.light-theme-active,
+body.light-theme-active .glass-viewport {
+  --glass-canvas-bg: radial-gradient(circle at 10% 12%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.10) 0%, rgba(241, 245, 249, 0.96) 45%),
+                     radial-gradient(circle at 90% 85%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.08) 0%, rgba(248, 250, 252, 0.98) 52%),
+                     linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%);
+  --glass-bg-base: rgba(255, 255, 255, 0.88);
+  --glass-bg-card: rgba(255, 255, 255, 0.94);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.98);
+  --glass-bg-hover: rgba(241, 245, 249, 0.96);
+  --glass-border: rgba(148, 163, 184, 0.35);
+  --glass-border-subtle: rgba(148, 163, 184, 0.22);
+  --glass-border-highlight: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.45);
+  --glass-shadow: 0 8px 28px -4px rgba(15, 23, 42, 0.08), 0 2px 8px -2px rgba(15, 23, 42, 0.04);
+  --glass-shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.06);
+  --glass-text-main: #0f172a;
+  --glass-text-muted: #475569;
+  --glass-text-dim: #64748b;
+
+  --text-primary: #0f172a !important;
+  --text-main: #0f172a !important;
+  --text-secondary: #334155 !important;
+  --text-muted: #475569 !important;
+  --text-light: #64748b !important;
+  --text-table: #0f172a !important;
+  --border-color: #cbd5e1 !important;
+  --border-light: #e2e8f0 !important;
+  --bg-main: transparent !important;
+  --bg-surface: rgba(255, 255, 255, 0.94) !important;
+  --bg-surface-elevated: #ffffff !important;
+  --bg-subtle: #f8fafc !important;
+  --bg-secondary: #f1f5f9 !important;
+  --bg-muted: #f1f5f9 !important;
+  --bg-hover: #e2e8f0 !important;
+  --bg-active: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.12) !important;
+  --bg-input: #ffffff !important;
+  --bg-th: #f1f5f9 !important;
+  --bg-card: rgba(255, 255, 255, 0.95) !important;
+  --bg-card-hover: #ffffff !important;
+  --bg-modal: #ffffff !important;
+  --card-bg: rgba(255, 255, 255, 0.95) !important;
+  --input-bg: #ffffff !important;
+  --surface: rgba(255, 255, 255, 0.95) !important;
+  --surface-color: rgba(255, 255, 255, 0.95) !important;
+  --surface-subtle: #f8fafc !important;
+  --primary-subtle: rgba(37, 99, 235, 0.10) !important;
+  --primary-light: rgba(37, 99, 235, 0.14) !important;
+  --success-bg: #ecfdf5 !important;
+  --success-text: #047857 !important;
+  --success-border: #a7f3d0 !important;
+  --warning-bg: #fffbeb !important;
+  --warning-text: #b45309 !important;
+  --warning-border: #fde68a !important;
+  --danger-bg: #fef2f2 !important;
+  --danger-text: #b91c1c !important;
+  --danger-border: #fecaca !important;
+  --info-bg: #eff6ff !important;
+  --info-text: #1d4ed8 !important;
+  --info-border: #bfdbfe !important;
+  --erp-bg-app: transparent !important;
+  --erp-border-color: #cbd5e1 !important;
+  --erp-sidebar-bg: rgba(255, 255, 255, 0.94) !important;
+  --erp-sidebar-border: #e2e8f0 !important;
+  --erp-sidebar-text: #0f172a !important;
+  --erp-text-main: #0f172a !important;
+  --erp-text-muted: #475569 !important;
+  --split-menu-bg: #ffffff !important;
+  --split-menu-border: #cbd5e1 !important;
+  --split-menu-hover: #f1f5f9 !important;
+  --split-menu-text: #0f172a !important;
+
+  background: var(--glass-canvas-bg) !important;
+  background-attachment: fixed !important;
+  color: #0f172a !important;
+  min-height: 100vh;
+}
+
+body.light-theme-active #root {
+  background: transparent !important;
+  color: #0f172a;
+}
+
+/* Header, Sidebar & Glass Containers */
+body.light-theme-active .app-header {
+  background: rgba(255, 255, 255, 0.90) !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-panel,
+body.light-theme-active .glass-card {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-title-capsule {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-screen-title,
+body.light-theme-active .glass-title-capsule h1 {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-title-icon {
+  background: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.14) !important;
+  border: 1px solid rgba(var(--entity-accent-rgb, 37, 99, 235), 0.35) !important;
+  color: var(--entity-accent, #2563eb) !important;
+  box-shadow: none !important;
+}
+
+body.light-theme-active .glass-subtabs-bar {
+  background: rgba(255, 255, 255, 0.90) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05) !important;
+}
+
+body.light-theme-active .glass-subtab-btn {
+  color: #334155 !important;
+}
+
+body.light-theme-active .glass-subtab-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-subtab-btn.active {
+  color: #ffffff !important;
+}
+
+body.light-theme-active .glass-calc-card {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+}
+
+body.light-theme-active .glass-calc-title {
+  color: #475569 !important;
+}
+
+body.light-theme-active .glass-calc-value {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-calc-sub {
+  color: #64748b !important;
+}
+
+/* Sidebar Navigation */
+body.light-theme-active .nav-section-header {
+  color: #64748b !important;
+}
+
+body.light-theme-active .nav-item {
+  color: #1e293b !important;
+}
+
+body.light-theme-active .nav-item:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .nav-item.active {
+  color: #ffffff !important;
+}
+
+/* Inputs, Selects, Textareas & Buttons */
+body.light-theme-active input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not(.printable-area *),
+body.light-theme-active select:not(.printable-area *),
+body.light-theme-active textarea:not(.printable-area *) {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.light-theme-active input::placeholder,
+body.light-theme-active textarea::placeholder {
+  color: #64748b !important;
+}
+
+body.light-theme-active select option {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .btn-secondary {
+  background: #ffffff !important;
+  color: #1e293b !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+body.light-theme-active .btn-secondary:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Tables */
+body.light-theme-active .table-container {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.light-theme-active table th {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+body.light-theme-active table td {
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+body.light-theme-active table tbody tr:hover {
+  background: rgba(241, 245, 249, 0.85) !important;
+}
+
+/* Hardcoded Dark Inline Backgrounds -> Crisp Light Glass Surfaces */
+body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):is(
+  [style*="15, 23, 42"],
+  [style*="11, 17, 32"],
+  [style*="30, 41, 59"],
+  [style*="17, 24, 39"],
+  [style*="2, 6, 23"],
+  [style*="#0f172a"],
+  [style*="#0b1120"],
+  [style*="#1e293b"],
+  [style*="#111827"],
+  [style*="#020617"],
+  [style*="#090f1d"]
+) {
+  background: rgba(255, 255, 255, 0.94) !important;
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text (unless inside solid/accent buttons) */
+body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.company-segment-pill.active *):not(.nav-item.active):not(.nav-item.active *):not(.glass-subtab-btn.active):not(.glass-subtab-btn.active *):not([style*="linear-gradient"]):not([style*="linear-gradient"] *):not([style*="background: rgb(37, 99, 235)"]):not([style*="background: #2563eb"]):not([style*="background-color: #2563eb"]):not([style*="background: #ef4444"]):not([style*="background: #10b981"]):not([style*="background: #059669"]):is(
+  [style*="color: rgb(255, 255, 255)"],
+  [style*="color: rgba(255, 255, 255"],
+  [style*="color: #ffffff"],
+  [style*="color: #fff"],
+  [style*="color: white"],
+  [style*="color: #f8fafc"],
+  [style*="color: #f1f5f9"],
+  [style*="color: #e2e8f0"],
+  [style*="color: #cbd5e1"]
+) {
+  color: #0f172a !important;
+}
+
+/* Dark-mode pastel inline text colors -> high-contrast readable shades on light backgrounds */
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):not([style*="linear-gradient"]):is([style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"]) {
+  color: #1d4ed8 !important;
+}
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #6ee7b7"], [style*="color: #86efac"]) {
+  color: #047857 !important;
+}
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #fcd34d"], [style*="color: #fde68a"]) {
+  color: #b45309 !important;
+}
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #fca5a5"], [style*="color: #fecaca"]) {
+  color: #b91c1c !important;
+}
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #c4b5fd"], [style*="color: #ddd6fe"]) {
+  color: #6d28d9 !important;
+}
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #94a3b8"], [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"]) {
+  color: #475569 !important;
+}
+
+/* Task Manager & Communication Panel Light Mode */
+body.light-theme-active .task-manager-root,
+body.light-theme-active .comm-container {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .comm-sidebar,
+body.light-theme-active .comm-chat-area,
+body.light-theme-active .comm-chat-header,
+body.light-theme-active .comm-input-area {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Light Scrollbar */
+body.light-theme-active ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+body.light-theme-active ::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 6px;
+}
+body.light-theme-active ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* ============================================================================
+   SMALL SCREEN / MOBILE TYPOGRAPHY & READABILITY GUARDRAILS (BOTH THEMES)
+   ============================================================================ */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Prevent iOS Safari zoom and keep form controls comfortable & legible */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 40px;
+  }
+
+  .glass-screen-title,
+  .glass-title-capsule h1 {
+    font-size: 0.95rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .glass-subtab-btn {
+    font-size: 0.78rem !important;
+    padding: 7px 11px !important;
+  }
+
+  .table-container table th,
+  .table-container table td {
+    font-size: 0.80rem !important;
+    line-height: 1.35 !important;
+    padding: 8px 10px !important;
+  }
+
+  /* Ensure small helper/caption text never becomes microscopic on small screens */
+  .glass-calc-title {
+    font-size: 0.72rem !important;
+  }
+  .glass-calc-value {
+    font-size: 1.15rem !important;
+  }
+  .glass-calc-sub {
+    font-size: 0.72rem !important;
+  }
+}

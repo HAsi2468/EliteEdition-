@@ -15,6 +15,7 @@ import { initCrossTabSync } from './utils/crossTabSync'
 import { enforceGlobalDDMMYYYYFormat } from './utils/dateUtils'
 import './styles/glassmorphicTheme.css'
 import './styles/advancedAnimations.css'
+import './styles/lightTheme.css'
 
 // Enforce withCredentials: true globally across all HTTP network clients
 axios.defaults.withCredentials = true;

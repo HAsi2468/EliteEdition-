@@ -137,7 +137,9 @@ import {
   Unlock,
   Scale,
   Plus,
-  HelpCircle
+  HelpCircle,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -749,6 +751,37 @@ export default function App() {
       description: 'Purchase Voucher',
     },
   ]);
+
+  // Dark / Light Theme Mode (defaults to 'dark', persisted in localStorage)
+  const [themeMode, setThemeMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_erp_theme');
+      return saved === 'light' ? 'light' : 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.setAttribute('data-theme', themeMode);
+    root.style.colorScheme = themeMode;
+    if (themeMode === 'light') {
+      document.body.classList.remove('glass-theme-active');
+      document.body.classList.add('light-theme-active');
+    } else {
+      document.body.classList.add('glass-theme-active');
+      document.body.classList.remove('light-theme-active');
+    }
+    try {
+      localStorage.setItem('elite_erp_theme', themeMode);
+    } catch (e) {}
+  }, [themeMode]);
+
+  const toggleThemeMode = () => {
+    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Dynamically bind Multi-Entity Visual Accents to document :root
   useEffect(() => {
@@ -2752,6 +2785,29 @@ export default function App() {
 
               <button
                 type="button"
+                onClick={toggleThemeMode}
+                className="btn-icon"
+                title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                style={{
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: themeMode === 'dark' ? '1px solid rgba(251, 191, 36, 0.38)' : '1px solid #cbd5e1',
+                  background: themeMode === 'dark' ? 'rgba(30, 41, 59, 0.85)' : '#ffffff',
+                  color: themeMode === 'dark' ? '#fcd34d' : '#1e293b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowNotificationDrawer(true)}
                 className="btn-icon"
                 title="Notifications & Alerts"
@@ -2958,6 +3014,33 @@ export default function App() {
                   Install App
                 </button>
               )}
+
+              {/* Dark / Light Mode Toggle */}
+              <button
+                type="button"
+                onClick={toggleThemeMode}
+                className="btn-secondary"
+                title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                style={{
+                  minHeight: '38px',
+                  height: '38px',
+                  padding: '0 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  border: themeMode === 'dark' ? '1px solid rgba(251, 191, 36, 0.35)' : '1px solid #cbd5e1',
+                  color: themeMode === 'dark' ? '#fcd34d' : '#0f172a'
+                }}
+              >
+                {themeMode === 'dark' ? <Sun size={15} style={{ flexShrink: 0 }} /> : <Moon size={15} style={{ flexShrink: 0 }} />}
+                <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
+              </button>
 
               {/* What's New Feature Changelog Drawer */}
               <ChangelogDrawer />

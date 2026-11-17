@@ -114,6 +114,23 @@
     <script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   </head>
   <body class="notranslate glass-theme-active" translate="no">
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('elite_erp_theme') || 'dark';
+          if (t !== 'light' && t !== 'dark') t = 'dark';
+          document.documentElement.setAttribute('data-theme', t);
+          document.documentElement.style.colorScheme = t;
+          if (t === 'light') {
+            document.body.classList.remove('glass-theme-active');
+            document.body.classList.add('light-theme-active');
+          } else {
+            document.body.classList.add('glass-theme-active');
+            document.body.classList.remove('light-theme-active');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

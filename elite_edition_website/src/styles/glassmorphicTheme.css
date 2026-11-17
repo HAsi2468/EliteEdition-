@@ -39,11 +39,10 @@
   --glass-text-dim: rgba(255, 255, 255, 0.48);
 }
 
-/* Apply Glass Background to Root & Main Workspace */
-:root,
-body,
+/* Apply Glass Background to Root & Main Workspace (Dark Mode) */
+html[data-theme="dark"],
 body.glass-theme-active,
-.glass-viewport {
+body.glass-theme-active .glass-viewport {
   --text-primary: #ffffff !important;
   --text-main: #ffffff !important;
   --text-secondary: #cbd5e1 !important;
