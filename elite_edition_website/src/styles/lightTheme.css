@@ -506,6 +506,33 @@ body.light-theme-active .pipeline-stage-card:hover {
   border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.38) !important;
 }
 
+body.light-theme-active .phoenix-emoji-popover {
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-color: rgba(148, 163, 184, 0.38) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .phoenix-media-top-tabs {
+  background: rgba(241, 245, 249, 0.96) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.30) !important;
+}
+
+body.light-theme-active .phoenix-media-tab-btn {
+  color: #334155 !important;
+}
+
+body.light-theme-active .phoenix-media-tab-btn:hover {
+  background: rgba(226, 232, 240, 0.7) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .phoenix-media-tab-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
 body.light-theme-active .badge-phoenix,
 body.light-theme-active .badge-phoenix-primary,
 body.light-theme-active .phoenix-sticker-card,

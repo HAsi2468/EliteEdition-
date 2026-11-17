@@ -8928,7 +8928,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <FileText size={16} color="#a78bfa" />
                                 </div>
                                 <span>Document / PDF</span>
@@ -8946,7 +8946,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <Clock size={16} color="#38bdf8" />
                                 </div>
                                 <span>Schedule Message</span>
@@ -8964,7 +8964,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <MapPin size={16} color="#4ade80" />
                                 </div>
                                 <span>Share Location</span>
@@ -8982,7 +8982,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(167, 139, 250, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(167, 139, 250, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <UserPlus size={16} color="#c4b5fd" />
                                 </div>
                                 <span>Share Contact Card</span>
@@ -9000,7 +9000,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <Video size={16} color="#38bdf8" />
                                 </div>
                                 <span>{isRecordingVideoNote ? 'Stop & Send Video Note' : 'Record Video Note'}</span>
@@ -9015,7 +9015,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: viewOnceSend ? '#38bdf8' : '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <Eye size={16} color="#38bdf8" />
                                 </div>
                                 <span>View-Once Media: {viewOnceSend ? 'ON' : 'OFF'}</span>
@@ -9033,7 +9033,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <Calendar size={16} color="#fbbf24" />
                                 </div>
                                 <span>Create Group Event</span>
@@ -9051,7 +9051,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
                                 }}
                               >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <PhoneCall size={16} color="#4ade80" />
                                 </div>
                                 <span>Shareable Call Link</span>
