@@ -406,10 +406,92 @@ body.light-theme-active .inward-tp-table-header,
 body.light-theme-active .infra-btn-secondary,
 body.light-theme-active .infra-badge-neutral,
 body.light-theme-active .myntra-btn-outline,
-body.light-theme-active .myntra-btn-subtle {
+body.light-theme-active .myntra-btn-subtle,
+body.light-theme-active .ent-stat-card,
+body.light-theme-active .complaint-modern-card,
+body.light-theme-active .smart-more-menu-dropdown,
+body.light-theme-active .subtab-chip,
+body.light-theme-active .pwa-update-bar,
+body.light-theme-active .pwa-ios-hint,
+body.light-theme-active .erp-hotkey-hud,
+body.light-theme-active .erp-kb-onboarding-banner,
+body.light-theme-active .erp-cheat-sheet-modal,
+body.light-theme-active .entity-switcher-trigger,
+body.light-theme-active .entity-switcher-dropdown,
+body.light-theme-active .quicklook-modal-panel,
+body.light-theme-active .quicklook-header,
+body.light-theme-active .smart-lightbox-panel,
+body.light-theme-active .smart-lightbox-header,
+body.light-theme-active .smart-lightbox-footer,
+body.light-theme-active .smart-thumbnail-wrap,
+body.light-theme-active .smart-thumb-fallback,
+body.light-theme-active .smart-peek-media-box,
+body.light-theme-active .barcode-hud-toast,
+body.light-theme-active .cell-hover-peek-popover,
+body.light-theme-active .coachmark-popover,
+body.light-theme-active .tour-popover-card,
+body.light-theme-active .table-context-menu-portal,
+body.light-theme-active .undo-toast-card,
+body.light-theme-active .validation-dock-card,
+body.light-theme-active .zen-exit-pill,
+body.light-theme-active .quick-tip-bar,
+body.light-theme-active .erp-table-wrap,
+body.light-theme-active .erp-modal,
+body.light-theme-active .taka-verify-card,
+body.light-theme-active .fabric-quality-modal-box,
+body.light-theme-active .task-list-table-container,
+body.light-theme-active .task-kpi-pill,
+body.light-theme-active .phoenix-chat-item:hover,
+body.light-theme-active .phoenix-reaction-pill,
+body.light-theme-active .phoenix-reply-banner,
+body.light-theme-active .phoenix-chat-input-pill,
+body.light-theme-active .phoenix-scroll-bottom-btn {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .erp-hud-pill,
+body.light-theme-active .erp-cheat-sheet-key,
+body.light-theme-active .erp-cheat-sheet-search,
+body.light-theme-active .quicklook-btn,
+body.light-theme-active .undo-btn-dismiss,
+body.light-theme-active .phoenix-tab-pill,
+body.light-theme-active .phoenix-msg-sender-role,
+body.light-theme-active .challan-tp-header,
+body.light-theme-active .challan-tp-row,
+body.light-theme-active .inward-tp-row,
+body.light-theme-active .inward-tp-num-cell,
+body.light-theme-active .taka-verify-chip,
+body.light-theme-active .task-col-quick-add-btn,
+body.light-theme-active .task-card-status-btn:not(.active),
+body.light-theme-active .task-search-input,
+body.light-theme-active .ufp-search-input,
+body.light-theme-active .keyboard-modal-search-input,
+body.light-theme-active .shortcut-search-input,
+body.light-theme-active .shortcut-row:hover {
   background: #f1f5f9 !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
+}
+
+body.light-theme-active .erp-hotkey-hud *,
+body.light-theme-active .erp-cheat-sheet-modal *,
+body.light-theme-active .ent-stat-card *,
+body.light-theme-active .complaint-modern-card *,
+body.light-theme-active .taka-verify-card *,
+body.light-theme-active .quicklook-modal-panel *,
+body.light-theme-active .smart-lightbox-panel *,
+body.light-theme-active .erp-modal * {
+  color: #0f172a;
+}
+
+/* Translucent white glass borders/surfaces used in Dark Mode -> visible slate borders in Light Mode */
+body.light-theme-active :is(div, button, span, section, aside, input, select):not(.printable-area *):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is(
+  [style*="border: 1px solid rgba(255, 255, 255"],
+  [style*="border-color: rgba(255, 255, 255"]
+) {
+  border-color: #cbd5e1 !important;
 }
 
 /* Tables */
