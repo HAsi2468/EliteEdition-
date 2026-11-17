@@ -506,12 +506,25 @@ body.light-theme-active .pipeline-stage-card:hover {
   border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.38) !important;
 }
 
-body.light-theme-active .phoenix-emoji-popover {
-  background: rgba(255, 255, 255, 0.96) !important;
+body.light-theme-active .phoenix-emoji-popover,
+body.light-theme-active .phoenix-attach-menu {
+  background: rgba(255, 255, 255, 0.97) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   border-color: rgba(148, 163, 184, 0.38) !important;
   color: #0f172a !important;
+}
+
+body.light-theme-active .phoenix-attach-menu > button {
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px 10px !important;
+}
+
+body.light-theme-active .phoenix-attach-menu > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body.light-theme-active .phoenix-media-top-tabs {

@@ -8844,6 +8844,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
                             />
                             <div
+                              className="phoenix-attach-menu"
                               style={{
                                 position: 'absolute',
                                 bottom: 'calc(100% + 12px)',
@@ -8855,12 +8856,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 boxShadow: '0 16px 40px rgba(2, 6, 23, 0.65)',
                                 zIndex: 9999,
                                 padding: '10px',
-                                width: '320px',
-                                maxWidth: '88vw',
+                                width: 'min(450px, 92vw)',
                                 maxHeight: '64vh',
                                 overflowY: 'auto',
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                                 gap: '6px',
                                 animation: 'fadeIn 0.15s ease'
                               }}
@@ -9067,60 +9067,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   <PhoneCall size={16} color="#4ade80" />
                                 </div>
                                 <span>Shareable Call Link</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowDesktopAttachMenu(false);
-                                  setShowPollModal(true);
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <BarChart2 size={16} color="#34d399" />
-                                </div>
-                                <span>Create Poll</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowDesktopAttachMenu(false);
-                                  handleOpenTaskModalFromChat();
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <CheckSquare size={16} color="#34d399" />
-                                </div>
-                                <span>Create Task</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowDesktopAttachMenu(false);
-                                  handleOpenShareModal('jobcard');
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                                  background: 'transparent', border: 'none', borderRadius: '8px', textAlign: 'left',
-                                  fontSize: '0.84rem', color: '#f8fafc', cursor: 'pointer', fontWeight: 600
-                                }}
-                              >
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(168, 85, 247, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Share2 size={16} color="#c084fc" />
-                                </div>
-                                <span>Quick Share Record</span>
                               </button>
 
                               <button
