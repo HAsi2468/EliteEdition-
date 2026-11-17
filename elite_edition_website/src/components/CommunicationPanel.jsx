@@ -7678,11 +7678,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 />
                               </div>
                             )}
-                            {msg.isEncrypted && (
-                              <div style={{ fontSize: '0.68rem', color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
-                                <Lock size={10} /> End-to-End Encrypted
-                              </div>
-                            )}
 
                             {/* Quick Share Record Card */}
                             {isRecordCard && msg.activityMeta && msg.activityMeta.module && (() => {
