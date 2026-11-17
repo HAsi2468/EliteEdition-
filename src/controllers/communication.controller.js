@@ -600,13 +600,29 @@ const postGroupMessage = async (req, res) => {
       });
     }
 
-    // Validate replyTo: must exist within this room or return 400
+    // Validate replyTo: allow same-room replies OR cross-room Reply Privately when sender belongs to the source room
     let cleanReplyTo = null;
     if (replyTo) {
       if (!mongoose.Types.ObjectId.isValid(replyTo)) {
         return res.status(400).json({ success: false, message: 'Invalid replyTo message ID' });
       }
-      const referencedMsg = await ChatMessage.findOne({ _id: replyTo, roomId: groupId }).lean();
+      let referencedMsg = await ChatMessage.findOne({ _id: replyTo, roomId: groupId }).lean();
+      if (!referencedMsg) {
+        const crossRoomMsg = await ChatMessage.findById(replyTo).lean();
+        if (crossRoomMsg) {
+          const srcRoom = await ChatRoom.findById(crossRoomMsg.roomId).select('members isPublic type').lean();
+          const hasSourceAccess = Boolean(
+            srcRoom && (
+              srcRoom.isPublic ||
+              srcRoom.type === 'channel' ||
+              (Array.isArray(srcRoom.members) && srcRoom.members.some((m) => getMemberIdString(m) === String(rawSenderId)))
+            )
+          );
+          if (hasSourceAccess) {
+            referencedMsg = crossRoomMsg;
+          }
+        }
+      }
       if (!referencedMsg) {
         return res.status(400).json({ success: false, message: 'Referenced replyTo message not found in this room' });
       }
