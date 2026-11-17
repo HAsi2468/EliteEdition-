@@ -414,6 +414,10 @@ body.light-theme-active .task-kanban-col,
 body.light-theme-active .task-card-status-group,
 body.light-theme-active .task-mobile-col-bar,
 body.light-theme-active .phoenix-chat-layout,
+body.light-theme-active .phoenix-chat-sidebar,
+body.light-theme-active .phoenix-sidebar-header,
+body.light-theme-active .phoenix-chat-header,
+body.light-theme-active .phoenix-chat-input-bar,
 body.light-theme-active .phoenix-chat-main,
 body.light-theme-active .comm-sidebar,
 body.light-theme-active .comm-chat-area,
@@ -560,6 +564,76 @@ body.light-theme-active .shortcut-row:hover {
   background: rgba(241, 245, 249, 0.88) !important;
   border-color: rgba(148, 163, 184, 0.36) !important;
   color: #0f172a !important;
+}
+
+body.light-theme-active .task-main-title,
+body.light-theme-active .task-kanban-col-title,
+body.light-theme-active .task-card-title,
+body.light-theme-active .phoenix-chat-header-title,
+body.light-theme-active .phoenix-chat-item-name,
+body.light-theme-active .phoenix-msg-sender-name {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .task-subtitle,
+body.light-theme-active .task-meta-subtitle,
+body.light-theme-active .task-card-desc,
+body.light-theme-active .task-subtask-label,
+body.light-theme-active .task-assignee-chip,
+body.light-theme-active .phoenix-chat-header-subtitle,
+body.light-theme-active .phoenix-chat-item-preview,
+body.light-theme-active .phoenix-chat-item-time,
+body.light-theme-active .phoenix-msg-meta,
+body.light-theme-active .phoenix-thread-section-label {
+  color: #475569 !important;
+}
+
+body.light-theme-active .task-kanban-col-header {
+  background: rgba(241, 245, 249, 0.92) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.30) !important;
+}
+
+body.light-theme-active .task-card {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(148, 163, 184, 0.32) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .task-card:hover {
+  background: #ffffff !important;
+  border-color: rgba(59, 130, 246, 0.45) !important;
+}
+
+body.light-theme-active .task-view-switcher,
+body.light-theme-active .task-scope-pills {
+  background: rgba(241, 245, 249, 0.90) !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
+}
+
+body.light-theme-active .task-view-tab,
+body.light-theme-active .task-scope-pill,
+body.light-theme-active .task-select {
+  color: #334155 !important;
+}
+
+body.light-theme-active .task-view-tab.active,
+body.light-theme-active .task-scope-pill.active {
+  background: #ffffff !important;
+  color: #2563eb !important;
+}
+
+body.light-theme-active .phoenix-chat-feed,
+body.light-theme-active .phoenix-chat-stream {
+  background: linear-gradient(135deg, #eef2f9 0%, #f1f5f9 50%, #e8eef8 100%) !important;
+}
+
+body.light-theme-active .phoenix-chat-item.active {
+  background: rgba(37, 99, 235, 0.12) !important;
+}
+
+body.light-theme-active .phoenix-chat-item.active .phoenix-chat-item-name {
+  color: #1d4ed8 !important;
 }
 
 body.light-theme-active .erp-hotkey-hud *,
