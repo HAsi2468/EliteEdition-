@@ -171,13 +171,17 @@ body.light-theme-active .glass-subtab-btn {
   color: #334155 !important;
 }
 
-body.light-theme-active .glass-subtab-btn:hover {
+body.light-theme-active .glass-subtab-btn:not(.active):hover {
   background: rgba(255, 255, 255, 0.85) !important;
   color: #0f172a !important;
 }
 
-body.light-theme-active .glass-subtab-btn.active {
+body.light-theme-active .glass-subtab-btn.active,
+body.light-theme-active .glass-subtab-btn.active:hover {
+  background: linear-gradient(135deg, var(--entity-accent, #2563eb), #1d4ed8) !important;
   color: #ffffff !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.55) !important;
+  box-shadow: 0 4px 14px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.30) !important;
 }
 
 body.light-theme-active .glass-screen-subtitle {
