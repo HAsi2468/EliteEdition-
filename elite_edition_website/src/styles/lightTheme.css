@@ -1319,6 +1319,48 @@ body.light-theme-active .is-floating .morphing-action-btn.secondary {
   border-color: rgba(148, 163, 184, 0.36) !important;
 }
 
+body.light-theme-active .smart-icon-btn {
+  background: rgba(241, 245, 249, 0.92) !important;
+  border: 1px solid rgba(148, 163, 184, 0.42) !important;
+  color: #334155 !important;
+}
+
+body.light-theme-active .smart-icon-btn:hover {
+  background: #ffffff !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.45) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .smart-icon-btn.primary {
+  background: rgba(224, 242, 254, 0.88) !important;
+  border-color: rgba(14, 165, 233, 0.40) !important;
+  color: #0284c7 !important;
+}
+
+body.light-theme-active .smart-icon-btn.success {
+  background: rgba(209, 250, 229, 0.88) !important;
+  border-color: rgba(16, 185, 129, 0.40) !important;
+  color: #059669 !important;
+}
+
+body.light-theme-active .smart-icon-btn.warning {
+  background: rgba(254, 243, 199, 0.88) !important;
+  border-color: rgba(245, 158, 11, 0.42) !important;
+  color: #b45309 !important;
+}
+
+body.light-theme-active .smart-icon-btn.danger {
+  background: rgba(254, 226, 226, 0.88) !important;
+  border-color: rgba(239, 68, 68, 0.40) !important;
+  color: #dc2626 !important;
+}
+
+body.light-theme-active .smart-icon-btn.purple {
+  background: rgba(243, 232, 255, 0.88) !important;
+  border-color: rgba(168, 85, 247, 0.40) !important;
+  color: #7c3aed !important;
+}
+
 body.light-theme-active .quicklook-viewport,
 body.light-theme-active .smart-lightbox-body {
   background: rgba(241, 245, 249, 0.86) !important;
