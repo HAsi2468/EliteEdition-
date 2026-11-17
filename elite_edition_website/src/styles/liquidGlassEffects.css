@@ -395,6 +395,149 @@ body.light-theme-active .system-notice-message {
 }
 
 /* ============================================================================
+   APPLE-GRADE LIQUID GLASS OPTICS (iOS 26 / macOS STYLE — DARK & LIGHT)
+   ============================================================================ */
+
+/* Vivid Multi-Tone Ambient Canvas so translucent glass visibly refracts color */
+body.glass-theme-active,
+body.glass-theme-active .glass-viewport {
+  background:
+    radial-gradient(circle at 12% 16%, rgba(var(--entity-accent-rgb, 56, 189, 248), 0.34) 0%, transparent 42%),
+    radial-gradient(circle at 88% 20%, rgba(129, 140, 248, 0.28) 0%, transparent 42%),
+    radial-gradient(circle at 74% 86%, rgba(14, 165, 233, 0.26) 0%, transparent 45%),
+    radial-gradient(circle at 22% 82%, rgba(168, 85, 247, 0.18) 0%, transparent 44%),
+    linear-gradient(135deg, #040812 0%, #091020 50%, #050a16 100%) !important;
+  background-attachment: fixed !important;
+}
+
+body.light-theme-active,
+body.light-theme-active .glass-viewport {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.28) 0%, transparent 44%),
+    radial-gradient(circle at 86% 18%, rgba(56, 189, 248, 0.26) 0%, transparent 42%),
+    radial-gradient(circle at 76% 84%, rgba(139, 92, 246, 0.20) 0%, transparent 46%),
+    radial-gradient(circle at 24% 84%, rgba(16, 185, 129, 0.14) 0%, transparent 44%),
+    linear-gradient(135deg, #dce7f9 0%, #edf2fa 48%, #dde8f8 100%) !important;
+  background-attachment: fixed !important;
+}
+
+/* Genuine Translucent Liquid Glass Surfaces + Curved Top Lens Gloss (Dark Mode) */
+body.glass-theme-active :is(.app-header, aside#erp-sidebar-nav, .glass-subtabs-bar, .glass-title-capsule, .glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(15, 23, 42, 0.0) 100%),
+    rgba(15, 23, 42, 0.48) !important;
+  backdrop-filter: blur(32px) saturate(220%) brightness(1.08) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(220%) brightness(1.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.20) !important;
+  box-shadow:
+    0 16px 40px -10px rgba(2, 6, 23, 0.62),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.34),
+    inset 1px 0 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Genuine Translucent Liquid Glass Surfaces + Curved Top Lens Gloss (Light Mode) */
+body.light-theme-active :is(.app-header, aside#erp-sidebar-nav, .glass-subtabs-bar, .glass-title-capsule, .glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.34) 42%, rgba(255, 255, 255, 0.46) 100%),
+    rgba(255, 255, 255, 0.50) !important;
+  backdrop-filter: blur(32px) saturate(215%) contrast(1.03) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(215%) contrast(1.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.88) !important;
+  box-shadow:
+    0 14px 36px -10px rgba(15, 23, 42, 0.12),
+    0 2px 10px -2px rgba(15, 23, 42, 0.05),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 1.5px 0 0 rgba(255, 255, 255, 0.90),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.28) !important;
+}
+
+/* Apple Squircle & Full-Pill Liquid Glass Geometry */
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-title-capsule, .glass-subtabs-bar, .entity-brand-badge-pill, .dept-switcher-header) {
+  border-radius: 999px !important;
+}
+
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
+  border-radius: 18px !important;
+}
+
+/* Curved Liquid-Glass Top Caustic Light Catch on Bars & Capsules */
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-title-capsule, .glass-subtabs-bar, .erp-hotkey-hud) {
+  position: relative;
+}
+
+body.glass-theme-active :is(.glass-title-capsule, .glass-subtabs-bar, .erp-hotkey-hud)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 6%;
+  right: 6%;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  pointer-events: none;
+}
+
+body.light-theme-active :is(.glass-title-capsule, .glass-subtabs-bar, .erp-hotkey-hud)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 6%;
+  right: 6%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 1) 50%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Liquid Glass Active Pills Specular Inner Rim & Soft Glow */
+:is(body.glass-theme-active, body.light-theme-active) :is(
+  .glass-subtab-btn.active,
+  .glass-view-toggle button.active,
+  .company-segment-pill.active,
+  .nav-item.active,
+  aside#erp-sidebar-nav button.active
+) {
+  box-shadow:
+    0 6px 20px -4px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.42),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.52),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16) !important;
+}
+
+/* Fluid Liquid Glass Shimmer Wave for Skeleton Loaders */
+@keyframes liquidGlassShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+body.glass-theme-active :is(.erp-shimmer-box, .skeleton-shimmer) {
+  background: linear-gradient(
+    110deg,
+    rgba(30, 41, 59, 0.55) 25%,
+    rgba(56, 189, 248, 0.16) 50%,
+    rgba(30, 41, 59, 0.55) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: liquidGlassShimmer 1.8s ease-in-out infinite !important;
+}
+
+body.light-theme-active :is(.erp-shimmer-box, .skeleton-shimmer) {
+  background: linear-gradient(
+    110deg,
+    rgba(226, 232, 240, 0.62) 25%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(226, 232, 240, 0.62) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: liquidGlassShimmer 1.8s ease-in-out infinite !important;
+}
+
+@media (max-width: 768px) {
+  body.glass-theme-active,
+  body.glass-theme-active .glass-viewport {
+    background-attachment: scroll !important;
+  }
+}
+
+/* ============================================================================
    PHASE 6: MOBILE & REDUCED-MOTION GUARDRAILS
    ============================================================================ */
 @media (max-width: 768px) {
