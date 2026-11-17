@@ -779,9 +779,58 @@ export default function App() {
     } catch (e) {}
   }, [themeMode]);
 
-  const toggleThemeMode = () => {
-    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  const toggleThemeMode = (e) => {
+    const nextTheme = themeMode === 'dark' ? 'light' : 'dark';
+    const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function' && !reduceMotion) {
+      const rect = e?.currentTarget?.getBoundingClientRect?.();
+      const x = rect ? rect.left + rect.width / 2 : (typeof e?.clientX === 'number' ? e.clientX : window.innerWidth / 2);
+      const y = rect ? rect.top + rect.height / 2 : (typeof e?.clientY === 'number' ? e.clientY : window.innerHeight / 2);
+      document.documentElement.style.setProperty('--vt-x', `${Math.round(x)}px`);
+      document.documentElement.style.setProperty('--vt-y', `${Math.round(y)}px`);
+      document.startViewTransition(() => {
+        setThemeMode(nextTheme);
+      });
+      return;
+    }
+    setThemeMode(nextTheme);
   };
+
+  // Global 60fps pointer-reactive specular spotlight for Liquid Glass cards (Dark & Light)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (window.matchMedia && (window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      return;
+    }
+    const CARD_SELECTOR = '.glass-card-item, .glass-calc-card, .ent-stat-card, .stat-card, .metric-card, .fusing-metric-card, .phoenix-card, .phoenix-kpi-card, .task-card';
+    let rafId = null;
+    let lastEvent = null;
+
+    const updateSpecular = () => {
+      rafId = null;
+      const ev = lastEvent;
+      if (!ev || !ev.target || typeof ev.target.closest !== 'function') return;
+      const card = ev.target.closest(CARD_SELECTOR);
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      card.style.setProperty('--glass-mx', `${Math.round(ev.clientX - rect.left)}px`);
+      card.style.setProperty('--glass-my', `${Math.round(ev.clientY - rect.top)}px`);
+    };
+
+    const onPointerMove = (ev) => {
+      lastEvent = ev;
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(updateSpecular);
+      }
+    };
+
+    document.addEventListener('pointermove', onPointerMove, { passive: true });
+    return () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   // Dynamically bind Multi-Entity Visual Accents to document :root
   useEffect(() => {

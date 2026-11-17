@@ -1,0 +1,317 @@
+/**
+ * Elite Edition ERP — Advanced Liquid Glass & Motion Layer (Dark + Light Parity)
+ *
+ * Implements:
+ * 1. Optical 3D specular rims & multi-tier frosted glass depth (Dark & Light)
+ * 2. View Transitions API circular ripple on Dark <-> Light theme switch
+ * 3. Pointer-reactive radial specular spotlight (--glass-mx / --glass-my)
+ * 4. Diagonal glass glint sweep on primary buttons & action pills
+ * 5. CSS linear() spring physics & staggered grid/table cascades
+ * 6. Scroll-driven sticky header elevation & reduced-motion guardrails
+ */
+
+@property --glass-orb-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --spring-snappy: linear(
+    0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%,
+    1.017, 1.077, 1.102 22.8%, 1.105 24.4%, 1.093 26.2%, 1.012 33.7%,
+    0.992 38.4%, 0.995 45.2%, 1.002 55.6%, 1
+  );
+  --spring-gentle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================================================
+   VIEW TRANSITIONS API — CIRCULAR THEME SWITCH RIPPLE
+   ============================================================================ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+  animation: liquidThemeRipple 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes liquidThemeRipple {
+  from {
+    clip-path: circle(0px at var(--vt-x, 50vw) var(--vt-y, 50vh));
+  }
+  to {
+    clip-path: circle(150vmax at var(--vt-x, 50vw) var(--vt-y, 50vh));
+  }
+}
+
+/* ============================================================================
+   PHASE 1 & 2: LIVING AMBIENT MESH & 3D SPECULAR GLASS OPTICS
+   ============================================================================ */
+@keyframes liquidMeshPulse {
+  0%, 100% {
+    --glass-orb-angle: 0deg;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    --glass-orb-angle: 120deg;
+    transform: translate3d(32px, -22px, 0) scale(1.08);
+  }
+  66% {
+    --glass-orb-angle: 240deg;
+    transform: translate3d(-24px, 28px, 0) scale(0.96);
+  }
+}
+
+body.glass-theme-active::before,
+body.light-theme-active::before {
+  animation: liquidMeshPulse 16s ease-in-out infinite !important;
+  will-change: transform;
+}
+
+body.glass-theme-active::after,
+body.light-theme-active::after {
+  animation: liquidMeshPulse 20s ease-in-out infinite reverse !important;
+  will-change: transform;
+}
+
+/* Richer Daylight Atmospheric Canvas so frosted glass visibly refracts color */
+body.light-theme-active,
+body.light-theme-active .glass-viewport {
+  background:
+    radial-gradient(circle at 12% 16%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.18) 0%, transparent 46%),
+    radial-gradient(circle at 86% 22%, rgba(14, 165, 233, 0.16) 0%, transparent 44%),
+    radial-gradient(circle at 72% 84%, rgba(139, 92, 246, 0.12) 0%, transparent 48%),
+    linear-gradient(135deg, #e2ebf8 0%, #f1f5f9 48%, #e4ecf9 100%) !important;
+  background-attachment: fixed !important;
+}
+
+/* 3D Specular Glass Rims (Dark Mode) */
+body.glass-theme-active :is(.glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card, .complaint-modern-card) {
+  backdrop-filter: blur(22px) saturate(185%) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(185%) brightness(1.05) !important;
+  box-shadow:
+    0 12px 34px -8px rgba(2, 6, 23, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 1px 0 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.40) !important;
+}
+
+/* 3D Specular Glass Rims (Light Mode) */
+body.light-theme-active :is(.glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card, .complaint-modern-card) {
+  backdrop-filter: blur(24px) saturate(190%) contrast(1.02) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(1.02) !important;
+  box-shadow:
+    0 10px 30px -8px rgba(15, 23, 42, 0.10),
+    0 2px 8px -2px rgba(15, 23, 42, 0.05),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.98),
+    inset 1px 0 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.26) !important;
+}
+
+/* ============================================================================
+   PHASE 3: POINTER-REACTIVE SPECULAR SPOTLIGHT & GLINT SWEEP
+   ============================================================================ */
+:is(body.glass-theme-active, body.light-theme-active) :is(
+  .glass-panel,
+  .glass-card,
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card
+) {
+  position: relative;
+  overflow: hidden;
+}
+
+:is(body.glass-theme-active, body.light-theme-active) :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card
+)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 1;
+}
+
+body.glass-theme-active :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card
+)::after {
+  background: radial-gradient(
+    280px circle at var(--glass-mx, 50%) var(--glass-my, 50%),
+    rgba(255, 255, 255, 0.14),
+    rgba(var(--entity-accent-rgb, 56, 189, 248), 0.08) 40%,
+    transparent 70%
+  );
+}
+
+body.light-theme-active :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card
+)::after {
+  background: radial-gradient(
+    280px circle at var(--glass-mx, 50%) var(--glass-my, 50%),
+    rgba(255, 255, 255, 0.85),
+    rgba(var(--entity-accent-rgb, 37, 99, 235), 0.10) 42%,
+    transparent 72%
+  );
+}
+
+:is(body.glass-theme-active, body.light-theme-active) :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card
+):hover::after {
+  opacity: 1;
+}
+
+/* Specular Glint Sweep on Primary Buttons */
+:is(body.glass-theme-active, body.light-theme-active) :is(.btn-primary, .ent-btn-primary, .glass-btn-primary, .fusing-btn-primary, .task-btn-primary) {
+  position: relative;
+  overflow: hidden;
+}
+
+:is(body.glass-theme-active, body.light-theme-active) :is(.btn-primary, .ent-btn-primary, .glass-btn-primary, .fusing-btn-primary, .task-btn-primary)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
+  transform: skewX(-18deg);
+  pointer-events: none;
+  transition: left 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:is(body.glass-theme-active, body.light-theme-active) :is(.btn-primary, .ent-btn-primary, .glass-btn-primary, .fusing-btn-primary, .task-btn-primary):hover::before {
+  left: 160%;
+}
+
+/* ============================================================================
+   PHASE 4: SPRING CHOREOGRAPHY & STAGGERED CASCADES
+   ============================================================================ */
+:is(body.glass-theme-active, body.light-theme-active) :is([role="dialog"]:not(.printable-area), .erp-modal, .ufp-popover) {
+  animation-timing-function: var(--spring-snappy) !important;
+}
+
+/* Staggered Card & Row Cascades */
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(1) { animation-delay: 20ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(2) { animation-delay: 45ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(3) { animation-delay: 70ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(4) { animation-delay: 95ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(5) { animation-delay: 120ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(6) { animation-delay: 145ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(7) { animation-delay: 170ms; }
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-card-item, .glass-calc-card, .ent-stat-card, .phoenix-kpi-card, .fusing-metric-card, .task-card):nth-child(8) { animation-delay: 195ms; }
+
+/* Smooth Tab & View Toggle Transitions */
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-subtab-btn, .glass-view-toggle button, .company-segment-pill, .dept-switcher-btn, .phoenix-tab-pill) {
+  transition:
+    transform 0.22s var(--spring-snappy),
+    background 0.22s var(--spring-gentle),
+    color 0.20s ease,
+    box-shadow 0.22s var(--spring-gentle) !important;
+}
+
+/* ============================================================================
+   PHASE 5: SCROLL-DRIVEN HEADER DEPTH
+   ============================================================================ */
+@supports (animation-timeline: scroll()) {
+  @keyframes liquidHeaderScroll {
+    from {
+      box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+    }
+    to {
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    }
+  }
+
+  :is(body.glass-theme-active, body.light-theme-active) .app-header {
+    animation: liquidHeaderScroll linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0px 120px;
+  }
+}
+
+/* ============================================================================
+   PHASE 6: MOBILE & REDUCED-MOTION GUARDRAILS
+   ============================================================================ */
+@media (max-width: 768px) {
+  body.glass-theme-active :is(.glass-panel, .glass-card, .glass-card-item),
+  body.light-theme-active :is(.glass-panel, .glass-card, .glass-card-item) {
+    backdrop-filter: blur(14px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  }
+
+  /* Disable pointer-reactive spotlight on touch devices */
+  :is(body.glass-theme-active, body.light-theme-active) :is(
+    .glass-card-item,
+    .glass-calc-card,
+    .ent-stat-card,
+    .stat-card,
+    .metric-card,
+    .fusing-metric-card,
+    .phoenix-card,
+    .phoenix-kpi-card,
+    .task-card
+  )::after {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  body.glass-theme-active::before,
+  body.glass-theme-active::after,
+  body.light-theme-active::before,
+  body.light-theme-active::after,
+  :is(body.glass-theme-active, body.light-theme-active) .app-header {
+    animation: none !important;
+  }
+}
