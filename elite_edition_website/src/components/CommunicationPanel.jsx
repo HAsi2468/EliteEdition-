@@ -7317,7 +7317,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     el.classList.add('reply-jump-pulse');
                                     setTimeout(() => {
                                       el.classList.remove('reply-jump-pulse');
-                                    }, 1700);
+                                    }, 2400);
                                   };
                                   const replyRoomId = msg.replyTo?.roomId?._id || msg.replyTo?.roomId;
                                   if (replyRoomId && String(replyRoomId) !== String(activeGroup?._id || '')) {

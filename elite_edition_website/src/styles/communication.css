@@ -1001,3 +1001,30 @@ body.glass-theme-active .wa-bubble-trigger:hover {
     padding: 8px 10px !important;
   }
 }
+
+@keyframes replyJumpHighlight {
+  0% {
+    background-color: rgba(56, 189, 248, 0.34);
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.32);
+    transform: scale(1.015);
+  }
+  30% {
+    background-color: rgba(251, 191, 36, 0.28);
+    box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.28);
+    transform: scale(1);
+  }
+  70% {
+    background-color: rgba(56, 189, 248, 0.20);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.reply-jump-pulse {
+  border-radius: 14px !important;
+  animation: replyJumpHighlight 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+}
