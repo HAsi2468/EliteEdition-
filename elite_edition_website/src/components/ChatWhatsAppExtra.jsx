@@ -54,7 +54,7 @@ export async function decryptRoomMessage(encryptedPayload, roomId) {
   }
 }
 
-/* ── Custom Per-Chat Web Audio Tone Synthesizer (100% Free Built-in) ── */
+/* ── Custom Per-Chat Web Audio Tone Synthesizer (56 Free Built-in Tones) ── */
 export const CHAT_TONES = [
   { key: 'default', label: 'Default Pop', freqs: [520, 680], type: 'sine', step: 0.08, dur: 0.16, vol: 0.08 },
   { key: 'chime', label: 'Crystal Chime', freqs: [880, 1175], type: 'sine', step: 0.08, dur: 0.18, vol: 0.08 },
@@ -73,6 +73,44 @@ export const CHAT_TONES = [
   { key: 'alert', label: 'Urgent Double', freqs: [880, 880, 1175], type: 'triangle', step: 0.09, dur: 0.14, vol: 0.085 },
   { key: 'zen', label: 'Zen Bowl', freqs: [432, 648], type: 'sine', step: 0.11, dur: 0.32, vol: 0.085 },
   { key: 'breeze', label: 'Morning Breeze', freqs: [587, 659, 784, 988], type: 'sine', step: 0.07, dur: 0.19, vol: 0.07 },
+  { key: 'bubble', label: 'Bubble Pop', freqs: [480, 720, 960], type: 'sine', step: 0.045, dur: 0.10, vol: 0.08 },
+  { key: 'kalimba', label: 'Kalimba Pluck', freqs: [523, 784, 659], type: 'triangle', step: 0.08, dur: 0.20, vol: 0.085 },
+  { key: 'xylophone', label: 'Bright Xylophone', freqs: [1047, 1319, 1568], type: 'sine', step: 0.06, dur: 0.14, vol: 0.07 },
+  { key: 'bamboo', label: 'Bamboo Flute', freqs: [587, 880, 784], type: 'sine', step: 0.09, dur: 0.22, vol: 0.075 },
+  { key: 'velvet', label: 'Velvet Ding', freqs: [494, 740], type: 'sine', step: 0.07, dur: 0.24, vol: 0.085 },
+  { key: 'prism', label: 'Prism Cascade', freqs: [659, 880, 1175, 1480], type: 'sine', step: 0.05, dur: 0.17, vol: 0.065 },
+  { key: 'glimmer', label: 'Starlight Glimmer', freqs: [988, 1319, 1568], type: 'sine', step: 0.07, dur: 0.18, vol: 0.065 },
+  { key: 'pebble', label: 'River Pebble', freqs: [392, 587], type: 'sine', step: 0.06, dur: 0.14, vol: 0.09 },
+  { key: 'cascade', label: 'Silver Cascade', freqs: [1175, 988, 784, 659], type: 'sine', step: 0.06, dur: 0.16, vol: 0.07 },
+  { key: 'echo', label: 'Canyon Echo', freqs: [659, 659, 494], type: 'sine', step: 0.10, dur: 0.22, vol: 0.075 },
+  { key: 'sunrise', label: 'Sunrise Chime', freqs: [440, 554, 659, 880], type: 'sine', step: 0.075, dur: 0.21, vol: 0.075 },
+  { key: 'twilight', label: 'Twilight Pad', freqs: [349, 440, 523], type: 'sine', step: 0.09, dur: 0.28, vol: 0.08 },
+  { key: 'meadow', label: 'Meadow Bird', freqs: [1175, 1397, 1175, 1568], type: 'sine', step: 0.055, dur: 0.12, vol: 0.06 },
+  { key: 'cricket', label: 'Night Cricket', freqs: [1319, 1568, 1319], type: 'triangle', step: 0.05, dur: 0.09, vol: 0.055 },
+  { key: 'rain', label: 'Raindrop Trio', freqs: [880, 1047, 1319], type: 'sine', step: 0.05, dur: 0.12, vol: 0.07 },
+  { key: 'cyber', label: 'Cyber Beep', freqs: [660, 880, 1320], type: 'square', step: 0.05, dur: 0.09, vol: 0.03 },
+  { key: 'matrix', label: 'Matrix Blip', freqs: [784, 523, 1047], type: 'sawtooth', step: 0.055, dur: 0.10, vol: 0.03 },
+  { key: 'laser', label: 'Laser Zip', freqs: [1480, 988, 659], type: 'triangle', step: 0.04, dur: 0.11, vol: 0.07 },
+  { key: 'coin', label: 'Arcade Coin', freqs: [988, 1319], type: 'square', step: 0.07, dur: 0.15, vol: 0.035 },
+  { key: 'powerup', label: 'Level Up', freqs: [440, 554, 659, 880, 1109], type: 'triangle', step: 0.055, dur: 0.14, vol: 0.07 },
+  { key: 'notify_pro', label: 'Executive Tone', freqs: [523, 659, 784], type: 'sine', step: 0.06, dur: 0.18, vol: 0.08 },
+  { key: 'slack_pop', label: 'Crisp Double Tap', freqs: [622, 932], type: 'triangle', step: 0.07, dur: 0.12, vol: 0.08 },
+  { key: 'teams_ping', label: 'Office Ping', freqs: [587, 880, 1175], type: 'sine', step: 0.065, dur: 0.16, vol: 0.075 },
+  { key: 'dispatch', label: 'Dispatch Horn', freqs: [523, 523, 784], type: 'triangle', step: 0.08, dur: 0.15, vol: 0.085 },
+  { key: 'beacon', label: 'Beacon Signal', freqs: [740, 988, 740], type: 'sine', step: 0.08, dur: 0.18, vol: 0.075 },
+  { key: 'temple', label: 'Temple Bell', freqs: [528, 792, 1056], type: 'sine', step: 0.10, dur: 0.34, vol: 0.075 },
+  { key: 'lotus', label: 'Lotus Bloom', freqs: [396, 528, 660], type: 'sine', step: 0.095, dur: 0.28, vol: 0.08 },
+  { key: 'sapphire', label: 'Sapphire Note', freqs: [784, 1175], type: 'sine', step: 0.075, dur: 0.20, vol: 0.075 },
+  { key: 'emerald', label: 'Emerald Drop', freqs: [659, 988], type: 'sine', step: 0.075, dur: 0.20, vol: 0.075 },
+  { key: 'ruby', label: 'Ruby Chord', freqs: [494, 622, 740], type: 'triangle', step: 0.06, dur: 0.20, vol: 0.075 },
+  { key: 'amber', label: 'Amber Glow', freqs: [440, 659, 880], type: 'sine', step: 0.08, dur: 0.22, vol: 0.075 },
+  { key: 'quartz', label: 'Quartz Tick', freqs: [1245, 1568], type: 'sine', step: 0.045, dur: 0.09, vol: 0.065 },
+  { key: 'piano_up', label: 'Soft Piano Up', freqs: [523, 587, 659, 784], type: 'triangle', step: 0.07, dur: 0.18, vol: 0.075 },
+  { key: 'piano_down', label: 'Soft Piano Down', freqs: [784, 659, 587, 523], type: 'triangle', step: 0.07, dur: 0.18, vol: 0.075 },
+  { key: 'harp_gliss', label: 'Harp Glissando', freqs: [440, 523, 659, 784, 988], type: 'sine', step: 0.045, dur: 0.18, vol: 0.065 },
+  { key: 'orbit', label: 'Orbit Pulse', freqs: [330, 440, 660, 880], type: 'sine', step: 0.07, dur: 0.19, vol: 0.075 },
+  { key: 'whisper', label: 'Gentle Whisper', freqs: [587, 740], type: 'sine', step: 0.09, dur: 0.20, vol: 0.055 },
+  { key: 'confirm', label: 'Success Chime', freqs: [523, 659, 1047], type: 'sine', step: 0.06, dur: 0.18, vol: 0.08 },
   { key: 'silent', label: 'Silent (No Sound)', freqs: [] },
 ];
 
@@ -451,17 +489,28 @@ export const CallLinkBubbleCard = ({ callLinkMeta, onJoin }) => {
 /* 5. Custom Per-Chat Notification Tone Modal */
 export const CustomToneModal = ({ roomName, currentTone = 'default', onSelectTone, onClose }) => {
   const [selected, setSelected] = useState(currentTone);
+  const [toneQuery, setToneQuery] = useState('');
+  const filteredTones = CHAT_TONES.filter((t) =>
+    t.label.toLowerCase().includes(toneQuery.trim().toLowerCase())
+  );
   return (
     <div style={backdrop} onClick={onClose}>
       <div style={card} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
             <Volume2 size={18} color="#38bdf8" /> Notification Tone ({roomName})
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '1rem', maxHeight: '52vh', overflowY: 'auto', paddingRight: '4px' }}>
-          {CHAT_TONES.map((t) => (
+        <input
+          type="text"
+          value={toneQuery}
+          onChange={(e) => setToneQuery(e.target.value)}
+          placeholder={`Search ${CHAT_TONES.length} free notification tones...`}
+          style={{ ...inp, marginBottom: '0.65rem', fontSize: '0.82rem' }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '1rem', maxHeight: '50vh', overflowY: 'auto', paddingRight: '4px' }}>
+          {filteredTones.map((t) => (
             <button
               key={t.key}
               type="button"
