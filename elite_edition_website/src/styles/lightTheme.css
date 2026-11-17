@@ -77,6 +77,20 @@ body.light-theme-active .glass-viewport {
   --split-menu-hover: rgba(241, 245, 249, 0.90) !important;
   --split-menu-text: #0f172a !important;
 
+  /* Fusing Module Light Mode Tokens */
+  --ee-fusing-bg-card: rgba(255, 255, 255, 0.84) !important;
+  --ee-fusing-brand-navy: #0284c7 !important;
+  --ee-fusing-border: rgba(148, 163, 184, 0.36) !important;
+  --ee-fusing-border-subtle: rgba(148, 163, 184, 0.22) !important;
+  --ee-fusing-text-primary: #0f172a !important;
+  --ee-fusing-text-secondary: #334155 !important;
+  --ee-fusing-text-muted: #475569 !important;
+  --ee-fusing-text-brand: #0284c7 !important;
+  --ee-fusing-status-done-text: #047857 !important;
+  --ee-fusing-status-pending-text: #b45309 !important;
+  --ee-fusing-status-progress-text: #0284c7 !important;
+  --ee-fusing-status-warning-text: #b91c1c !important;
+
   background: var(--glass-canvas-bg) !important;
   background-attachment: fixed !important;
   color: #0f172a !important;
@@ -807,7 +821,7 @@ body.light-theme-active table tr:hover td {
 }
 
 /* Hardcoded Dark Inline Backgrounds -> Frosted Light Glass Surfaces */
-body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="15, 23, 42"],
+body.light-theme-active :is(div, span, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="15, 23, 42"],
   [style*="11, 17, 32"],
   [style*="30, 41, 59"],
   [style*="51, 65, 85"],
@@ -932,7 +946,7 @@ html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.ac
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.active *,
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
-html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="rgba("]),
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
   [style*="background: rgb(29, 78, 216)"], [style*="background-color: rgb(29, 78, 216)"], [style*="background: #1d4ed8"],
@@ -954,7 +968,7 @@ html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.
   [style*="background: rgb(217, 119, 6)"], [style*="background-color: rgb(217, 119, 6)"], [style*="background: #d97706"],
   [style*="background: rgb(245, 158, 11)"], [style*="background-color: rgb(245, 158, 11)"], [style*="background: #f59e0b"],
   [style*="background: rgb(100, 116, 139)"], [style*="background-color: rgb(100, 116, 139)"], [style*="background: #64748b"]),
-html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="rgba("]),
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
   [style*="background: rgb(79, 70, 229)"], [style*="background-color: rgb(79, 70, 229)"], [style*="background: #4f46e5"],
@@ -1065,10 +1079,20 @@ body.light-theme-active .fusing-table th,
 body.light-theme-active .fusing-sticky-col-header {
   background: rgba(241, 245, 249, 0.96) !important;
   color: #0f172a !important;
+  box-shadow: -4px 0 12px rgba(15, 23, 42, 0.06) !important;
 }
 
-body.light-theme-active .fusing-table tbody tr:hover {
-  background: rgba(226, 232, 240, 0.55) !important;
+body.light-theme-active .fusing-sticky-col-cell {
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #0f172a !important;
+  box-shadow: -4px 0 12px rgba(15, 23, 42, 0.06) !important;
+}
+
+body.light-theme-active .fusing-table tbody tr:hover,
+body.light-theme-active .fusing-table tbody tr:hover .fusing-sticky-col-cell {
+  background: rgba(226, 232, 240, 0.92) !important;
+  background-color: rgba(226, 232, 240, 0.92) !important;
+  color: #0f172a !important;
 }
 
 /* Fabric Enterprise Module */
