@@ -452,15 +452,6 @@ body.light-theme-active :is(.app-header, aside#erp-sidebar-nav, .glass-subtabs-b
     inset 0 -1px 0 rgba(148, 163, 184, 0.28) !important;
 }
 
-/* Apple Squircle & Full-Pill Liquid Glass Geometry */
-:is(body.glass-theme-active, body.light-theme-active) :is(.glass-title-capsule, .glass-subtabs-bar, .entity-brand-badge-pill, .dept-switcher-header) {
-  border-radius: 999px !important;
-}
-
-:is(body.glass-theme-active, body.light-theme-active) :is(.glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
-  border-radius: 18px !important;
-}
-
 /* Curved Liquid-Glass Top Caustic Light Catch on Bars & Capsules */
 :is(body.glass-theme-active, body.light-theme-active) :is(.glass-title-capsule, .glass-subtabs-bar, .erp-hotkey-hud) {
   position: relative;
