@@ -801,11 +801,35 @@ export const LocationBubbleCard = ({ locationMeta }) => {
   const lng = Number(locationMeta.lng || 0);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
   const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-  const delta = 0.006;
-  const osmEmbedUrl = hasCoords
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${(lng - delta).toFixed(5)},${(lat - delta).toFixed(5)},${(lng + delta).toFixed(5)},${(lat + delta).toFixed(5)}&layer=mapnik&marker=${lat.toFixed(5)},${lng.toFixed(5)}`
-    : null;
   const isLiveActive = locationMeta.isLive && (!locationMeta.liveExpiresAt || new Date(locationMeta.liveExpiresAt) > new Date());
+
+  // Compute Web Mercator tile coordinates (z=15) so the exact GPS point sits dead-center under the pin
+  let tileGrid = null;
+  if (hasCoords) {
+    const z = 15;
+    const n = Math.pow(2, z);
+    const clampedLat = Math.max(-85, Math.min(85, lat));
+    const latRad = (clampedLat * Math.PI) / 180;
+    const xFloat = ((lng + 180) / 360) * n;
+    const yFloat = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+    const tx = Math.floor(xFloat);
+    const ty = Math.floor(yFloat);
+    const fracX = xFloat - tx;
+    const fracY = yFloat - ty;
+    const tiles = [];
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const cx = ((tx + dx) % n + n) % n;
+        const cy = ty + dy;
+        tiles.push({
+          key: `${dx}_${dy}`,
+          url: cy >= 0 && cy < n ? `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${cx}/${cy}@2x.png` : null,
+        });
+      }
+    }
+    tileGrid = { tiles, fracX, fracY };
+  }
+
   return (
     <a
       href={mapUrl}
@@ -825,40 +849,87 @@ export const LocationBubbleCard = ({ locationMeta }) => {
         boxShadow: '0 4px 14px rgba(15, 23, 42, 0.14)',
       }}
     >
-      {/* WhatsApp-style Map Preview */}
+      {/* WhatsApp-style Map Preview (Raster Tiles + Centered Pin) */}
       <div
         style={{
           position: 'relative',
-          height: '132px',
+          height: '136px',
           width: '100%',
           background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #dcfce7 100%)',
           overflow: 'hidden',
         }}
       >
-        {osmEmbedUrl ? (
-          <iframe
-            title={locationMeta.label || 'Location Map'}
-            src={osmEmbedUrl}
+        {tileGrid ? (
+          <div
             style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: '768px',
+              height: '768px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 256px)',
+              gridTemplateRows: 'repeat(3, 256px)',
+              transform: `translate(${-((1 + tileGrid.fracX) * 256)}px, ${-((1 + tileGrid.fracY) * 256)}px)`,
               pointerEvents: 'none',
-              display: 'block',
             }}
-            loading="lazy"
-          />
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0369a1' }}>
-            <MapPin size={32} />
+          >
+            {tileGrid.tiles.map((t) =>
+              t.url ? (
+                <img
+                  key={t.key}
+                  src={t.url}
+                  alt=""
+                  loading="lazy"
+                  style={{ width: '256px', height: '256px', display: 'block', objectFit: 'cover' }}
+                  onError={(e) => { e.currentTarget.style.opacity = '0'; }}
+                />
+              ) : (
+                <div key={t.key} style={{ width: '256px', height: '256px' }} />
+              )
+            )}
           </div>
-        )}
+        ) : null}
+
+        {/* Centered WhatsApp-Style Pin Marker */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -85%)',
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: isLiveActive ? '#16a34a' : '#ef4444',
+              border: '3px solid #ffffff',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+            }}
+          >
+            <MapPin size={16} color="#ffffff" />
+          </div>
+        </div>
+
         {isLiveActive && (
           <div
             style={{
               position: 'absolute',
               top: '8px',
               left: '8px',
+              zIndex: 3,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
