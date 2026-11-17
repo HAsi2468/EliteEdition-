@@ -250,7 +250,35 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
   );
 };
 
-/* 3. Location Sharing Modal */
+/* Shared Web Mercator tile grid helper for WhatsApp-style map previews */
+function buildMercatorTileGrid(lat, lng, zoom = 15) {
+  const numLat = Number(lat);
+  const numLng = Number(lng);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLng) || (numLat === 0 && numLng === 0)) return null;
+  const n = Math.pow(2, zoom);
+  const clampedLat = Math.max(-85, Math.min(85, numLat));
+  const latRad = (clampedLat * Math.PI) / 180;
+  const xFloat = ((numLng + 180) / 360) * n;
+  const yFloat = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  const tx = Math.floor(xFloat);
+  const ty = Math.floor(yFloat);
+  const fracX = xFloat - tx;
+  const fracY = yFloat - ty;
+  const tiles = [];
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const cx = ((tx + dx) % n + n) % n;
+      const cy = ty + dy;
+      tiles.push({
+        key: `${dx}_${dy}`,
+        url: cy >= 0 && cy < n ? `https://basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${cx}/${cy}@2x.png` : null,
+      });
+    }
+  }
+  return { tiles, fracX, fracY };
+}
+
+/* 3. Location Sharing Modal (WhatsApp-Style Live Map Preview + Duration Pills) */
 export const LocationShareModal = ({ onSendLocation, onClose }) => {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
@@ -261,6 +289,20 @@ export const LocationShareModal = ({ onSendLocation, onClose }) => {
   const [locating, setLocating] = useState(false);
   const [geoErr, setGeoErr] = useState('');
 
+  const reverseGeocode = async (la, ln) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(la)}&lon=${encodeURIComponent(ln)}`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.display_name) {
+        const shortAddr = data.display_name.split(',').slice(0, 3).map((s) => s.trim()).join(', ');
+        setAddress((prev) => prev || shortAddr);
+      }
+    } catch {}
+  };
+
   const detectGPS = () => {
     if (!navigator.geolocation) {
       setGeoErr('Geolocation is not supported in this browser.');
@@ -270,12 +312,15 @@ export const LocationShareModal = ({ onSendLocation, onClose }) => {
     setGeoErr('');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLat(pos.coords.latitude.toFixed(6));
-        setLng(pos.coords.longitude.toFixed(6));
+        const la = pos.coords.latitude.toFixed(6);
+        const ln = pos.coords.longitude.toFixed(6);
+        setLat(la);
+        setLng(ln);
         setLocating(false);
+        reverseGeocode(la, ln);
       },
       (err) => {
-        setGeoErr(err.message || 'Unable to fetch GPS location. You can enter coordinates or address manually.');
+        setGeoErr(err.message || 'Unable to fetch GPS location. You can enter coordinates manually.');
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -304,40 +349,186 @@ export const LocationShareModal = ({ onSendLocation, onClose }) => {
     });
   };
 
+  const previewTiles = buildMercatorTileGrid(lat, lng, 15);
+
   return (
     <div style={modalBackdropStyle} onClick={onClose}>
-      <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+      <div style={{ ...modalCardStyle, maxWidth: '460px' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.98rem' }}>
             <MapPin size={18} color="#22c55e" /> Share Location
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-          <button type="button" onClick={detectGPS} disabled={locating} style={{ ...primaryBtnStyle, justifyContent: 'center', background: 'rgba(34,197,94,0.18)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)' }}>
-            <Navigation size={15} /> {locating ? 'Detecting GPS...' : 'Use My Current GPS Location'}
-          </button>
-          {geoErr && <div style={{ color: '#fbbf24', fontSize: '0.78rem' }}>{geoErr}</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="Latitude (e.g. 21.1702)" style={inputStyle} />
-            <input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="Longitude (e.g. 72.8311)" style={inputStyle} />
-          </div>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Location Label (e.g. Factory Gate 2)" style={inputStyle} />
-          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address / Landmark (optional)" style={inputStyle} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={isLive} onChange={(e) => setIsLive(e.target.checked)} />
-            Share Live Location
-            {isLive && (
-              <select value={liveMinutes} onChange={(e) => setLiveMinutes(Number(e.target.value))} style={{ ...inputStyle, width: 'auto', padding: '0.25rem 0.5rem', marginLeft: 'auto' }}>
-                <option value={15}>15 mins</option>
-                <option value={60}>1 hour</option>
-                <option value={480}>8 hours</option>
-              </select>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          {/* Live Map Preview Box */}
+          <div
+            style={{
+              position: 'relative',
+              height: '148px',
+              width: '100%',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #dcfce7 100%)',
+            }}
+          >
+            {previewTiles ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: '768px',
+                  height: '768px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 256px)',
+                  gridTemplateRows: 'repeat(3, 256px)',
+                  transform: `translate(${-((1 + previewTiles.fracX) * 256)}px, ${-((1 + previewTiles.fracY) * 256)}px)`,
+                  pointerEvents: 'none',
+                }}
+              >
+                {previewTiles.tiles.map((t) =>
+                  t.url ? (
+                    <img
+                      key={t.key}
+                      src={t.url}
+                      alt=""
+                      style={{ width: '256px', height: '256px', display: 'block', objectFit: 'cover' }}
+                      onError={(e) => { e.currentTarget.style.opacity = '0'; }}
+                    />
+                  ) : (
+                    <div key={t.key} style={{ width: '256px', height: '256px' }} />
+                  )
+                )}
+              </div>
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#0369a1', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                <MapPin size={26} />
+                <span>{locating ? 'Locating GPS coordinates...' : 'Tap "Use Current GPS" or enter coordinates'}</span>
+              </div>
             )}
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.3rem' }}>
-            <button type="button" onClick={onClose} style={{ ...primaryBtnStyle, background: 'rgba(148,163,184,0.15)' }}>Cancel</button>
-            <button type="submit" style={primaryBtnStyle}>Send Location</button>
+
+            {previewTiles && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -85%)',
+                  zIndex: 2,
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: isLive ? '#16a34a' : '#ef4444',
+                  border: '3px solid #ffffff',
+                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <MapPin size={16} color="#ffffff" />
+              </div>
+            )}
+
+            {isLive && (
+              <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px', borderRadius: '999px', background: '#16a34a', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#bbf7d0' }} /> LIVE
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={detectGPS}
+              disabled={locating}
+              style={{
+                position: 'absolute',
+                bottom: '8px',
+                right: '8px',
+                zIndex: 3,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '5px 10px',
+                borderRadius: '8px',
+                background: 'rgba(15, 23, 42, 0.86)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <Navigation size={13} color="#4ade80" /> {locating ? 'Detecting...' : 'Use Current GPS'}
+            </button>
+          </div>
+
+          {geoErr && <div style={{ color: '#fbbf24', fontSize: '0.76rem' }}>{geoErr}</div>}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Latitude</div>
+              <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="21.1702" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Longitude</div>
+              <input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="72.8311" style={inputStyle} />
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Location Title</div>
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Factory Gate 2 / Current Location" style={inputStyle} />
+          </div>
+
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Address / Landmark (optional)</div>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Auto-filled from GPS or enter landmark" style={inputStyle} />
+          </div>
+
+          {/* Live Location Toggle + Duration Pills */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.5rem 0.65rem', borderRadius: '10px', background: 'rgba(148, 163, 184, 0.1)', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+              <input type="checkbox" checked={isLive} onChange={(e) => setIsLive(e.target.checked)} />
+              <span>Share Live Location</span>
+            </label>
+            {isLive && (
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[
+                  { mins: 15, text: '15m' },
+                  { mins: 60, text: '1h' },
+                  { mins: 480, text: '8h' },
+                ].map((opt) => (
+                  <button
+                    key={opt.mins}
+                    type="button"
+                    onClick={() => setLiveMinutes(opt.mins)}
+                    style={{
+                      padding: '4px 9px',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: liveMinutes === opt.mins ? '1px solid #16a34a' : '1px solid rgba(148, 163, 184, 0.3)',
+                      background: liveMinutes === opt.mins ? '#16a34a' : 'transparent',
+                      color: liveMinutes === opt.mins ? '#ffffff' : 'inherit',
+                    }}
+                  >
+                    {opt.text}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.2rem' }}>
+            <button type="button" onClick={onClose} style={{ ...primaryBtnStyle, background: 'rgba(148,163,184,0.18)', color: 'inherit' }}>Cancel</button>
+            <button type="submit" style={{ ...primaryBtnStyle, background: isLive ? '#16a34a' : '#2563eb' }}>
+              <MapPin size={15} /> {isLive ? 'Share Live Location' : 'Send Location'}
+            </button>
           </div>
         </form>
       </div>
@@ -803,32 +994,7 @@ export const LocationBubbleCard = ({ locationMeta }) => {
   const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
   const isLiveActive = locationMeta.isLive && (!locationMeta.liveExpiresAt || new Date(locationMeta.liveExpiresAt) > new Date());
 
-  // Compute Web Mercator tile coordinates (z=15) so the exact GPS point sits dead-center under the pin
-  let tileGrid = null;
-  if (hasCoords) {
-    const z = 15;
-    const n = Math.pow(2, z);
-    const clampedLat = Math.max(-85, Math.min(85, lat));
-    const latRad = (clampedLat * Math.PI) / 180;
-    const xFloat = ((lng + 180) / 360) * n;
-    const yFloat = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
-    const tx = Math.floor(xFloat);
-    const ty = Math.floor(yFloat);
-    const fracX = xFloat - tx;
-    const fracY = yFloat - ty;
-    const tiles = [];
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        const cx = ((tx + dx) % n + n) % n;
-        const cy = ty + dy;
-        tiles.push({
-          key: `${dx}_${dy}`,
-          url: cy >= 0 && cy < n ? `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${cx}/${cy}@2x.png` : null,
-        });
-      }
-    }
-    tileGrid = { tiles, fracX, fracY };
-  }
+  const tileGrid = buildMercatorTileGrid(lat, lng, 15);
 
   return (
     <a
