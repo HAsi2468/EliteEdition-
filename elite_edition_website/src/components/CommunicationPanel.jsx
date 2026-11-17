@@ -3148,7 +3148,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (res.success && res.data) {
         const dmRoom = res.data;
         setShowNewDmModal(false);
-        setRosterTab('direct');
+        setRosterTab('all');
         setActiveGroup(dmRoom);
         setGroups((prev) => {
           const exists = prev.some((g) => String(g._id) === String(dmRoom._id));
@@ -5271,9 +5271,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     });
 
     let baseItems = [];
-    if (phoenixFilter === 'groups' || rosterTab === 'groups') {
+    if (phoenixFilter === 'groups') {
       baseItems = groups.filter((g) => g.type !== 'direct');
-    } else if (phoenixFilter === 'direct' || phoenixFilter === 'personal' || rosterTab === 'direct') {
+    } else if (phoenixFilter === 'direct' || phoenixFilter === 'personal') {
       baseItems = groups.filter((g) => g.type === 'direct');
     } else {
       // 'all': WhatsApp style: ALL active groups and active DMs merged together
