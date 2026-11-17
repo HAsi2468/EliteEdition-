@@ -54,12 +54,25 @@ export async function decryptRoomMessage(encryptedPayload, roomId) {
   }
 }
 
-/* ── Custom Per-Chat Web Audio Tone Synthesizer ── */
+/* ── Custom Per-Chat Web Audio Tone Synthesizer (100% Free Built-in) ── */
 export const CHAT_TONES = [
-  { key: 'default', label: 'Default Pop', freqs: [520, 680] },
-  { key: 'chime', label: 'Crystal Chime', freqs: [880, 1175] },
-  { key: 'bell', label: 'Soft Bell', freqs: [660, 990] },
-  { key: 'pulse', label: 'Digital Pulse', freqs: [440, 554, 659] },
+  { key: 'default', label: 'Default Pop', freqs: [520, 680], type: 'sine', step: 0.08, dur: 0.16, vol: 0.08 },
+  { key: 'chime', label: 'Crystal Chime', freqs: [880, 1175], type: 'sine', step: 0.08, dur: 0.18, vol: 0.08 },
+  { key: 'bell', label: 'Soft Bell', freqs: [660, 990], type: 'sine', step: 0.09, dur: 0.22, vol: 0.08 },
+  { key: 'pulse', label: 'Digital Pulse', freqs: [440, 554, 659], type: 'triangle', step: 0.07, dur: 0.15, vol: 0.08 },
+  { key: 'aurora', label: 'Aurora Harp', freqs: [523, 659, 784, 1047], type: 'sine', step: 0.065, dur: 0.20, vol: 0.075 },
+  { key: 'droplet', label: 'Water Droplet', freqs: [740, 1109], type: 'sine', step: 0.055, dur: 0.13, vol: 0.085 },
+  { key: 'marimba', label: 'Warm Marimba', freqs: [392, 523, 659], type: 'triangle', step: 0.08, dur: 0.18, vol: 0.09 },
+  { key: 'chord', label: 'Glass Chord', freqs: [587, 740, 880], type: 'sine', step: 0.04, dur: 0.24, vol: 0.07 },
+  { key: 'ping', label: 'Sonar Ping', freqs: [1047, 1319], type: 'sine', step: 0.09, dur: 0.20, vol: 0.07 },
+  { key: 'sparkle', label: 'Sparkle Rising', freqs: [659, 784, 988, 1319], type: 'sine', step: 0.055, dur: 0.16, vol: 0.07 },
+  { key: 'knock', label: 'Soft Knock', freqs: [260, 330], type: 'triangle', step: 0.07, dur: 0.11, vol: 0.10 },
+  { key: 'whistle', label: 'Airy Whistle', freqs: [988, 1175, 1397], type: 'sine', step: 0.075, dur: 0.17, vol: 0.065 },
+  { key: 'cosmic', label: 'Cosmic Synth', freqs: [330, 494, 659, 988], type: 'triangle', step: 0.07, dur: 0.22, vol: 0.075 },
+  { key: 'retro', label: 'Retro Arcade', freqs: [523, 659, 784], type: 'square', step: 0.065, dur: 0.12, vol: 0.035 },
+  { key: 'alert', label: 'Urgent Double', freqs: [880, 880, 1175], type: 'triangle', step: 0.09, dur: 0.14, vol: 0.085 },
+  { key: 'zen', label: 'Zen Bowl', freqs: [432, 648], type: 'sine', step: 0.11, dur: 0.32, vol: 0.085 },
+  { key: 'breeze', label: 'Morning Breeze', freqs: [587, 659, 784, 988], type: 'sine', step: 0.07, dur: 0.19, vol: 0.07 },
   { key: 'silent', label: 'Silent (No Sound)', freqs: [] },
 ];
 
@@ -70,18 +83,22 @@ export function playRoomNotificationTone(toneKey = 'default') {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
-    let t = ctx.currentTime;
+    const t = ctx.currentTime;
+    const step = tone.step || 0.08;
+    const dur = tone.dur || 0.16;
+    const vol = tone.vol || 0.08;
+    const oscType = tone.type || 'sine';
     tone.freqs.forEach((f, idx) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, t + idx * 0.08);
-      gain.gain.setValueAtTime(0.08, t + idx * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.08 + 0.16);
+      osc.type = oscType;
+      osc.frequency.setValueAtTime(f, t + idx * step);
+      gain.gain.setValueAtTime(vol, t + idx * step);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + idx * step + dur);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(t + idx * 0.08);
-      osc.stop(t + idx * 0.08 + 0.17);
+      osc.start(t + idx * step);
+      osc.stop(t + idx * step + dur + 0.01);
     });
   } catch {}
 }
@@ -443,7 +460,7 @@ export const CustomToneModal = ({ roomName, currentTone = 'default', onSelectTon
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '1rem', maxHeight: '52vh', overflowY: 'auto', paddingRight: '4px' }}>
           {CHAT_TONES.map((t) => (
             <button
               key={t.key}
