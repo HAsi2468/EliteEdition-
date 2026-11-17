@@ -3166,10 +3166,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const handleReplyPrivately = async (msg) => {
+    const rawSender = msg?.senderId ?? msg?.sender;
     const senderId =
-      msg?.sender?._id ||
-      msg?.sender?.id ||
-      (typeof msg?.sender === 'string' ? msg.sender : null);
+      typeof rawSender === 'object' && rawSender !== null
+        ? rawSender._id || rawSender.id
+        : typeof rawSender === 'string'
+        ? rawSender
+        : null;
+    const senderName =
+      (typeof rawSender === 'object' && rawSender !== null ? rawSender.name || rawSender.username : null) ||
+      msg?.senderName ||
+      'Staff Member';
     const myId = currentUser?._id || currentUser?.id;
     if (!senderId || String(senderId) === String(myId)) {
       if (typeof window !== 'undefined' && window.showToast) {
@@ -3181,10 +3188,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       ...msg,
       _replyPrivatelyFromGroup: activeGroup?.name || 'Group Chat',
     };
-    await handleStartDirectChat({ _id: senderId, name: msg?.sender?.name });
+    await handleStartDirectChat({ _id: senderId, name: senderName });
     setReplyToMessage(quotedPreview);
     if (typeof window !== 'undefined' && window.showToast) {
-      window.showToast(`Replying privately to ${msg?.sender?.name || 'member'}`, 'success');
+      window.showToast(`Replying privately to ${senderName}`, 'success');
     }
   };
 
@@ -7144,7 +7151,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     <span>Star / Unstar</span>
                                   </button>
 
-                                  {String(msg?.sender?._id || msg?.sender?.id || msg?.sender || '') !== String(currentUser?._id || currentUser?.id || '') && (
+                                  {(() => {
+                                    const sRaw = msg?.senderId ?? msg?.sender;
+                                    const sId = typeof sRaw === 'object' && sRaw !== null ? (sRaw._id || sRaw.id) : sRaw;
+                                    const mId = currentUser?._id || currentUser?.id;
+                                    return Boolean(sId) && String(sId) !== String(mId || '');
+                                  })() && (
                                     <button
                                       type="button"
                                       onClick={() => {
