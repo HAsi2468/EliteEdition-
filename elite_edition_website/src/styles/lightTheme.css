@@ -2,8 +2,8 @@
  * Elite ERP - Daylight Frosted Glass Theme (Light Mode) & Small-Screen Readability Guardrails
  *
  * Activated when <html data-theme="light"> and <body class="light-theme-active">.
- * Ensures 100% WCAG-readable dark-slate typography on crisp daylight glass surfaces,
- * including overrides for components with hardcoded dark inline styles.
+ * Ensures 100% WCAG-readable dark-slate typography on crisp daylight glass surfaces
+ * across all screens, modals, drawers, filter popovers, chat, task manager, and tables.
  */
 
 html[data-theme="light"],
@@ -90,7 +90,7 @@ body.light-theme-active #root {
 
 /* Header, Sidebar & Glass Containers */
 body.light-theme-active .app-header {
-  background: rgba(255, 255, 255, 0.90) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   border-bottom: 1px solid #cbd5e1 !important;
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
   color: #0f172a !important;
@@ -98,7 +98,7 @@ body.light-theme-active .app-header {
 
 body.light-theme-active .glass-panel,
 body.light-theme-active .glass-card {
-  background: rgba(255, 255, 255, 0.92) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
   border-color: rgba(148, 163, 184, 0.35) !important;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07) !important;
   color: #0f172a !important;
@@ -126,7 +126,7 @@ body.light-theme-active .glass-title-icon {
 }
 
 body.light-theme-active .glass-subtabs-bar {
-  background: rgba(255, 255, 255, 0.90) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   border: 1px solid #cbd5e1 !important;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05) !important;
 }
@@ -145,7 +145,7 @@ body.light-theme-active .glass-subtab-btn.active {
 }
 
 body.light-theme-active .glass-calc-card {
-  background: rgba(255, 255, 255, 0.94) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   border: 1px solid #cbd5e1 !important;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
 }
@@ -165,7 +165,7 @@ body.light-theme-active .glass-calc-sub {
 /* Sidebar Navigation & Top Company Switcher */
 body.light-theme-active .sidebar-wrap,
 body.light-theme-active aside#erp-sidebar-nav {
-  background: rgba(255, 255, 255, 0.94) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   border: 1px solid #cbd5e1 !important;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
   color: #0f172a !important;
@@ -241,7 +241,7 @@ body.light-theme-active .nav-item.active {
   color: #ffffff !important;
 }
 
-/* Inputs, Selects, Textareas & Buttons */
+/* Inputs, Selects, Textareas & Standard Buttons */
 body.light-theme-active input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not(.printable-area *),
 body.light-theme-active select:not(.printable-area *),
 body.light-theme-active textarea:not(.printable-area *) {
@@ -272,16 +272,143 @@ body.light-theme-active .btn-secondary:hover {
   color: #0f172a !important;
 }
 
+/* Filter Popover, Date Picker, Modals, Drawers & Enterprise Toolbars */
+body.light-theme-active .ufp-trigger-btn,
 body.light-theme-active .daterange-trigger-btn,
-body.light-theme-active .unified-filter-trigger {
+body.light-theme-active .unified-filter-trigger,
+body.light-theme-active .changelog-trigger-btn {
   background: #ffffff !important;
   color: #0f172a !important;
   border: 1px solid #cbd5e1 !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
 }
 
+body.light-theme-active .ufp-trigger-btn:hover,
+body.light-theme-active .daterange-trigger-btn:hover {
+  background: #f8fafc !important;
+  border-color: #3b82f6 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .ufp-trigger-btn.ufp-active {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  color: #1d4ed8 !important;
+}
+
+body.light-theme-active .ufp-trigger-btn *,
 body.light-theme-active .daterange-trigger-btn *,
 body.light-theme-active .unified-filter-trigger * {
+  color: inherit !important;
+}
+
+body.light-theme-active .ufp-trigger-btn .ufp-badge {
+  color: #ffffff !important;
+}
+
+body.light-theme-active .ufp-popover,
+body.light-theme-active .ufp-options-panel,
+body.light-theme-active .changelog-drawer-header,
+body.light-theme-active .changelog-item-card,
+body.light-theme-active .changelog-breakdown,
+body.light-theme-active .mini-thumb-box,
+body.light-theme-active .mini-popover-box,
+body.light-theme-active .keyboard-modal-container,
+body.light-theme-active .keyboard-modal-header,
+body.light-theme-active .keyboard-column,
+body.light-theme-active .keyboard-shortcut-row,
+body.light-theme-active .keyboard-modal-footer,
+body.light-theme-active .shortcut-modal-dialog,
+body.light-theme-active .shortcut-search-bar,
+body.light-theme-active .selection-aggregate-dock {
+  background: rgba(255, 255, 255, 0.97) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.light-theme-active .ufp-sidebar,
+body.light-theme-active .changelog-media-slot,
+body.light-theme-active .keyboard-modal-search-wrapper,
+body.light-theme-active kbd.keycap,
+body.light-theme-active .selection-dock-btn {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.light-theme-active .ufp-popover *,
+body.light-theme-active .keyboard-modal-container *,
+body.light-theme-active .shortcut-modal-dialog *,
+body.light-theme-active .changelog-item-card * {
+  color: #0f172a;
+}
+
+/* Task Manager, Communication, Fabric, Fusing, Infra & Myntra Modules */
+body.light-theme-active .task-unified-header,
+body.light-theme-active .task-kanban-col,
+body.light-theme-active .task-card-status-group,
+body.light-theme-active .task-mobile-col-bar,
+body.light-theme-active .phoenix-chat-layout,
+body.light-theme-active .phoenix-chat-main,
+body.light-theme-active .comm-sidebar,
+body.light-theme-active .comm-chat-area,
+body.light-theme-active .comm-chat-header,
+body.light-theme-active .comm-input-area,
+body.light-theme-active .fabric-header-card,
+body.light-theme-active .challan-modal-box,
+body.light-theme-active .challan-col-right,
+body.light-theme-active .inward-tp-modal-box,
+body.light-theme-active .fusing-header-section,
+body.light-theme-active .fusing-metric-card,
+body.light-theme-active .fusing-filters-wrapper,
+body.light-theme-active .fusing-desktop-table-wrapper,
+body.light-theme-active .fusing-sticky-col-cell,
+body.light-theme-active .fusing-card,
+body.light-theme-active .fusing-pagination-bar,
+body.light-theme-active .fusing-entry-card,
+body.light-theme-active .fusing-wastage-matrix,
+body.light-theme-active .infra-tabs-bar,
+body.light-theme-active .infra-kpi-card,
+body.light-theme-active .infra-toolbar,
+body.light-theme-active .infra-table-wrapper,
+body.light-theme-active .infra-drawer-content,
+body.light-theme-active .infra-metric-tile,
+body.light-theme-active .infra-modal-content,
+body.light-theme-active .myntra-card-container,
+body.light-theme-active .myntra-stage-item,
+body.light-theme-active .myntra-table-container,
+body.light-theme-active .myntra-vault-banner,
+body.light-theme-active .myntra-modal {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .task-col-count,
+body.light-theme-active .task-due-chip,
+body.light-theme-active .task-subtask-track,
+body.light-theme-active .task-card-status-select,
+body.light-theme-active .task-btn-secondary,
+body.light-theme-active .task-card-action-btn,
+body.light-theme-active .phoenix-search-box,
+body.light-theme-active .phoenix-tab-segmented,
+body.light-theme-active .phoenix-mobile-back-btn,
+body.light-theme-active .phoenix-action-btn-neutral,
+body.light-theme-active .phoenix-date-badge,
+body.light-theme-active .phoenix-msg-row.incoming .phoenix-msg-bubble,
+body.light-theme-active .phoenix-msg-quote,
+body.light-theme-active .phoenix-msg-actions,
+body.light-theme-active .fabric-tab-chip,
+body.light-theme-active .challan-mobile-tab-btn,
+body.light-theme-active .inward-tp-meta-banner,
+body.light-theme-active .inward-tp-tools-bar,
+body.light-theme-active .inward-tp-table-header,
+body.light-theme-active .infra-btn-secondary,
+body.light-theme-active .infra-badge-neutral,
+body.light-theme-active .myntra-btn-outline,
+body.light-theme-active .myntra-btn-subtle {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
   color: #0f172a !important;
 }
 
@@ -307,18 +434,21 @@ body.light-theme-active table tbody tr:hover {
 }
 
 /* Hardcoded Dark Inline Backgrounds -> Crisp Light Glass Surfaces */
-body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):not([style*="linear-gradient"]):is(
+body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is(
   [style*="15, 23, 42"],
   [style*="11, 17, 32"],
   [style*="30, 41, 59"],
+  [style*="51, 65, 85"],
   [style*="17, 24, 39"],
   [style*="2, 6, 23"],
   [style*="15,23,42"],
   [style*="11,17,32"],
   [style*="30,41,59"],
+  [style*="51,65,85"],
   [style*="#0f172a"],
   [style*="#0b1120"],
   [style*="#1e293b"],
+  [style*="#334155"],
   [style*="#111827"],
   [style*="#020617"],
   [style*="#090f1d"]
@@ -329,8 +459,8 @@ body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, 
   border-color: #cbd5e1 !important;
 }
 
-/* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text (unless inside solid/accent buttons) */
-body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd, button, select):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.company-segment-pill.active *):not(.nav-item.active):not(.nav-item.active *):not(.glass-subtab-btn.active):not(.glass-subtab-btn.active *):not(aside#erp-sidebar-nav button.active *):not(aside#erp-sidebar-nav button[aria-current="page"] *):not([style*="linear-gradient"]):not([style*="linear-gradient"] *):not([style*="background: rgb(37, 99, 235)"]):not([style*="background: #2563eb"]):not([style*="background-color: #2563eb"]):not([style*="background: #ef4444"]):not([style*="background: #10b981"]):not([style*="background: #059669"]):is(
+/* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text */
+body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd, button, select):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.nav-item.active):not(.glass-subtab-btn.active):is(
   [style*="color: rgb(255, 255, 255)"],
   [style*="color: rgba(255, 255, 255"],
   [style*="color:rgb(255,255,255)"],
@@ -355,57 +485,62 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
   color: #0f172a !important;
 }
 
-/* Dark-mode pastel inline text colors -> high-contrast readable shades on light backgrounds (hex + React rgb()) */
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):not([style*="linear-gradient"]):is(
+/* Dark-mode pastel inline text colors -> high-contrast readable shades on light backgrounds */
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"], [style*="color: #38bdf8"],
   [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(125, 211, 252)"], [style*="color: rgb(186, 230, 253)"], [style*="color: rgb(56, 189, 248)"]
 ) {
   color: #1d4ed8 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #6ee7b7"], [style*="color: #86efac"], [style*="color: #34d399"],
   [style*="color: rgb(110, 231, 183)"], [style*="color: rgb(134, 239, 172)"], [style*="color: rgb(52, 211, 153)"]
 ) {
   color: #047857 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #fcd34d"], [style*="color: #fde68a"], [style*="color: #fbbf24"],
   [style*="color: rgb(252, 211, 77)"], [style*="color: rgb(253, 230, 138)"], [style*="color: rgb(251, 191, 36)"]
 ) {
   color: #b45309 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #fca5a5"], [style*="color: #fecaca"], [style*="color: #f87171"],
   [style*="color: rgb(252, 165, 165)"], [style*="color: rgb(254, 202, 202)"], [style*="color: rgb(248, 113, 113)"]
 ) {
   color: #b91c1c !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #c4b5fd"], [style*="color: #ddd6fe"], [style*="color: #a78bfa"],
   [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(167, 139, 250)"]
 ) {
   color: #6d28d9 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
   [style*="color: #94a3b8"], [style*="color: rgb(148, 163, 184)"],
   [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"], [style*="color: rgba(255, 255, 255, 0.5"]
 ) {
   color: #475569 !important;
 }
 
-/* Task Manager & Communication Panel Light Mode */
-body.light-theme-active .task-manager-root,
-body.light-theme-active .comm-container {
-  color: #0f172a !important;
-}
-
-body.light-theme-active .comm-sidebar,
-body.light-theme-active .comm-chat-area,
-body.light-theme-active .comm-chat-header,
-body.light-theme-active .comm-input-area {
-  background: rgba(255, 255, 255, 0.94) !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+/* Preserve Crisp White Text on Solid Gradient / Primary Action Buttons & Active Sidebar Items */
+body.light-theme-active .btn-primary,
+body.light-theme-active .btn-primary *,
+body.light-theme-active .nav-item.active,
+body.light-theme-active .nav-item.active *,
+body.light-theme-active .glass-subtab-btn.active,
+body.light-theme-active .glass-subtab-btn.active *,
+body.light-theme-active aside#erp-sidebar-nav button.active,
+body.light-theme-active aside#erp-sidebar-nav button.active *,
+body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
+body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
+body.light-theme-active button[style*="linear-gradient"],
+body.light-theme-active button[style*="linear-gradient"] *,
+body.light-theme-active button[style*="background: rgb(37, 99, 235)"],
+body.light-theme-active button[style*="background: rgb(37, 99, 235)"] *,
+body.light-theme-active button[style*="background: #2563eb"],
+body.light-theme-active button[style*="background: #2563eb"] * {
+  color: #ffffff !important;
 }
 
 /* Light Scrollbar */
@@ -456,7 +591,6 @@ body.light-theme-active ::-webkit-scrollbar-thumb:hover {
     padding: 8px 10px !important;
   }
 
-  /* Ensure small helper/caption text never becomes microscopic on small screens */
   .glass-calc-title {
     font-size: 0.72rem !important;
   }
