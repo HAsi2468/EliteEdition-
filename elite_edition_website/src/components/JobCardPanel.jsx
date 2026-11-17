@@ -233,7 +233,7 @@ function WorkflowStageBadge({ card }) {
   }
 
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'rgba(148, 163, 184, 0.16)', color:'#e2e8f0', border:'1px solid rgba(148, 163, 184, 0.3)', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title="Job Card created. Next stage: Printing Log">
+    <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'3px 8px', borderRadius:'6px', background:'rgba(148, 163, 184, 0.16)', color:'var(--text-secondary)', border:'1px solid rgba(148, 163, 184, 0.3)', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' }} title="Job Card created. Next stage: Printing Log">
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8' }} />
       1. Printing Pending
     </span>

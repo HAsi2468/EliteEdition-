@@ -272,6 +272,19 @@ body.light-theme-active .btn-secondary:hover {
   color: #0f172a !important;
 }
 
+body.light-theme-active .daterange-trigger-btn,
+body.light-theme-active .unified-filter-trigger {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+body.light-theme-active .daterange-trigger-btn *,
+body.light-theme-active .unified-filter-trigger * {
+  color: #0f172a !important;
+}
+
 /* Tables */
 body.light-theme-active .table-container {
   background: rgba(255, 255, 255, 0.96) !important;
@@ -294,12 +307,15 @@ body.light-theme-active table tbody tr:hover {
 }
 
 /* Hardcoded Dark Inline Backgrounds -> Crisp Light Glass Surfaces */
-body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):is(
+body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):not([style*="linear-gradient"]):is(
   [style*="15, 23, 42"],
   [style*="11, 17, 32"],
   [style*="30, 41, 59"],
   [style*="17, 24, 39"],
   [style*="2, 6, 23"],
+  [style*="15,23,42"],
+  [style*="11,17,32"],
+  [style*="30,41,59"],
   [style*="#0f172a"],
   [style*="#0b1120"],
   [style*="#1e293b"],
@@ -314,14 +330,17 @@ body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, 
 }
 
 /* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text (unless inside solid/accent buttons) */
-body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.company-segment-pill.active *):not(.nav-item.active):not(.nav-item.active *):not(.glass-subtab-btn.active):not(.glass-subtab-btn.active *):not(aside#erp-sidebar-nav button.active *):not(aside#erp-sidebar-nav button[aria-current="page"] *):not([style*="linear-gradient"]):not([style*="linear-gradient"] *):not([style*="background: rgb(37, 99, 235)"]):not([style*="background: #2563eb"]):not([style*="background-color: #2563eb"]):not([style*="background: #ef4444"]):not([style*="background: #10b981"]):not([style*="background: #059669"]):is(
+body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd, button, select):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.company-segment-pill.active *):not(.nav-item.active):not(.nav-item.active *):not(.glass-subtab-btn.active):not(.glass-subtab-btn.active *):not(aside#erp-sidebar-nav button.active *):not(aside#erp-sidebar-nav button[aria-current="page"] *):not([style*="linear-gradient"]):not([style*="linear-gradient"] *):not([style*="background: rgb(37, 99, 235)"]):not([style*="background: #2563eb"]):not([style*="background-color: #2563eb"]):not([style*="background: #ef4444"]):not([style*="background: #10b981"]):not([style*="background: #059669"]):is(
   [style*="color: rgb(255, 255, 255)"],
   [style*="color: rgba(255, 255, 255"],
+  [style*="color:rgb(255,255,255)"],
+  [style*="color:rgba(255,255,255"],
   [style*="color: rgb(248, 250, 252)"],
   [style*="color: rgba(248, 250, 252"],
   [style*="color: rgb(241, 245, 249)"],
   [style*="color: rgba(241, 245, 249"],
   [style*="color: rgb(226, 232, 240)"],
+  [style*="color:rgb(226,232,240)"],
   [style*="color: rgba(226, 232, 240"],
   [style*="color: rgb(203, 213, 225)"],
   [style*="color: rgba(203, 213, 225"],
