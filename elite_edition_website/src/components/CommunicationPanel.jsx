@@ -3165,6 +3165,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  const handleReplyPrivately = async (msg) => {
+    const senderId =
+      msg?.sender?._id ||
+      msg?.sender?.id ||
+      (typeof msg?.sender === 'string' ? msg.sender : null);
+    const myId = currentUser?._id || currentUser?.id;
+    if (!senderId || String(senderId) === String(myId)) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('You can only reply privately to another member’s message.', 'info');
+      }
+      return;
+    }
+    const quotedPreview = {
+      ...msg,
+      _replyPrivatelyFromGroup: activeGroup?.name || 'Group Chat',
+    };
+    await handleStartDirectChat({ _id: senderId, name: msg?.sender?.name });
+    setReplyToMessage(quotedPreview);
+    if (typeof window !== 'undefined' && window.showToast) {
+      window.showToast(`Replying privately to ${msg?.sender?.name || 'member'}`, 'success');
+    }
+  };
+
   const handleOpenCreateGroupModal = async () => {
     setShowCreateGroupModal(true);
     setLoadingUsers(true);
@@ -7121,17 +7144,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     <span>Star / Unstar</span>
                                   </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setThreadParentMsg(msg);
-                                      setActiveMsgMenuId(null);
-                                    }}
-                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
-                                  >
-                                    <MessageSquare size={14} color="#38bdf8" />
-                                    <span>Reply in Thread</span>
-                                  </button>
+                                  {String(msg?.sender?._id || msg?.sender?.id || msg?.sender || '') !== String(currentUser?._id || currentUser?.id || '') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMsgMenuId(null);
+                                        handleReplyPrivately(msg);
+                                      }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                    >
+                                      <Lock size={14} color="#38bdf8" />
+                                      <span>Reply Privately</span>
+                                    </button>
+                                  )}
 
                                   <button
                                     type="button"
