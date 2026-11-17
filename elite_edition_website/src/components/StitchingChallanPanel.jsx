@@ -316,7 +316,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
           <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
             Garment Challans
           </span>
-          <EntityBrandBadge />
+          <EntityBrandBadge entityId="Elite Stitching" />
         </div>
 
         {/* Entry Buttons Top in Header */}
