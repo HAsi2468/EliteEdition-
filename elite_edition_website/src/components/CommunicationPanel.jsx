@@ -7304,23 +7304,48 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               </div>
                             )}
 
-                            {/* Quoted Reply Card (Click to jump) */}
+                            {/* Quoted Reply Card (Click to jump — supports both same-room and cross-room Reply Privately) */}
                             {msg.replyTo && (
                               <div
-                                onClick={() => {
+                                onClick={async () => {
                                   const targetId = msg.replyTo?._id || msg.replyTo?.id || (typeof msg.replyTo === 'string' ? msg.replyTo : null);
-                                  if (targetId) {
-                                    const el = document.getElementById(`msg_${targetId}`);
-                                    if (el) {
-                                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  if (!targetId) return;
+                                  const highlightEl = (el) => {
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    el.classList.remove('reply-jump-pulse');
+                                    void el.offsetWidth;
+                                    el.classList.add('reply-jump-pulse');
+                                    setTimeout(() => {
                                       el.classList.remove('reply-jump-pulse');
-                                      void el.offsetWidth; // Force CSS reflow to re-trigger animation
-                                      el.classList.add('reply-jump-pulse');
-                                      setTimeout(() => {
-                                        el.classList.remove('reply-jump-pulse');
-                                      }, 1700);
+                                    }, 1700);
+                                  };
+                                  const replyRoomId = msg.replyTo?.roomId?._id || msg.replyTo?.roomId;
+                                  if (replyRoomId && String(replyRoomId) !== String(activeGroup?._id || '')) {
+                                    const targetRoom = groups.find((g) => String(g._id) === String(replyRoomId));
+                                    if (targetRoom) {
+                                      setPhoenixFilter('all');
+                                      setRosterTab('all');
+                                      setActiveGroup(targetRoom);
+                                      if (socket && targetRoom._id) {
+                                        socket.emit('join-room', targetRoom._id);
+                                      }
+                                      await fetchGroupMessages(targetRoom._id, msgFilter, true);
+                                      let tries = 0;
+                                      const waitAndJump = () => {
+                                        const el = document.getElementById(`msg_${targetId}`);
+                                        if (el) {
+                                          highlightEl(el);
+                                        } else if (tries < 20) {
+                                          tries += 1;
+                                          setTimeout(waitAndJump, 100);
+                                        }
+                                      };
+                                      setTimeout(waitAndJump, 120);
+                                      return;
                                     }
                                   }
+                                  const el = document.getElementById(`msg_${targetId}`);
+                                  if (el) highlightEl(el);
                                 }}
                                 style={{
                                   cursor: 'pointer',
@@ -7340,6 +7365,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               >
                                 <div style={{ fontWeight: 700, color: isMe ? '#ffffff' : '#2563eb', fontSize: '0.7rem', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                                   {typeof msg.replyTo.senderId === 'object' ? (msg.replyTo.senderId.name || msg.replyTo.senderId.username) : 'Staff Member'}
+                                  {(() => {
+                                    const rRoomId = msg.replyTo?.roomId?._id || msg.replyTo?.roomId;
+                                    if (!rRoomId || String(rRoomId) === String(activeGroup?._id || '')) return null;
+                                    const srcGrp = groups.find((g) => String(g._id) === String(rRoomId));
+                                    return srcGrp?.name ? ` • ${srcGrp.name}` : ' • Group';
+                                  })()}
                                 </div>
                                 <div style={{
                                   color: isMe ? 'rgba(255,255,255,0.92)' : '#475569',

@@ -682,7 +682,7 @@ html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoe
   color: #ffffff !important;
 }
 
-html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble > :not(.phoenix-location-card):not([class*="card"]) {
+html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble *:not(.phoenix-location-card):not(.phoenix-location-card *) {
   color: #ffffff !important;
 }
 
