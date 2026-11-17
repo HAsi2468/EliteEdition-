@@ -496,6 +496,9 @@ body.light-theme-active .infra-badge-neutral,
 body.light-theme-active .myntra-btn-outline,
 body.light-theme-active .myntra-btn-subtle,
 body.light-theme-active .erp-hud-pill,
+body.light-theme-active .erp-hud-key,
+body.light-theme-active .erp-hotkey-hud kbd,
+body.light-theme-active kbd:not(.printable-area *):not(.btn-primary *),
 body.light-theme-active .erp-cheat-sheet-key,
 body.light-theme-active .erp-cheat-sheet-search,
 body.light-theme-active .quicklook-btn,
@@ -671,6 +674,35 @@ body.light-theme-active button[style*="background: rgb(37, 99, 235)"] *,
 body.light-theme-active button[style*="background: #2563eb"],
 body.light-theme-active button[style*="background: #2563eb"] * {
   color: #ffffff !important;
+}
+
+/* Light Mode Company Switch Curtain & Loading Shimmers */
+body.light-theme-active .erp-brand-curtain {
+  background: radial-gradient(circle at 50% 38%, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.16) 0%, rgba(241, 245, 249, 0.88) 55%, rgba(226, 232, 240, 0.95) 100%) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+body.light-theme-active .erp-brand-curtain-card {
+  background: rgba(255, 255, 255, 0.86) !important;
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .erp-brand-curtain-card > div:nth-child(2) {
+  background: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.12) !important;
+  border: 1.5px solid rgba(var(--entity-accent-rgb, 37, 99, 235), 0.45) !important;
+  color: var(--entity-accent, #2563eb) !important;
+  box-shadow: 0 8px 24px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.18) !important;
+}
+
+body.light-theme-active .erp-shimmer-box,
+body.light-theme-active .skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.65) 0%, rgba(255, 255, 255, 0.92) 50%, rgba(226, 232, 240, 0.65) 100%) !important;
+  background-size: 200% 100% !important;
 }
 
 /* Light Scrollbar */
