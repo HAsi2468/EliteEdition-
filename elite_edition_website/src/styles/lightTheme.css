@@ -178,6 +178,80 @@ body.light-theme-active .glass-subtab-btn.active {
   color: #ffffff !important;
 }
 
+body.light-theme-active .glass-screen-subtitle {
+  color: #475569 !important;
+}
+
+body.light-theme-active .glass-view-toggle {
+  background: rgba(241, 245, 249, 0.90) !important;
+  border: 1px solid rgba(148, 163, 184, 0.40) !important;
+}
+
+body.light-theme-active .glass-view-toggle button {
+  color: #475569 !important;
+  background: transparent !important;
+}
+
+body.light-theme-active .glass-view-toggle button:hover {
+  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+}
+
+body.light-theme-active .glass-view-toggle button.active {
+  background: #ffffff !important;
+  color: var(--entity-accent, #2563eb) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.10) !important;
+}
+
+body.light-theme-active .glass-card-item {
+  background: rgba(255, 255, 255, 0.84) !important;
+  border: 1px solid rgba(148, 163, 184, 0.34) !important;
+  box-shadow: var(--glass-shadow-sm) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-card-item:hover {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.42) !important;
+}
+
+body.light-theme-active .glass-button {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid rgba(148, 163, 184, 0.40) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .glass-button:hover {
+  background: #ffffff !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.45) !important;
+}
+
+body.light-theme-active .ent-tab-bar,
+body.light-theme-active .ops-action-bar {
+  background: rgba(255, 255, 255, 0.76) !important;
+  border: 1px solid rgba(148, 163, 184, 0.34) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .ent-tab-btn,
+body.light-theme-active .ops-action-btn {
+  background: rgba(241, 245, 249, 0.86) !important;
+  border: 1px solid rgba(148, 163, 184, 0.36) !important;
+  color: #1e293b !important;
+}
+
+body.light-theme-active .ent-tab-btn:hover,
+body.light-theme-active .ops-action-btn:hover {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active footer.zero-mouse-bar.glass-dock {
+  background: rgba(255, 255, 255, 0.84) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.34) !important;
+  color: #0f172a !important;
+}
+
 body.light-theme-active .glass-calc-card {
   background: rgba(255, 255, 255, 0.76) !important;
   backdrop-filter: blur(18px) saturate(170%) !important;
@@ -732,20 +806,36 @@ body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, 
   [style*="30, 41, 59"],
   [style*="51, 65, 85"],
   [style*="17, 24, 39"],
+  [style*="31, 41, 55"],
+  [style*="55, 65, 81"],
+  [style*="24, 24, 27"],
   [style*="2, 6, 23"],
   [style*="15,23,42"],
   [style*="11,17,32"],
   [style*="30,41,59"],
   [style*="51,65,85"],
+  [style*="17,24,39"],
+  [style*="31,41,55"],
   [style*="#0f172a"],
   [style*="#0b1120"],
   [style*="#1e293b"],
   [style*="#334155"],
   [style*="#111827"],
+  [style*="#1f2937"],
+  [style*="#374151"],
   [style*="#020617"],
-  [style*="#090f1d"]) {
-  background: rgba(255, 255, 255, 0.78) !important;
-  background-color: rgba(255, 255, 255, 0.78) !important;
+  [style*="#090f1d"],
+  [style*="#141824"],
+  [style*="background: rgba(255, 255, 255, 0.0"],
+  [style*="background-color: rgba(255, 255, 255, 0.0"],
+  [style*="background: rgba(255,255,255,0.0"],
+  [style*="background-color: rgba(255,255,255,0.0"],
+  [style*="background: rgba(255, 255, 255, 0.1"],
+  [style*="background-color: rgba(255, 255, 255, 0.1"],
+  [style*="background: rgba(255,255,255,0.1"],
+  [style*="background-color: rgba(255,255,255,0.1"]) {
+  background: rgba(255, 255, 255, 0.80) !important;
+  background-color: rgba(255, 255, 255, 0.80) !important;
   backdrop-filter: blur(16px) saturate(165%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(165%) !important;
   color: #0f172a !important;
@@ -753,9 +843,13 @@ body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, 
 }
 
 /* Translucent white glass borders used in Dark Mode -> visible frosted borders in Light Mode */
-body.light-theme-active :is(div, button, span, section, aside, input, select):not(.printable-area *):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="border: 1px solid rgba(255, 255, 255"],
-  [style*="border-color: rgba(255, 255, 255"]) {
-  border-color: rgba(148, 163, 184, 0.38) !important;
+body.light-theme-active :is(div, button, span, section, aside, input, select):not(.printable-area *):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="rgba(255, 255, 255, 0.0"],
+  [style*="rgba(255, 255, 255, 0.1"],
+  [style*="rgba(255, 255, 255, 0.2"],
+  [style*="rgba(255,255,255,0.0"],
+  [style*="rgba(255,255,255,0.1"],
+  [style*="rgba(255,255,255,0.2"]) {
+  border-color: rgba(148, 163, 184, 0.36) !important;
 }
 
 /* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text */
@@ -772,13 +866,21 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
   [style*="color: rgba(226, 232, 240"],
   [style*="color: rgb(203, 213, 225)"],
   [style*="color: rgba(203, 213, 225"],
+  [style*="color: rgb(249, 250, 251)"],
+  [style*="color: rgb(243, 244, 246)"],
+  [style*="color: rgb(229, 231, 235)"],
+  [style*="color: rgb(209, 213, 219)"],
   [style*="color: #ffffff"],
   [style*="color: #fff"],
   [style*="color: white"],
   [style*="color: #f8fafc"],
   [style*="color: #f1f5f9"],
   [style*="color: #e2e8f0"],
-  [style*="color: #cbd5e1"]) {
+  [style*="color: #cbd5e1"],
+  [style*="color: #f9fafb"],
+  [style*="color: #f3f4f6"],
+  [style*="color: #e5e7eb"],
+  [style*="color: #d1d5db"]) {
   color: #0f172a !important;
 }
 
@@ -808,7 +910,7 @@ body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(
   color: #6d28d9 !important;
 }
 
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is([style*="color: #94a3b8"], [style*="color: rgb(148, 163, 184)"],
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is([style*="color: #94a3b8"], [style*="color: rgb(148, 163, 184)"], [style*="color: #9ca3af"], [style*="color: rgb(156, 163, 175)"],
   [style*="color: rgba(255, 255, 255, 0.9"], [style*="color: rgba(255, 255, 255, 0.8"], [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"], [style*="color: rgba(255, 255, 255, 0.5"], [style*="color: rgba(255, 255, 255, 0.4"]) {
   color: #475569 !important;
 }
@@ -824,7 +926,7 @@ html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.ac
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.active *,
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
-html[data-theme="light"] html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"],
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"],
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
   [style*="background: rgb(29, 78, 216)"], [style*="background-color: rgb(29, 78, 216)"], [style*="background: #1d4ed8"],
@@ -900,6 +1002,320 @@ body.light-theme-active ::-webkit-scrollbar-thumb {
 
 body.light-theme-active ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* ============================================================================
+   MODULE & COMMON COMPONENT LIGHT MODE OVERRIDES
+   ============================================================================ */
+
+/* Fusing Enterprise Module */
+body.light-theme-active .fusing-module-container,
+body.light-theme-active .fusing-main-title,
+body.light-theme-active .fusing-metric-val,
+body.light-theme-active .fusing-card-party-title,
+body.light-theme-active .fusing-card-stat-val,
+body.light-theme-active .fusing-field-label,
+body.light-theme-active .fusing-table,
+body.light-theme-active .fusing-table td {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .fusing-metric-label,
+body.light-theme-active .fusing-metric-unit,
+body.light-theme-active .fusing-metric-subtitle,
+body.light-theme-active .fusing-search-icon,
+body.light-theme-active .fusing-card-design-text,
+body.light-theme-active .fusing-card-stat-label,
+body.light-theme-active .fusing-pagination-info,
+body.light-theme-active .fusing-subnav-btn {
+  color: #475569 !important;
+}
+
+body.light-theme-active .fusing-btn-secondary,
+body.light-theme-active .fusing-search-input,
+body.light-theme-active .fusing-filter-select,
+body.light-theme-active .fusing-tag-pill,
+body.light-theme-active .fusing-page-btn,
+body.light-theme-active .fusing-field-input,
+body.light-theme-active .fusing-wastage-card,
+body.light-theme-active .fusing-chip-btn,
+body.light-theme-active .fusing-chip,
+body.light-theme-active .fusing-card-stats-row {
+  background: rgba(241, 245, 249, 0.90) !important;
+  border-color: rgba(148, 163, 184, 0.38) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .fusing-btn-secondary:hover,
+body.light-theme-active .fusing-subnav-btn:hover,
+body.light-theme-active .fusing-tag-pill:hover,
+body.light-theme-active .fusing-page-btn:hover:not(:disabled) {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .fusing-table thead,
+body.light-theme-active .fusing-table th,
+body.light-theme-active .fusing-sticky-col-header {
+  background: rgba(241, 245, 249, 0.96) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .fusing-table tbody tr:hover {
+  background: rgba(226, 232, 240, 0.55) !important;
+}
+
+/* Fabric Enterprise Module */
+body.light-theme-active .fabric-title-text {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .challan-modal-header,
+body.light-theme-active .challan-mobile-tabs-bar,
+body.light-theme-active .challan-col-left,
+body.light-theme-active .challan-tp-list,
+body.light-theme-active .challan-tp-footer,
+body.light-theme-active .inward-tp-header,
+body.light-theme-active .inward-tp-list,
+body.light-theme-active .inward-tp-footer {
+  background: rgba(248, 250, 252, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .challan-tab-badge,
+body.light-theme-active .inward-tp-meter-input,
+body.light-theme-active .inward-tp-notes-input {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.40) !important;
+  color: #0f172a !important;
+}
+
+/* Myntra Integration Module */
+body.light-theme-active .myntra-hub-wrapper,
+body.light-theme-active .myntra-title,
+body.light-theme-active .myntra-kpi-value,
+body.light-theme-active .myntra-stage-title,
+body.light-theme-active .myntra-form-label {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .myntra-kpi-label,
+body.light-theme-active .myntra-stage-count {
+  color: #475569 !important;
+}
+
+body.light-theme-active .myntra-tab-btn,
+body.light-theme-active .myntra-tab-count,
+body.light-theme-active .myntra-kpi-card,
+body.light-theme-active .myntra-pipeline-bar,
+body.light-theme-active .myntra-search-input,
+body.light-theme-active .myntra-sim-card,
+body.light-theme-active .myntra-code-preview,
+body.light-theme-active .myntra-form-input {
+  background: rgba(248, 250, 252, 0.90) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .myntra-tab-btn:hover {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .myntra-tab-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Infrastructure Billing Module */
+body.light-theme-active .infra-root,
+body.light-theme-active .infra-title,
+body.light-theme-active .infra-kpi-value,
+body.light-theme-active .infra-form-label {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .infra-kpi-label,
+body.light-theme-active .infra-tab-btn {
+  color: #475569 !important;
+}
+
+body.light-theme-active .infra-search-input,
+body.light-theme-active .infra-filter-btn,
+body.light-theme-active .infra-progress-track,
+body.light-theme-active .infra-drawer-header,
+body.light-theme-active .infra-section-card,
+body.light-theme-active .infra-form-input,
+body.light-theme-active .infra-form-select,
+body.light-theme-active .infra-form-textarea {
+  background: rgba(248, 250, 252, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .infra-tab-btn:hover {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .infra-tab-btn.active,
+body.light-theme-active .infra-filter-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Communication & Task Manager Additions */
+body.light-theme-active .phoenix-search-input,
+body.light-theme-active .phoenix-chat-textarea,
+body.light-theme-active .task-manager-container {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .phoenix-msg-action-icon {
+  color: #475569 !important;
+}
+
+body.light-theme-active .phoenix-msg-action-icon:hover {
+  background: rgba(226, 232, 240, 0.8) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .task-mobile-col-pill {
+  background: rgba(241, 245, 249, 0.90) !important;
+  color: #334155 !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+}
+
+body.light-theme-active .task-mobile-col-pill.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Responsive Modals & Keyboard Cheat Sheet */
+body.light-theme-active .erp-modal__header,
+body.light-theme-active .erp-modal__footer,
+body.light-theme-active .erp-cheat-sheet-header,
+body.light-theme-active .erp-cheat-sheet-card {
+  background: rgba(248, 250, 252, 0.94) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .erp-modal__title,
+body.light-theme-active .erp-cheat-sheet-row {
+  color: #0f172a !important;
+}
+
+/* Common UI Components (Numeric Inputs, Filter Popovers, Context Menus, Modals, Docks) */
+body.light-theme-active .standard-numeric-wrapper,
+body.light-theme-active .standard-numeric-wrapper.is-focused,
+body.light-theme-active .standard-numeric-wrapper.is-disabled,
+body.light-theme-active .standard-numeric-wrapper.is-readonly,
+body.light-theme-active .standard-numeric-prefix,
+body.light-theme-active .standard-numeric-suffix {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.42) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .standard-numeric-input,
+body.light-theme-active .standard-numeric-wrapper.is-readonly .standard-numeric-input {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .ufp-header,
+body.light-theme-active .ufp-nav,
+body.light-theme-active .ufp-footer,
+body.light-theme-active .ufp-close-btn,
+body.light-theme-active .ufp-option-badge,
+body.light-theme-active .shortcut-modal-header,
+body.light-theme-active .shortcut-modal-footer,
+body.light-theme-active .shortcut-modal-close-btn,
+body.light-theme-active .mini-grid-cell,
+body.light-theme-active .barcode-hud-badge,
+body.light-theme-active .barcode-hud-btn,
+body.light-theme-active .cell-hover-peek-copy-btn,
+body.light-theme-active .coachmark-kbd,
+body.light-theme-active .coachmark-btn-secondary,
+body.light-theme-active .keyboard-keycap,
+body.light-theme-active .keyboard-keycap-sm,
+body.light-theme-active .quick-tip-nav-btn,
+body.light-theme-active .selection-dock-badge,
+body.light-theme-active .smart-lightbox-category,
+body.light-theme-active .smart-lightbox-action-btn,
+body.light-theme-active .smart-peek-category-badge {
+  background: rgba(241, 245, 249, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .ufp-title,
+body.light-theme-active .ufp-nav-item,
+body.light-theme-active .ufp-option-item,
+body.light-theme-active .shortcut-modal-title,
+body.light-theme-active .shortcut-desc,
+body.light-theme-active .keyboard-modal-title,
+body.light-theme-active .keyboard-desc,
+body.light-theme-active .changelog-drawer-title,
+body.light-theme-active .changelog-card-heading,
+body.light-theme-active .breakdown-text,
+body.light-theme-active .barcode-hud-code,
+body.light-theme-active .cell-hover-peek-content,
+body.light-theme-active .coachmark-description,
+body.light-theme-active .entity-switcher-name,
+body.light-theme-active .entity-option-name,
+body.light-theme-active .quicklook-file-title,
+body.light-theme-active .quick-tip-text,
+body.light-theme-active .selection-dock-badge strong,
+body.light-theme-active .selection-dock-metric-value,
+body.light-theme-active .smart-lightbox-title,
+body.light-theme-active .smart-lightbox-meta-v,
+body.light-theme-active .validation-pill-btn,
+body.light-theme-active .validation-pill-msg,
+body.light-theme-active .context-menu-item {
+  color: #0f172a !important;
+}
+
+body.light-theme-active .ufp-nav-item:hover,
+body.light-theme-active .ufp-option-item:hover,
+body.light-theme-active .entity-option-btn:hover,
+body.light-theme-active .context-menu-item:hover,
+body.light-theme-active .context-menu-item:focus-visible {
+  background: rgba(226, 232, 240, 0.72) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .ufp-option-item.ufp-selected {
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #1d4ed8 !important;
+}
+
+body.light-theme-active .context-menu-shortcut {
+  background: rgba(241, 245, 249, 0.90) !important;
+  color: #475569 !important;
+}
+
+body.light-theme-active .context-menu-divider {
+  background: rgba(148, 163, 184, 0.28) !important;
+}
+
+body.light-theme-active .morphing-action-bar-wrapper.is-floating .morphing-action-bar {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.40) !important;
+  color: #0f172a !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12) !important;
+}
+
+body.light-theme-active .is-floating .morphing-action-btn.secondary {
+  background: rgba(241, 245, 249, 0.92) !important;
+  color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+}
+
+body.light-theme-active .quicklook-viewport,
+body.light-theme-active .smart-lightbox-body {
+  background: rgba(241, 245, 249, 0.86) !important;
 }
 
 /* ============================================================================
