@@ -610,12 +610,18 @@ const postGroupMessage = async (req, res) => {
       if (!referencedMsg) {
         const crossRoomMsg = await ChatMessage.findById(replyTo).lean();
         if (crossRoomMsg) {
-          const srcRoom = await ChatRoom.findById(crossRoomMsg.roomId).select('members isPublic type').lean();
+          const srcRoom = await ChatRoom.findById(crossRoomMsg.roomId).select('members type').lean();
+          const requesterRole = String(req.user?.role || '').toLowerCase();
+          const isAdminUser = Boolean(req.user?.isMainAdmin || req.user?.isAdmin || ['admin', 'master_admin', 'master'].includes(requesterRole));
           const hasSourceAccess = Boolean(
             srcRoom && (
-              srcRoom.isPublic ||
-              srcRoom.type === 'channel' ||
-              (Array.isArray(srcRoom.members) && srcRoom.members.some((m) => getMemberIdString(m) === String(rawSenderId)))
+              isAdminUser ||
+              srcRoom.type === 'broadcast' ||
+              srcRoom.type === 'community' ||
+              (Array.isArray(srcRoom.members) && srcRoom.members.some((m) => {
+                const candidateId = m && typeof m === 'object' ? (m._id || m.id || m.userId || m.user) : m;
+                return candidateId && String(candidateId) === String(rawSenderId);
+              }))
             )
           );
           if (hasSourceAccess) {
