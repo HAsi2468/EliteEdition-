@@ -101,12 +101,14 @@ body.light-theme-active::before {
   top: -120px;
   left: -100px;
   background: var(--entity-accent, #3b82f6);
+  animation: glassOrbDrift 14s ease-in-out infinite;
 }
 
 body.light-theme-active::after {
   bottom: -140px;
   right: -100px;
   background: #38bdf8;
+  animation: glassOrbDrift 18s ease-in-out infinite reverse;
 }
 
 body.light-theme-active #root {
@@ -1316,6 +1318,100 @@ body.light-theme-active .is-floating .morphing-action-btn.secondary {
 body.light-theme-active .quicklook-viewport,
 body.light-theme-active .smart-lightbox-body {
   background: rgba(241, 245, 249, 0.86) !important;
+}
+
+/* ============================================================================
+   LIGHT MODE ENTRANCE ANIMATIONS, HOVER ELEVATION & MICRO-INTERACTIONS
+   (Mirrors Dark Glass Theme motion language for Daylight Liquid Glass)
+   ============================================================================ */
+body.light-theme-active .ent-screen-container,
+body.light-theme-active .workspace-container > div {
+  animation: glassScreenReveal 0.26s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+body.light-theme-active .ent-section-card,
+body.light-theme-active .table-responsive-wrapper {
+  animation: glassScreenEntrance 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.05s backwards;
+}
+
+body.light-theme-active .glass-panel,
+body.light-theme-active [role="dialog"]:not(.printable-area),
+body.light-theme-active div[style*="position: fixed"] > div[style*="border-radius"],
+body.light-theme-active div[style*="position: fixed"] > form[style*="border-radius"] {
+  animation: glassModalSpring 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+body.light-theme-active .ent-stat-card,
+body.light-theme-active .glass-card-item {
+  animation: glassCardEntrance 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+body.light-theme-active .job-card-item,
+body.light-theme-active .ent-stat-card,
+body.light-theme-active .stat-card,
+body.light-theme-active .metric-card,
+body.light-theme-active .glass-calc-card,
+body.light-theme-active .glass-card-item,
+body.light-theme-active .fusing-metric-card,
+body.light-theme-active .complaint-modern-card {
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.2s ease,
+              background 0.2s ease !important;
+}
+
+body.light-theme-active .job-card-item:hover,
+body.light-theme-active .ent-stat-card:hover,
+body.light-theme-active .stat-card:hover,
+body.light-theme-active .metric-card:hover,
+body.light-theme-active .glass-calc-card:hover,
+body.light-theme-active .glass-card-item:hover,
+body.light-theme-active .fusing-metric-card:hover,
+body.light-theme-active .complaint-modern-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.42) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10), 0 0 16px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.10) !important;
+}
+
+body.light-theme-active button:not(:disabled),
+body.light-theme-active .btn:not(:disabled),
+body.light-theme-active .ent-btn:not(:disabled) {
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+              background 0.18s ease,
+              border-color 0.18s ease,
+              color 0.18s ease !important;
+}
+
+body.light-theme-active .btn-primary:not(:disabled):hover,
+body.light-theme-active .ent-btn-primary:not(:disabled):hover,
+body.light-theme-active .glass-btn-primary:not(:disabled):hover,
+body.light-theme-active .fusing-btn-primary:not(:disabled):hover,
+body.light-theme-active .task-btn-primary:not(:disabled):hover {
+  transform: translateY(-1.5px) !important;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.30), 0 0 12px rgba(59, 130, 246, 0.18) !important;
+}
+
+body.light-theme-active .btn-secondary:not(:disabled):hover,
+body.light-theme-active .ent-btn-secondary:not(:disabled):hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.40) !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light-theme-active button:not(:disabled):active,
+body.light-theme-active .btn:not(:disabled):active,
+body.light-theme-active .ent-btn:not(:disabled):active {
+  transform: scale(0.97) !important;
+}
+
+body.light-theme-active input:focus,
+body.light-theme-active select:focus,
+body.light-theme-active textarea:focus {
+  border-color: var(--entity-accent, #2563eb) !important;
+  box-shadow: 0 0 0 3px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.18) !important;
+  outline: none !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
 }
 
 /* ============================================================================
