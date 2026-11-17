@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { api, getBaseUrl, getAccessToken, authFetch } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
@@ -2821,8 +2821,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const forceScrollBottomUntilRef = useRef(0);
 
-  // Auto-scroll to bottom on thread open (handles async E2EE decrypt + image/PDF height expansion)
-  useEffect(() => {
+  const instantSnapBottom = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const prevBehavior = el.style.scrollBehavior;
+    el.style.scrollBehavior = 'auto';
+    el.scrollTop = el.scrollHeight;
+    el.style.scrollBehavior = prevBehavior;
+  }, []);
+
+  // Instantly position at latest message BEFORE paint on thread open (no visible scroll)
+  useLayoutEffect(() => {
     if (!activeGroup?._id) return;
     isNearBottomRef.current = true;
     forceScrollBottomUntilRef.current = Date.now() + 1800;
@@ -2831,9 +2840,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const snapBottom = () => {
       if (chatScrollRef.current && Date.now() <= forceScrollBottomUntilRef.current) {
-        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        instantSnapBottom();
       }
     };
+
+    snapBottom();
 
     const cancelForceScroll = () => {
       forceScrollBottomUntilRef.current = 0;
@@ -2856,19 +2867,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         el.removeEventListener('touchstart', cancelForceScroll);
       }
     };
-  }, [activeGroup?._id]);
+  }, [activeGroup?._id, instantSnapBottom]);
 
-  // Auto-scroll to chat bottom safely strictly within message container
-  useEffect(() => {
+  // Snap to latest message before paint whenever messages update while at bottom / opening chat
+  useLayoutEffect(() => {
     if ((isNearBottomRef.current || Date.now() <= forceScrollBottomUntilRef.current) && chatScrollRef.current) {
-      const rafId = requestAnimationFrame(() => {
-        if (chatScrollRef.current) {
-          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-        }
-      });
-      return () => cancelAnimationFrame(rafId);
+      instantSnapBottom();
     }
-  }, [messages, viewportHeight]);
+  }, [messages, viewportHeight, instantSnapBottom]);
 
   const fetchGroups = async (showLoader = false) => {
     if (showLoader) {
