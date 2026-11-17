@@ -112,8 +112,10 @@ body.light-theme-active .glass-title-capsule {
 }
 
 body.light-theme-active .glass-screen-title,
-body.light-theme-active .glass-title-capsule h1 {
+body.light-theme-active .glass-title-capsule h1,
+body.light-theme-active .glass-title-capsule > span:first-of-type {
   color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
 }
 
 body.light-theme-active .glass-title-icon {
@@ -160,7 +162,68 @@ body.light-theme-active .glass-calc-sub {
   color: #64748b !important;
 }
 
-/* Sidebar Navigation */
+/* Sidebar Navigation & Top Company Switcher */
+body.light-theme-active .sidebar-wrap,
+body.light-theme-active aside#erp-sidebar-nav {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active aside#erp-sidebar-nav button,
+body.light-theme-active aside#erp-sidebar-nav a {
+  color: #1e293b !important;
+  background: transparent !important;
+}
+
+body.light-theme-active aside#erp-sidebar-nav button:hover,
+body.light-theme-active aside#erp-sidebar-nav a:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
+body.light-theme-active aside#erp-sidebar-nav button.active,
+body.light-theme-active aside#erp-sidebar-nav a.active {
+  background: linear-gradient(135deg, var(--entity-accent, #2563eb), #1d4ed8) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.28) !important;
+}
+
+body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
+body.light-theme-active aside#erp-sidebar-nav button.active *,
+body.light-theme-active aside#erp-sidebar-nav a.active * {
+  color: #ffffff !important;
+}
+
+body.light-theme-active .dept-switcher-header {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+}
+
+body.light-theme-active .company-segment-pill,
+body.light-theme-active .dept-switcher-btn {
+  color: #334155 !important;
+  background: transparent !important;
+}
+
+body.light-theme-active .company-segment-pill:hover,
+body.light-theme-active .dept-switcher-btn:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+body.light-theme-active .company-segment-pill.active,
+body.light-theme-active .dept-switcher-btn.active {
+  background: #ffffff !important;
+  color: var(--entity-accent, #2563eb) !important;
+  border: 1px solid rgba(var(--entity-accent-rgb, 37, 99, 235), 0.35) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+  font-weight: 700 !important;
+}
+
 body.light-theme-active .nav-section-header {
   color: #64748b !important;
 }
@@ -251,9 +314,17 @@ body.light-theme-active :is(div, section, aside, header, footer, main, nav, ul, 
 }
 
 /* Hardcoded White / Pale-Slate Inline Text -> High-Contrast Slate Text (unless inside solid/accent buttons) */
-body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.company-segment-pill.active *):not(.nav-item.active):not(.nav-item.active *):not(.glass-subtab-btn.active):not(.glass-subtab-btn.active *):not([style*="linear-gradient"]):not([style*="linear-gradient"] *):not([style*="background: rgb(37, 99, 235)"]):not([style*="background: #2563eb"]):not([style*="background-color: #2563eb"]):not([style*="background: #ef4444"]):not([style*="background: #10b981"]):not([style*="background: #059669"]):is(
+body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th, strong, b, small, a, code, kbd):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.btn-primary):not(.btn-primary *):not(.company-segment-pill.active):not(.company-segment-pill.active *):not(.nav-item.active):not(.nav-item.active *):not(.glass-subtab-btn.active):not(.glass-subtab-btn.active *):not(aside#erp-sidebar-nav button.active *):not(aside#erp-sidebar-nav button[aria-current="page"] *):not([style*="linear-gradient"]):not([style*="linear-gradient"] *):not([style*="background: rgb(37, 99, 235)"]):not([style*="background: #2563eb"]):not([style*="background-color: #2563eb"]):not([style*="background: #ef4444"]):not([style*="background: #10b981"]):not([style*="background: #059669"]):is(
   [style*="color: rgb(255, 255, 255)"],
   [style*="color: rgba(255, 255, 255"],
+  [style*="color: rgb(248, 250, 252)"],
+  [style*="color: rgba(248, 250, 252"],
+  [style*="color: rgb(241, 245, 249)"],
+  [style*="color: rgba(241, 245, 249"],
+  [style*="color: rgb(226, 232, 240)"],
+  [style*="color: rgba(226, 232, 240"],
+  [style*="color: rgb(203, 213, 225)"],
+  [style*="color: rgba(203, 213, 225"],
   [style*="color: #ffffff"],
   [style*="color: #fff"],
   [style*="color: white"],
@@ -265,23 +336,41 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
   color: #0f172a !important;
 }
 
-/* Dark-mode pastel inline text colors -> high-contrast readable shades on light backgrounds */
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):not([style*="linear-gradient"]):is([style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"]) {
+/* Dark-mode pastel inline text colors -> high-contrast readable shades on light backgrounds (hex + React rgb()) */
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):not([style*="linear-gradient"]):is(
+  [style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"], [style*="color: #38bdf8"],
+  [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(125, 211, 252)"], [style*="color: rgb(186, 230, 253)"], [style*="color: rgb(56, 189, 248)"]
+) {
   color: #1d4ed8 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #6ee7b7"], [style*="color: #86efac"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+  [style*="color: #6ee7b7"], [style*="color: #86efac"], [style*="color: #34d399"],
+  [style*="color: rgb(110, 231, 183)"], [style*="color: rgb(134, 239, 172)"], [style*="color: rgb(52, 211, 153)"]
+) {
   color: #047857 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #fcd34d"], [style*="color: #fde68a"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+  [style*="color: #fcd34d"], [style*="color: #fde68a"], [style*="color: #fbbf24"],
+  [style*="color: rgb(252, 211, 77)"], [style*="color: rgb(253, 230, 138)"], [style*="color: rgb(251, 191, 36)"]
+) {
   color: #b45309 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #fca5a5"], [style*="color: #fecaca"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+  [style*="color: #fca5a5"], [style*="color: #fecaca"], [style*="color: #f87171"],
+  [style*="color: rgb(252, 165, 165)"], [style*="color: rgb(254, 202, 202)"], [style*="color: rgb(248, 113, 113)"]
+) {
   color: #b91c1c !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #c4b5fd"], [style*="color: #ddd6fe"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+  [style*="color: #c4b5fd"], [style*="color: #ddd6fe"], [style*="color: #a78bfa"],
+  [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(167, 139, 250)"]
+) {
   color: #6d28d9 !important;
 }
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is([style*="color: #94a3b8"], [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):not(.btn-primary *):is(
+  [style*="color: #94a3b8"], [style*="color: rgb(148, 163, 184)"],
+  [style*="color: rgba(255, 255, 255, 0.7"], [style*="color: rgba(255, 255, 255, 0.6"], [style*="color: rgba(255, 255, 255, 0.5"]
+) {
   color: #475569 !important;
 }
 
