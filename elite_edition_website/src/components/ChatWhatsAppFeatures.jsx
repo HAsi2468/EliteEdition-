@@ -7,19 +7,21 @@ import {
 import api from '../services/api';
 
 export const WALLPAPER_PRESETS = [
-  { key: 'default', label: 'Default Dark', style: {} },
+  { key: 'default', label: 'Default Theme', isLight: false, style: {} },
   {
     key: 'whatsapp-doodle',
     label: 'Midnight Slate',
+    isLight: false,
     style: {
       backgroundColor: '#0b141a',
-      backgroundImage: 'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 0)',
+      backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 0)',
       backgroundSize: '20px 20px',
     },
   },
   {
     key: 'emerald-night',
     label: 'Emerald Night',
+    isLight: false,
     style: {
       background: 'linear-gradient(145deg, #062822 0%, #091d26 55%, #071318 100%)',
     },
@@ -27,6 +29,7 @@ export const WALLPAPER_PRESETS = [
   {
     key: 'indigo-aurora',
     label: 'Indigo Aurora',
+    isLight: false,
     style: {
       background: 'linear-gradient(135deg, #13112b 0%, #1c1942 50%, #0d1629 100%)',
     },
@@ -34,6 +37,7 @@ export const WALLPAPER_PRESETS = [
   {
     key: 'warm-charcoal',
     label: 'Warm Charcoal',
+    isLight: false,
     style: {
       background: 'linear-gradient(160deg, #1f1a18 0%, #161416 60%, #111318 100%)',
     },
@@ -41,19 +45,62 @@ export const WALLPAPER_PRESETS = [
   {
     key: 'ocean-deep',
     label: 'Ocean Deep',
+    isLight: false,
     style: {
       background: 'linear-gradient(160deg, #071e30 0%, #0a2a3d 50%, #061523 100%)',
     },
   },
+  {
+    key: 'soft-sky',
+    label: 'Soft Sky',
+    isLight: true,
+    style: {
+      background: 'linear-gradient(145deg, #e0f2fe 0%, #eff6ff 55%, #dbeafe 100%)',
+    },
+  },
+  {
+    key: 'mint-breeze',
+    label: 'Mint Breeze',
+    isLight: true,
+    style: {
+      background: 'linear-gradient(145deg, #ecfdf5 0%, #f0fdfa 55%, #d1fae5 100%)',
+    },
+  },
+  {
+    key: 'warm-sand',
+    label: 'Warm Sand',
+    isLight: true,
+    style: {
+      backgroundColor: '#f5efe6',
+      backgroundImage: 'radial-gradient(rgba(15,23,42,0.06) 1px, transparent 0)',
+      backgroundSize: '20px 20px',
+    },
+  },
+  {
+    key: 'lavender-mist',
+    label: 'Lavender Mist',
+    isLight: true,
+    style: {
+      background: 'linear-gradient(135deg, #f3e8ff 0%, #eef2ff 55%, #e0e7ff 100%)',
+    },
+  },
 ];
+
+const isLightModeActive = () =>
+  typeof document !== 'undefined' &&
+  (document.body?.classList?.contains('light-theme-active') ||
+    document.documentElement?.getAttribute('data-theme') === 'light');
 
 export const getWallpaperStyle = (keyOrUrl) => {
   if (!keyOrUrl || keyOrUrl === 'default') return {};
   const preset = WALLPAPER_PRESETS.find((p) => p.key === keyOrUrl);
   if (preset) return preset.style;
   if (keyOrUrl.startsWith('http://') || keyOrUrl.startsWith('https://') || keyOrUrl.startsWith('data:')) {
+    const scrim = isLightModeActive()
+      ? 'linear-gradient(rgba(248,250,252,0.72), rgba(248,250,252,0.72))'
+      : 'linear-gradient(rgba(10,14,22,0.72), rgba(10,14,22,0.72))';
     return {
-      backgroundImage: `linear-gradient(rgba(10,14,22,0.72), rgba(10,14,22,0.72)), url("${keyOrUrl}")`,
+      backgroundImage: `${scrim}, url("${keyOrUrl}")`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
@@ -76,12 +123,14 @@ const modalBackdropStyle = {
 const modalCardStyle = {
   width: '100%',
   maxWidth: '460px',
-  background: 'var(--bg-elevated, #0f172a)',
-  border: '1px solid rgba(148,163,184,0.2)',
+  background: 'var(--bg-modal, #0f172a)',
+  backdropFilter: 'blur(20px) saturate(160%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+  border: '1px solid var(--border-light, rgba(148,163,184,0.22))',
   borderRadius: '16px',
   padding: '1.25rem',
   color: 'var(--text-primary, #f8fafc)',
-  boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+  boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
   maxHeight: '88vh',
   overflowY: 'auto',
 };
@@ -90,9 +139,9 @@ const inputStyle = {
   width: '100%',
   padding: '0.6rem 0.75rem',
   borderRadius: '10px',
-  border: '1px solid rgba(148,163,184,0.25)',
-  background: 'rgba(15, 23, 42, 0.65)',
-  color: '#f8fafc',
+  border: '1px solid var(--border-light, rgba(148,163,184,0.25))',
+  background: 'var(--bg-input, rgba(15, 23, 42, 0.65))',
+  color: 'var(--text-primary, #f8fafc)',
   fontSize: '0.88rem',
   outline: 'none',
 };
@@ -212,33 +261,38 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
     <div style={modalBackdropStyle} onClick={onClose}>
       <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: 'var(--text-primary, #f8fafc)' }}>
             <ImageIcon size={18} color="#38bdf8" /> Chat Wallpaper ({scopeLabel})
           </div>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.65rem', marginBottom: '1rem' }}>
-          {WALLPAPER_PRESETS.map((preset) => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.65rem', marginBottom: '1rem' }}>
+          {WALLPAPER_PRESETS.filter((p) => p.key === 'default' || p.isLight === isLightModeActive()).map((preset) => {
             const active = currentWallpaper === preset.key || (!currentWallpaper && preset.key === 'default');
+            const isDefaultLight = preset.key === 'default' && isLightModeActive();
+            const cardBg = isDefaultLight
+              ? { background: 'linear-gradient(135deg, #eef2f9 0%, #f1f5f9 50%, #e8eef8 100%)' }
+              : preset.style;
+            const useDarkText = preset.isLight || isDefaultLight;
             return (
               <button
                 key={preset.key}
                 type="button"
                 onClick={() => onSelect(preset.key)}
                 style={{
-                  height: '76px',
+                  height: '72px',
                   borderRadius: '12px',
-                  border: active ? '2px solid #3b82f6' : '1px solid rgba(148,163,184,0.2)',
-                  ...preset.style,
-                  backgroundColor: preset.style.backgroundColor || '#0f172a',
-                  color: '#e2e8f0',
+                  border: active ? '2px solid #3b82f6' : '1px solid var(--border-light, rgba(148,163,184,0.25))',
+                  ...cardBg,
+                  backgroundColor: cardBg.backgroundColor || (useDarkText ? '#f1f5f9' : '#0f172a'),
+                  color: useDarkText ? '#0f172a' : '#e2e8f0',
                   fontSize: '0.75rem',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'flex-end',
                   justifyContent: 'center',
-                  padding: '0.4rem',
+                  padding: '0.45rem',
                 }}
               >
                 {preset.label}
