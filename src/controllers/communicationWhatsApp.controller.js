@@ -408,11 +408,12 @@ const transcribeVoiceMessage = async (req, res) => {
 
     const openAiKey = process.env.OPENAI_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
-    if (!openAiKey && !geminiKey) {
-      return res.status(503).json({
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!openAiKey && !geminiKey && !groqKey) {
+      return res.status(200).json({
         success: false,
         code: 'TRANSCRIPTION_KEY_MISSING',
-        message: 'Configure OPENAI_API_KEY or GEMINI_API_KEY in server .env to enable automatic multi-language voice transcription.'
+        message: 'Configure OPENAI_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY in server .env to enable automatic multi-language voice transcription.'
       });
     }
 
@@ -456,6 +457,16 @@ const transcribeVoiceMessage = async (req, res) => {
         });
         rawTranscript = trFallback?.text || '';
       }
+    } else if (groqKey) {
+      const OpenAI = require('openai');
+      const groqClient = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' });
+      const ext = mimeType.includes('mpeg') ? 'mp3' : mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : mimeType.includes('wav') ? 'wav' : 'webm';
+      const fileObj = await OpenAI.toFile(buffer, `voice_${messageId}.${ext}`, { type: mimeType });
+      const tr = await groqClient.audio.transcriptions.create({
+        file: fileObj,
+        model: 'whisper-large-v3-turbo'
+      });
+      rawTranscript = tr?.text || '';
     } else if (geminiKey) {
       const { GoogleGenerativeAI } = require('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(geminiKey);
@@ -503,7 +514,24 @@ const transcribeVoiceMessage = async (req, res) => {
   }
 };
 
-// 7C. Translate Any Chat Message or Voice Transcript to User's Known Language
+const LANG_NAME_TO_CODE = {
+  english: 'en',
+  gujarati: 'gu',
+  hindi: 'hi',
+  marathi: 'mr',
+  tamil: 'ta',
+  telugu: 'te',
+  punjabi: 'pa',
+  bengali: 'bn',
+  kannada: 'kn',
+  malayalam: 'ml',
+  urdu: 'ur',
+  arabic: 'ar',
+  spanish: 'es'
+};
+const translationMemoryCache = new Map();
+
+// 7C. Translate Any Chat Message or Voice Transcript to User's Known Language (Fast <300ms + AI Fallback)
 const translateChatMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -528,68 +556,97 @@ const translateChatMessage = async (req, res) => {
     }
 
     const lang = String(targetLanguage || 'English').trim().slice(0, 60);
-    const systemPrompt = `You are a precise translator. Translate the user's message accurately and naturally into ${lang} (using its standard native script, e.g. ગુજરાતી for Gujarati, हिन्दी for Hindi, English for English). Preserve numbers, dates, order IDs, and proper names. Output ONLY the translated text without quotes, labels, or commentary.`;
+    const tlCode = LANG_NAME_TO_CODE[lang.toLowerCase()] || 'en';
+    const cacheKey = `${messageId}:${tlCode}:${sourceText.slice(0, 120)}`;
+    if (translationMemoryCache.has(cacheKey)) {
+      return res.json({ success: true, translatedText: translationMemoryCache.get(cacheKey), targetLanguage: lang, cached: true });
+    }
 
     let translatedText = '';
-    const openAiKey = process.env.OPENAI_API_KEY;
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const xaiKey = process.env.XAI_API_KEY;
 
-    if (openAiKey) {
-      const OpenAI = require('openai');
-      const openai = new OpenAI({ apiKey: openAiKey });
-      const resp = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        temperature: 0.1,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: sourceText }
-        ]
+    // 1. Fast path (~150-300ms): Google Translate public gtx endpoint with sl=auto
+    try {
+      const gRes = await axios.get('https://translate.googleapis.com/translate_a/single', {
+        params: { client: 'gtx', sl: 'auto', tl: tlCode, dt: 't', q: sourceText },
+        timeout: 3500
       });
-      translatedText = resp?.choices?.[0]?.message?.content || '';
-    } else if (geminiKey) {
-      const { GoogleGenerativeAI } = require('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const modelNames = ['gemini-2.0-flash', 'gemini-1.5-flash'];
-      for (const mName of modelNames) {
-        try {
-          const model = genAI.getGenerativeModel({ model: mName });
-          const result = await model.generateContent(`${systemPrompt}\n\nMessage:\n${sourceText}`);
-          translatedText = result?.response?.text?.() || '';
-          if (translatedText.trim()) break;
-        } catch (gemErr) {
-          if (mName === modelNames[modelNames.length - 1]) throw gemErr;
-        }
+      if (Array.isArray(gRes?.data?.[0])) {
+        translatedText = gRes.data[0].map((seg) => (Array.isArray(seg) ? seg[0] : '')).join('').trim();
       }
-    } else if (xaiKey) {
-      const xaiRes = await axios.post(
-        'https://api.x.ai/v1/chat/completions',
-        {
-          model: 'grok-3-mini',
+    } catch (_) {
+      // Fall through to AI providers if fast path fails
+    }
+
+    // 2. AI fallback if fast path returned empty
+    if (!translatedText) {
+      const systemPrompt = `You are a precise translator. Translate the user's message accurately and naturally into ${lang} (using its standard native script, e.g. ગુજરાતી for Gujarati, हिन्दी for Hindi, English for English). Preserve numbers, dates, order IDs, and proper names. Output ONLY the translated text without quotes, labels, or commentary.`;
+      const openAiKey = process.env.OPENAI_API_KEY;
+      const geminiKey = process.env.GEMINI_API_KEY;
+      const xaiKey = process.env.XAI_API_KEY;
+
+      if (openAiKey) {
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: openAiKey });
+        const resp = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
           temperature: 0.1,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: sourceText }
           ]
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${xaiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 20000
+        });
+        translatedText = resp?.choices?.[0]?.message?.content || '';
+      } else if (geminiKey) {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const modelNames = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+        for (const mName of modelNames) {
+          try {
+            const model = genAI.getGenerativeModel({ model: mName });
+            const result = await model.generateContent(`${systemPrompt}\n\nMessage:\n${sourceText}`);
+            translatedText = result?.response?.text?.() || '';
+            if (translatedText.trim()) break;
+          } catch (gemErr) {
+            if (mName === modelNames[modelNames.length - 1]) throw gemErr;
+          }
         }
-      );
-      translatedText = xaiRes?.data?.choices?.[0]?.message?.content || '';
-    } else {
-      return res.status(503).json({
-        success: false,
-        code: 'TRANSLATION_KEY_MISSING',
-        message: 'No AI API key (XAI_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY) configured on server.'
-      });
+      } else if (xaiKey) {
+        const xaiRes = await axios.post(
+          'https://api.x.ai/v1/chat/completions',
+          {
+            model: 'grok-3-fast',
+            temperature: 0.1,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: sourceText }
+            ]
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${xaiKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 8000
+          }
+        );
+        translatedText = xaiRes?.data?.choices?.[0]?.message?.content || '';
+      } else {
+        return res.status(200).json({
+          success: false,
+          code: 'TRANSLATION_KEY_MISSING',
+          message: 'Translation service unavailable.'
+        });
+      }
     }
 
     const clean = sanitizeChatMessage(String(translatedText || '').trim(), 5000);
+    if (clean) {
+      if (translationMemoryCache.size > 500) {
+        const firstKey = translationMemoryCache.keys().next().value;
+        translationMemoryCache.delete(firstKey);
+      }
+      translationMemoryCache.set(cacheKey, clean);
+    }
     return res.json({ success: true, translatedText: clean, targetLanguage: lang });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to translate message', error: err.message });
