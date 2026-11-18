@@ -75,11 +75,15 @@ export function BottomSheet({ isOpen, onClose, title = 'Filters', children, styl
       }}
     >
       <div
+        className="glass-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '560px',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.96))',
+          backdropFilter: 'blur(20px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+          borderTop: '1px solid var(--border-light, rgba(148, 163, 184, 0.22))',
           borderTopLeftRadius: '20px',
           borderTopRightRadius: '20px',
           padding: '12px 18px',
@@ -87,7 +91,7 @@ export function BottomSheet({ isOpen, onClose, title = 'Filters', children, styl
           maxHeight: '88dvh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 -8px 30px rgba(0,0,0,0.18)',
+          boxShadow: '0 -8px 30px rgba(0,0,0,0.28)',
           transform: `translateY(${dragOffset}px)`,
           transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
           ...style
@@ -130,19 +134,19 @@ export function BottomSheet({ isOpen, onClose, title = 'Filters', children, styl
             paddingBottom: '10px'
           }}
         >
-          <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary, #f8fafc)' }}>
             {title}
           </div>
           <button
             type="button"
             onClick={onClose}
             style={{
-              background: '#f1f5f9',
-              border: 'none',
+              background: 'var(--bg-muted, rgba(148, 163, 184, 0.16))',
+              border: '1px solid var(--border-light, rgba(148, 163, 184, 0.22))',
               borderRadius: '6px',
               fontSize: '13px',
               fontWeight: 600,
-              color: '#64748b',
+              color: 'var(--text-secondary, #cbd5e1)',
               cursor: 'pointer',
               minHeight: '36px',
               padding: '6px 12px',

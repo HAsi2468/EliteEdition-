@@ -465,14 +465,17 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
       }}
     >
       <div
+        className="glass-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: isMobile ? '560px' : '680px',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.96))',
+          backdropFilter: 'blur(20px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(160%)',
           borderRadius: isMobile ? '20px 20px 0 0' : '12px',
-          border: isMobile ? 'none' : '1px solid #cbd5e1',
-          boxShadow: isMobile ? '0 -10px 40px rgba(0,0,0,0.25)' : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 25px rgba(0, 0, 0, 0.05)',
+          border: isMobile ? 'none' : '1px solid var(--border-light, rgba(148, 163, 184, 0.24))',
+          boxShadow: isMobile ? '0 -10px 40px rgba(0,0,0,0.35)' : '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 25px rgba(0, 0, 0, 0.12)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -494,15 +497,15 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
               justifyContent: 'center',
               padding: '8px 0 4px',
               cursor: 'grab',
-              backgroundColor: '#f8fafc',
-              borderBottom: '1px solid #f1f5f9'
+              backgroundColor: 'var(--bg-th, rgba(30, 41, 59, 0.72))',
+              borderBottom: '1px solid var(--border-light, rgba(148, 163, 184, 0.18))'
             }}
           >
             <div
               style={{
                 width: '42px',
                 height: '4px',
-                backgroundColor: '#cbd5e1',
+                backgroundColor: 'var(--border-color, #94a3b8)',
                 borderRadius: '999px'
               }}
             />
@@ -515,12 +518,12 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
             display: 'flex',
             alignItems: 'center',
             padding: '13px 18px',
-            borderBottom: '1px solid #e2e8f0',
+            borderBottom: '1px solid var(--border-light, rgba(148, 163, 184, 0.2))',
             gap: '12px',
-            backgroundColor: '#f8fafc'
+            backgroundColor: 'var(--bg-th, rgba(30, 41, 59, 0.72))'
           }}
         >
-          <Search size={19} color="#2563eb" style={{ flexShrink: 0 }} />
+          <Search size={19} color="#3b82f6" style={{ flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"
@@ -533,7 +536,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
               border: 'none',
               outline: 'none',
               fontSize: '15px',
-              color: '#0f172a',
+              color: 'var(--text-primary, #f8fafc)',
               backgroundColor: 'transparent',
               fontWeight: 500
             }}
@@ -546,7 +549,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                 background: 'none',
                 border: 'none',
                 fontSize: '12px',
-                color: '#64748b',
+                color: 'var(--text-muted, #94a3b8)',
                 cursor: 'pointer',
                 padding: '4px 6px'
               }}
@@ -558,12 +561,12 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
             type="button"
             onClick={onClose}
             style={{
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
+              background: 'var(--bg-muted, rgba(148, 163, 184, 0.16))',
+              border: '1px solid var(--border-light, rgba(148, 163, 184, 0.28))',
               borderRadius: '6px',
               fontSize: '11px',
               fontWeight: 600,
-              color: '#475569',
+              color: 'var(--text-secondary, #cbd5e1)',
               cursor: 'pointer',
               padding: '3px 7px'
             }}
@@ -578,8 +581,8 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
             display: 'flex',
             gap: '6px',
             padding: '7px 14px',
-            borderBottom: '1px solid #f1f5f9',
-            backgroundColor: '#ffffff',
+            borderBottom: '1px solid var(--border-light, rgba(148, 163, 184, 0.16))',
+            backgroundColor: 'var(--bg-surface, rgba(15, 23, 42, 0.78))',
             overflowX: 'auto'
           }}
         >
@@ -689,13 +692,13 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                 onMouseEnter={() => setSelectedIndex(index)}
                 style={{
                   padding: '9px 16px',
-                  backgroundColor: isSelected ? '#f8fafc' : 'transparent',
-                  borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
+                  backgroundColor: isSelected ? 'var(--bg-hover, rgba(148, 163, 184, 0.14))' : 'transparent',
+                  borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  borderBottom: '1px solid #f8fafc',
+                  borderBottom: '1px solid var(--border-light, rgba(148, 163, 184, 0.12))',
                   minHeight: '44px',
                   transition: 'background-color 0.1s ease'
                 }}

@@ -139,21 +139,24 @@ export function SearchableSelect({
       {/* Dropdown Menu */}
       {isOpen && (
         <div
+          className="glass-panel"
           style={{
             position: 'absolute',
             top: 'calc(100% + 4px)',
             left: 0,
             right: 0,
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
+            backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.96))',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
             borderRadius: '8px',
             zIndex: 9999,
             overflow: 'hidden',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.22)'
           }}
         >
           {/* Search Field inside dropdown */}
-          <div style={{ padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ padding: '8px', borderBottom: '1px solid var(--border-light, rgba(148, 163, 184, 0.16))' }}>
             <input
               ref={inputRef}
               type="text"
@@ -169,7 +172,9 @@ export function SearchableSelect({
                 height: '38px',
                 padding: '6px 10px',
                 fontSize: '16px', // 16px to prevent mobile zoom
-                border: '1px solid #e2e8f0',
+                background: 'var(--bg-input, rgba(15, 23, 42, 0.7))',
+                color: 'var(--text-primary, #f8fafc)',
+                border: '1px solid var(--border-light, rgba(148, 163, 184, 0.22))',
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'

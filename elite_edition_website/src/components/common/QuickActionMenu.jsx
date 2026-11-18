@@ -179,9 +179,9 @@ export default function QuickActionMenu({
             width: `${MENU_WIDTH}px`,
             maxHeight: `${menuPos.maxHeight}px`,
             overflowY: 'auto',
-            background: 'rgba(15, 23, 42, 0.97)',
+            background: 'var(--bg-modal, rgba(15, 23, 42, 0.97))',
             borderRadius: '10px',
-            border: '1px solid rgba(255, 255, 255, 0.16)',
+            border: '1px solid var(--border-light, rgba(255, 255, 255, 0.16))',
             boxShadow: '0 16px 40px -6px rgba(0, 0, 0, 0.6)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
@@ -232,10 +232,10 @@ export default function QuickActionMenu({
                   <Icon size={16} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#ffffff' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary, #ffffff)' }}>
                     {item.label}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, rgba(255, 255, 255, 0.65))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.subtitle}
                   </div>
                 </div>
@@ -266,11 +266,11 @@ export default function QuickActionMenu({
         >
           <div
             style={{
-              background: 'rgba(15, 23, 42, 0.98)',
+              background: 'var(--bg-modal, rgba(15, 23, 42, 0.98))',
               width: '100%',
               maxWidth: '500px',
               borderRadius: '16px 16px 0 0',
-              borderTop: '1px solid rgba(255, 255, 255, 0.16)',
+              borderTop: '1px solid var(--border-light, rgba(255, 255, 255, 0.16))',
               padding: '16px 18px calc(18px + env(safe-area-inset-bottom, 0px))',
               display: 'flex',
               flexDirection: 'column',
@@ -284,11 +284,11 @@ export default function QuickActionMenu({
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '38px', height: '4px', borderRadius: '2px', background: 'rgba(255, 255, 255, 0.25)' }} />
               <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff' }}>Quick Actions</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary, #ffffff)' }}>Quick Actions</span>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  style={{ background: 'transparent', border: 'none', color: 'rgba(255, 255, 255, 0.7)', cursor: 'pointer', padding: '4px' }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, rgba(255, 255, 255, 0.7))', cursor: 'pointer', padding: '4px' }}
                 >
                   <X size={18} />
                 </button>
@@ -335,10 +335,10 @@ export default function QuickActionMenu({
                       <Icon size={18} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary, #ffffff)' }}>
                         {item.label}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.68)', marginTop: '1px' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, rgba(255, 255, 255, 0.68))', marginTop: '1px' }}>
                         {item.subtitle}
                       </div>
                     </div>
