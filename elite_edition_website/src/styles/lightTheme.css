@@ -772,12 +772,21 @@ body.light-theme-active .phoenix-chat-item.active .phoenix-chat-item-name {
   color: #1d4ed8 !important;
 }
 
-html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble {
+html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble,
+html[data-theme="light"] body.light-theme-active .phoenix-bubble-sent {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
   color: #ffffff !important;
 }
 
-html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble *:not(.phoenix-location-card):not(.phoenix-location-card *) {
+html[data-theme="light"] body.light-theme-active .phoenix-msg-row.outgoing .phoenix-msg-bubble *:not(.phoenix-location-card):not(.phoenix-location-card *),
+html[data-theme="light"] body.light-theme-active .phoenix-bubble-sent *:not(.phoenix-location-card):not(.phoenix-location-card *) {
   color: #ffffff !important;
+}
+
+html[data-theme="light"] body.light-theme-active .phoenix-bubble-received {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
 }
 
 body.light-theme-active .erp-hotkey-hud *,
@@ -946,7 +955,7 @@ html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.ac
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.active *,
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
-html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):not(.phoenix-chat-feed):not(.phoenix-chat-feed *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
   [style*="background: rgb(29, 78, 216)"], [style*="background-color: rgb(29, 78, 216)"], [style*="background: #1d4ed8"],
@@ -968,7 +977,7 @@ html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.
   [style*="background: rgb(217, 119, 6)"], [style*="background-color: rgb(217, 119, 6)"], [style*="background: #d97706"],
   [style*="background: rgb(245, 158, 11)"], [style*="background-color: rgb(245, 158, 11)"], [style*="background: #f59e0b"],
   [style*="background: rgb(100, 116, 139)"], [style*="background-color: rgb(100, 116, 139)"], [style*="background: #64748b"]),
-html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):not(.phoenix-chat-feed):not(.phoenix-chat-feed *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
   [style*="background: rgb(79, 70, 229)"], [style*="background-color: rgb(79, 70, 229)"], [style*="background: #4f46e5"],
