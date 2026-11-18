@@ -1189,7 +1189,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         return;
       }
       attempts += 1;
-      if (attempts < 30) {
+      const missingInLoaded = !loadingMessages && messages.length > 0 && !messages.some((m) => String(m._id) === String(pendingScrollMsgId));
+      if (attempts < 20 && !missingInLoaded) {
         retryTimer = setTimeout(tryScroll, 150);
       } else {
         pendingScrollMsgIdRef.current = null;
@@ -4950,6 +4951,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           return g;
         });
       });
+      pendingScrollMsgIdRef.current = null;
+      setPendingScrollMsgId(null);
       isNearBottomRef.current = true;
       setShowScrollBottom(false);
       setUnreadBelowCount(0);
@@ -4966,6 +4969,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       setIsUrgent(false);
       setMentionQuery(null);
       setMentionedUserIds([]);
+      isSendingRef.current = false;
 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (isTypingRef.current && socket && activeGroup?._id) {
