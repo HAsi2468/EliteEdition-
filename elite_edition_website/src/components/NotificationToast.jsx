@@ -90,13 +90,14 @@ const flashBrowserTabTitle = (text) => {
   }
 };
 
-export const triggerPushNotification = (title, message, type = 'info', actionTab = null) => {
+export const triggerPushNotification = (title, message, type = 'info', actionTab = null, meta = null) => {
   const item = {
     id: Date.now() + Math.random().toString(36).substring(2, 7),
     title,
     message: message || '',
     type,
     actionTab,
+    ...(meta && typeof meta === 'object' ? { meta } : {}),
     timestamp: new Date().toISOString(),
     read: false,
   };
@@ -207,7 +208,29 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
           : '#2563eb';
 
         return (
-          <div key={toast.id} style={{ ...styles.toastCard, borderLeft: `4px solid ${borderColor}` }}>
+          <div
+            key={toast.id}
+            onClick={() => {
+              if (toast.actionTab || toast.meta?.roomId) {
+                const tab = toast.actionTab || 'communication';
+                window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: { tab } }));
+                if (toast.meta?.roomId) {
+                  const jumpDetail = {
+                    roomId: String(toast.meta.roomId),
+                    messageId: toast.meta.messageId ? String(toast.meta.messageId) : null,
+                  };
+                  window.__elitePendingChatJump = jumpDetail;
+                  window.dispatchEvent(new CustomEvent('elite-open-chat-room', { detail: jumpDetail }));
+                }
+                setToasts(prev => prev.filter(t => t.id !== toast.id));
+              }
+            }}
+            style={{
+              ...styles.toastCard,
+              borderLeft: `4px solid ${borderColor}`,
+              cursor: (toast.actionTab || toast.meta?.roomId) ? 'pointer' : 'default',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
               <div style={{ marginTop: '2px', flexShrink: 0 }}>{getIcon()}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -215,7 +238,10 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
                 {toast.message && <div style={styles.message}>{toast.message}</div>}
               </div>
               <button
-                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setToasts(prev => prev.filter(t => t.id !== toast.id));
+                }}
                 style={styles.closeBtn}
                 title="Dismiss"
               >
@@ -304,6 +330,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
         if (!item.read) existing.hasUnread = true;
         if (new Date(item.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
           existing.timestamp = item.timestamp;
+          if (item.meta) existing.meta = item.meta;
         }
       } else {
         const entry = {
@@ -591,8 +618,19 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                     key={item.id}
                     onClick={() => {
                       markGroupRead(item.ids);
-                      if (targetTab && onSelectTab) {
-                        onSelectTab(targetTab);
+                      const resolvedTab = targetTab || (item?.meta?.roomId ? 'communication' : null);
+                      if (resolvedTab && onSelectTab) {
+                        onSelectTab(resolvedTab);
+                      }
+                      if (item?.meta?.roomId) {
+                        const jumpDetail = {
+                          roomId: String(item.meta.roomId),
+                          messageId: item.meta.messageId ? String(item.meta.messageId) : null,
+                        };
+                        window.__elitePendingChatJump = jumpDetail;
+                        window.dispatchEvent(new CustomEvent('elite-open-chat-room', { detail: jumpDetail }));
+                      }
+                      if (resolvedTab) {
                         onClose();
                       }
                     }}

@@ -768,6 +768,17 @@ export default function App() {
     setShowNotificationDrawer(false);
   }, [activeTab, activeDepartment]);
 
+  useEffect(() => {
+    const handleNavigateTabEvent = (e) => {
+      const targetTab = e?.detail?.tab;
+      if (targetTab) {
+        setActiveTab(targetTab);
+      }
+    };
+    window.addEventListener('elite-navigate-tab', handleNavigateTabEvent);
+    return () => window.removeEventListener('elite-navigate-tab', handleNavigateTabEvent);
+  }, []);
+
   const applyThemeDom = (mode) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
@@ -1828,11 +1839,15 @@ export default function App() {
         setChatUnreadCount((prev) => prev + 1);
       }
 
+      const rawRoomId = typeof msg.roomId === 'object' ? (msg.roomId?._id || msg.roomId?.id) : msg.roomId;
+      const msgIdStr = msg._id || msg.id || null;
+
       triggerPushNotification(
         `💬 Chat from ${senderName}`,
         msgContent,
         'info',
-        'communication'
+        'communication',
+        rawRoomId ? { roomId: String(rawRoomId), messageId: msgIdStr ? String(msgIdStr) : null } : null
       );
     };
 
@@ -1858,7 +1873,15 @@ export default function App() {
 
     const handleMention = (data) => {
       if (data && data.content) {
-        triggerPushNotification(`💬 Mentioned by ${data.senderName || 'Colleague'}`, data.content, 'info', 'communication');
+        const rawRoomId = typeof data.roomId === 'object' ? (data.roomId?._id || data.roomId?.id) : data.roomId;
+        const msgIdStr = data.messageId || data._id || null;
+        triggerPushNotification(
+          `💬 Mentioned by ${data.senderName || 'Colleague'}`,
+          data.content,
+          'info',
+          'communication',
+          rawRoomId ? { roomId: String(rawRoomId), messageId: msgIdStr ? String(msgIdStr) : null } : null
+        );
       }
     };
 

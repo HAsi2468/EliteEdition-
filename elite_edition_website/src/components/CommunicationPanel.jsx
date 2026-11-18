@@ -2791,6 +2791,48 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   }, []);
 
+  useEffect(() => {
+    const openTargetRoom = (detail) => {
+      const targetRoomId = detail?.roomId ? String(detail.roomId) : '';
+      if (!targetRoomId) return;
+      const targetMsgId = detail?.messageId ? String(detail.messageId) : null;
+      const found = (groups || []).find((g) => String(g._id) === targetRoomId);
+      if (found) {
+        if (window.__elitePendingChatJump?.roomId === targetRoomId) {
+          window.__elitePendingChatJump = null;
+        }
+        setMainTab('chat');
+        setPhoenixFilter('all');
+        setRosterTab('all');
+        handleSelectGroup(found);
+        if (targetMsgId) {
+          setPendingScrollMsgId(targetMsgId);
+        }
+      } else if (Array.isArray(groups) && groups.length > 0) {
+        if (window.__elitePendingChatJump?.roomId === targetRoomId) {
+          window.__elitePendingChatJump = null;
+        }
+        setMainTab('chat');
+        handleSelectGroup({ _id: targetRoomId, name: 'Conversation', type: 'group' });
+        if (targetMsgId) {
+          setPendingScrollMsgId(targetMsgId);
+        }
+      }
+    };
+
+    if (window.__elitePendingChatJump?.roomId) {
+      openTargetRoom(window.__elitePendingChatJump);
+    }
+
+    const handleOpenChatRoomEvent = (e) => {
+      if (e?.detail?.roomId) {
+        openTargetRoom(e.detail);
+      }
+    };
+    window.addEventListener('elite-open-chat-room', handleOpenChatRoomEvent);
+    return () => window.removeEventListener('elite-open-chat-room', handleOpenChatRoomEvent);
+  }, [groups]);
+
   const handleSelectGroup = (targetGroup) => {
     if (!targetGroup) return;
     const myId = String(currentUser?._id || currentUser?.id || '');
