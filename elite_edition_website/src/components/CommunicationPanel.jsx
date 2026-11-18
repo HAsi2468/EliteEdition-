@@ -794,37 +794,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [isCallMinimized, setIsCallMinimized] = useState(false);
 
   useEffect(() => {
-    if (!pendingScrollMsgId) return;
-    let attempts = 0;
-    let retryTimer = null;
-    const tryScroll = () => {
-      const el = document.getElementById(`msg_${pendingScrollMsgId}`) || document.querySelector(`[data-msg-id="${pendingScrollMsgId}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.remove('reply-jump-pulse');
-        void el.offsetWidth;
-        el.classList.add('reply-jump-pulse');
-        setTimeout(() => {
-          el.classList.remove('reply-jump-pulse');
-        }, 3000);
-        setPendingScrollMsgId(null);
-        return;
-      }
-      attempts += 1;
-      if (attempts < 30) {
-        retryTimer = setTimeout(tryScroll, 150);
-      } else {
-        setPendingScrollMsgId(null);
-      }
-    };
-    const timer = setTimeout(tryScroll, 120);
-    return () => {
-      clearTimeout(timer);
-      if (retryTimer) clearTimeout(retryTimer);
-    };
-  }, [pendingScrollMsgId, messages, activeGroup?._id, loadingMessages]);
-
-  useEffect(() => {
     let cancelled = false;
     const loadReminders = async () => {
       try {
@@ -1196,6 +1165,37 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   });
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!pendingScrollMsgId) return;
+    let attempts = 0;
+    let retryTimer = null;
+    const tryScroll = () => {
+      const el = document.getElementById(`msg_${pendingScrollMsgId}`) || document.querySelector(`[data-msg-id="${pendingScrollMsgId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.remove('reply-jump-pulse');
+        void el.offsetWidth;
+        el.classList.add('reply-jump-pulse');
+        setTimeout(() => {
+          el.classList.remove('reply-jump-pulse');
+        }, 3000);
+        setPendingScrollMsgId(null);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 30) {
+        retryTimer = setTimeout(tryScroll, 150);
+      } else {
+        setPendingScrollMsgId(null);
+      }
+    };
+    const timer = setTimeout(tryScroll, 120);
+    return () => {
+      clearTimeout(timer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [pendingScrollMsgId, messages, activeGroup?._id, loadingMessages]);
 
   // Group members view & edit state
   const [showMembersModal, setShowMembersModal] = useState(false);
