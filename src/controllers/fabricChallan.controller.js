@@ -1897,7 +1897,7 @@ const downloadChallanPdf = async (req, res) => {
     };
 
     const renderPage = (isColorPage) => {
-      const pageTintBg = isColorPage ? tintColor(companyBrandColor, 0.08) : tintColor(duplicateBrandColor, 0.06);
+      const pageTintBg = isColorPage ? tintColor(companyBrandColor, 0.94) : tintColor(duplicateBrandColor, 0.08);
 
       // Draw border
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
@@ -2074,7 +2074,7 @@ const downloadChallanPdf = async (req, res) => {
         doc.rect(x, dynTpTableStartY, tpColWidth, tableHeaderHeight).fill(pageTintBg);
         doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, dynTpTableStartY, tpColWidth, tableHeaderHeight).stroke();
         
-        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+        doc.fillColor(isColorPage ? '#ffffff' : '#000000').fontSize(12).font('Helvetica-Bold')
           .text('TP NO.', x, dynTpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
         doc.text('METRES', x + tpColWidth * 0.35, dynTpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
       }
