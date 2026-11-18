@@ -682,6 +682,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [streamHistoryError, setStreamHistoryError] = useState(null);
   const [translatedMap, setTranslatedMap] = useState({});
   const [translatingMsgId, setTranslatingMsgId] = useState(null);
+  const [speechRecLang, setSpeechRecLang] = useState(() => {
+    try {
+      return (typeof localStorage !== 'undefined' && localStorage.getItem('elite_voice_speech_lang')) || (typeof navigator !== 'undefined' && navigator.language) || 'en-IN';
+    } catch (_) {
+      return 'en-IN';
+    }
+  });
   const [preferredTranslateLang, setPreferredTranslateLang] = useState(() => {
     try {
       return (typeof localStorage !== 'undefined' && localStorage.getItem('elite_chat_translate_lang')) || 'English';
@@ -3823,6 +3830,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       msgType: 'human',
       priority: isUrgent ? 'urgent' : 'normal',
       attachment: audioAttachment,
+      transcript: audioAttachment.transcript || '',
       readBy: [senderId],
       isOptimistic: true
     };
@@ -3929,6 +3937,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       mediaRecorder.start();
       setIsRecordingAudio(true);
       liveTranscriptRef.current = '';
+      try {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+          const rec = new SpeechRec();
+          rec.continuous = true;
+          rec.interimResults = false;
+          rec.lang = speechRecLang || 'en-IN';
+          rec.onresult = (ev) => {
+            const chunks = [];
+            for (let i = 0; i < ev.results.length; i += 1) {
+              chunks.push(ev.results[i][0].transcript);
+            }
+            liveTranscriptRef.current = chunks.join(' ').trim();
+          };
+          rec.start();
+          speechRecRef.current = rec;
+        }
+      } catch (_) { }
       setRecordingSeconds(0);
       recordingSecondsRef.current = 0;
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
@@ -9259,6 +9285,56 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         <span>{slideCancelActive ? 'Release to Cancel ✕' : `Recording... ${String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:${String(recordingSeconds % 60).padStart(2, '0')}`}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <select
+                          value={speechRecLang}
+                          onChange={(e) => {
+                            const nextLang = e.target.value;
+                            setSpeechRecLang(nextLang);
+                            try { if (typeof localStorage !== 'undefined') localStorage.setItem('elite_voice_speech_lang', nextLang); } catch (_) {}
+                            try {
+                              if (speechRecRef.current) {
+                                speechRecRef.current.stop();
+                                speechRecRef.current = null;
+                              }
+                              const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+                              if (SpeechRec) {
+                                const rec = new SpeechRec();
+                                rec.continuous = true;
+                                rec.interimResults = false;
+                                rec.lang = nextLang;
+                                rec.onresult = (ev) => {
+                                  const chunks = [];
+                                  for (let i = 0; i < ev.results.length; i += 1) {
+                                    chunks.push(ev.results[i][0].transcript);
+                                  }
+                                  liveTranscriptRef.current = chunks.join(' ').trim();
+                                };
+                                rec.start();
+                                speechRecRef.current = rec;
+                              }
+                            } catch (_) {}
+                          }}
+                          title="Voice speech language"
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '2px 5px',
+                            borderRadius: '8px',
+                            border: '1px solid #fca5a5',
+                            background: '#ffffff',
+                            color: '#991b1b',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="en-IN">EN</option>
+                          <option value="gu-IN">ગુજરાતી</option>
+                          <option value="hi-IN">हिन्दी</option>
+                          <option value="mr-IN">मराठी</option>
+                          <option value="ta-IN">தமிழ்</option>
+                          <option value="pa-IN">ਪੰਜਾਬੀ</option>
+                          <option value="bn-IN">বাংলা</option>
+                          <option value="te-IN">తెలుగు</option>
+                        </select>
                         <button type="button" onClick={cancelAudioRecording} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>Cancel</button>
                         <button
                           type="button"
