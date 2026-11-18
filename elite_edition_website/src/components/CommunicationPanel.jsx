@@ -789,6 +789,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [dueReminderBanner, setDueReminderBanner] = useState(null);
   const [showRemindersModal, setShowRemindersModal] = useState(false);
   const [pendingScrollMsgId, setPendingScrollMsgId] = useState(null);
+  const pendingScrollMsgIdRef = useRef(null);
   const [forwardGroupConfirmed, setForwardGroupConfirmed] = useState(false);
   const isSendingRef = useRef(false);
   const [isCallMinimized, setIsCallMinimized] = useState(false);
@@ -1167,12 +1168,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
+    pendingScrollMsgIdRef.current = pendingScrollMsgId;
     if (!pendingScrollMsgId) return;
     let attempts = 0;
     let retryTimer = null;
     const tryScroll = () => {
       const el = document.getElementById(`msg_${pendingScrollMsgId}`) || document.querySelector(`[data-msg-id="${pendingScrollMsgId}"]`);
       if (el) {
+        forceScrollBottomUntilRef.current = 0;
+        isNearBottomRef.current = false;
+        pendingScrollMsgIdRef.current = null;
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.remove('reply-jump-pulse');
         void el.offsetWidth;
@@ -1187,6 +1192,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (attempts < 30) {
         retryTimer = setTimeout(tryScroll, 150);
       } else {
+        pendingScrollMsgIdRef.current = null;
         setPendingScrollMsgId(null);
       }
     };
@@ -2802,26 +2808,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (!targetRoomId) return;
       const targetMsgId = detail?.messageId ? String(detail.messageId) : null;
       const found = (groups || []).find((g) => String(g._id) === targetRoomId);
-      if (found) {
-        if (window.__elitePendingChatJump?.roomId === targetRoomId) {
-          window.__elitePendingChatJump = null;
-        }
-        setMainTab('chat');
-        setPhoenixFilter('all');
-        setRosterTab('all');
-        handleSelectGroup(found);
-        if (targetMsgId) {
-          setPendingScrollMsgId(targetMsgId);
-        }
-      } else if (Array.isArray(groups) && groups.length > 0) {
-        if (window.__elitePendingChatJump?.roomId === targetRoomId) {
-          window.__elitePendingChatJump = null;
-        }
-        setMainTab('chat');
-        handleSelectGroup({ _id: targetRoomId, name: 'Conversation', type: 'group' });
-        if (targetMsgId) {
-          setPendingScrollMsgId(targetMsgId);
-        }
+      const targetObj = found || (Array.isArray(groups) && groups.length > 0 ? { _id: targetRoomId, name: 'Conversation', type: 'group' } : null);
+      if (!targetObj) return;
+
+      if (window.__elitePendingChatJump?.roomId === targetRoomId) {
+        window.__elitePendingChatJump = null;
+      }
+      if (targetMsgId) {
+        pendingScrollMsgIdRef.current = targetMsgId;
+        forceScrollBottomUntilRef.current = 0;
+        isNearBottomRef.current = false;
+      }
+      setMainTab('chat');
+      setPhoenixFilter('all');
+      setRosterTab('all');
+      if (String(activeGroupIdRef.current || '') !== targetRoomId) {
+        handleSelectGroup(targetObj);
+      }
+      if (targetMsgId) {
+        setPendingScrollMsgId(targetMsgId);
       }
     };
 
@@ -2931,6 +2936,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // Instantly position at latest message BEFORE paint on thread open (no visible scroll)
   useLayoutEffect(() => {
     if (!activeGroup?._id) return;
+    if (pendingScrollMsgIdRef.current) return;
     isNearBottomRef.current = true;
     forceScrollBottomUntilRef.current = Date.now() + 1800;
     setShowScrollBottom(false);
@@ -2969,6 +2975,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   // Snap to latest message before paint whenever messages update while at bottom / opening chat
   useLayoutEffect(() => {
+    if (pendingScrollMsgIdRef.current) return;
     if ((isNearBottomRef.current || Date.now() <= forceScrollBottomUntilRef.current) && chatScrollRef.current) {
       instantSnapBottom();
     }
