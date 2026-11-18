@@ -88,14 +88,16 @@ export function MobileBottomNav({
 
   return (
     <nav
-      className="mobile-bottom-nav"
+      className="mobile-bottom-nav glass-panel"
       style={{
         position: 'fixed',
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#ffffff',
-        borderTop: '1px solid #e2e8f0',
+        background: 'var(--bg-glass-heavy, var(--bg-card, rgba(15, 23, 42, 0.92)))',
+        backdropFilter: 'blur(16px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+        borderTop: '1px solid var(--border-light, rgba(148, 163, 184, 0.22))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
@@ -104,7 +106,7 @@ export function MobileBottomNav({
         zIndex: 9000,
         height: 'calc(54px + env(safe-area-inset-bottom, 0px))',
         boxSizing: 'border-box',
-        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)',
+        boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.14)',
         ...style
       }}
     >
@@ -112,6 +114,7 @@ export function MobileBottomNav({
         const isMore = item.id === '__more__';
         const isActive = !isMore && (activeTab === item.id);
         const count = badgeCounts[item.id];
+        const labelColor = isActive ? 'var(--primary, #3b82f6)' : 'var(--text-secondary, #94a3b8)';
 
         return (
           <button
@@ -135,7 +138,7 @@ export function MobileBottomNav({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: isActive ? '#1d4ed8' : '#64748b',
+              color: labelColor,
               fontWeight: isActive ? 700 : 500,
               fontSize: '12px',
               position: 'relative',
@@ -144,7 +147,7 @@ export function MobileBottomNav({
               transition: 'color 0.15s ease'
             }}
           >
-            <span style={{ position: 'relative' }}>
+            <span style={{ position: 'relative', color: labelColor }}>
               {item.label}
               {count > 0 && (
                 <span

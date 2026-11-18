@@ -193,6 +193,14 @@ export function MessageInfoModal({ message, onClose }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (!message?._id) return;
     setLoading(true);
     api.getChatMessageInfo(message._id)

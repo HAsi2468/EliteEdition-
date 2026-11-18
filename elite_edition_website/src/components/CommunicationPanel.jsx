@@ -10,6 +10,7 @@ import ToolResultDispatcher from './cards/ToolResultDispatcher';
 import ChatContainer from './cards/ChatContainer';
 import EmojiPickerPopover from './EmojiPickerPopover';
 import { useFileUpload } from '../hooks/useFileUpload';
+import { triggerEliteAlert, showToast } from '../services/dialogService';
 import { ChatStreamSkeleton } from './common/Skeletons';
 import '../styles/communication.css';
 import {
@@ -785,7 +786,38 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [reminderTargetMsg, setReminderTargetMsg] = useState(null);
   const [myReminders, setMyReminders] = useState([]);
   const [dueReminderBanner, setDueReminderBanner] = useState(null);
+  const [showRemindersModal, setShowRemindersModal] = useState(false);
+  const [pendingScrollMsgId, setPendingScrollMsgId] = useState(null);
+  const [forwardGroupConfirmed, setForwardGroupConfirmed] = useState(false);
+  const isSendingRef = useRef(false);
   const [isCallMinimized, setIsCallMinimized] = useState(false);
+
+  useEffect(() => {
+    if (!pendingScrollMsgId) return;
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(`msg_${pendingScrollMsgId}`) || document.querySelector(`[data-msg-id="${pendingScrollMsgId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.remove('reply-jump-pulse');
+        void el.offsetWidth;
+        el.classList.add('reply-jump-pulse');
+        setTimeout(() => {
+          el.classList.remove('reply-jump-pulse');
+        }, 2600);
+        setPendingScrollMsgId(null);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 12) {
+        setTimeout(tryScroll, 150);
+      } else {
+        setPendingScrollMsgId(null);
+      }
+    };
+    const timer = setTimeout(tryScroll, 100);
+    return () => clearTimeout(timer);
+  }, [pendingScrollMsgId, messages, activeGroup?._id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4110,9 +4142,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const handleTogglePin = (messageId) => {
-    if (socket && activeGroup) {
+    if (!messageId || !activeGroup) return;
+    const targetMsg = messages.find((m) => String(m._id) === String(messageId));
+    const nextPinned = !Boolean(targetMsg?.isPinned);
+    setMessages((prev) =>
+      prev.map((m) => (String(m._id) === String(messageId) ? { ...m, isPinned: nextPinned } : m))
+    );
+    if (socket && socket.connected) {
       socket.emit('toggle-pin-message', { messageId, roomId: activeGroup._id });
     }
+    showToast(
+      nextPinned ? 'Message Pinned' : 'Message Unpinned',
+      nextPinned ? 'Pinned to room banner.' : 'Removed from pinned messages.',
+      'info'
+    );
   };
 
   const handleExportChatLog = () => {
@@ -4233,12 +4276,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     if (inRoomQuery && inRoomQuery.trim()) {
       const q = inRoomQuery.toLowerCase();
-      filteredList = filteredList.filter(
-        (m) =>
-          (m.content || '').toLowerCase().includes(q) ||
+      filteredList = filteredList.filter((m) => {
+        const readableText = (m.isEncrypted && decryptedMap[m._id]) ? decryptedMap[m._id] : (m.content || '');
+        return (
+          readableText.toLowerCase().includes(q) ||
           (m.senderName || m.senderId?.name || '').toLowerCase().includes(q) ||
           (m.moduleName || '').toLowerCase().includes(q)
-      );
+        );
+      });
     }
 
     const sortedList = [...filteredList].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
@@ -4522,12 +4567,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleOpenForwardModal = (msg) => {
     setForwardTargetMsg(msg);
     setForwardTargetRoomId('');
+    setForwardGroupConfirmed(false);
     setShowForwardModal(true);
   };
 
   const handleSubmitForward = async () => {
     if (!forwardTargetMsg || !forwardTargetRoomId) {
-      alert('Please select a target channel or DM.');
+      triggerEliteAlert('Validation', 'Please select a target channel or DM.', 'warning');
+      return;
+    }
+    const targetRoom = groups.find((g) => String(g._id) === String(forwardTargetRoomId));
+    if (targetRoom && targetRoom.type !== 'direct' && !forwardGroupConfirmed) {
+      triggerEliteAlert('Confirmation Required', 'Please confirm forwarding into a multi-member group channel.', 'warning');
       return;
     }
     setForwardingMsg(true);
@@ -4535,13 +4586,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       const res = await api.forwardMessage(forwardTargetMsg._id, forwardTargetRoomId);
       if (res.success) {
         setShowForwardModal(false);
-        alert('Message forwarded successfully!');
+        setForwardGroupConfirmed(false);
+        triggerEliteAlert('Success', 'Message forwarded successfully!', 'success');
         if (String(activeGroup?._id) === String(forwardTargetRoomId)) {
           setMessages((prev) => [...prev, res.data]);
         }
       }
     } catch (err) {
-      alert('Failed to forward message: ' + err.message);
+      triggerEliteAlert('Forward Failed', 'Failed to forward message: ' + (err?.message || 'Unknown error'), 'error');
     } finally {
       setForwardingMsg(false);
     }
@@ -4755,19 +4807,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleSendMessage = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isSendingRef.current) return;
     if (uploadingFile) {
-      alert('Please wait for the attachment to finish uploading before sending.');
+      triggerEliteAlert('Upload in Progress', 'Please wait for the attachment to finish uploading before sending.', 'warning');
       return;
     }
     if ((!inputMessage.trim() && !attachedFile) || !activeGroup) return;
 
     const senderId = currentUser?.id || currentUser?._id;
     if (!senderId) {
-      alert('User session not loaded. Please log in again.');
+      triggerEliteAlert('Session Required', 'User session not loaded. Please log in again.', 'warning');
       return;
     }
 
-    const messageText = inputMessage.trim();
+    isSendingRef.current = true;
+    try {
+      const messageText = inputMessage.trim();
 
     const finalMentionedUserIds = Array.from(
       new Set([
@@ -4950,6 +5005,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           )
         );
       }
+    }
+    } finally {
+      isSendingRef.current = false;
     }
   };
 
@@ -5159,7 +5217,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     try {
       const res = await api.syncCommunicationGroups();
       if (res.success) {
-        alert(`Authority Groups synchronized successfully! (${res.count || 0} groups updated)`);
+        triggerEliteAlert('Success', `Authority Groups synchronized successfully! (${res.count || 0} groups updated)`, 'success');
         await fetchGroups(true);
       }
     } catch (err) {
@@ -5219,7 +5277,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (res.success && res.data) {
         setGroupMembers(res.data);
         setIsEditingMembers(false);
-        alert('Group members updated successfully!');
+        triggerEliteAlert('Success', 'Group members updated successfully!', 'success');
         await fetchGroups(false);
       }
     } catch (err) {
@@ -6103,6 +6161,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           } else if (rawRoomId) {
                             handleSelectGroup({ _id: rawRoomId, name: roomName || 'Conversation', type: m.roomId?.type || 'group' });
                           }
+                          if (m?._id) {
+                            setPendingScrollMsgId(m._id);
+                          }
                         }}
                         style={{
                           padding: '7px 10px',
@@ -6402,6 +6463,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           </>
                         )}
 
+                        {/* Reminders List Quick Trigger */}
+                        <button
+                          type="button"
+                          className="phoenix-action-btn-neutral"
+                          style={{
+                            position: 'relative',
+                            width: isMobileScreen ? 32 : 36,
+                            height: isMobileScreen ? 32 : 36,
+                            color: '#f59e0b',
+                            background: 'rgba(245,158,11,0.1)',
+                            border: '1px solid rgba(245,158,11,0.25)'
+                          }}
+                          onClick={() => setShowRemindersModal(true)}
+                          title={`Scheduled Reminders (${myReminders.length})`}
+                        >
+                          <Bell size={isMobileScreen ? 14 : 16} />
+                          {myReminders.length > 0 && (
+                            <span style={{
+                              position: 'absolute',
+                              top: -4,
+                              right: -4,
+                              minWidth: 16,
+                              height: 16,
+                              borderRadius: 999,
+                              background: '#f59e0b',
+                              color: '#0f172a',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0 4px'
+                            }}>
+                              {myReminders.length}
+                            </span>
+                          )}
+                        </button>
+
                         {/* ERP Operations Copilot Quick Trigger */}
                         <button
                           type="button"
@@ -6596,9 +6695,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     autoFocus
                   />
                   {inRoomQuery && (
-                    <button onClick={() => setInRoomQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                      <X size={14} />
-                    </button>
+                    <>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {chatFilteredCount} {chatFilteredCount === 1 ? 'match' : 'matches'}
+                      </span>
+                      <button onClick={() => setInRoomQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Clear search">
+                        <X size={14} />
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -7166,7 +7270,31 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     type="button"
                                     onClick={async () => {
                                       setActiveMsgMenuId(null);
-                                      await api.toggleStarChatMessage(msg._id).catch(() => {});
+                                      const myUid = String(currentUser?._id || currentUser?.id || '');
+                                      const wasStarred = Boolean(
+                                        msg.isStarred ||
+                                        (Array.isArray(msg.starredBy) && msg.starredBy.some((id) => String(id?._id || id) === myUid))
+                                      );
+                                      setMessages((prev) =>
+                                        prev.map((m) => {
+                                          if (String(m._id) !== String(msg._id)) return m;
+                                          const curStars = Array.isArray(m.starredBy) ? m.starredBy : [];
+                                          const nextStars = wasStarred
+                                            ? curStars.filter((id) => String(id?._id || id) !== myUid)
+                                            : [...curStars, myUid];
+                                          return { ...m, isStarred: !wasStarred, starredBy: nextStars };
+                                        })
+                                      );
+                                      try {
+                                        await api.toggleStarChatMessage(msg._id);
+                                        showToast(
+                                          wasStarred ? 'Unstarred' : 'Message Starred',
+                                          wasStarred ? 'Removed from Starred Messages.' : 'Saved to Starred Messages.',
+                                          'info'
+                                        );
+                                      } catch {
+                                        showToast('Star Failed', 'Could not update star status.', 'error');
+                                      }
                                     }}
                                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                   >
@@ -7255,8 +7383,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (navigator.clipboard) {
-                                          navigator.clipboard.writeText(msg.content);
+                                        const textToCopy = (msg.isEncrypted && decryptedMap[msg._id]) ? decryptedMap[msg._id] : (msg.content || '');
+                                        if (navigator.clipboard && textToCopy) {
+                                          navigator.clipboard.writeText(textToCopy)
+                                            .then(() => showToast('Copied', 'Message copied to clipboard.', 'success'))
+                                            .catch(() => showToast('Copy Failed', 'Clipboard access denied.', 'warning'));
                                         }
                                         setActiveMsgMenuId(null);
                                       }}
@@ -8211,7 +8342,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               paddingRight: isMe ? '4px' : 0
                             }}
                           >
-                            {msg.isPinned && <Pin size={10} color="#d97706" style={{ transform: 'rotate(45deg)' }} />}
+                            {msg.isPinned && <Pin size={10} color="#d97706" style={{ transform: 'rotate(45deg)' }} title="Pinned" />}
+                            {(msg.isStarred || (Array.isArray(msg.starredBy) && msg.starredBy.some((id) => String(id?._id || id) === String(currentUser?._id || currentUser?.id || '')))) && (
+                              <Star size={10} color="#fbbf24" fill="#fbbf24" title="Starred" />
+                            )}
                             <span>{formatTime(msg.createdAt)}</span>
                             {isMe && (() => {
                               if (msg.sendFailed) {
@@ -10987,12 +11121,79 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           existingReminders={myReminders}
           onClose={() => setReminderTargetMsg(null)}
           onCreated={(created) => {
-            if (created) setMyReminders((prev) => [...prev, created]);
+            if (created) {
+              setMyReminders((prev) => [...prev, created]);
+              const whenStr = created.remindAt
+                ? new Date(created.remindAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : 'scheduled time';
+              showToast('Reminder Scheduled', `You will be reminded at ${whenStr}.`, 'success');
+            }
           }}
           onDeleted={(deletedId) => {
             setMyReminders((prev) => prev.filter((r) => String(r._id) !== String(deletedId)));
+            showToast('Reminder Cancelled', 'Scheduled reminder removed.', 'info');
           }}
         />
+      )}
+
+      {showRemindersModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setShowRemindersModal(false)}
+        >
+          <div
+            className="glass-panel"
+            style={{ width: '100%', maxWidth: 460, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Bell size={18} color="#f59e0b" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Scheduled Reminders ({myReminders.length})
+                </h3>
+              </div>
+              <button type="button" onClick={() => setShowRemindersModal(false)} className="btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+                Close
+              </button>
+            </div>
+            <div style={{ padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {myReminders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  No active message reminders. Use "Remind Me" from any message menu to set one.
+                </div>
+              ) : (
+                myReminders.map((r) => (
+                  <div key={r._id} style={{ padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid var(--border-light)', background: 'var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f59e0b', marginBottom: '2px' }}>
+                        {r.remindAt ? new Date(r.remindAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Scheduled'}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.note || r.messageSnippet || r.messageId?.content || 'Message reminder'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await api.deleteChatReminder(r._id);
+                          setMyReminders((prev) => prev.filter((item) => String(item._id) !== String(r._id)));
+                          showToast('Reminder Cancelled', 'Scheduled reminder removed.', 'info');
+                        } catch {
+                          showToast('Error', 'Failed to cancel reminder.', 'error');
+                        }
+                      }}
+                      style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {dueReminderBanner && typeof document !== 'undefined' && ReactDOM.createPortal(
@@ -11118,17 +11319,47 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </label>
                 <select
                   value={forwardTargetRoomId}
-                  onChange={(e) => setForwardTargetRoomId(e.target.value)}
+                  onChange={(e) => {
+                    setForwardTargetRoomId(e.target.value);
+                    setForwardGroupConfirmed(false);
+                  }}
                   style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 >
                   <option value="">-- Choose Channel or DM Room --</option>
-                  {groups.map((g) => (
-                    <option key={g._id} value={g._id}>
-                      {g.type === 'direct' ? `💬 DM: ${g.name}` : `🏢 Group: ${g.name} (${g.department})`}
-                    </option>
-                  ))}
+                  <optgroup label="Saved Messages &amp; Direct Messages">
+                    {groups.filter((g) => g.type === 'direct').map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {`💬 DM: ${g.name}`}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Group Channels (Multi-Member)">
+                    {groups.filter((g) => g.type !== 'direct').map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {`🏢 Group: ${g.name}${g.department ? ` (${g.department})` : ''}`}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
+
+              {(() => {
+                const selectedTarget = groups.find((g) => String(g._id) === String(forwardTargetRoomId));
+                if (!selectedTarget || selectedTarget.type === 'direct') return null;
+                return (
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '0.6rem 0.75rem', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', fontSize: '0.76rem', color: '#f59e0b', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={forwardGroupConfirmed}
+                      onChange={(e) => setForwardGroupConfirmed(e.target.checked)}
+                      style={{ marginTop: '2px' }}
+                    />
+                    <span>
+                      <strong>Multi-member group:</strong> Confirm forwarding this message into <strong>{selectedTarget.name}</strong>.
+                    </span>
+                  </label>
+                );
+              })()}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
                 <button
@@ -11142,9 +11373,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 <button
                   type="button"
                   onClick={handleSubmitForward}
-                  disabled={forwardingMsg || !forwardTargetRoomId}
+                  disabled={forwardingMsg || !forwardTargetRoomId || (groups.find((g) => String(g._id) === String(forwardTargetRoomId))?.type !== 'direct' && !forwardGroupConfirmed)}
                   className="btn-primary"
-                  style={{ fontSize: '0.8rem', padding: '0.45rem 1.1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', opacity: !forwardTargetRoomId ? 0.6 : 1 }}
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 1.1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', opacity: (!forwardTargetRoomId || (groups.find((g) => String(g._id) === String(forwardTargetRoomId))?.type !== 'direct' && !forwardGroupConfirmed)) ? 0.6 : 1 }}
                 >
                   {forwardingMsg ? 'Forwarding...' : 'Forward Message →'}
                 </button>

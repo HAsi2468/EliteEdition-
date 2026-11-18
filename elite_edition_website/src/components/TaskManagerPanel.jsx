@@ -824,13 +824,26 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         const createdTask = res.data || res;
         const createdId = getTaskId(createdTask);
         setTasks((prev) => {
-          const exists = prev.some((t) => getTaskId(t) === createdId);
-          if (exists) return prev;
-          return [createdTask, ...prev];
+          const safePrev = Array.isArray(prev) ? prev : [];
+          const exists = safePrev.some((t) => getTaskId(t) === createdId);
+          if (exists) return safePrev;
+          return [createdTask, ...safePrev];
         });
+        setSearchQuery('');
+        setPriorityFilter('all');
+        setStatusFilter('all');
+        if (taskScope === 'completed' || taskScope === 'overdue' || taskScope === 'today') {
+          setTaskScope('all');
+        }
         setShowCreateModal(false);
         resetCreateForm();
         triggerEliteAlert('Success', `Task "${createdTask.title || newTitle.trim()}" created successfully!`, 'success');
+        // Background sync so populated fields and board counters match server immediately
+        api.getTasks({ limit: 200 }).then((fresh) => {
+          if (fresh?.success && Array.isArray(fresh?.data)) {
+            setTasks(isMasterAdmin ? fresh.data : fresh.data.filter(isTaskVisible));
+          }
+        }).catch(() => {});
       } else {
         throw new Error(res?.message || 'Server did not return created task.');
       }
@@ -1013,62 +1026,71 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         userId: myId,
         senderName: myName
       });
-      if (res.success && res.data) {
+      if (res?.success && res?.data) {
         const updated = res.data;
         const upId = getTaskId(updated);
         setSelectedTask(updated);
-        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        setTasks((prev) => (Array.isArray(prev) ? prev.map((t) => (t && getTaskId(t) === upId ? updated : t)) : []));
         setNewCommentText('');
+      } else if (res?.message) {
+        triggerEliteAlert('Comment Error', res.message, 'error');
       }
     } catch (err) {
-      triggerEliteAlert('Comment Error', 'Failed to add comment: ' + err.message, 'error');
+      triggerEliteAlert('Comment Error', 'Failed to add comment: ' + (err?.message || 'Unknown error'), 'error');
     }
   };
 
   const handleEditComment = async (commentId, text) => {
-    if (!selectedTask || !text || !text.trim()) return;
+    if (!selectedTask || !text || !text.trim() || !commentId) return;
     try {
       const res = await api.editTaskComment(getTaskId(selectedTask), commentId, { text: text.trim() });
-      if (res.success && res.data) {
+      if (res?.success && res?.data) {
         const updated = res.data;
         const upId = getTaskId(updated);
         setSelectedTask(updated);
-        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        setTasks((prev) => (Array.isArray(prev) ? prev.map((t) => (t && getTaskId(t) === upId ? updated : t)) : []));
         setEditingCommentId(null);
         setEditingCommentText('');
+      } else if (res?.message) {
+        triggerEliteAlert('Comment Error', res.message, 'error');
       }
     } catch (err) {
-      triggerEliteAlert('Comment Error', 'Failed to edit comment: ' + err.message, 'error');
+      triggerEliteAlert('Comment Error', 'Failed to edit comment: ' + (err?.message || 'Unknown error'), 'error');
     }
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!selectedTask) return;
+    if (!selectedTask || !commentId) return;
     try {
       const res = await api.deleteTaskComment(getTaskId(selectedTask), commentId);
-      if (res.success && res.data) {
+      if (res?.success && res?.data) {
         const updated = res.data;
         const upId = getTaskId(updated);
         setSelectedTask(updated);
-        setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
+        setTasks((prev) => (Array.isArray(prev) ? prev.map((t) => (t && getTaskId(t) === upId ? updated : t)) : []));
+      } else if (res?.message) {
+        triggerEliteAlert('Comment Error', res.message, 'error');
       }
     } catch (err) {
-      triggerEliteAlert('Comment Error', 'Failed to delete comment: ' + err.message, 'error');
+      triggerEliteAlert('Comment Error', 'Failed to delete comment: ' + (err?.message || 'Unknown error'), 'error');
     }
   };
 
   const handleDeleteTask = async (taskId, e) => {
     if (e) e.stopPropagation();
+    const targetId = String(taskId);
+    const targetTask = (selectedTask && getTaskId(selectedTask) === targetId)
+      ? selectedTask
+      : (tasks || []).find((t) => getTaskId(t) === targetId);
+    const taskLabel = targetTask?.title ? `"${targetTask.title}"` : 'this task';
     const confirmed = await triggerEliteConfirm({
       title: 'Delete Task',
-      message: 'Are you sure you want to delete this task? This action cannot be undone.',
+      message: `Are you sure you want to delete ${taskLabel}? This action cannot be undone.`,
       confirmText: 'Yes',
       cancelText: 'No',
       type: 'danger'
     });
     if (!confirmed) return;
-
-    const targetId = String(taskId);
     // Optimistic immediate UI removal to prevent lingering and duplicate clicks
     const backupTasks = tasks;
     setTasks((prev) => prev.filter((t) => getTaskId(t) !== targetId));
@@ -1201,11 +1223,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
       (cleanTerm && (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username || '') : String(t.createdBy)).toLowerCase().includes(cleanTerm))
     );
 
-    const commentsMatch = (t.comments || []).some((c) =>
-      (c.text || '').toLowerCase().includes(term) ||
-      (cleanTerm && (c.text || '').toLowerCase().includes(cleanTerm)) ||
-      (c.senderName || '').toLowerCase().includes(term) ||
-      (cleanTerm && (c.senderName || '').toLowerCase().includes(cleanTerm))
+    const commentsMatch = (t.comments || []).filter(Boolean).some((c) =>
+      String(c.text || '').toLowerCase().includes(term) ||
+      (cleanTerm && String(c.text || '').toLowerCase().includes(cleanTerm)) ||
+      String(c.senderName || '').toLowerCase().includes(term) ||
+      (cleanTerm && String(c.senderName || '').toLowerCase().includes(cleanTerm))
     );
 
     return titleMatch || descMatch || refMatch || clientMatch || lotMatch || assigneeMatch || creatorMatch || commentsMatch;
@@ -6117,23 +6139,33 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                   </h4>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.6rem', maxHeight: 200, overflowY: 'auto' }}>
-                    {(selectedTask.comments || []).map((c, idx) => {
-                      const commentId = c._id || idx;
+                    {(selectedTask.comments || []).filter(Boolean).map((c, idx) => {
+                      const commentId = c._id || `idx_${idx}`;
+                      const hasServerId = Boolean(c._id);
                       const isEditing = editingCommentId === commentId;
                       const commentSenderId = String(c.sender?._id || c.sender || c.user || c.userId || '');
-                      const canModify = isMasterAdmin || commentSenderId === String(myId) || (c.senderName && (c.senderName || '').toLowerCase() === (myName || '').toLowerCase());
+                      const senderLabel = typeof c.senderName === 'string' ? c.senderName : (c.sender?.name || 'Staff');
+                      const canModify = hasServerId && (isMasterAdmin || commentSenderId === String(myId) || senderLabel.toLowerCase() === String(myName || '').toLowerCase());
+                      const commentTimeStr = c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 
                       return (
                         <div key={commentId} style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid var(--border-light)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563eb' }}>{c.senderName || 'Staff'}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563eb' }}>{senderLabel}</span>
+                              {commentTimeStr && (
+                                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                                  {commentTimeStr}{c.editedAt ? ' (edited)' : ''}
+                                </span>
+                              )}
+                            </div>
                             {canModify && !isEditing && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setEditingCommentId(commentId);
-                                    setEditingCommentText(c.text || '');
+                                    setEditingCommentText(String(c.text || ''));
                                   }}
                                   style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '1px 3px' }}
                                   title="Edit comment"
@@ -6177,11 +6209,26 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                               </div>
                             </div>
                           ) : (
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', marginTop: '2px', wordBreak: 'break-word' }}>{c.text}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', marginTop: '2px', wordBreak: 'break-word' }}>{String(c.text || '')}</div>
                           )}
                         </div>
                       );
                     })}
+                    {(selectedTask.auditLogs || []).length > 0 && (
+                      <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed var(--border-light)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Activity Log</div>
+                        {(selectedTask.auditLogs || []).slice(-10).reverse().map((log, lIdx) => (
+                          <div key={log?._id || `log_${lIdx}`} style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+                            <span>• <strong>{log?.actorName || log?.userName || 'System'}</strong>: {log?.action || log?.details || 'Updated task'}</span>
+                            {(log?.timestamp || log?.createdAt) && (
+                              <span style={{ whiteSpace: 'nowrap', color: '#94a3b8' }}>
+                                {new Date(log.timestamp || log.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '0.4rem' }}>
@@ -6218,7 +6265,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 <div>
                   <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Priority</label>
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '3px 8px', borderRadius: '4px', background: getPriorityBadge(selectedTask.priority).bg, color: getPriorityBadge(selectedTask.priority).color }}>
-                    {selectedTask.priority.toUpperCase()}
+                    {String(selectedTask.priority || 'medium').toUpperCase()}
                   </span>
                 </div>
 

@@ -81,8 +81,8 @@ export function useFileUpload(defaultOptions = {}) {
       let fileToUpload = file;
       const fileType = getFileType(file);
 
-      // Compress large images if enabled
-      if (fileType === 'image' && opts.compress !== false && !file.name?.toLowerCase().endsWith('.svg')) {
+      // Compress large images if enabled (skip small images <= 350KB so lossless PNGs keep exact magic bytes)
+      if (fileType === 'image' && opts.compress !== false && !file.name?.toLowerCase().endsWith('.svg') && file.size > 350 * 1024) {
         try {
           const imageCompressionModule = await import('browser-image-compression');
           const imageCompression = imageCompressionModule.default || imageCompressionModule;
@@ -91,10 +91,24 @@ export function useFileUpload(defaultOptions = {}) {
             maxWidthOrHeight: opts.maxWidthOrHeight || 2560,
             useWebWorker: true
           });
-          // Re-wrap compressed Blob into a File object with original name preserved
-          fileToUpload = new File([compressedBlob], originalInputFileName || 'image.png', {
-            type: compressedBlob.type || file.type || 'image/png'
-          });
+          // Sync filename extension with actual compressed MIME/magic-byte format so backend signature checks pass
+          const outMime = (compressedBlob.type || file.type || 'image/png').toLowerCase();
+          const mimeToExt = {
+            'image/jpeg': '.jpg',
+            'image/jpg': '.jpg',
+            'image/png': '.png',
+            'image/webp': '.webp',
+            'image/gif': '.gif',
+            'image/bmp': '.bmp'
+          };
+          const targetExt = mimeToExt[outMime];
+          let targetName = originalInputFileName || `image${targetExt || '.png'}`;
+          if (targetExt && /\.[a-z0-9]+$/i.test(targetName)) {
+            targetName = targetName.replace(/\.[a-z0-9]+$/i, targetExt);
+          } else if (targetExt) {
+            targetName = `${targetName}${targetExt}`;
+          }
+          fileToUpload = new File([compressedBlob], targetName, { type: outMime });
         } catch (compressionErr) {
           console.warn('[useFileUpload] Image compression skipped/failed:', compressionErr);
           fileToUpload = file;

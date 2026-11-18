@@ -225,169 +225,171 @@ export default function GlobalQuickActions({
     >
       {/* Action Menu Card */}
       {isOpen && (
-        <div
-          style={{
-            marginBottom: '12px',
-            width: '320px',
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            borderRadius: '16px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 20px 40px -8px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-            overflow: 'hidden',
-            animation: 'slideUpFade 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-            transformOrigin: 'bottom right'
-          }}
-        >
-          {/* Menu Header */}
           <div
+            className="glass-panel"
             style={{
-              padding: '12px 16px',
-              borderBottom: '1px solid #f1f5f9',
-              background: 'linear-gradient(135deg, #f8fafc, #ffffff)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              marginBottom: '12px',
+              width: '320px',
+              maxWidth: 'calc(100vw - 24px)',
+              background: 'var(--bg-modal, rgba(15, 23, 42, 0.95))',
+              backdropFilter: 'blur(20px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+              borderRadius: '16px',
+              border: '1px solid var(--border-light, rgba(148, 163, 184, 0.22))',
+              boxShadow: '0 20px 40px -8px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(148, 163, 184, 0.12)',
+              overflow: 'hidden',
+              animation: 'slideUpFade 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+              transformOrigin: 'bottom right'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '6px',
-                  background: 'rgba(37, 99, 235, 0.1)',
-                  color: '#2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Zap size={14} />
-              </div>
-              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                Quick Actions
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span
-                style={{
-                  fontSize: '0.6875rem',
-                  color: '#64748b',
-                  background: '#f1f5f9',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  fontWeight: 600
-                }}
-              >
-                Esc
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                title="Close Quick Actions"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  borderRadius: '4px'
-                }}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* Action Items List */}
-          <div style={{ padding: '6px' }}>
-            {quickActions.map((item) => {
-              const IconComp = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={item.onClick}
+            {/* Menu Header */}
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border-light, rgba(148, 163, 184, 0.18))',
+                background: 'var(--bg-th, rgba(30, 41, 59, 0.72))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
                   style={{
-                    width: '100%',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    background: 'rgba(37, 99, 235, 0.15)',
+                    color: '#3b82f6',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#f8fafc';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
+                    justifyContent: 'center'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                    <div
+                  <Zap size={14} />
+                </div>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary, #f8fafc)', letterSpacing: '-0.01em' }}>
+                  Quick Actions
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span
+                  style={{
+                    fontSize: '0.6875rem',
+                    color: 'var(--text-muted, #94a3b8)',
+                    background: 'var(--bg-muted, rgba(148, 163, 184, 0.16))',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontWeight: 600
+                  }}
+                >
+                  Esc
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  title="Close Quick Actions"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted, #94a3b8)',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRadius: '4px'
+                  }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Action Items List */}
+            <div style={{ padding: '6px' }}>
+              {quickActions.map((item) => {
+                const IconComp = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onClick}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--bg-hover, rgba(148, 163, 184, 0.14))';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '8px',
+                          background: `${item.color}20`,
+                          color: item.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <IconComp size={16} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary, #f8fafc)', lineHeight: 1.2 }}>
+                          {item.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.6875rem',
+                            color: 'var(--text-muted, #94a3b8)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            marginTop: '2px'
+                          }}
+                        >
+                          {item.desc}
+                        </div>
+                      </div>
+                    </div>
+
+                    <kbd
                       style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: `${item.color}15`,
-                        color: item.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        fontSize: '0.625rem',
+                        fontFamily: 'inherit',
+                        fontWeight: 600,
+                        background: 'var(--bg-muted, rgba(148, 163, 184, 0.16))',
+                        color: 'var(--text-secondary, #cbd5e1)',
+                        padding: '2px 6px',
+                        borderRadius: '5px',
+                        border: '1px solid var(--border-light, rgba(148, 163, 184, 0.24))',
+                        marginLeft: '8px',
                         flexShrink: 0
                       }}
                     >
-                      <IconComp size={16} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', lineHeight: 1.2 }}>
-                        {item.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '0.6875rem',
-                          color: '#64748b',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          marginTop: '2px'
-                        }}
-                      >
-                        {item.desc}
-                      </div>
-                    </div>
-                  </div>
-
-                  <kbd
-                    style={{
-                      fontSize: '0.625rem',
-                      fontFamily: 'inherit',
-                      fontWeight: 600,
-                      background: '#f1f5f9',
-                      color: '#475569',
-                      padding: '2px 6px',
-                      borderRadius: '5px',
-                      border: '1px solid #e2e8f0',
-                      marginLeft: '8px',
-                      flexShrink: 0
-                    }}
-                  >
-                    {item.shortcut}
-                  </kbd>
-                </button>
-              );
-            })}
+                      {item.shortcut}
+                    </kbd>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
       )}
 
       <style>{`

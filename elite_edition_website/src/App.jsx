@@ -2563,24 +2563,24 @@ export default function App() {
       {/* Apple iOS PWA Installation Prompt (iOS 16.4+ Web Push Support) */}
       <IosInstallPrompt />
 
-      {/* Notifications permission bar - minimal */}
+      {/* Notifications permission bar - minimal, positioned at top-right so it never overlaps bottom composer */}
       {isAuthenticated && notificationPerm === 'denied' && !permSnoozedSession && (
         <div style={{
           position: 'fixed',
-          bottom: '16px',
-          left: '16px',
-          maxWidth: '440px',
+          top: 'calc(env(safe-area-inset-top, 0px) + 64px)',
+          right: '12px',
+          maxWidth: 'min(420px, calc(100vw - 24px))',
           background: 'var(--danger-bg, #fef2f2)',
           border: '1px solid var(--danger-border, #fecaca)',
           borderRadius: '10px',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
           color: 'var(--danger-text, #991b1b)',
-          padding: '10px 16px',
+          padding: '8px 12px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           fontSize: 'var(--font-size-meta, 0.75rem)',
-          gap: '12px',
+          gap: '10px',
           flexWrap: 'wrap',
           zIndex: 1100
         }}>
