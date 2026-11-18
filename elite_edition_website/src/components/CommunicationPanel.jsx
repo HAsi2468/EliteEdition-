@@ -5403,11 +5403,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       baseItems = [...groups];
     }
 
+    // Hide archived chats from main view unless explicitly searching or viewing archived
+    const isRoomArchivedForMe = (g) => Array.isArray(g.archivedBy) && g.archivedBy.some((id) => String(id?._id || id?.id || id) === myId);
+    if (!term && phoenixFilter !== 'archived') {
+      baseItems = baseItems.filter((g) => !isRoomArchivedForMe(g));
+    }
+
     // Filter by Phoenix Segmented Tabs: All | Personal | Groups | Unread
     if (phoenixFilter === 'read') {
-      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) === 0 && !(g.unreadBy || []).some((id) => String(id) === myId));
+      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) === 0 && !(g.unreadBy || []).some((id) => String(id?._id || id?.id || id) === myId));
     } else if (phoenixFilter === 'unread') {
-      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0 || (g.unreadBy || []).some((id) => String(id) === myId));
+      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0 || (g.unreadBy || []).some((id) => String(id?._id || id?.id || id) === myId));
     } else if (phoenixFilter === 'broadcast') {
       baseItems = baseItems.filter((g) => g.type === 'broadcast');
     }
@@ -5421,7 +5427,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return isNaN(parsed) ? 0 : parsed;
     };
 
-    const isRoomPinnedForMe = (g) => Boolean(g.isPinned || (Array.isArray(g.pinnedBy) && g.pinnedBy.some((id) => String(id) === myId)));
+    const isRoomPinnedForMe = (g) => Boolean(g.isPinned || (Array.isArray(g.pinnedBy) && g.pinnedBy.some((id) => String(id?._id || id?.id || id) === myId)));
 
     // Sort WhatsApp-style: Pinned chats first, then most recent message!
     baseItems.sort((a, b) => {
@@ -13256,10 +13262,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 ? (peerObj?.name || peerObj?.username || activeGroup.name || 'Direct Chat')
                 : (activeGroup.name || 'Group');
               const avatar = isDirectChat ? (peerObj?.avatarUrl || '') : (activeGroup.avatarUrl || '');
-              const isMuted = Array.isArray(activeGroup.mutedBy) && activeGroup.mutedBy.some((m) => String(m.userId) === uid);
-              const isArch = Array.isArray(activeGroup.archivedBy) && activeGroup.archivedBy.some((id) => String(id) === uid);
+              const isMuted = Array.isArray(activeGroup.mutedBy) && activeGroup.mutedBy.some((m) => String(m?.userId?._id || m?.userId || m) === uid);
+              const isArch = Array.isArray(activeGroup.archivedBy) && activeGroup.archivedBy.some((id) => String(id?._id || id?.id || id) === uid);
+              const isPinnedRoom = Boolean(activeGroup.isPinned || (Array.isArray(activeGroup.pinnedBy) && activeGroup.pinnedBy.some((id) => String(id?._id || id?.id || id) === uid)));
 
-              const infoBtn = (icon, label, onClick, accent = '#f8fafc') => (
+              const infoBtn = (icon, label, onClick, accent = 'var(--text-primary, #f8fafc)') => (
                 <button
                   type="button"
                   onClick={() => { setShowChatInfoDrawer(false); onClick(); }}
@@ -13270,8 +13277,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(148, 163, 184, 0.14)',
-                    background: 'rgba(15, 23, 42, 0.72)',
+                    border: '1px solid var(--border-light, rgba(148, 163, 184, 0.14))',
+                    background: 'var(--bg-card, rgba(15, 23, 42, 0.72))',
                     color: accent,
                     fontSize: '0.82rem',
                     fontWeight: 600,
@@ -13351,35 +13358,78 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     {/* Chat Controls */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Chat Preferences</div>
-                      {infoBtn(<Pin size={15} color="#f59e0b" />, 'Pin / Unpin Chat to Top', async () => {
-                        const res = await api.togglePinChatRoom(activeGroup._id);
-                        if (res?.success) {
-                          setGroups((prev) => prev.map((g) => {
-                            if (String(g._id) !== String(activeGroup._id)) return g;
-                            const curr = Array.isArray(g.pinnedBy) ? g.pinnedBy : [];
-                            return { ...g, pinnedBy: res.isPinned ? [...curr, uid] : curr.filter((id) => String(id) !== uid) };
-                          }));
+                      {infoBtn(<Pin size={15} color="#f59e0b" />, isPinnedRoom ? 'Unpin Chat from Top' : 'Pin Chat to Top', async () => {
+                        try {
+                          const res = await api.togglePinChatRoom(activeGroup._id);
+                          if (res?.success) {
+                            const nextPinned = Boolean(res.isPinned);
+                            const updatePinnedList = (g) => {
+                              const curr = Array.isArray(g.pinnedBy) ? g.pinnedBy.filter((id) => String(id?._id || id?.id || id) !== uid) : [];
+                              return { ...g, isPinned: nextPinned, pinnedBy: nextPinned ? [...curr, uid] : curr };
+                            };
+                            setGroups((prev) => prev.map((g) => (String(g._id) === String(activeGroup._id) ? updatePinnedList(g) : g)));
+                            setActiveGroup((prev) => (prev && String(prev._id) === String(activeGroup._id) ? updatePinnedList(prev) : prev));
+                            showToast(nextPinned ? 'Chat Pinned' : 'Chat Unpinned', nextPinned ? 'Moved to the top of your chat list.' : 'Removed from pinned chats.', 'success');
+                          } else {
+                            showToast('Pin Failed', res?.message || 'Could not update pin status.', 'error');
+                          }
+                        } catch (err) {
+                          showToast('Pin Failed', err?.message || 'Could not pin this chat.', 'error');
                         }
                       })}
                       {infoBtn(<MessageSquare size={15} color="#38bdf8" />, 'Mark as Unread', async () => {
-                        const res = await api.toggleMarkChatUnread(activeGroup._id, true);
-                        if (res?.success) {
-                          setGroups((prev) => prev.map((g) => String(g._id) === String(activeGroup._id) ? { ...g, unreadBy: [...(g.unreadBy || []), uid] } : g));
-                          setActiveGroup(null);
+                        try {
+                          const res = await api.toggleMarkChatUnread(activeGroup._id, true);
+                          if (res?.success) {
+                            setGroups((prev) => prev.map((g) => String(g._id) === String(activeGroup._id) ? { ...g, unreadBy: [...(g.unreadBy || []), uid] } : g));
+                            setActiveGroup(null);
+                            showToast('Marked as Unread', 'Conversation marked unread.', 'info');
+                          }
+                        } catch (err) {
+                          showToast('Error', err?.message || 'Could not mark chat as unread.', 'error');
                         }
                       })}
                       {infoBtn(<VolumeX size={15} color="#f59e0b" />, isMuted ? 'Unmute Chat Notifications' : 'Mute Chat Notifications', async () => {
-                        await api.toggleMuteChatRoom(activeGroup._id, !isMuted).catch(() => { });
-                        fetchGroups(true);
+                        try {
+                          const nextMuted = !isMuted;
+                          const res = await api.toggleMuteChatRoom(activeGroup._id, nextMuted);
+                          if (res?.success) {
+                            const updateMuted = (g) => {
+                              const curr = Array.isArray(g.mutedBy) ? g.mutedBy.filter((m) => String(m?.userId?._id || m?.userId || m) !== uid) : [];
+                              return { ...g, mutedBy: nextMuted ? [...curr, { userId: uid }] : curr };
+                            };
+                            setGroups((prev) => prev.map((g) => (String(g._id) === String(activeGroup._id) ? updateMuted(g) : g)));
+                            setActiveGroup((prev) => (prev && String(prev._id) === String(activeGroup._id) ? updateMuted(prev) : prev));
+                            showToast(nextMuted ? 'Chat Muted' : 'Chat Unmuted', nextMuted ? 'Notifications muted for this chat.' : 'Notifications enabled for this chat.', 'info');
+                          }
+                          fetchGroups(true);
+                        } catch (err) {
+                          showToast('Mute Failed', err?.message || 'Could not update mute status.', 'error');
+                        }
                       })}
                       {infoBtn(chatSoundMuted ? <Volume2 size={15} color="#10b981" /> : <VolumeX size={15} color="#ef4444" />, chatSoundMuted ? 'Unmute Sound' : 'Mute Sound', () => {
                         const next = !chatSoundMuted;
                         setChatSoundMuted(next);
                         if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                        showToast(next ? 'Sound Muted' : 'Sound Enabled', next ? 'Chat notification sounds muted.' : 'Chat notification sounds enabled.', 'info');
                       })}
                       {infoBtn(<Archive size={15} color="#94a3b8" />, isArch ? 'Unarchive Chat' : 'Archive Chat', async () => {
-                        await api.toggleArchiveChatRoom(activeGroup._id, !isArch).catch(() => { });
-                        fetchGroups(true);
+                        try {
+                          const nextArch = !isArch;
+                          const res = await api.toggleArchiveChatRoom(activeGroup._id, nextArch);
+                          if (res?.success) {
+                            setGroups((prev) => prev.map((g) => {
+                              if (String(g._id) !== String(activeGroup._id)) return g;
+                              const curr = Array.isArray(g.archivedBy) ? g.archivedBy.filter((id) => String(id?._id || id?.id || id) !== uid) : [];
+                              return { ...g, archivedBy: nextArch ? [...curr, uid] : curr };
+                            }));
+                            if (nextArch) setActiveGroup(null);
+                            showToast(nextArch ? 'Chat Archived' : 'Chat Unarchived', nextArch ? 'Moved out of active chats.' : 'Restored to active chats.', 'info');
+                          }
+                          fetchGroups(true);
+                        } catch (err) {
+                          showToast('Archive Failed', err?.message || 'Could not update archive status.', 'error');
+                        }
                       })}
                     </div>
 

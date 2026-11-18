@@ -32,6 +32,8 @@ const toggleMuteRoom = async (req, res) => {
       });
     }
 
+    try { require('./communication.controller').invalidateGroupsCache(); } catch (_) {}
+
     return res.json({ success: true, muted: Boolean(muted) });
   } catch (err) {
     logger.error('toggleMuteRoom error: %o', err);
@@ -57,6 +59,7 @@ const toggleArchiveRoom = async (req, res) => {
       : { $pull: { archivedBy: new mongoose.Types.ObjectId(userId) } };
 
     await ChatRoom.findByIdAndUpdate(groupId, op);
+    try { require('./communication.controller').invalidateGroupsCache(); } catch (_) {}
     return res.json({ success: true, archived: Boolean(archived) });
   } catch (err) {
     logger.error('toggleArchiveRoom error: %o', err);

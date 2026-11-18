@@ -30,6 +30,8 @@ const togglePinRoom = async (req, res) => {
       await ChatRoom.updateOne({ _id: groupId }, { $addToSet: { pinnedBy: userObjId } });
     }
 
+    try { require('./communication.controller').invalidateGroupsCache(); } catch (_) {}
+
     return res.json({ success: true, isPinned: !alreadyPinned });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to toggle pin room', error: err.message });
@@ -56,6 +58,8 @@ const toggleMarkUnread = async (req, res) => {
     } else {
       await ChatRoom.updateOne({ _id: groupId }, { $pull: { unreadBy: userObjId } });
     }
+
+    try { require('./communication.controller').invalidateGroupsCache(); } catch (_) {}
 
     return res.json({ success: true, isMarkedUnread: forceUnread });
   } catch (err) {
