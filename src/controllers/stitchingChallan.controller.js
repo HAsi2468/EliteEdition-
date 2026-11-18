@@ -259,7 +259,7 @@ function renderDynamicStitchingChallanPage(doc, challan, isOriginalCopy, logoPat
   const borderLineColor = primaryColor;
   const mutedColor = isOriginalCopy ? '#475569' : tintColor('#475569', 0.45);
   const darkText = isOriginalCopy ? '#0f172a' : tintColor('#0f172a', 0.40);
-  const rowAltBg = tintColor(primaryColor, 0.94);
+  const rowAltBg = tintColor(primaryColor, 0.06);
   const copyBadge = isOriginalCopy ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';
 
   const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {

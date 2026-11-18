@@ -570,8 +570,8 @@ const downloadChallanPdf = async (req, res) => {
     const renderChallanPage = (isColor) => {
       // Original uses 100% department brand color; Duplicate uses exact same department color at 50% lighter
       const primaryColor = isColor ? companyBrandColor : duplicateBrandColor;
-      const lightTint = isColor ? tintColor(companyBrandColor, 0.92) : tintColor(duplicateBrandColor, 0.95);
-      const borderTint = tintColor(primaryColor, 0.72);
+      const lightTint = isColor ? tintColor(companyBrandColor, 0.08) : tintColor(duplicateBrandColor, 0.06);
+      const borderTint = tintColor(primaryColor, 0.30);
       const textColor = isColor ? '#0f172a' : '#334155';
       const mutedColor = isColor ? '#64748b' : '#64748b';
       const copyBadge = isColor ? 'ORIGINAL FOR CONSIGNEE' : 'DUPLICATE FOR TRANSPORTER';

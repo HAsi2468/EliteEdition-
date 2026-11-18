@@ -1897,7 +1897,7 @@ const downloadChallanPdf = async (req, res) => {
     };
 
     const renderPage = (isColorPage) => {
-      const pageTintBg = isColorPage ? tintColor(companyBrandColor, 0.94) : tintColor(duplicateBrandColor, 0.96);
+      const pageTintBg = isColorPage ? tintColor(companyBrandColor, 0.08) : tintColor(duplicateBrandColor, 0.06);
 
       // Draw border
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
@@ -2418,9 +2418,9 @@ const downloadBulkChallansPdf = async (req, res) => {
 
       const renderBulkCopy = (isDuplicate = false) => {
         const BRAND = isDuplicate ? dupBrandColor : baseBrandColor;
-        const BRAND_MID = isDuplicate ? tintColor(baseBrandColor, 0.58) : tintColor(baseBrandColor, 0.15);
-        const BRAND_LIGHT = isDuplicate ? tintColor(baseBrandColor, 0.95) : tintColor(baseBrandColor, 0.92);
-        const BORDER_COL = tintColor(BRAND, 0.75);
+        const BRAND_MID = isDuplicate ? tintColor(baseBrandColor, 0.45) : tintColor(baseBrandColor, 0.75);
+        const BRAND_LIGHT = isDuplicate ? tintColor(baseBrandColor, 0.05) : tintColor(baseBrandColor, 0.08);
+        const BORDER_COL = tintColor(BRAND, 0.30);
         const copyBadge = isDuplicate ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR CONSIGNEE';
 
         doc.strokeColor(BORDER_COL).lineWidth(0.8).rect(MR, MR, contentWidth, PH - 2 * MR).stroke();
