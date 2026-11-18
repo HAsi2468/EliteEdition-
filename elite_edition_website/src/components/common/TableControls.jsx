@@ -83,12 +83,12 @@ export function TableControls({
             height: '36px',
             minHeight: '36px',
             padding: '6px 12px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
+            backgroundColor: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+            border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
             borderRadius: '6px',
             fontSize: '13px',
             fontWeight: 500,
-            color: '#334155',
+            color: 'var(--text-primary, #f8fafc)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -101,17 +101,18 @@ export function TableControls({
 
         {showColDropdown && (
           <div
+            className="glass-panel"
             style={{
               position: 'absolute',
               top: 'calc(100% + 4px)',
               left: 0,
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.96))',
+              border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
               borderRadius: '6px',
               padding: '6px',
               zIndex: 9999,
               minWidth: '180px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+              boxShadow: '0 8px 24px rgba(0,0,0,0.22)'
             }}
           >
             <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
@@ -126,7 +127,7 @@ export function TableControls({
                       gap: '8px',
                       padding: '6px 8px',
                       fontSize: '13px',
-                      color: '#0f172a',
+                      color: 'var(--text-primary, #f8fafc)',
                       cursor: 'pointer',
                       borderRadius: '4px'
                     }}
@@ -155,12 +156,12 @@ export function TableControls({
             height: '36px',
             minHeight: '36px',
             padding: '6px 12px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
+            backgroundColor: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+            border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
             borderRadius: '6px',
             fontSize: '13px',
             fontWeight: 500,
-            color: '#334155',
+            color: 'var(--text-primary, #f8fafc)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -174,17 +175,18 @@ export function TableControls({
 
         {showDensityDropdown && (
           <div
+            className="glass-panel"
             style={{
               position: 'absolute',
               top: 'calc(100% + 4px)',
               left: 0,
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.96))',
+              border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
               borderRadius: '6px',
               padding: '4px',
               zIndex: 9999,
               minWidth: '140px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+              boxShadow: '0 8px 24px rgba(0,0,0,0.22)'
             }}
           >
             <div
@@ -192,7 +194,8 @@ export function TableControls({
               style={{
                 padding: '8px 12px',
                 cursor: 'pointer',
-                backgroundColor: density === 'comfortable' ? '#f1f5f9' : 'transparent',
+                color: 'var(--text-primary, #f8fafc)',
+                backgroundColor: density === 'comfortable' ? 'var(--bg-hover, rgba(148, 163, 184, 0.16))' : 'transparent',
                 fontWeight: density === 'comfortable' ? 600 : 400,
                 borderRadius: '4px'
               }}
@@ -204,7 +207,8 @@ export function TableControls({
               style={{
                 padding: '8px 12px',
                 cursor: 'pointer',
-                backgroundColor: density === 'compact' ? '#f1f5f9' : 'transparent',
+                color: 'var(--text-primary, #f8fafc)',
+                backgroundColor: density === 'compact' ? 'var(--bg-hover, rgba(148, 163, 184, 0.16))' : 'transparent',
                 fontWeight: density === 'compact' ? 600 : 400,
                 borderRadius: '4px'
               }}
@@ -225,12 +229,12 @@ export function TableControls({
               height: '36px',
               minHeight: '36px',
               padding: '6px 12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              backgroundColor: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+              border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
               borderRadius: '6px',
               fontSize: '13px',
               fontWeight: 500,
-              color: '#334155',
+              color: 'var(--text-primary, #f8fafc)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -243,17 +247,18 @@ export function TableControls({
 
           {showViewDropdown && (
             <div
+              className="glass-panel"
               style={{
                 position: 'absolute',
                 top: 'calc(100% + 4px)',
                 left: 0,
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
+                backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.96))',
+                border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
                 borderRadius: '6px',
                 padding: '4px',
                 zIndex: 9999,
                 minWidth: '160px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                boxShadow: '0 8px 24px rgba(0,0,0,0.22)'
               }}
             >
               {savedViews.map((v) => (

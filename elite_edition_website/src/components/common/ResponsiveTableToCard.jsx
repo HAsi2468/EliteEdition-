@@ -413,9 +413,9 @@ export function ResponsiveTableToCard({
                     fontSize: '14px',
                     fontWeight: 600,
                     borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#2563eb',
+                    border: '1px solid var(--border-light, rgba(148, 163, 184, 0.28))',
+                    background: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+                    color: 'var(--primary, #3b82f6)',
                     cursor: 'pointer',
                     marginTop: '4px'
                   }}

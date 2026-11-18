@@ -28,9 +28,9 @@ export default function EnterpriseEmptyState({
         justifyContent: 'center',
         padding: '48px 24px',
         textAlign: 'center',
-        background: '#ffffff',
+        background: 'var(--bg-card, rgba(15, 23, 42, 0.72))',
         borderRadius: '12px',
-        border: '1px dashed #cbd5e1',
+        border: '1px dashed var(--border-light, rgba(148, 163, 184, 0.28))',
         margin: '16px 0',
         minHeight: '260px',
         ...style
@@ -42,12 +42,12 @@ export default function EnterpriseEmptyState({
           width: '56px',
           height: '56px',
           borderRadius: '16px',
-          background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-          border: '1px solid #bfdbfe',
+          background: 'rgba(37, 99, 235, 0.14)',
+          border: '1px solid rgba(59, 130, 246, 0.35)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#2563eb',
+          color: '#3b82f6',
           marginBottom: '16px',
           boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'
         }}
@@ -60,7 +60,7 @@ export default function EnterpriseEmptyState({
         style={{
           fontSize: '1rem',
           fontWeight: 700,
-          color: '#0f172a',
+          color: 'var(--text-primary, #f8fafc)',
           margin: '0 0 6px 0',
           letterSpacing: '-0.01em'
         }}
@@ -72,7 +72,7 @@ export default function EnterpriseEmptyState({
       <p
         style={{
           fontSize: '0.8125rem',
-          color: '#64748b',
+          color: 'var(--text-muted, #94a3b8)',
           maxWidth: '380px',
           margin: '0 0 20px 0',
           lineHeight: 1.5

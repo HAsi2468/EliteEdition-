@@ -166,11 +166,11 @@ export function PullToRefresh({ onRefresh, children, className = '', style = {} 
               justifyContent: 'center',
               gap: '6px',
               padding: '6px 14px',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.94))',
               borderRadius: '999px',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08)',
-              border: `1px solid ${isTriggerable || isRefreshing ? '#93c5fd' : '#e2e8f0'}`,
-              color: isTriggerable || isRefreshing ? '#2563eb' : '#64748b',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.08)',
+              border: `1px solid ${isTriggerable || isRefreshing ? '#3b82f6' : 'var(--border-light, rgba(148, 163, 184, 0.25))'}`,
+              color: isTriggerable || isRefreshing ? '#3b82f6' : 'var(--text-muted, #94a3b8)',
               fontSize: '12px',
               fontWeight: 600
             }}

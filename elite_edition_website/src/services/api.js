@@ -3102,26 +3102,9 @@ export const api = {
       return request('/backup/history');
     },
 
-  async listR2Backups() {
-      return request('/backup/list-r2');
-    },
-
-  async triggerR2Backup() {
-      return request('/backup/trigger-r2', {
-        method: 'POST',
-      });
-    },
-
-  async sendBackupEmail(payload = {}) {
-      return request('/backup/send-email', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    },
-
   async downloadAuthenticatedFile(endpoint, fallbackFilename) {
       const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token') || '';
-      const base = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/v1';
+      const base = getBaseUrl() || '/v1';
       const url = `${base}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

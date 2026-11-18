@@ -82,15 +82,16 @@ export class ErrorBoundary extends Component {
 
       return (
         <div
+          className="glass-panel"
           style={{
             padding: '36px 24px',
             textAlign: 'center',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--bg-modal, rgba(15, 23, 42, 0.94))',
+            border: '1px solid var(--border-light, rgba(148, 163, 184, 0.24))',
             borderRadius: '12px',
             margin: '24px auto',
             maxWidth: '520px',
-            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.06)',
+            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.18)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -102,11 +103,11 @@ export class ErrorBoundary extends Component {
               width: '44px',
               height: '44px',
               borderRadius: '50%',
-              backgroundColor: '#eff6ff',
+              backgroundColor: 'rgba(37, 99, 235, 0.14)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#2563eb',
+              color: '#3b82f6',
               marginBottom: '2px'
             }}
           >
@@ -116,10 +117,10 @@ export class ErrorBoundary extends Component {
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary, #f8fafc)' }}>
             {isOffline ? 'You Are Currently Offline' : 'Something went wrong loading this screen'}
           </div>
-          <div style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5, maxWidth: '440px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted, #94a3b8)', lineHeight: 1.5, maxWidth: '440px' }}>
             {isOffline
               ? 'This screen requires an active internet connection to load live analytics. Check your Wi-Fi/mobile data and tap Reload.'
               : isChunkOrInitError

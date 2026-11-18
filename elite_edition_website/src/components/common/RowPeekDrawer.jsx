@@ -197,8 +197,8 @@ export function RowPeekDrawer({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
+                  backgroundColor: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+                  border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
                   borderRadius: '6px',
                   overflow: 'hidden'
                 }}
@@ -214,7 +214,7 @@ export function RowPeekDrawer({
                     padding: '5px 7px',
                     cursor: onNavigatePrevious ? 'pointer' : 'not-allowed',
                     opacity: onNavigatePrevious ? 1 : 0.4,
-                    color: '#475569',
+                    color: 'var(--text-secondary, #cbd5e1)',
                     display: 'flex',
                     alignItems: 'center'
                   }}
@@ -263,9 +263,9 @@ export function RowPeekDrawer({
                 width: '30px',
                 height: '30px',
                 borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#64748b',
+                border: '1px solid var(--border-light, rgba(148, 163, 184, 0.25))',
+                backgroundColor: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+                color: 'var(--text-muted, #94a3b8)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -285,8 +285,8 @@ export function RowPeekDrawer({
           {fields && fields.length > 0 && (
             <div
               style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
+                backgroundColor: 'var(--bg-card, rgba(15, 23, 42, 0.78))',
+                border: '1px solid var(--border-light, rgba(148, 163, 184, 0.22))',
                 borderRadius: '8px',
                 overflow: 'hidden'
               }}
