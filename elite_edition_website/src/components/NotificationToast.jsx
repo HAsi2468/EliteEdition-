@@ -90,6 +90,16 @@ const flashBrowserTabTitle = (text) => {
   }
 };
 
+export const clearRoomNotifications = (roomId) => {
+  if (!roomId) return;
+  const target = String(roomId);
+  const history = getNotificationHistory();
+  const filtered = history.filter((h) => String(h?.meta?.roomId || '') !== target);
+  if (filtered.length !== history.length) {
+    saveNotificationHistory(filtered);
+  }
+};
+
 export const triggerPushNotification = (title, message, type = 'info', actionTab = null, meta = null) => {
   const item = {
     id: Date.now() + Math.random().toString(36).substring(2, 7),
@@ -399,6 +409,13 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     setHistory(updated);
   };
 
+  const removeGroupFromHistory = (itemIds) => {
+    const updated = history.filter(h => !itemIds.includes(h.id));
+    saveNotificationHistory(updated);
+    setHistory(updated);
+    setSelectedNotifIds(prev => prev.filter(id => !itemIds.includes(id)));
+  };
+
   const handleEnablePush = async () => {
     const res = await requestNotificationPermission();
     setPermStatus(res);
@@ -617,12 +634,13 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                   <div
                     key={item.id}
                     onClick={() => {
-                      markGroupRead(item.ids);
+                      removeGroupFromHistory(item.ids);
                       const resolvedTab = targetTab || (item?.meta?.roomId ? 'communication' : null);
                       if (resolvedTab && onSelectTab) {
                         onSelectTab(resolvedTab);
                       }
                       if (item?.meta?.roomId) {
+                        clearRoomNotifications(item.meta.roomId);
                         const jumpDetail = {
                           roomId: String(item.meta.roomId),
                           messageId: item.meta.messageId ? String(item.meta.messageId) : null,

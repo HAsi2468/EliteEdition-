@@ -11,6 +11,7 @@ import ChatContainer from './cards/ChatContainer';
 import EmojiPickerPopover from './EmojiPickerPopover';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { triggerEliteAlert, showToast } from '../services/dialogService';
+import { clearRoomNotifications } from './NotificationToast';
 import { ChatStreamSkeleton } from './common/Skeletons';
 import '../styles/communication.css';
 import {
@@ -795,6 +796,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     if (!pendingScrollMsgId) return;
     let attempts = 0;
+    let retryTimer = null;
     const tryScroll = () => {
       const el = document.getElementById(`msg_${pendingScrollMsgId}`) || document.querySelector(`[data-msg-id="${pendingScrollMsgId}"]`);
       if (el) {
@@ -804,20 +806,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         el.classList.add('reply-jump-pulse');
         setTimeout(() => {
           el.classList.remove('reply-jump-pulse');
-        }, 2600);
+        }, 3000);
         setPendingScrollMsgId(null);
         return;
       }
       attempts += 1;
-      if (attempts < 12) {
-        setTimeout(tryScroll, 150);
+      if (attempts < 30) {
+        retryTimer = setTimeout(tryScroll, 150);
       } else {
         setPendingScrollMsgId(null);
       }
     };
-    const timer = setTimeout(tryScroll, 100);
-    return () => clearTimeout(timer);
-  }, [pendingScrollMsgId, messages, activeGroup?._id]);
+    const timer = setTimeout(tryScroll, 120);
+    return () => {
+      clearTimeout(timer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [pendingScrollMsgId, messages, activeGroup?._id, loadingMessages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2877,6 +2882,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       setLoadingMessages(true);
     }
 
+    if (targetGroup?._id) {
+      clearRoomNotifications(targetGroup._id);
+    }
     setActiveGroup(targetGroup);
     setShowInRoomSearch(false);
     setInRoomQuery('');

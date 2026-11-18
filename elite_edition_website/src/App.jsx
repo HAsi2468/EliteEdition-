@@ -1823,7 +1823,7 @@ export default function App() {
       }
     }
 
-    const handleReceiveMessage = (msg) => {
+    const handleReceiveMessage = async (msg) => {
       if (!msg) return;
       const myId = String(currentUser?._id || currentUser?.id || '');
       const senderObj = msg.senderId;
@@ -1832,15 +1832,36 @@ export default function App() {
       // Do not trigger notification for messages sent by current user
       if (myId && senderIdStr === myId) return;
 
+      const rawRoomId = typeof msg.roomId === 'object' ? (msg.roomId?._id || msg.roomId?.id) : msg.roomId;
+      const msgIdStr = msg._id || msg.id || null;
+
+      let readableText = msg.content || '';
+      if (msg.isEncrypted && msg.encryptedPayload && rawRoomId) {
+        try {
+          const { decryptRoomMessage } = await import('./components/ChatWhatsAppExtra');
+          const decrypted = await decryptRoomMessage(msg.encryptedPayload, String(rawRoomId));
+          if (decrypted) readableText = decrypted;
+        } catch (_) {
+          // Fallback to msg.content
+        }
+      }
+      if (typeof readableText === 'string' && readableText.includes('&')) {
+        readableText = readableText
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&amp;/g, '&');
+      }
+
       const senderName = typeof senderObj === 'object' ? (senderObj?.name || senderObj?.username || 'Colleague') : 'Colleague';
-      const msgContent = msg.type === 'record-card' ? `🃏 Shared Record Card: ${msg.content}` : (msg.attachment ? `📎 [${msg.attachment.fileType || 'Attachment'}] ${msg.content}` : msg.content);
+      const msgContent = msg.type === 'record-card'
+        ? `🃏 Shared Record Card: ${readableText}`
+        : (msg.attachment ? `📎 [${msg.attachment.fileType || 'Attachment'}] ${readableText}` : readableText);
 
       if (activeTab !== 'communication' && activeTab !== 'workspace') {
         setChatUnreadCount((prev) => prev + 1);
       }
-
-      const rawRoomId = typeof msg.roomId === 'object' ? (msg.roomId?._id || msg.roomId?.id) : msg.roomId;
-      const msgIdStr = msg._id || msg.id || null;
 
       triggerPushNotification(
         `💬 Chat from ${senderName}`,
