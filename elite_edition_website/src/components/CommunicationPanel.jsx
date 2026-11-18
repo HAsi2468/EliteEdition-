@@ -3863,15 +3863,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             return g;
           });
         });
-        if (realMsg._id) {
-          api.transcribeVoiceMessage(realMsg._id).then((tRes) => {
-            if (tRes && tRes.success && tRes.transcript) {
-              setMessages((prev) =>
-                prev.map((m) => (String(m._id) === String(realMsg._id) ? { ...m, transcript: tRes.transcript } : m))
-              );
-            }
-          }).catch(() => {});
-        }
       }
     } catch (err) {
       console.warn('HTTP post message failed, falling back to socket emit:', err.message);
