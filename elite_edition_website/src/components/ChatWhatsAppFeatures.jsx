@@ -189,6 +189,24 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
   const [customUrl, setCustomUrl] = useState(
     currentWallpaper && !WALLPAPER_PRESETS.some((p) => p.key === currentWallpaper) ? currentWallpaper : ''
   );
+  const [uploadingWallpaper, setUploadingWallpaper] = useState(false);
+
+  const handleUploadWallpaper = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingWallpaper(true);
+    try {
+      const res = await api.uploadChatAttachment(file, 'Wallpapers');
+      const url = res?.fileUrl || res?.url || res?.data?.fileUrl || res?.data?.url;
+      if (url) {
+        onSelect(url);
+      }
+    } catch {
+      // Ignore upload failure
+    } finally {
+      setUploadingWallpaper(false);
+    }
+  };
 
   return (
     <div style={modalBackdropStyle} onClick={onClose}>
@@ -197,7 +215,7 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
             <ImageIcon size={18} color="#38bdf8" /> Chat Wallpaper ({scopeLabel})
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.65rem', marginBottom: '1rem' }}>
           {WALLPAPER_PRESETS.map((preset) => {
@@ -228,7 +246,7 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
             );
           })}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.6rem' }}>
           <input
             type="url"
             value={customUrl}
@@ -244,6 +262,21 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
           >
             Apply
           </button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <label style={{ ...primaryBtnStyle, background: 'rgba(56, 189, 248, 0.16)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', cursor: uploadingWallpaper ? 'wait' : 'pointer', fontSize: '0.78rem' }}>
+            {uploadingWallpaper ? 'Uploading...' : 'Upload Image'}
+            <input type="file" accept="image/*" onChange={handleUploadWallpaper} style={{ display: 'none' }} disabled={uploadingWallpaper} />
+          </label>
+          {currentWallpaper && currentWallpaper !== 'default' && (
+            <button
+              type="button"
+              onClick={() => onSelect('default')}
+              style={{ background: 'none', border: '1px solid rgba(148,163,184,0.28)', borderRadius: '8px', color: '#94a3b8', padding: '0.45rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Reset Default
+            </button>
+          )}
         </div>
       </div>
     </div>

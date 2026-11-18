@@ -487,7 +487,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-  background: rgba(9, 15, 29, 0.55) !important;
+  background: rgba(9, 15, 29, 0.55);
   display: flex;
   flex-direction: column;
   gap: 4px;

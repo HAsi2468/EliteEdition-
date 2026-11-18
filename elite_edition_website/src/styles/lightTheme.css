@@ -759,8 +759,8 @@ body.light-theme-active .task-scope-pill.active {
   color: #2563eb !important;
 }
 
-body.light-theme-active .phoenix-chat-feed,
-body.light-theme-active .phoenix-chat-stream {
+body.light-theme-active .phoenix-chat-feed:not(.has-custom-wallpaper),
+body.light-theme-active .phoenix-chat-stream:not(.has-custom-wallpaper) {
   background: linear-gradient(135deg, #eef2f9 0%, #f1f5f9 50%, #e8eef8 100%) !important;
 }
 
