@@ -91,12 +91,38 @@ const isLightModeActive = () =>
   (document.body?.classList?.contains('light-theme-active') ||
     document.documentElement?.getAttribute('data-theme') === 'light');
 
+const DARK_TO_LIGHT_PAIR = {
+  'whatsapp-doodle': 'warm-sand',
+  'emerald-night': 'mint-breeze',
+  'indigo-aurora': 'lavender-mist',
+  'warm-charcoal': 'warm-sand',
+  'ocean-deep': 'soft-sky',
+};
+
+const LIGHT_TO_DARK_PAIR = {
+  'soft-sky': 'ocean-deep',
+  'mint-breeze': 'emerald-night',
+  'warm-sand': 'whatsapp-doodle',
+  'lavender-mist': 'indigo-aurora',
+};
+
 export const getWallpaperStyle = (keyOrUrl) => {
   if (!keyOrUrl || keyOrUrl === 'default') return {};
+  const lightActive = isLightModeActive();
   const preset = WALLPAPER_PRESETS.find((p) => p.key === keyOrUrl);
-  if (preset) return preset.style;
+  if (preset) {
+    if (lightActive && !preset.isLight && DARK_TO_LIGHT_PAIR[preset.key]) {
+      const paired = WALLPAPER_PRESETS.find((p) => p.key === DARK_TO_LIGHT_PAIR[preset.key]);
+      if (paired) return paired.style;
+    }
+    if (!lightActive && preset.isLight && LIGHT_TO_DARK_PAIR[preset.key]) {
+      const paired = WALLPAPER_PRESETS.find((p) => p.key === LIGHT_TO_DARK_PAIR[preset.key]);
+      if (paired) return paired.style;
+    }
+    return preset.style;
+  }
   if (keyOrUrl.startsWith('http://') || keyOrUrl.startsWith('https://') || keyOrUrl.startsWith('data:')) {
-    const scrim = isLightModeActive()
+    const scrim = lightActive
       ? 'linear-gradient(rgba(248,250,252,0.72), rgba(248,250,252,0.72))'
       : 'linear-gradient(rgba(10,14,22,0.72), rgba(10,14,22,0.72))';
     return {
@@ -266,7 +292,7 @@ export const WallpaperPickerModal = ({ currentWallpaper, scopeLabel, onSelect, o
           </div>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.65rem', marginBottom: '1rem' }}>
+        <div className="no-glass-override" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.65rem', marginBottom: '1rem' }}>
           {WALLPAPER_PRESETS.filter((p) => p.key === 'default' || p.isLight === isLightModeActive()).map((preset) => {
             const active = currentWallpaper === preset.key || (!currentWallpaper && preset.key === 'default');
             const isDefaultLight = preset.key === 'default' && isLightModeActive();

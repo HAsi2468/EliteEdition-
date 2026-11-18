@@ -830,7 +830,7 @@ body.light-theme-active table tr:hover td {
 }
 
 /* Hardcoded Dark Inline Backgrounds -> Frosted Light Glass Surfaces */
-body.light-theme-active :is(div, span, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="15, 23, 42"],
+body.light-theme-active :is(div, span, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.phoenix-chat-stream):not(.phoenix-chat-feed):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="15, 23, 42"],
   [style*="11, 17, 32"],
   [style*="30, 41, 59"],
   [style*="51, 65, 85"],
