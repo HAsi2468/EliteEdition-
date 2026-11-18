@@ -274,6 +274,7 @@ export const ROUTE_ALIASES = {
   'stitching-finance': { tab: 'es_invoices', dept: 'stitching' },
   'eo_invoices': { tab: 'eo_invoices', dept: 'elite_online' },
   'eo_expenses': { tab: 'eo_expenses', dept: 'elite_online' },
+  'exedp_dashboard': { tab: 'exedp_dashboard', dept: 'exedp' },
   'exedp_invoices': { tab: 'exedp_invoices', dept: 'exedp' },
   'exedp_finance': { tab: 'exedp_invoices', dept: 'exedp' },
   'exedp_expenses': { tab: 'exedp_expenses', dept: 'exedp' },
@@ -294,7 +295,7 @@ export const ALL_KNOWN_ERP_TABS = new Set([
   'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials', 'yj_rfd',
   'es_dashboard', 'es_invoices', 'es_finance', 'stitching_invoices', 'stitching_finance', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials',
   'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'eo_invoices',
-  'exedp_invoices', 'exedp_expenses',
+  'exedp_dashboard', 'exedp_invoices', 'exedp_expenses',
   'raw_materials', 'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master',
   'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings', 'jobcards_stitching_challan',
   'jobcards_stitching_settings', 'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry',
@@ -321,6 +322,7 @@ export function getDepartmentForTab(tab) {
   if (tab.startsWith('so_')) return 'sobise';
   if (tab.startsWith('ew_')) return 'ethno_wear';
   if (tab.startsWith('yj_')) return 'yamunaji';
+  if (tab.startsWith('exedp_')) return 'exedp';
   return null;
 }
 
@@ -1360,9 +1362,11 @@ export default function App() {
   };
 
   const getFirstYJTab = () => {
-    if (!currentUser || isSuperOrAdmin) return 'yj_invoices';
+    if (!currentUser || isSuperOrAdmin) return 'yj_dashboard';
     const allowed = YAMUNAJI_PERMISSIONS.filter(t => currentUser.permissions?.includes(t));
-    return allowed.includes('yj_invoices') ? 'yj_invoices' : (allowed[0] || 'yj_invoices');
+    if (allowed.includes('yj_dashboard')) return 'yj_dashboard';
+    if (allowed.includes('yj_invoices')) return 'yj_invoices';
+    return allowed[0] || 'yj_dashboard';
   };
 
   const getFirstStitchingTab = () => {
@@ -1394,6 +1398,8 @@ export default function App() {
       setActiveDepartment('ethno_wear');
     } else if (activeTab.startsWith('yj_')) {
       setActiveDepartment('yamunaji');
+    } else if (activeTab.startsWith('exedp_')) {
+      setActiveDepartment('exedp');
     } else if (activeTab.startsWith('eo_') || ELITE_ONLINE_PERMISSIONS.includes(activeTab)) {
       setActiveDepartment('elite_online');
     }
@@ -1525,7 +1531,7 @@ export default function App() {
     } else if (dept === 'ethno_wear') {
       setActiveTab('ew_invoices');
     } else if (dept === 'yamunaji') {
-      setActiveTab('yj_invoices');
+      setActiveTab(getFirstYJTab());
     } else if (dept === 'elite_online') {
       const firstTab = getFirstOnlineTab();
       setActiveTab(firstTab);
@@ -1573,12 +1579,13 @@ export default function App() {
       'ew_dashboard', 'ew_design', 'ew_rfd', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
       'yj_dashboard', 'yj_rfd', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials',
       'es_dashboard', 'es_invoices', 'es_finance', 'stitching_invoices', 'stitching_finance', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
-      'exedp_invoices', 'exedp_expenses',
+      'exedp_dashboard', 'exedp_invoices', 'exedp_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
       'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent',
-      'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create'
+      'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create', 'eo_invoices',
+      'designer_screen', 'designer_module', 'designer', 'reconciliation', 'ledger-reconciliation', 'voucher', 'voucher_entry', 'jobcards_complaints'
     ];
 
     if (isSuperOrAdmin) {
@@ -3525,11 +3532,23 @@ export default function App() {
                     )}
                     {activeDepartment === 'yamunaji' && (
                       <>
+                        <button onClick={() => { setActiveTab('yj_dashboard'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_dashboard' ? 'active' : ''}`}>
+                          Dashboard
+                        </button>
                         <button onClick={() => { setActiveTab('yj_rfd'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_rfd' ? 'active' : ''}`}>
                           Fabric Process
                         </button>
                         <button onClick={() => { setActiveTab('yj_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_raw_materials' ? 'active' : ''}`}>
                           Raw Materials
+                        </button>
+                        <button onClick={() => { setActiveTab('yj_invoices'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_invoices' ? 'active' : ''}`}>
+                          Finance
+                        </button>
+                        <button onClick={() => { setActiveTab('yj_complaints'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_complaints' ? 'active' : ''}`}>
+                          Complaints
+                        </button>
+                        <button onClick={() => { setActiveTab('yj_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_settings' ? 'active' : ''}`}>
+                          Settings
                         </button>
                       </>
                     )}
@@ -3558,7 +3577,7 @@ export default function App() {
                         Raw Materials
                       </button>
                     )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) && (
+                    {activeDepartment === 'elite_online' && (!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) && (
                       <button onClick={() => { setActiveTab('eo_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_settings' ? 'active' : ''}`}>
                         Settings
                       </button>

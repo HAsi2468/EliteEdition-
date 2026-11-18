@@ -52,6 +52,27 @@ const COMPANY_NAV_CONFIG = {
     { id: 'so_complaints', label: 'Complaints' },
     { id: 'so_settings', label: 'Settings' },
     { id: '__more__', label: 'More' }
+  ],
+  ethno_wear: [
+    { id: 'ew_dashboard', label: 'Dashboard' },
+    { id: 'ew_design', label: 'Design' },
+    { id: 'ew_invoices', label: 'Finance' },
+    { id: 'ew_settings', label: 'Settings' },
+    { id: '__more__', label: 'More' }
+  ],
+  yamunaji: [
+    { id: 'yj_dashboard', label: 'Dashboard' },
+    { id: 'yj_rfd', label: 'Process' },
+    { id: 'yj_raw_materials', label: 'Materials' },
+    { id: 'yj_invoices', label: 'Finance' },
+    { id: '__more__', label: 'More' }
+  ],
+  exedp: [
+    { id: 'exedp_dashboard', label: 'Dashboard' },
+    { id: 'exedp_invoices', label: 'Finance' },
+    { id: 'exedp_expenses', label: 'Expenses' },
+    { id: 'communication', label: 'Chat' },
+    { id: '__more__', label: 'More' }
   ]
 };
 
