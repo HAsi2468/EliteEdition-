@@ -901,6 +901,7 @@ const create = async (req, res) => {
         recordId: created._id,
         permissionScope: 'finance_expenses',
         department: 'Finance',
+        actionTab: 'expense_dashboard',
         description: `💸 **Expense Voucher #${created.voucherNo}** logged for Purpose: **"${created.title}"** | Category: **${created.category}** | Amount: **₹${created.amount}** (${created.type === 'IN' ? 'Income' : 'Expense'}) [${created.bankAccount || created.paymentMode}] by **${uName}**.`
       }).catch(e => logger.warn('publishActivity expense create failed: %s', e.message));
     } catch (e) {

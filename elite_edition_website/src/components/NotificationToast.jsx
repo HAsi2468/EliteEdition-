@@ -243,6 +243,14 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     if (isOpen) refreshHistory();
     const handleUpdate = () => refreshHistory();
     window.addEventListener('elite-notification-history-update', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    const handleKeyDown = (e) => {
+      if (isOpen && e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
     
     const updatePerm = () => {
       if ('Notification' in window) {
@@ -264,10 +272,12 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
 
     return () => {
       window.removeEventListener('elite-notification-history-update', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('focus', updatePerm);
       window.removeEventListener('elite-permission-change', updatePerm);
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   const unreadCount = history.filter(h => !h.read).length;
   const alertCount = history.filter(h => h.type === 'danger' || h.type === 'warning' || (h.title && (h.title.toLowerCase().includes('alert') || h.title.toLowerCase().includes('error')))).length;
@@ -385,9 +395,24 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
 
   if (!isOpen) return null;
 
+  const resolveNotificationTargetTab = (item) => {
+    const text = `${item?.title || ''} ${item?.message || ''}`;
+    if (/Voucher #|Expense Voucher|-EXP-/i.test(text)) return 'expense_dashboard';
+    if (/Job #|JC-|Job Card/i.test(text)) return 'jobcards_list';
+    if (/Invoice #|EDP\/\d+/i.test(text)) return 'exedp_invoices';
+    if (/OVERDUE TASK|Task/i.test(text)) return 'task_management';
+    return item?.actionTab || null;
+  };
+
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 1000001, display: 'flex', justifyContent: 'flex-end' }}>
-      <div style={{ width: '440px', maxWidth: '100vw', height: '100%', background: 'var(--bg-card, #161b26)', borderLeft: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 45px rgba(0,0,0,0.6)', animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 1000001, display: 'flex', justifyContent: 'flex-end' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: '440px', maxWidth: '100vw', height: '100%', background: 'var(--bg-card, #161b26)', borderLeft: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 45px rgba(0,0,0,0.6)', animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}
+      >
         
         {/* Drawer Header */}
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
@@ -559,14 +584,15 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                 };
 
                 const isGroupSelected = item.ids.every(id => selectedNotifIds.includes(id));
+                const targetTab = resolveNotificationTargetTab(item);
 
                 return (
                   <div
                     key={item.id}
                     onClick={() => {
                       markGroupRead(item.ids);
-                      if (item.actionTab && onSelectTab) {
-                        onSelectTab(item.actionTab);
+                      if (targetTab && onSelectTab) {
+                        onSelectTab(targetTab);
                         onClose();
                       }
                     }}
@@ -575,7 +601,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                       borderRadius: '10px',
                       background: isGroupSelected ? 'rgba(56, 189, 248, 0.15)' : !item.hasUnread ? 'rgba(255,255,255,0.02)' : 'rgba(56,189,248,0.08)',
                       border: isGroupSelected ? '1px solid var(--primary)' : !item.hasUnread ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(56,189,248,0.25)',
-                      cursor: item.actionTab ? 'pointer' : 'default',
+                      cursor: targetTab ? 'pointer' : 'default',
                       transition: 'all 0.15s ease',
                       position: 'relative'
                     }}
@@ -603,7 +629,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{formatTime(item.timestamp)}</span>
                         </div>
                         {item.message && <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.35 }}>{item.message}</p>}
-                        {item.actionTab && (
+                        {targetTab && (
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: 'var(--primary)', marginTop: '0.4rem', fontWeight: 600 }}>
                             <span>Open Module</span> <ExternalLink size={10} />
                           </div>

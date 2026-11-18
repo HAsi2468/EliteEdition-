@@ -762,6 +762,10 @@ export default function App() {
     }
   });
 
+  useEffect(() => {
+    setShowNotificationDrawer(false);
+  }, [activeTab, activeDepartment]);
+
   const applyThemeDom = (mode) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;

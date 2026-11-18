@@ -145,9 +145,21 @@ import {
   BulkActionToolbar
 } from './ChatAdvancedFeatures';
 
+function decodeHtmlEntities(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&amp;/g, '&');
+}
+
 function formatChatPreviewSnippet(text) {
   if (!text || typeof text !== 'string') return '';
-  let cleaned = text;
+  let cleaned = decodeHtmlEntities(text);
   cleaned = cleaned.replace(/https?:\/\/(www\.)?([^\s/]+)[^\s]*/gi, (match, p1, domain) => `🔗 ${domain}`);
   cleaned = cleaned.replace(/[*_`~]/g, '');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -2068,7 +2080,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleDeleteMessage = (msgOrId) => {
     if (!msgOrId) return;
     if (typeof msgOrId === 'object') {
-      const text = msgOrId.content || (msgOrId.attachment?.fileName ? `Attachment: ${msgOrId.attachment.fileName}` : 'Message');
+      const rawText = (msgOrId.isEncrypted && decryptedMap[msgOrId._id]) ? decryptedMap[msgOrId._id] : msgOrId.content;
+      const text = decodeHtmlEntities(rawText) || (msgOrId.attachment?.fileName ? `Attachment: ${msgOrId.attachment.fileName}` : 'Message');
       setDeleteTargetMsg({
         id: String(msgOrId._id || msgOrId.id),
         text: text,
@@ -2076,7 +2089,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       });
     } else {
       const found = messages.find((m) => String(m._id) === String(msgOrId));
-      const text = found?.content || (found?.attachment?.fileName ? `Attachment: ${found.attachment.fileName}` : 'Message');
+      const rawText = (found?.isEncrypted && decryptedMap[found?._id]) ? decryptedMap[found._id] : found?.content;
+      const text = decodeHtmlEntities(rawText) || (found?.attachment?.fileName ? `Attachment: ${found.attachment.fileName}` : 'Message');
       setDeleteTargetMsg({
         id: String(msgOrId),
         text: text,
@@ -2302,10 +2316,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         setMessages((prev) =>
           prev.map((m) =>
             String(m._id) === String(data.messageId)
-              ? { ...m, content: data.newContent, isEdited: true }
+              ? { ...m, content: data.newContent, isEdited: true, isEncrypted: false }
               : m
           )
         );
+        setDecryptedMap((prev) => ({ ...prev, [data.messageId]: data.newContent }));
       }
     };
 
@@ -4714,10 +4729,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setMessages((prev) =>
       prev.map((m) =>
         String(m._id) === String(msgId)
-          ? { ...m, content: editedContent, isEdited: true }
+          ? { ...m, content: editedContent, isEdited: true, isEncrypted: false }
           : m
       )
     );
+    setDecryptedMap((prev) => ({ ...prev, [msgId]: editedContent }));
 
     if (api.editCommunicationMessage) {
       api.editCommunicationMessage(msgId, editedContent).catch((err) => {
@@ -7224,7 +7240,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                         onClick={() => {
                                           setActiveMsgMenuId(null);
                                           setEditingMessage(msg);
-                                          setEditDraftText(msg.content || '');
+                                          const readable = (msg.isEncrypted && decryptedMap[msg._id]) ? decryptedMap[msg._id] : (msg.content || '');
+                                          setEditDraftText(decodeHtmlEntities(readable));
                                         }}
                                         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
                                       >
@@ -7288,6 +7305,33 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               >
                                 <span style={{ fontSize: '0.9rem' }}>🚫</span>
                                 <span>This message was deleted</span>
+                                <button
+                                  type="button"
+                                  title="Remove from view"
+                                  aria-label="Remove deleted message from view"
+                                  onClick={() => {
+                                    setMessages((prev) => {
+                                      const next = prev.filter((m) => String(m._id) !== String(msg._id));
+                                      if (activeGroup?._id) {
+                                        messagesCacheRef.current[activeGroup._id] = next;
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                  style={{
+                                    marginLeft: '4px',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'inherit',
+                                    opacity: 0.7,
+                                    cursor: 'pointer',
+                                    fontSize: '0.78rem',
+                                    padding: '0 4px',
+                                    lineHeight: 1
+                                  }}
+                                >
+                                  ✕
+                                </button>
                               </div>
                             ) : (
                               <>
