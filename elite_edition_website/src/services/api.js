@@ -2945,6 +2945,12 @@ export const api = {
       });
     },
 
+  async transcribeVoiceMessage(messageId) {
+      return request(`/communication/messages/${messageId}/transcribe`, {
+        method: 'POST',
+      });
+    },
+
   async getChatPreferences() {
       return request('/communication/preferences');
     },

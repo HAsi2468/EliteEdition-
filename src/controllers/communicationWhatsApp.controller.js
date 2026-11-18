@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const axios = require('axios');
 const { ChatRoom, ChatMessage, ChatUserPreference, ChatMessageReminder } = require('../db/models/chat.model');
 const { user: User } = require('../db/models');
 const { dispatchChatMessage } = require('./chatController');
@@ -392,6 +393,116 @@ const saveVoiceTranscript = async (req, res) => {
   }
 };
 
+// 7B. Auto-Detect Language & Transcribe Voice Note via AI (Supports Any Language: Gujarati, Hindi, English, etc.)
+const transcribeVoiceMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ success: false, message: 'Invalid message ID' });
+    }
+
+    const msg = await ChatMessage.findById(messageId).select('roomId attachment transcript').lean();
+    if (!msg || !msg.attachment?.fileUrl) {
+      return res.status(404).json({ success: false, message: 'Voice attachment not found' });
+    }
+
+    const openAiKey = process.env.OPENAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!openAiKey && !geminiKey) {
+      return res.status(503).json({
+        success: false,
+        code: 'TRANSCRIPTION_KEY_MISSING',
+        message: 'Configure OPENAI_API_KEY or GEMINI_API_KEY in server .env to enable automatic multi-language voice transcription.'
+      });
+    }
+
+    const audioRes = await axios.get(msg.attachment.fileUrl, {
+      responseType: 'arraybuffer',
+      timeout: 25000
+    });
+    const buffer = Buffer.from(audioRes.data);
+    if (!buffer.length) {
+      return res.status(400).json({ success: false, message: 'Empty audio file' });
+    }
+
+    const urlLower = String(msg.attachment.fileUrl).toLowerCase();
+    const headerMime = String(audioRes.headers?.['content-type'] || '').split(';')[0].trim();
+    const mimeType = headerMime.startsWith('audio/')
+      ? headerMime
+      : (urlLower.endsWith('.mp3') ? 'audio/mpeg'
+        : urlLower.endsWith('.m4a') || urlLower.endsWith('.mp4') ? 'audio/mp4'
+        : urlLower.endsWith('.ogg') ? 'audio/ogg'
+        : urlLower.endsWith('.wav') ? 'audio/wav'
+        : 'audio/webm');
+
+    let rawTranscript = '';
+
+    if (openAiKey) {
+      const OpenAI = require('openai');
+      const openai = new OpenAI({ apiKey: openAiKey });
+      const ext = mimeType.includes('mpeg') ? 'mp3' : mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : mimeType.includes('wav') ? 'wav' : 'webm';
+      const fileObj = await OpenAI.toFile(buffer, `voice_${messageId}.${ext}`, { type: mimeType });
+      try {
+        const tr = await openai.audio.transcriptions.create({
+          file: fileObj,
+          model: 'gpt-4o-mini-transcribe',
+          prompt: 'Auto-detect any spoken language (Gujarati, Hindi, English, Marathi, etc.) and transcribe verbatim in the native script.'
+        });
+        rawTranscript = tr?.text || '';
+      } catch (primaryErr) {
+        const trFallback = await openai.audio.transcriptions.create({
+          file: await OpenAI.toFile(buffer, `voice_${messageId}.${ext}`, { type: mimeType }),
+          model: 'whisper-1'
+        });
+        rawTranscript = trFallback?.text || '';
+      }
+    } else if (geminiKey) {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(geminiKey);
+      const prompt = 'Auto-detect the exact spoken language(s) in this audio (such as Gujarati, Hindi, English, Marathi, Tamil, Punjabi, etc., or mixed). Transcribe the exact spoken words verbatim in the speaker\'s native script (for Gujarati use ગુજરાતી script, for Hindi use Devanagari हिन्दी script, for English use English). Do NOT translate into English. Output ONLY the clean verbatim transcript text with no quotes or extra commentary.';
+      const modelNames = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const mName of modelNames) {
+        try {
+          const model = genAI.getGenerativeModel({ model: mName });
+          const result = await model.generateContent([
+            { inlineData: { mimeType, data: buffer.toString('base64') } },
+            prompt
+          ]);
+          rawTranscript = result?.response?.text?.() || '';
+          if (rawTranscript.trim()) break;
+        } catch (gemErr) {
+          if (mName === modelNames[modelNames.length - 1]) throw gemErr;
+        }
+      }
+    }
+
+    const clean = sanitizeChatMessage(String(rawTranscript || '').trim(), 5000);
+    await ChatMessage.updateOne({ _id: messageId }, { $set: { transcript: clean } });
+
+    const io = req.app.get('io');
+    if (io && msg.roomId) {
+      const roomIdStr = String(msg.roomId);
+      let broadcast = io.to(roomIdStr);
+      const room = await ChatRoom.findById(roomIdStr).select('members').lean();
+      if (room?.members?.length) {
+        room.members.forEach((m) => {
+          const mid = String(m?._id || m);
+          if (mid) broadcast = broadcast.to(`user_${mid}`);
+        });
+      }
+      broadcast.emit('message-transcript-updated', {
+        roomId: roomIdStr,
+        messageId: String(messageId),
+        transcript: clean
+      });
+    }
+
+    return res.json({ success: true, transcript: clean });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to transcribe audio', error: err.message });
+  }
+};
+
 // 8. User Chat Preferences (Wallpapers, Privacy Toggles, Media Auto-Download)
 const getUserChatPreferences = async (req, res) => {
   try {
@@ -750,6 +861,7 @@ module.exports = {
   sendBroadcastMessage,
   markViewOnceOpened,
   saveVoiceTranscript,
+  transcribeVoiceMessage,
   getUserChatPreferences,
   updateUserChatPreferences,
   getStorageUsage,

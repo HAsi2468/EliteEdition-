@@ -2658,7 +2658,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     socket.on('message-reaction-updated', handleReaction);
     socket.on('message-edited', handleEdited);
     socket.on('message-deleted', handleDeleted);
+    const handleTranscriptUpdated = (data) => {
+      if (data && data.messageId && typeof data.transcript === 'string') {
+        const currentActiveId = activeGroupIdRef.current;
+        if (!currentActiveId || !data.roomId || String(data.roomId) === String(currentActiveId)) {
+          setMessages((prev) =>
+            prev.map((m) => (String(m._id) === String(data.messageId) ? { ...m, transcript: data.transcript } : m))
+          );
+        }
+      }
+    };
+
     socket.on('message-pin-updated', handlePinUpdated);
+    socket.on('message-transcript-updated', handleTranscriptUpdated);
     socket.on('room-messages-read', handleRoomMessagesRead);
     socket.on('messages-delivered', handleMessagesDelivered);
     socket.on('poll-updated', handlePollUpdated);
@@ -2685,6 +2697,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('message-edited', handleEdited);
       socket.off('message-deleted', handleDeleted);
       socket.off('message-pin-updated', handlePinUpdated);
+      socket.off('message-transcript-updated', handleTranscriptUpdated);
       socket.off('room-messages-read', handleRoomMessagesRead);
       socket.off('messages-delivered', handleMessagesDelivered);
       socket.off('poll-updated', handlePollUpdated);
@@ -3810,6 +3823,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             return g;
           });
         });
+        if (realMsg._id) {
+          api.transcribeVoiceMessage(realMsg._id).then((tRes) => {
+            if (tRes && tRes.success && tRes.transcript) {
+              setMessages((prev) =>
+                prev.map((m) => (String(m._id) === String(realMsg._id) ? { ...m, transcript: tRes.transcript } : m))
+              );
+            }
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       console.warn('HTTP post message failed, falling back to socket emit:', err.message);
@@ -3868,24 +3890,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       mediaRecorder.start();
       setIsRecordingAudio(true);
       liveTranscriptRef.current = '';
-      try {
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRec) {
-          const rec = new SpeechRec();
-          rec.continuous = true;
-          rec.interimResults = false;
-          rec.lang = 'en-US';
-          rec.onresult = (ev) => {
-            const chunks = [];
-            for (let i = 0; i < ev.results.length; i += 1) {
-              chunks.push(ev.results[i][0].transcript);
-            }
-            liveTranscriptRef.current = chunks.join(' ').trim();
-          };
-          rec.start();
-          speechRecRef.current = rec;
-        }
-      } catch (_) { }
       setRecordingSeconds(0);
       recordingSecondsRef.current = 0;
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
