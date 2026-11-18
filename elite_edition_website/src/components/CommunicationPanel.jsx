@@ -636,8 +636,25 @@ const mergeMessages = (prev = [], incoming = []) => {
   });
 };
 
+const MemoizedRender = React.memo(
+  ({ renderFn }) => renderFn(),
+  (prev, next) =>
+    prev.deps.length === next.deps.length &&
+    prev.deps.every((d, i) => Object.is(d, next.deps[i]))
+);
+
 export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat', activeTab = 'communication', onUnreadChange }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
+  const isChatVisible = (activeTab === 'communication' || activeTab === 'workspace') && mainTab === 'chat';
+  const isChatVisibleRef = useRef(isChatVisible);
+  isChatVisibleRef.current = isChatVisible;
+
+  const canMarkChatAsRead = useCallback(() => {
+    return (
+      isChatVisibleRef.current &&
+      (typeof document === 'undefined' || document.visibilityState === 'visible')
+    );
+  }, []);
 
   useEffect(() => {
     if (initialMainTab) {
@@ -657,7 +674,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [activeGroup, setActiveGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [roomDrafts, setRoomDrafts] = useState({});
+  const roomDraftsRef = useRef({});
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchResults, setMessageSearchResults] = useState([]);
   const [isSearchingMessages, setIsSearchingMessages] = useState(false);
@@ -728,7 +745,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // Auto-restore draft message per room/DM conversation
   useEffect(() => {
     if (!activeGroup?._id) return;
-    setInputMessage(roomDrafts[activeGroup._id] || '');
+    setInputMessage(roomDraftsRef.current[activeGroup._id] || '');
   }, [activeGroup?._id]);
   const [msgFilter, setMsgFilter] = useState('all'); // 'all' | 'human' | 'system_activity' | 'urgent' | 'media'
   const [rosterTab, setRosterTab] = useState('all'); // 'all' | 'groups' | 'direct'
@@ -2263,7 +2280,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           const filtered = prev.filter((m) => !(m.isOptimistic && ((m.clientMsgId && msg.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.content === msg.content || String(m._id) === String(msg._id))));
           return mergeMessages(filtered, [{ ...msg, isOptimistic: false }]);
         });
-        if (socket && uId) {
+        if (socket && uId && canMarkChatAsRead()) {
           socket.emit('read-room-messages', { roomId: currentActiveId, userId: uId });
         }
       }
@@ -2275,7 +2292,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       setGroups((prevGroups) => {
         return prevGroups.map((g) => {
           if (String(g._id) === String(msg.roomId)) {
-            const isCurrentActive = currentActiveId && String(g._id) === String(currentActiveId);
+            const isCurrentActive = currentActiveId && String(g._id) === String(currentActiveId) && canMarkChatAsRead();
             const newUnread = isCurrentActive ? 0 : (g.unreadCount || 0) + 1;
             return {
               ...g,
@@ -2698,6 +2715,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     return () => clearInterval(fallbackPollInterval);
   }, [isSocketConnected, activeGroup?._id, msgFilter]);
 
+  // Mark active room messages as read ONLY when user actually returns to the visible chat screen/tab
+  useEffect(() => {
+    const syncReadIfVisible = () => {
+      const roomId = activeGroupIdRef.current;
+      const myId = currentUser?._id || currentUser?.id;
+      if (!roomId || !myId || !canMarkChatAsRead()) return;
+      if (socket && socket.connected) {
+        socket.emit('read-room-messages', { roomId, userId: myId });
+      }
+      setGroups((prev) =>
+        prev.map((g) => (String(g._id) === String(roomId) && (g.unreadCount || 0) > 0 ? { ...g, unreadCount: 0 } : g))
+      );
+    };
+
+    syncReadIfVisible();
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncReadIfVisible();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [isChatVisible, activeGroup?._id, socket, currentUser, canMarkChatAsRead]);
+
   // Handle global answering from outside tabs (e.g. from App.jsx global call banner)
   useEffect(() => {
     const handleGlobalAnswer = (e) => {
@@ -2858,10 +2903,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setShowScrollBottom(false);
     setUnreadBelowCount(0);
     if (activeGroup?._id && inputMessage) {
-      setRoomDrafts((prev) => ({
-        ...prev,
-        [activeGroup._id]: inputMessage
-      }));
+      roomDraftsRef.current[activeGroup._id] = inputMessage;
     }
 
     // Abort any ongoing stream history fetch from previous room
@@ -2897,7 +2939,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (typeof localStorage !== 'undefined' && targetGroup._id) {
       localStorage.setItem('elite_active_chat_room_id', targetGroup._id);
     }
-    setInputMessage(roomDrafts[targetGroup._id] || '');
+    setInputMessage(roomDraftsRef.current[targetGroup._id] || '');
     if (socket && targetGroup._id) {
       socket.emit('join-room', targetGroup._id);
     }
@@ -3136,12 +3178,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
         const myId = currentUser?._id || currentUser?.id;
         if (socket && myId && groupId) {
-          socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+          if (canMarkChatAsRead()) {
+            socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+          }
           socket.emit('sync-delivered', { roomId: groupId, userId: myId });
         }
-        setGroups((prev) =>
-          prev.map((g) => (String(g._id) === String(groupId) ? { ...g, unreadCount: 0 } : g))
-        );
+        if (canMarkChatAsRead()) {
+          setGroups((prev) =>
+            prev.map((g) => (String(g._id) === String(groupId) ? { ...g, unreadCount: 0 } : g))
+          );
+        }
       } else {
         if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
           const cached = messagesCacheRef.current[groupId];
@@ -3193,7 +3239,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
         const myId = currentUser?._id || currentUser?.id;
         if (socket && socket.connected && myId && groupId) {
-          socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+          if (canMarkChatAsRead()) {
+            socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+          }
           socket.emit('sync-delivered', { roomId: groupId, userId: myId });
         }
       }
@@ -4530,7 +4578,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const val = e.target.value;
     setInputMessage(val);
     if (activeGroup?._id) {
-      setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
+      roomDraftsRef.current[activeGroup._id] = val;
     }
 
     const cursorPos = e.target.selectionStart;
@@ -4666,9 +4714,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const isAtBottom = distanceFromBottom <= 140;
     isNearBottomRef.current = isAtBottom;
-    setShowScrollBottom(!isAtBottom);
+    setShowScrollBottom((prev) => (prev === !isAtBottom ? prev : !isAtBottom));
     if (isAtBottom) {
-      setUnreadBelowCount(0);
+      setUnreadBelowCount((prev) => (prev === 0 ? prev : 0));
     }
 
     // Only load older messages if container actually overflows and user deliberately scrolled to the top
@@ -4978,11 +5026,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
 
       if (activeGroup?._id) {
-        setRoomDrafts((prev) => {
-          const copy = { ...prev };
-          delete copy[activeGroup._id];
-          return copy;
-        });
+        delete roomDraftsRef.current[activeGroup._id];
       }
 
       try {
@@ -6063,7 +6107,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       </span>
                     </div>
                   )}
-                  {filteredGroups.map((group) => {
+                  <MemoizedRender
+                    deps={[filteredGroups, activeGroup?._id, onlineUserIds]}
+                    renderFn={() => filteredGroups.map((group) => {
                     const isVirtual = group.isVirtualContact;
                     const isActive = !isVirtual && activeGroup && String(activeGroup._id) === String(group._id);
                     const isDirect = group.type === 'direct';
@@ -6198,6 +6244,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       </div>
                     );
                   })}
+                  />
                 </>
               )}
 
@@ -6926,7 +6973,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           );
                         }
 
-                        return chatDayGroups.map((group) => (
+                        return (
+                          <MemoizedRender
+                            deps={[chatDayGroups, activeGroup?._id, activeMsgMenuId, decryptedMap, playingAudioId, isMobileScreen, currentUser?._id, inRoomQuery]}
+                            renderFn={() => chatDayGroups.map((group) => (
                           <div
                             key={group.key}
                             className="phoenix-day-group"
@@ -8554,7 +8604,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               );
                             })}
                           </div>
-                        ));
+                        ))}
+                          />
+                        );
                       })()}
                     </ErrorBoundary>
                     <div ref={chatBottomRef} />

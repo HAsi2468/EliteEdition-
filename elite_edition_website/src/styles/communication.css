@@ -492,6 +492,7 @@
   flex-direction: column;
   gap: 4px;
   scroll-behavior: auto;
+  contain: layout style;
 }
 
 /* Date Divider Pill */

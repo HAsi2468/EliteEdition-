@@ -133,7 +133,7 @@ const Workspace = ({ currentUser }) => {
     }
   }, [rooms]);
 
-  // Mark room as read when activeRoom changes
+  // Mark room as read when activeRoom changes (only if browser tab is visible)
   useEffect(() => {
     if (activeRoom) {
       markRoomAsRead(activeRoom._id);
@@ -142,15 +142,15 @@ const Workspace = ({ currentUser }) => {
         [activeRoom._id]: 0
       }));
       setHasMoreMessages(true);
-      if (socket) {
+      if (socket && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
         socket.emit('read-room-messages', { roomId: activeRoom._id, userId: currentUser._id });
       }
     }
   }, [activeRoom, socket]);
 
-  // Emit read receipt when new messages are appended to active room
+  // Emit read receipt when new messages are appended to active room (only if browser tab is visible)
   useEffect(() => {
-    if (activeRoom && socket && messages.length > 0) {
+    if (activeRoom && socket && messages.length > 0 && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
       socket.emit('read-room-messages', { roomId: activeRoom._id, userId: currentUser._id });
     }
   }, [activeRoom, socket, messages.length]);
