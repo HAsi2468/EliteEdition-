@@ -81,6 +81,7 @@ import {
   Eye,
   Check,
   CheckCheck,
+  Globe,
   Share2,
   FilePlus,
   BarChart2,
@@ -679,6 +680,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [messageSearchResults, setMessageSearchResults] = useState([]);
   const [isSearchingMessages, setIsSearchingMessages] = useState(false);
   const [streamHistoryError, setStreamHistoryError] = useState(null);
+  const [translatedMap, setTranslatedMap] = useState({});
+  const [translatingMsgId, setTranslatingMsgId] = useState(null);
+  const [preferredTranslateLang, setPreferredTranslateLang] = useState(() => {
+    try {
+      return (typeof localStorage !== 'undefined' && localStorage.getItem('elite_chat_translate_lang')) || 'English';
+    } catch (_) {
+      return 'English';
+    }
+  });
+
+  const handleTranslateMessage = async (msg, langOverride) => {
+    if (!msg?._id) return;
+    const targetLang = langOverride || preferredTranslateLang || 'English';
+    if (langOverride) {
+      setPreferredTranslateLang(langOverride);
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_translate_lang', langOverride);
+      } catch (_) {}
+    }
+    const decryptedText = (msg.isEncrypted && decryptedMap[msg._id]) ? decryptedMap[msg._id] : undefined;
+    const overrideText = (msg.transcript && msg.transcript.trim()) ? msg.transcript : decryptedText;
+    setTranslatingMsgId(msg._id);
+    try {
+      const res = await api.translateChatMessage(msg._id, targetLang, overrideText);
+      if (res && res.success && res.translatedText) {
+        setTranslatedMap((prev) => ({
+          ...prev,
+          [msg._id]: { text: res.translatedText, lang: res.targetLanguage || targetLang }
+        }));
+      } else {
+        showToast('Translation', res?.message || 'Could not translate message', 'warning');
+      }
+    } catch (err) {
+      showToast('Translation', err?.message || 'Translation failed', 'error');
+    } finally {
+      setTranslatingMsgId(null);
+    }
+  };
   const [showCopilotModal, setShowCopilotModal] = useState(false);
 
   const handleCopilotCardAction = (actionType, payload) => {
@@ -6979,7 +7018,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                         return (
                           <MemoizedRender
-                            deps={[chatDayGroups, activeGroup?._id, activeMsgMenuId, decryptedMap, playingAudioId, isMobileScreen, currentUser?._id, inRoomQuery]}
+                            deps={[chatDayGroups, activeGroup?._id, activeMsgMenuId, decryptedMap, translatedMap, translatingMsgId, preferredTranslateLang, playingAudioId, isMobileScreen, currentUser?._id, inRoomQuery]}
                             renderFn={() => chatDayGroups.map((group) => (
                           <div
                             key={group.key}
@@ -7362,6 +7401,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                                       <Reply size={14} color="#38bdf8" />
                                                       <span>Reply</span>
                                                     </button>
+
+                                                    {((msg.transcript && msg.transcript.trim()) || (msg.content && !msg.content.startsWith('Attached '))) && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setActiveMsgMenuId(null);
+                                                          handleTranslateMessage(msg);
+                                                        }}
+                                                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
+                                                      >
+                                                        <Globe size={14} color="#34d399" />
+                                                        <span>Translate ({preferredTranslateLang})</span>
+                                                      </button>
+                                                    )}
 
                                                     <button
                                                       type="button"
@@ -7928,8 +7981,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                                     </button>
                                                   </div>
                                                   {msg.transcript && (
-                                                    <div style={{ fontSize: '0.73rem', opacity: 0.88, marginTop: '3px', fontStyle: 'italic' }}>
-                                                      “{msg.transcript}”
+                                                    <div style={{ fontSize: '0.73rem', opacity: 0.9, marginTop: '4px', fontStyle: 'italic', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                      <span>“{msg.transcript}”</span>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleTranslateMessage(msg)}
+                                                        disabled={translatingMsgId === msg._id}
+                                                        style={{
+                                                          alignSelf: 'flex-start',
+                                                          fontSize: '0.64rem',
+                                                          fontWeight: 700,
+                                                          fontStyle: 'normal',
+                                                          padding: '1px 7px',
+                                                          borderRadius: '999px',
+                                                          border: '1px solid rgba(56,189,248,0.35)',
+                                                          background: 'rgba(56,189,248,0.12)',
+                                                          color: isMe ? '#e0f2fe' : '#2563eb',
+                                                          cursor: 'pointer'
+                                                        }}
+                                                      >
+                                                        {translatingMsgId === msg._id ? 'Translating...' : `🌐 Translate (${preferredTranslateLang})`}
+                                                      </button>
                                                     </div>
                                                   )}
                                                 </div>
@@ -8407,6 +8479,59 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                                     </div>
                                                   );
                                                 })()}
+                                              </div>
+                                            )}
+
+                                            {/* Translated Text / Transcript Block */}
+                                            {translatedMap[msg._id] && (
+                                              <div
+                                                style={{
+                                                  marginTop: '4px',
+                                                  marginBottom: '6px',
+                                                  padding: '6px 9px',
+                                                  borderRadius: '8px',
+                                                  background: isMe ? 'rgba(255,255,255,0.14)' : 'rgba(16,185,129,0.10)',
+                                                  borderLeft: isMe ? '2.5px solid #e0f2fe' : '2.5px solid #10b981',
+                                                  fontSize: '0.78rem',
+                                                  lineHeight: 1.4
+                                                }}
+                                              >
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '3px', fontSize: '0.66rem', fontWeight: 700, opacity: 0.85 }}>
+                                                  <span>🌐 Translated to</span>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <select
+                                                      value={translatedMap[msg._id].lang}
+                                                      onChange={(e) => handleTranslateMessage(msg, e.target.value)}
+                                                      style={{
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 700,
+                                                        background: 'transparent',
+                                                        color: 'inherit',
+                                                        border: '1px solid currentColor',
+                                                        borderRadius: '4px',
+                                                        padding: '0 3px',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                    >
+                                                      {['English', 'Gujarati', 'Hindi', 'Marathi', 'Tamil', 'Telugu', 'Punjabi', 'Bengali', 'Kannada', 'Malayalam', 'Urdu', 'Arabic', 'Spanish'].map((l) => (
+                                                        <option key={l} value={l} style={{ color: '#0f172a', background: '#ffffff' }}>{l}</option>
+                                                      ))}
+                                                    </select>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setTranslatedMap((prev) => {
+                                                        const copy = { ...prev };
+                                                        delete copy[msg._id];
+                                                        return copy;
+                                                      })}
+                                                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.75rem', lineHeight: 1, padding: '0 2px' }}
+                                                      title="Hide translation"
+                                                    >
+                                                      ×
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                                <div>{translatedMap[msg._id].text}</div>
                                               </div>
                                             )}
 

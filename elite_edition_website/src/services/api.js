@@ -2951,6 +2951,13 @@ export const api = {
       });
     },
 
+  async translateChatMessage(messageId, targetLanguage = 'English', text = undefined) {
+      return request(`/communication/messages/${messageId}/translate`, {
+        method: 'POST',
+        body: JSON.stringify({ targetLanguage, ...(typeof text === 'string' ? { text } : {}) }),
+      });
+    },
+
   async getChatPreferences() {
       return request('/communication/preferences');
     },

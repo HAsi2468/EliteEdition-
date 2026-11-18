@@ -78,6 +78,7 @@ router.post('/broadcasts/:groupId/send', communicationWhatsAppController.sendBro
 router.post('/messages/:messageId/view-once', communicationWhatsAppController.markViewOnceOpened);
 router.patch('/messages/:messageId/transcript', communicationWhatsAppController.saveVoiceTranscript);
 router.post('/messages/:messageId/transcribe', communicationWhatsAppController.transcribeVoiceMessage);
+router.post('/messages/:messageId/translate', communicationWhatsAppController.translateChatMessage);
 router.get('/preferences', communicationWhatsAppController.getUserChatPreferences);
 router.patch('/preferences', communicationWhatsAppController.updateUserChatPreferences);
 router.get('/storage', communicationWhatsAppController.getStorageUsage);

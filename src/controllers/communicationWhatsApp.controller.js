@@ -503,6 +503,99 @@ const transcribeVoiceMessage = async (req, res) => {
   }
 };
 
+// 7C. Translate Any Chat Message or Voice Transcript to User's Known Language
+const translateChatMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { targetLanguage = 'English', text: overrideText } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ success: false, message: 'Invalid message ID' });
+    }
+
+    const msg = await ChatMessage.findById(messageId).select('content transcript').lean();
+    if (!msg) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const sourceText = String(
+      (typeof overrideText === 'string' && overrideText.trim())
+        ? overrideText
+        : ((msg.transcript && msg.transcript.trim()) ? msg.transcript : (msg.content || ''))
+    ).trim();
+
+    if (!sourceText) {
+      return res.status(400).json({ success: false, message: 'No text or transcript available to translate' });
+    }
+
+    const lang = String(targetLanguage || 'English').trim().slice(0, 60);
+    const systemPrompt = `You are a precise translator. Translate the user's message accurately and naturally into ${lang} (using its standard native script, e.g. ગુજરાતી for Gujarati, हिन्दी for Hindi, English for English). Preserve numbers, dates, order IDs, and proper names. Output ONLY the translated text without quotes, labels, or commentary.`;
+
+    let translatedText = '';
+    const openAiKey = process.env.OPENAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const xaiKey = process.env.XAI_API_KEY;
+
+    if (openAiKey) {
+      const OpenAI = require('openai');
+      const openai = new OpenAI({ apiKey: openAiKey });
+      const resp = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: sourceText }
+        ]
+      });
+      translatedText = resp?.choices?.[0]?.message?.content || '';
+    } else if (geminiKey) {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(geminiKey);
+      const modelNames = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const mName of modelNames) {
+        try {
+          const model = genAI.getGenerativeModel({ model: mName });
+          const result = await model.generateContent(`${systemPrompt}\n\nMessage:\n${sourceText}`);
+          translatedText = result?.response?.text?.() || '';
+          if (translatedText.trim()) break;
+        } catch (gemErr) {
+          if (mName === modelNames[modelNames.length - 1]) throw gemErr;
+        }
+      }
+    } else if (xaiKey) {
+      const xaiRes = await axios.post(
+        'https://api.x.ai/v1/chat/completions',
+        {
+          model: 'grok-3-mini',
+          temperature: 0.1,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: sourceText }
+          ]
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${xaiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 20000
+        }
+      );
+      translatedText = xaiRes?.data?.choices?.[0]?.message?.content || '';
+    } else {
+      return res.status(503).json({
+        success: false,
+        code: 'TRANSLATION_KEY_MISSING',
+        message: 'No AI API key (XAI_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY) configured on server.'
+      });
+    }
+
+    const clean = sanitizeChatMessage(String(translatedText || '').trim(), 5000);
+    return res.json({ success: true, translatedText: clean, targetLanguage: lang });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to translate message', error: err.message });
+  }
+};
+
 // 8. User Chat Preferences (Wallpapers, Privacy Toggles, Media Auto-Download)
 const getUserChatPreferences = async (req, res) => {
   try {
@@ -862,6 +955,7 @@ module.exports = {
   markViewOnceOpened,
   saveVoiceTranscript,
   transcribeVoiceMessage,
+  translateChatMessage,
   getUserChatPreferences,
   updateUserChatPreferences,
   getStorageUsage,
