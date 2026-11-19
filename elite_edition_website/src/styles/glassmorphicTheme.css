@@ -1820,6 +1820,28 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background-color: rgb(224, 231, 255)"],
   [style*="background: rgb(255, 237, 213)"],
   [style*="background-color: rgb(255, 237, 213)"],
+  [style*="background: rgb(255, 247, 237)"],
+  [style*="background-color: rgb(255, 247, 237)"],
+  [style*="background: rgb(250, 250, 250)"],
+  [style*="background-color: rgb(250, 250, 250)"],
+  [style*="background: rgb(243, 232, 255)"],
+  [style*="background-color: rgb(243, 232, 255)"],
+  [style*="background: rgb(240, 244, 248)"],
+  [style*="background-color: rgb(240, 244, 248)"],
+  [style*="background: rgb(255, 235, 235)"],
+  [style*="background-color: rgb(255, 235, 235)"],
+  [style*="background: rgb(249, 250, 251)"],
+  [style*="background-color: rgb(249, 250, 251)"],
+  [style*="background: rgb(187, 247, 208)"],
+  [style*="background-color: rgb(187, 247, 208)"],
+  [style*="background: rgb(252, 245, 255)"],
+  [style*="background-color: rgb(252, 245, 255)"],
+  [style*="background: rgb(191, 219, 254)"],
+  [style*="background-color: rgb(191, 219, 254)"],
+  [style*="background: rgb(243, 244, 246)"],
+  [style*="background-color: rgb(243, 244, 246)"],
+  [style*="background: rgb(245, 239, 230)"],
+  [style*="background-color: rgb(245, 239, 230)"],
   [style*="background: rgb(240, 253, 244)"],
   [style*="background-color: rgb(240, 253, 244)"],
   [style*="background: rgb(236, 253, 245)"],
@@ -1891,7 +1913,12 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
 body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td, th, label, a):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="color: rgb(76, 29, 149)"], [style*="color: #4c1d95"],
   [style*="color: rgb(91, 33, 182)"], [style*="color: #5b21b6"],
-  [style*="color: rgb(109, 40, 217)"], [style*="color: #6d28d9"]
+  [style*="color: rgb(109, 40, 217)"], [style*="color: #6d28d9"],
+  [style*="color: rgb(55, 48, 163)"], [style*="color: #3730a3"],
+  [style*="color: rgb(107, 33, 168)"], [style*="color: #6b21a8"],
+  [style*="color: rgb(30, 27, 75)"], [style*="color: #1e1b4b"],
+  [style*="color: rgb(88, 28, 135)"], [style*="color: #581c87"],
+  [style*="color: rgb(59, 7, 100)"], [style*="color: #3b0764"]
 ) {
   color: #ddd6fe !important;
 }
@@ -1911,7 +1938,9 @@ body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td,
   [style*="color: rgb(159, 18, 57)"], [style*="color: #9f1239"],
   [style*="color: rgb(136, 19, 55)"], [style*="color: #881337"],
   [style*="color: rgb(153, 27, 27)"], [style*="color: #991b1b"],
-  [style*="color: rgb(127, 29, 29)"], [style*="color: #7f1d1d"]
+  [style*="color: rgb(127, 29, 29)"], [style*="color: #7f1d1d"],
+  [style*="color: rgb(76, 5, 25)"], [style*="color: #4c0519"],
+  [style*="color: rgb(157, 23, 77)"], [style*="color: #9d174d"]
 ) {
   color: #fda4af !important;
 }
@@ -1927,9 +1956,16 @@ body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td,
 body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td, th, label, a):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="color: rgb(120, 53, 15)"], [style*="color: #78350f"],
   [style*="color: rgb(146, 64, 14)"], [style*="color: #92400e"],
-  [style*="color: rgb(180, 83, 9)"], [style*="color: #b45309"]
+  [style*="color: rgb(180, 83, 9)"], [style*="color: #b45309"],
+  [style*="color: rgb(124, 45, 18)"], [style*="color: #7c2d12"]
 ) {
   color: #fde68a !important;
+}
+
+body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td, th, label, a):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
+  [style*="color: rgb(11, 15, 25)"], [style*="color: #0b0f19"]
+) {
+  color: #f8fafc !important;
 }
 
 /* 7. Mobile Bottom Navigation Bar — Dark Frosted Glass */
