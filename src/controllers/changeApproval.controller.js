@@ -800,22 +800,25 @@ const getUserDataEntries = async (req, res) => {
     }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 40));
+    const limitNum = Math.min(250, Math.max(1, parseInt(limit, 10) || 50));
 
-    // Construct Date Range Objects & Strings
+    // Construct Date Range Objects & Strings (IST +05:30 accurate day boundaries)
     let dateStartObj = null;
     let dateEndObj = null;
     let startDateStr = '';
     let endDateStr = '';
 
     if (startDate) {
-      dateStartObj = new Date(startDate);
-      startDateStr = startDate.split('T')[0];
+      startDateStr = String(startDate).split('T')[0];
+      dateStartObj = /^\d{4}-\d{2}-\d{2}$/.test(startDateStr)
+        ? new Date(`${startDateStr}T00:00:00+05:30`)
+        : new Date(startDate);
     }
     if (endDate) {
-      dateEndObj = new Date(endDate);
-      dateEndObj.setHours(23, 59, 59, 999);
-      endDateStr = endDate.split('T')[0];
+      endDateStr = String(endDate).split('T')[0];
+      dateEndObj = /^\d{4}-\d{2}-\d{2}$/.test(endDateStr)
+        ? new Date(`${endDateStr}T23:59:59.999+05:30`)
+        : new Date(endDate);
     }
     const hasDate = Boolean(dateStartObj || dateEndObj);
 

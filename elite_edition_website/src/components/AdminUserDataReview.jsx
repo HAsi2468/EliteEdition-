@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import {
@@ -50,8 +50,19 @@ export default function AdminUserDataReview({ companyEntity }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
+  const latestReqIdRef = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Detail Modal
   const [inspectEntry, setInspectEntry] = useState(null);
@@ -69,8 +80,9 @@ export default function AdminUserDataReview({ companyEntity }) {
     }
   }, []);
 
-  // Fetch user entries
+  // Fetch user entries (with race-condition guard + debounced search + selectable pageSize)
   const fetchEntries = useCallback(async () => {
+    const reqId = ++latestReqIdRef.current;
     setLoading(true);
     try {
       const res = await api.getUserDataEntries({
@@ -80,10 +92,12 @@ export default function AdminUserDataReview({ companyEntity }) {
         department: selectedDepartment,
         startDate,
         endDate,
-        search,
+        search: debouncedSearch,
         page,
-        limit: 35,
+        limit: pageSize,
       });
+
+      if (reqId !== latestReqIdRef.current) return;
 
       if (res && res.data) {
         setEntries(res.data || []);
@@ -95,12 +109,15 @@ export default function AdminUserDataReview({ companyEntity }) {
         }
       }
     } catch (err) {
+      if (reqId !== latestReqIdRef.current) return;
       console.error('Failed to load user entries:', err);
       triggerPushNotification('Error', err.message || 'Failed to fetch user entries', 'error');
     } finally {
-      setLoading(false);
+      if (reqId === latestReqIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [selectedUser, selectedModule, selectedCompany, selectedDepartment, startDate, endDate, search, page]);
+  }, [selectedUser, selectedModule, selectedCompany, selectedDepartment, startDate, endDate, debouncedSearch, page, pageSize]);
 
   useEffect(() => {
     fetchUsers();
@@ -667,6 +684,46 @@ export default function AdminUserDataReview({ companyEntity }) {
                   <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '3px' }}>
                     {item.details}
                   </div>
+
+                  {/* Rich Inline Metadata Pills (Show more data directly on the row) */}
+                  {(() => {
+                    const r = item.rawDoc || {};
+                    const chips = [
+                      (item.party || r.partyName || r.party || r.clientName) && `👤 ${item.party || r.partyName || r.party || r.clientName}`,
+                      (r.fabric || r.fabricName) && `🧵 ${r.fabric || r.fabricName}`,
+                      (r.designNo || r.designName) && `🎨 ${r.designNo || r.designName}`,
+                      (r.voucherNo || r.billNo || r.invoiceNo || r.challanNo) && `🧾 ${r.voucherNo || r.billNo || r.invoiceNo || r.challanNo}`,
+                      (r.paymentMode || r.bankAccount) && `💳 ${[r.paymentMode, r.bankAccount].filter(Boolean).join(' • ')}`,
+                      (r.category && item.module !== 'JobCard') && `🏷️ ${r.category}`,
+                      (r.machine || r.fusingMachine || r.printerMachine) && `⚙️ ${r.machine || r.fusingMachine || r.printerMachine}`,
+                      (r.remarks || r.description || r.notes) && `📝 ${String(r.remarks || r.description || r.notes).slice(0, 65)}`,
+                    ].filter(Boolean);
+                    if (chips.length === 0) return null;
+                    return (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '5px' }}>
+                        {chips.slice(0, 5).map((chip, cIdx) => (
+                          <span
+                            key={cIdx}
+                            style={{
+                              fontSize: '0.67rem',
+                              fontWeight: 600,
+                              padding: '1.5px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(56, 189, 248, 0.10)',
+                              border: '1px solid rgba(56, 189, 248, 0.24)',
+                              color: 'var(--text-primary, #e2e8f0)',
+                              maxWidth: '240px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -765,44 +822,74 @@ export default function AdminUserDataReview({ companyEntity }) {
         </div>
       )}
 
-      {/* Pagination Footer */}
-      {pagination.totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            style={{
-              padding: '0.4rem 0.8rem',
-              borderRadius: '6px',
-              border: '1px solid #bfdbfe',
-              background: '#ffffff',
-              color: '#1d4ed8',
-              cursor: page <= 1 ? 'not-allowed' : 'pointer',
-              opacity: page <= 1 ? 0.5 : 1
-            }}
-          >
-            Previous
-          </button>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e40af' }}>
-            Page {page} of {pagination.totalPages}
+      {/* Pagination & Page Size Footer */}
+      {pagination.total > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted, #94a3b8)' }}>
+            Showing {entries.length} of {pagination.total} entries
           </span>
-          <button
-            type="button"
-            disabled={page >= pagination.totalPages}
-            onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-            style={{
-              padding: '0.4rem 0.8rem',
-              borderRadius: '6px',
-              border: '1px solid #bfdbfe',
-              background: '#ffffff',
-              color: '#1d4ed8',
-              cursor: page >= pagination.totalPages ? 'not-allowed' : 'pointer',
-              opacity: page >= pagination.totalPages ? 0.5 : 1
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
             }}
+            style={{
+              padding: '0.32rem 0.55rem',
+              borderRadius: '6px',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              background: 'var(--bg-input, rgba(15, 23, 42, 0.7))',
+              color: 'var(--text-primary, #f8fafc)',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+            title="Entries per page"
           >
-            Next
-          </button>
+            <option value={35}>35 / page</option>
+            <option value={50}>50 / page</option>
+            <option value={100}>100 / page</option>
+            <option value={200}>200 / page</option>
+          </select>
+          {pagination.totalPages > 1 && (
+            <>
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                style={{
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: '6px',
+                  border: '1px solid #bfdbfe',
+                  background: '#ffffff',
+                  color: '#1d4ed8',
+                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                  opacity: page <= 1 ? 0.5 : 1
+                }}
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e40af' }}>
+                Page {page} of {pagination.totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                style={{
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: '6px',
+                  border: '1px solid #bfdbfe',
+                  background: '#ffffff',
+                  color: '#1d4ed8',
+                  cursor: page >= pagination.totalPages ? 'not-allowed' : 'pointer',
+                  opacity: page >= pagination.totalPages ? 0.5 : 1
+                }}
+              >
+                Next
+              </button>
+            </>
+          )}
         </div>
       )}
 

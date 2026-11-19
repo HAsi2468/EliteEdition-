@@ -1816,6 +1816,10 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background-color: rgb(224, 242, 254)"],
   [style*="background: rgb(219, 234, 254)"],
   [style*="background-color: rgb(219, 234, 254)"],
+  [style*="background: rgb(224, 231, 255)"],
+  [style*="background-color: rgb(224, 231, 255)"],
+  [style*="background: rgb(255, 237, 213)"],
+  [style*="background-color: rgb(255, 237, 213)"],
   [style*="background: rgb(240, 253, 244)"],
   [style*="background-color: rgb(240, 253, 244)"],
   [style*="background: rgb(236, 253, 245)"],
@@ -1871,7 +1875,11 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background: #faf5ff"],
   [style*="background-color: #faf5ff"],
   [style*="background: #f5f3ff"],
-  [style*="background-color: #f5f3ff"]
+  [style*="background-color: #f5f3ff"],
+  [style*="background: #e0e7ff"],
+  [style*="background-color: #e0e7ff"],
+  [style*="background: #ffedd5"],
+  [style*="background-color: #ffedd5"]
 ) {
   background: rgba(15, 23, 42, 0.78) !important;
   background-color: rgba(15, 23, 42, 0.78) !important;
