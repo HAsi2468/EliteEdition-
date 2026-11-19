@@ -843,15 +843,39 @@ body.glass-theme-active div[style*="background: rgb(252, 231, 243)"] {
   color: #ffffff !important;
 }
 
-body.glass-theme-active div[style*="linear-gradient"][style*="#ffffff"],
-body.glass-theme-active div[style*="linear-gradient"][style*="rgb(255, 255, 255)"],
-body.glass-theme-active div[style*="linear-gradient"][style*="#f0fdf4"],
-body.glass-theme-active div[style*="linear-gradient"][style*="#eff6ff"],
-body.glass-theme-active div[style*="linear-gradient"][style*="#fef2f2"],
-body.glass-theme-active div[style*="linear-gradient"][style*="#fffbeb"],
-body.glass-theme-active div[style*="linear-gradient"][style*="#f8fafc"] {
-  background: rgba(15, 23, 42, 0.72) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+body.glass-theme-active :is(div, section, article, aside, header, footer, li, form, button, span)[style*="linear-gradient"]:not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
+  [style*="#ffffff"],
+  [style*="rgb(255, 255, 255)"],
+  [style*="rgba(255, 255, 255, 0.8"],
+  [style*="rgba(255, 255, 255, 0.9"],
+  [style*="rgba(255,255,255,0.8"],
+  [style*="rgba(255,255,255,0.9"],
+  [style*="#f0fdf4"], [style*="rgb(240, 253, 244)"],
+  [style*="#ecfdf5"], [style*="rgb(236, 253, 245)"],
+  [style*="#d1fae5"], [style*="rgb(209, 250, 229)"],
+  [style*="#dcfce7"], [style*="rgb(220, 252, 231)"],
+  [style*="#eff6ff"], [style*="rgb(239, 246, 255)"],
+  [style*="#dbeafe"], [style*="rgb(219, 234, 254)"],
+  [style*="#e0f2fe"], [style*="rgb(224, 242, 254)"],
+  [style*="#f0f9ff"], [style*="rgb(240, 249, 255)"],
+  [style*="#f0f7ff"], [style*="rgb(240, 247, 255)"],
+  [style*="#fef2f2"], [style*="rgb(254, 242, 242)"],
+  [style*="#fee2e2"], [style*="rgb(254, 226, 226)"],
+  [style*="#fffbeb"], [style*="rgb(255, 251, 235)"],
+  [style*="#fefce8"], [style*="rgb(254, 252, 232)"],
+  [style*="#fef3c7"], [style*="rgb(254, 243, 199)"],
+  [style*="#fff7ed"], [style*="rgb(255, 247, 237)"],
+  [style*="#ffedd5"], [style*="rgb(255, 237, 213)"],
+  [style*="#f8fafc"], [style*="rgb(248, 250, 252)"],
+  [style*="#f1f5f9"], [style*="rgb(241, 245, 249)"],
+  [style*="#e2e8f0"], [style*="rgb(226, 232, 240)"],
+  [style*="#f5f3ff"], [style*="rgb(245, 243, 255)"],
+  [style*="#faf5ff"], [style*="rgb(250, 245, 255)"],
+  [style*="#f3e8ff"], [style*="rgb(243, 232, 255)"],
+  [style*="#eef2ff"], [style*="rgb(238, 242, 255)"]
+) {
+  background: rgba(15, 23, 42, 0.78) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
   color: #ffffff !important;
 }
 
@@ -1678,16 +1702,20 @@ body.glass-theme-active .rpcb-banner {
    into high-contrast dark glassy surfaces while preserving A4 print sheets.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* 1. Emerald / Mint / Green Pastels (#ecfdf5, #d1fae5, #f0fdf4, #dcfce7) */
+/* 1. Emerald / Mint / Green Pastels (#ecfdf5, #d1fae5, #f0fdf4, #dcfce7, #a7f3d0, #bbf7d0) */
 body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="236, 253, 245"],
   [style*="209, 250, 229"],
   [style*="240, 253, 244"],
   [style*="220, 252, 231"],
+  [style*="167, 243, 208"],
+  [style*="187, 247, 208"],
   [style*="#ecfdf5"],
   [style*="#d1fae5"],
   [style*="#f0fdf4"],
-  [style*="#dcfce7"]
+  [style*="#dcfce7"],
+  [style*="#a7f3d0"],
+  [style*="#bbf7d0"]
 ) {
   background: rgba(16, 185, 129, 0.2) !important;
   background-color: rgba(16, 185, 129, 0.2) !important;
@@ -1695,16 +1723,22 @@ body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printab
   border-color: rgba(52, 211, 153, 0.45) !important;
 }
 
-/* 2. Blue / Sky / Cyan Pastels (#eff6ff, #dbeafe, #e0f2fe, #f0f9ff) */
+/* 2. Blue / Sky / Cyan Pastels (#eff6ff, #dbeafe, #e0f2fe, #f0f9ff, #bfdbfe, #c7d2fe, #e0e7ff) */
 body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="239, 246, 255"],
   [style*="219, 234, 254"],
   [style*="224, 242, 254"],
   [style*="240, 249, 255"],
+  [style*="191, 219, 254"],
+  [style*="199, 210, 254"],
+  [style*="224, 231, 255"],
   [style*="#eff6ff"],
   [style*="#dbeafe"],
   [style*="#e0f2fe"],
-  [style*="#f0f9ff"]
+  [style*="#f0f9ff"],
+  [style*="#bfdbfe"],
+  [style*="#c7d2fe"],
+  [style*="#e0e7ff"]
 ) {
   background: rgba(59, 130, 246, 0.2) !important;
   background-color: rgba(59, 130, 246, 0.2) !important;
@@ -1712,16 +1746,24 @@ body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printab
   border-color: rgba(96, 165, 250, 0.45) !important;
 }
 
-/* 3. Amber / Yellow / Orange Pastels (#fffbeb, #fef3c7, #fff7ed, #ffedd5) */
+/* 3. Amber / Yellow / Orange Pastels (#fffbeb, #fef3c7, #fff7ed, #ffedd5, #fde68a, #fffbe6, #fffdf7, #fefce8) */
 body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="255, 251, 235"],
   [style*="254, 243, 199"],
   [style*="255, 247, 237"],
   [style*="255, 237, 213"],
+  [style*="253, 230, 138"],
+  [style*="255, 251, 230"],
+  [style*="255, 253, 247"],
+  [style*="254, 252, 232"],
   [style*="#fffbeb"],
   [style*="#fef3c7"],
   [style*="#fff7ed"],
-  [style*="#ffedd5"]
+  [style*="#ffedd5"],
+  [style*="#fde68a"],
+  [style*="#fffbe6"],
+  [style*="#fffdf7"],
+  [style*="#fefce8"]
 ) {
   background: rgba(245, 158, 11, 0.22) !important;
   background-color: rgba(245, 158, 11, 0.22) !important;
@@ -1729,16 +1771,22 @@ body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printab
   border-color: rgba(251, 191, 36, 0.48) !important;
 }
 
-/* 4. Red / Rose Pastels (#fef2f2, #fee2e2, #fff1f2, #ffe4e6) */
+/* 4. Red / Rose Pastels (#fef2f2, #fee2e2, #fff1f2, #ffe4e6, #fecaca, #fffbfb, #ffebeb) */
 body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="254, 242, 242"],
   [style*="254, 226, 226"],
   [style*="255, 241, 242"],
   [style*="255, 228, 230"],
+  [style*="254, 202, 202"],
+  [style*="255, 251, 251"],
+  [style*="255, 235, 235"],
   [style*="#fef2f2"],
   [style*="#fee2e2"],
   [style*="#fff1f2"],
-  [style*="#ffe4e6"]
+  [style*="#ffe4e6"],
+  [style*="#fecaca"],
+  [style*="#fffbfb"],
+  [style*="#ffebeb"]
 ) {
   background: rgba(239, 68, 68, 0.22) !important;
   background-color: rgba(239, 68, 68, 0.22) !important;
@@ -1746,18 +1794,24 @@ body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printab
   border-color: rgba(248, 113, 113, 0.48) !important;
 }
 
-/* 5. Violet / Purple / Pink Pastels (#f5f3ff, #ede9fe, #fdf4ff, #fae8ff, #fdf2f8) */
+/* 5. Violet / Purple / Pink Pastels (#f5f3ff, #ede9fe, #fdf4ff, #fae8ff, #fdf2f8, #f3e8ff, #d8b4fe, #fcf5ff) */
 body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="245, 243, 255"],
   [style*="237, 233, 254"],
   [style*="253, 244, 255"],
   [style*="250, 232, 255"],
   [style*="253, 242, 248"],
+  [style*="243, 232, 255"],
+  [style*="216, 180, 254"],
+  [style*="252, 245, 255"],
   [style*="#f5f3ff"],
   [style*="#ede9fe"],
   [style*="#fdf4ff"],
   [style*="#fae8ff"],
-  [style*="#fdf2f8"]
+  [style*="#fdf2f8"],
+  [style*="#f3e8ff"],
+  [style*="#d8b4fe"],
+  [style*="#fcf5ff"]
 ) {
   background: rgba(139, 92, 246, 0.22) !important;
   background-color: rgba(139, 92, 246, 0.22) !important;
@@ -1765,7 +1819,7 @@ body.glass-theme-active :is(div, span, button, a, td, th, label, p):not(.printab
   border-color: rgba(167, 139, 250, 0.48) !important;
 }
 
-/* 6. White / Slate Pastels on Badges, Buttons & Cells (#ffffff, #f8fafc, #f1f5f9, #e2e8f0) */
+/* 6. White / Slate Pastels on Badges, Buttons & Cells (#ffffff, #f8fafc, #f1f5f9, #e2e8f0, #fafbfc, #cbd5e1, #d1d5db, #fafafa, #fcfdff) */
 body.glass-theme-active :is(span, button, a, label, p, td, th):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.company-segment-pill.active):is(
   [style*="background: rgb(255, 255, 255)"],
   [style*="background-color: rgb(255, 255, 255)"],
@@ -1775,6 +1829,16 @@ body.glass-theme-active :is(span, button, a, label, p, td, th):not(.printable-ar
   [style*="background-color: rgb(241, 245, 249)"],
   [style*="background: rgb(226, 232, 240)"],
   [style*="background-color: rgb(226, 232, 240)"],
+  [style*="background: rgb(250, 251, 252)"],
+  [style*="background-color: rgb(250, 251, 252)"],
+  [style*="background: rgb(203, 213, 225)"],
+  [style*="background-color: rgb(203, 213, 225)"],
+  [style*="background: rgb(209, 213, 219)"],
+  [style*="background-color: rgb(209, 213, 219)"],
+  [style*="background: rgb(250, 250, 250)"],
+  [style*="background-color: rgb(250, 250, 250)"],
+  [style*="background: rgb(252, 253, 255)"],
+  [style*="background-color: rgb(252, 253, 255)"],
   [style*="background: #fff"],
   [style*="background-color: #fff"],
   [style*="background: white"],
@@ -1784,7 +1848,17 @@ body.glass-theme-active :is(span, button, a, label, p, td, th):not(.printable-ar
   [style*="background: #f1f5f9"],
   [style*="background-color: #f1f5f9"],
   [style*="background: #e2e8f0"],
-  [style*="background-color: #e2e8f0"]
+  [style*="background-color: #e2e8f0"],
+  [style*="background: #fafbfc"],
+  [style*="background-color: #fafbfc"],
+  [style*="background: #cbd5e1"],
+  [style*="background-color: #cbd5e1"],
+  [style*="background: #d1d5db"],
+  [style*="background-color: #d1d5db"],
+  [style*="background: #fafafa"],
+  [style*="background-color: #fafafa"],
+  [style*="background: #fcfdff"],
+  [style*="background-color: #fcfdff"]
 ) {
   background: rgba(30, 41, 59, 0.82) !important;
   background-color: rgba(30, 41, 59, 0.82) !important;
@@ -1796,12 +1870,32 @@ body.glass-theme-active :is(span, button, a, label, p, td, th):not(.printable-ar
 body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul, ol, form, table):not(.printable-area):not(.printable-area *):not(.print-a4-sheet):not(.print-a4-sheet *):not(.a4-invoice-sheet):not(.a4-invoice-sheet *):not(.no-glass-override):not(.no-glass-override *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):is(
   [style*="background: rgb(255, 255, 255)"],
   [style*="background-color: rgb(255, 255, 255)"],
+  [style*="background: rgba(255, 255, 255, 0.9"],
+  [style*="background-color: rgba(255, 255, 255, 0.9"],
+  [style*="background: rgba(255, 255, 255, 0.8"],
+  [style*="background-color: rgba(255, 255, 255, 0.8"],
+  [style*="background: rgba(255, 255, 255, 0.7"],
+  [style*="background-color: rgba(255, 255, 255, 0.7"],
   [style*="background: rgb(248, 250, 252)"],
   [style*="background-color: rgb(248, 250, 252)"],
+  [style*="background: rgb(250, 251, 252)"],
+  [style*="background-color: rgb(250, 251, 252)"],
+  [style*="background: rgb(252, 253, 255)"],
+  [style*="background-color: rgb(252, 253, 255)"],
+  [style*="background: rgb(255, 251, 251)"],
+  [style*="background-color: rgb(255, 251, 251)"],
+  [style*="background: rgb(255, 251, 230)"],
+  [style*="background-color: rgb(255, 251, 230)"],
+  [style*="background: rgb(255, 253, 247)"],
+  [style*="background-color: rgb(255, 253, 247)"],
   [style*="background: rgb(241, 245, 249)"],
   [style*="background-color: rgb(241, 245, 249)"],
   [style*="background: rgb(226, 232, 240)"],
   [style*="background-color: rgb(226, 232, 240)"],
+  [style*="background: rgb(203, 213, 225)"],
+  [style*="background-color: rgb(203, 213, 225)"],
+  [style*="background: rgb(209, 213, 219)"],
+  [style*="background-color: rgb(209, 213, 219)"],
   [style*="background: rgb(248, 250, 255)"],
   [style*="background-color: rgb(248, 250, 255)"],
   [style*="background: rgb(240, 247, 255)"],
@@ -1818,10 +1912,14 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background-color: rgb(219, 234, 254)"],
   [style*="background: rgb(224, 231, 255)"],
   [style*="background-color: rgb(224, 231, 255)"],
+  [style*="background: rgb(199, 210, 254)"],
+  [style*="background-color: rgb(199, 210, 254)"],
   [style*="background: rgb(255, 237, 213)"],
   [style*="background-color: rgb(255, 237, 213)"],
   [style*="background: rgb(255, 247, 237)"],
   [style*="background-color: rgb(255, 247, 237)"],
+  [style*="background: rgb(253, 230, 138)"],
+  [style*="background-color: rgb(253, 230, 138)"],
   [style*="background: rgb(250, 250, 250)"],
   [style*="background-color: rgb(250, 250, 250)"],
   [style*="background: rgb(243, 232, 255)"],
@@ -1830,10 +1928,16 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background-color: rgb(240, 244, 248)"],
   [style*="background: rgb(255, 235, 235)"],
   [style*="background-color: rgb(255, 235, 235)"],
+  [style*="background: rgb(254, 202, 202)"],
+  [style*="background-color: rgb(254, 202, 202)"],
   [style*="background: rgb(249, 250, 251)"],
   [style*="background-color: rgb(249, 250, 251)"],
   [style*="background: rgb(187, 247, 208)"],
   [style*="background-color: rgb(187, 247, 208)"],
+  [style*="background: rgb(167, 243, 208)"],
+  [style*="background-color: rgb(167, 243, 208)"],
+  [style*="background: rgb(209, 250, 229)"],
+  [style*="background-color: rgb(209, 250, 229)"],
   [style*="background: rgb(252, 245, 255)"],
   [style*="background-color: rgb(252, 245, 255)"],
   [style*="background: rgb(191, 219, 254)"],
@@ -1864,16 +1968,32 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background-color: rgb(245, 243, 255)"],
   [style*="background: rgb(253, 244, 255)"],
   [style*="background-color: rgb(253, 244, 255)"],
+  [style*="background: rgb(253, 242, 248)"],
+  [style*="background-color: rgb(253, 242, 248)"],
   [style*="background: #fff"],
   [style*="background-color: #fff"],
   [style*="background: white"],
   [style*="background-color: white"],
   [style*="background: #f8fafc"],
   [style*="background-color: #f8fafc"],
+  [style*="background: #fafbfc"],
+  [style*="background-color: #fafbfc"],
+  [style*="background: #fcfdff"],
+  [style*="background-color: #fcfdff"],
+  [style*="background: #fffbfb"],
+  [style*="background-color: #fffbfb"],
+  [style*="background: #fffbe6"],
+  [style*="background-color: #fffbe6"],
+  [style*="background: #fffdf7"],
+  [style*="background-color: #fffdf7"],
   [style*="background: #f1f5f9"],
   [style*="background-color: #f1f5f9"],
   [style*="background: #e2e8f0"],
   [style*="background-color: #e2e8f0"],
+  [style*="background: #cbd5e1"],
+  [style*="background-color: #cbd5e1"],
+  [style*="background: #d1d5db"],
+  [style*="background-color: #d1d5db"],
   [style*="background: #f8faff"],
   [style*="background-color: #f8faff"],
   [style*="background: #f0f7ff"],
@@ -1888,18 +2008,30 @@ body.glass-theme-active :is(div, section, article, aside, header, footer, li, ul
   [style*="background-color: #f0fdf4"],
   [style*="background: #ecfdf5"],
   [style*="background-color: #ecfdf5"],
+  [style*="background: #d1fae5"],
+  [style*="background-color: #d1fae5"],
+  [style*="background: #a7f3d0"],
+  [style*="background-color: #a7f3d0"],
   [style*="background: #fffbeb"],
   [style*="background-color: #fffbeb"],
   [style*="background: #fefce8"],
   [style*="background-color: #fefce8"],
+  [style*="background: #fde68a"],
+  [style*="background-color: #fde68a"],
   [style*="background: #fef2f2"],
   [style*="background-color: #fef2f2"],
+  [style*="background: #fecaca"],
+  [style*="background-color: #fecaca"],
+  [style*="background: #fdf2f8"],
+  [style*="background-color: #fdf2f8"],
   [style*="background: #faf5ff"],
   [style*="background-color: #faf5ff"],
   [style*="background: #f5f3ff"],
   [style*="background-color: #f5f3ff"],
   [style*="background: #e0e7ff"],
   [style*="background-color: #e0e7ff"],
+  [style*="background: #c7d2fe"],
+  [style*="background-color: #c7d2fe"],
   [style*="background: #ffedd5"],
   [style*="background-color: #ffedd5"]
 ) {
@@ -1914,7 +2046,11 @@ body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td,
   [style*="color: rgb(76, 29, 149)"], [style*="color: #4c1d95"],
   [style*="color: rgb(91, 33, 182)"], [style*="color: #5b21b6"],
   [style*="color: rgb(109, 40, 217)"], [style*="color: #6d28d9"],
+  [style*="color: rgb(126, 34, 206)"], [style*="color: #7e22ce"],
+  [style*="color: rgb(147, 51, 234)"], [style*="color: #9333ea"],
   [style*="color: rgb(55, 48, 163)"], [style*="color: #3730a3"],
+  [style*="color: rgb(67, 56, 202)"], [style*="color: #4338ca"],
+  [style*="color: rgb(49, 46, 129)"], [style*="color: #312e81"],
   [style*="color: rgb(107, 33, 168)"], [style*="color: #6b21a8"],
   [style*="color: rgb(30, 27, 75)"], [style*="color: #1e1b4b"],
   [style*="color: rgb(88, 28, 135)"], [style*="color: #581c87"],
@@ -1936,6 +2072,8 @@ body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td,
 
 body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td, th, label, a):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="color: rgb(159, 18, 57)"], [style*="color: #9f1239"],
+  [style*="color: rgb(190, 24, 93)"], [style*="color: #be185d"],
+  [style*="color: rgb(219, 39, 119)"], [style*="color: #db2777"],
   [style*="color: rgb(136, 19, 55)"], [style*="color: #881337"],
   [style*="color: rgb(153, 27, 27)"], [style*="color: #991b1b"],
   [style*="color: rgb(127, 29, 29)"], [style*="color: #7f1d1d"],
@@ -1948,7 +2086,10 @@ body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td,
 body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td, th, label, a):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
   [style*="color: rgb(30, 58, 138)"], [style*="color: #1e3a8a"],
   [style*="color: rgb(30, 64, 175)"], [style*="color: #1e40af"],
-  [style*="color: rgb(29, 78, 216)"], [style*="color: #1d4ed8"]
+  [style*="color: rgb(29, 78, 216)"], [style*="color: #1d4ed8"],
+  [style*="color: rgb(3, 105, 161)"], [style*="color: #0369a1"],
+  [style*="color: rgb(7, 89, 133)"], [style*="color: #075985"],
+  [style*="color: rgb(11, 83, 148)"], [style*="color: #0b5394"]
 ) {
   color: #93c5fd !important;
 }
@@ -1963,7 +2104,13 @@ body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td,
 }
 
 body.glass-theme-active :is(div, span, p, strong, b, h1, h2, h3, h4, h5, h6, td, th, label, a):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):is(
-  [style*="color: rgb(11, 15, 25)"], [style*="color: #0b0f19"]
+  [style*="color: rgb(2, 6, 23)"], [style*="color: #020617"],
+  [style*="color: rgb(11, 15, 25)"], [style*="color: #0b0f19"],
+  [style*="color: rgb(11, 17, 32)"], [style*="color: #0b1120"],
+  [style*="color: rgb(55, 65, 81)"], [style*="color: #374151"],
+  [style*="color: rgb(75, 85, 99)"], [style*="color: #4b5563"],
+  [style*="color: rgb(68, 68, 68)"], [style*="color: #444"],
+  [style*="color: rgb(85, 85, 85)"], [style*="color: #555"]
 ) {
   color: #f8fafc !important;
 }

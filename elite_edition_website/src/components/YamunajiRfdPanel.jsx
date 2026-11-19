@@ -8937,14 +8937,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         border: inwardRfdForm.isChallanClosed ? '2px solid #10b981' : '1.5px solid #e2e8f0',
-                        background: inwardRfdForm.isChallanClosed ? 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(255,255,255,0.9))' : '#fafbfc',
-                        boxShadow: inwardRfdForm.isChallanClosed ? '0 4px 12px rgba(16,185,129,0.12)' : 'none'
+                        background: inwardRfdForm.isChallanClosed ? '#ecfdf5' : '#f8fafc',
+                        boxShadow: inwardRfdForm.isChallanClosed ? '0 4px 12px rgba(16,185,129,0.16)' : 'none'
                       }}
                     >
                       <div style={{
                         width: 22, height: 22, borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: inwardRfdForm.isChallanClosed ? '#10b981' : '#cbd5e1',
+                        background: inwardRfdForm.isChallanClosed ? '#10b981' : '#64748b',
                         color: '#ffffff', fontSize: '0.75rem', fontWeight: 900, flexShrink: 0, marginTop: 2
                       }}>
                         ✓
@@ -8971,14 +8971,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         border: !inwardRfdForm.isChallanClosed ? '2px solid #f59e0b' : '1.5px solid #e2e8f0',
-                        background: !inwardRfdForm.isChallanClosed ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(255,255,255,0.9))' : '#fafbfc',
-                        boxShadow: !inwardRfdForm.isChallanClosed ? '0 4px 12px rgba(245,158,11,0.12)' : 'none'
+                        background: !inwardRfdForm.isChallanClosed ? '#fffbeb' : '#f8fafc',
+                        boxShadow: !inwardRfdForm.isChallanClosed ? '0 4px 12px rgba(245,158,11,0.16)' : 'none'
                       }}
                     >
                       <div style={{
                         width: 22, height: 22, borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: !inwardRfdForm.isChallanClosed ? '#f59e0b' : '#cbd5e1',
+                        background: !inwardRfdForm.isChallanClosed ? '#f59e0b' : '#64748b',
                         color: '#ffffff', fontSize: '0.75rem', fontWeight: 900, flexShrink: 0, marginTop: 2
                       }}>
                         ⏳

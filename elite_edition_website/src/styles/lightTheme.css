@@ -830,15 +830,23 @@ body.light-theme-active table tr:hover td {
 }
 
 /* Hardcoded Dark Inline Backgrounds -> Frosted Light Glass Surfaces */
-body.light-theme-active :is(div, span, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.phoenix-chat-stream):not(.phoenix-chat-feed):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is([style*="15, 23, 42"],
-  [style*="11, 17, 32"],
-  [style*="30, 41, 59"],
-  [style*="51, 65, 85"],
-  [style*="17, 24, 39"],
-  [style*="31, 41, 55"],
-  [style*="55, 65, 81"],
-  [style*="24, 24, 27"],
-  [style*="2, 6, 23"],
+body.light-theme-active :is(div, span, section, aside, header, footer, main, nav, ul, li, form, table, thead, tbody, tr, th, td, button):not(.printable-area *):not(.print-a4-sheet *):not(.a4-invoice-sheet *):not(.no-glass-override *):not(.phoenix-chat-stream):not(.phoenix-chat-feed):not(.company-segment-pill.active):not(.btn-primary):not(.nav-item.active):not(.glass-subtab-btn.active):is(
+  [style*="rgb(15, 23, 42)"], [style*="rgba(15, 23, 42"], [style*="15, 23, 42"],
+  [style*="rgb(11, 17, 32)"], [style*="rgba(11, 17, 32"], [style*="11, 17, 32"],
+  [style*="rgb(30, 41, 59)"], [style*="rgba(30, 41, 59"], [style*="30, 41, 59"],
+  [style*="rgb(51, 65, 85)"], [style*="rgba(51, 65, 85"], [style*="51, 65, 85"],
+  [style*="rgb(17, 24, 39)"], [style*="rgba(17, 24, 39"], [style*="17, 24, 39"],
+  [style*="rgb(31, 41, 55)"], [style*="rgba(31, 41, 55"], [style*="31, 41, 55"],
+  [style*="rgb(55, 65, 81)"], [style*="rgba(55, 65, 81"], [style*="55, 65, 81"],
+  [style*="rgb(24, 24, 27)"], [style*="24, 24, 27"],
+  [style*="rgb(2, 6, 23)"], [style*="rgba(2, 6, 23"], [style*="2, 6, 23"],
+  [style*="rgb(9, 13, 22)"], [style*="9, 13, 22"],
+  [style*="rgb(10, 15, 29)"], [style*="10, 15, 29"],
+  [style*="rgb(10, 14, 23)"], [style*="10, 14, 23"],
+  [style*="rgb(11, 15, 25)"], [style*="11, 15, 25"],
+  [style*="rgb(11, 20, 26)"], [style*="11, 20, 26"],
+  [style*="rgb(3, 7, 18)"], [style*="3, 7, 18"],
+  [style*="rgb(22, 27, 38)"], [style*="22, 27, 38"],
   [style*="15,23,42"],
   [style*="11,17,32"],
   [style*="30,41,59"],
@@ -854,6 +862,13 @@ body.light-theme-active :is(div, span, section, aside, header, footer, main, nav
   [style*="#374151"],
   [style*="#020617"],
   [style*="#090f1d"],
+  [style*="#090d16"],
+  [style*="#0a0f1d"],
+  [style*="#0a0e17"],
+  [style*="#0b0f19"],
+  [style*="#0b141a"],
+  [style*="#030712"],
+  [style*="#161b26"],
   [style*="#141824"],
   [style*="background: rgba(255, 255, 255, 0.0"],
   [style*="background-color: rgba(255, 255, 255, 0.0"],
@@ -888,6 +903,8 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
   [style*="color:rgba(255,255,255"],
   [style*="color: rgb(248, 250, 252)"],
   [style*="color: rgba(248, 250, 252"],
+  [style*="color: rgb(250, 250, 250)"],
+  [style*="color: rgb(240, 244, 248)"],
   [style*="color: rgb(241, 245, 249)"],
   [style*="color: rgba(241, 245, 249"],
   [style*="color: rgb(226, 232, 240)"],
@@ -902,6 +919,8 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
   [style*="color: #ffffff"],
   [style*="color: #fff"],
   [style*="color: white"],
+  [style*="color: #fafafa"],
+  [style*="color: #f0f4f8"],
   [style*="color: #f8fafc"],
   [style*="color: #f1f5f9"],
   [style*="color: #e2e8f0"],
@@ -914,28 +933,35 @@ body.light-theme-active :is(div, span, p, label, h1, h2, h3, h4, h5, h6, td, th,
 }
 
 /* Dark-mode pastel inline text colors -> high-contrast readable shades on light frosted glass */
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is([style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"], [style*="color: #38bdf8"], [style*="color: #60a5fa"],
-  [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(125, 211, 252)"], [style*="color: rgb(186, 230, 253)"], [style*="color: rgb(56, 189, 248)"], [style*="color: rgb(96, 165, 250)"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
+  [style*="color: #93c5fd"], [style*="color: #7dd3fc"], [style*="color: #bae6fd"], [style*="color: #38bdf8"], [style*="color: #60a5fa"],
+  [style*="color: #bfdbfe"], [style*="color: #dbeafe"], [style*="color: #e0f2fe"], [style*="color: #eff6ff"], [style*="color: #f0f9ff"], [style*="color: #f0f7ff"], [style*="color: #eef2ff"], [style*="color: #e0e7ff"], [style*="color: #c7d2fe"], [style*="color: #67e8f9"], [style*="color: #a5f3fc"], [style*="color: #cffafe"],
+  [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(125, 211, 252)"], [style*="color: rgb(186, 230, 253)"], [style*="color: rgb(56, 189, 248)"], [style*="color: rgb(96, 165, 250)"],
+  [style*="color: rgb(191, 219, 254)"], [style*="color: rgb(219, 234, 254)"], [style*="color: rgb(224, 242, 254)"], [style*="color: rgb(239, 246, 255)"], [style*="color: rgb(240, 249, 255)"], [style*="color: rgb(240, 247, 255)"], [style*="color: rgb(238, 242, 255)"], [style*="color: rgb(224, 231, 255)"], [style*="color: rgb(199, 210, 254)"], [style*="color: rgb(103, 232, 249)"], [style*="color: rgb(165, 243, 252)"], [style*="color: rgb(207, 250, 254)"]) {
   color: #1d4ed8 !important;
 }
 
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is([style*="color: #6ee7b7"], [style*="color: #86efac"], [style*="color: #34d399"],
-  [style*="color: rgb(110, 231, 183)"], [style*="color: rgb(134, 239, 172)"], [style*="color: rgb(52, 211, 153)"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
+  [style*="color: #6ee7b7"], [style*="color: #86efac"], [style*="color: #34d399"], [style*="color: #4ade80"], [style*="color: #a7f3d0"], [style*="color: #bbf7d0"], [style*="color: #d1fae5"], [style*="color: #dcfce7"], [style*="color: #ecfdf5"], [style*="color: #f0fdf4"], [style*="color: #99f6e4"], [style*="color: #ccfbf1"],
+  [style*="color: rgb(110, 231, 183)"], [style*="color: rgb(134, 239, 172)"], [style*="color: rgb(52, 211, 153)"], [style*="color: rgb(74, 222, 128)"], [style*="color: rgb(167, 243, 208)"], [style*="color: rgb(187, 247, 208)"], [style*="color: rgb(209, 250, 229)"], [style*="color: rgb(220, 252, 231)"], [style*="color: rgb(236, 253, 245)"], [style*="color: rgb(240, 253, 244)"], [style*="color: rgb(153, 246, 228)"], [style*="color: rgb(204, 251, 241)"]) {
   color: #047857 !important;
 }
 
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *, .btn-primary):is([style*="color: #fcd34d"], [style*="color: #fde68a"], [style*="color: #fbbf24"], [style*="color: #f59e0b"], [style*="color: #fde047"], [style*="color: #facc15"], [style*="color: #fdba74"], [style*="color: #fb923c"],
-  [style*="color: rgb(252, 211, 77)"], [style*="color: rgb(253, 230, 138)"], [style*="color: rgb(251, 191, 36)"], [style*="color: rgb(245, 158, 11)"], [style*="color: rgb(253, 224, 71)"], [style*="color: rgb(250, 204, 21)"], [style*="color: rgb(253, 186, 116)"], [style*="color: rgb(251, 146, 60)"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *, .btn-primary):is(
+  [style*="color: #fcd34d"], [style*="color: #fde68a"], [style*="color: #fbbf24"], [style*="color: #f59e0b"], [style*="color: #fde047"], [style*="color: #facc15"], [style*="color: #fdba74"], [style*="color: #fb923c"], [style*="color: #fed7aa"], [style*="color: #ffedd5"], [style*="color: #fef3c7"], [style*="color: #fefce8"], [style*="color: #fff7ed"], [style*="color: #fffbeb"],
+  [style*="color: rgb(252, 211, 77)"], [style*="color: rgb(253, 230, 138)"], [style*="color: rgb(251, 191, 36)"], [style*="color: rgb(245, 158, 11)"], [style*="color: rgb(253, 224, 71)"], [style*="color: rgb(250, 204, 21)"], [style*="color: rgb(253, 186, 116)"], [style*="color: rgb(251, 146, 60)"], [style*="color: rgb(254, 215, 170)"], [style*="color: rgb(255, 237, 213)"], [style*="color: rgb(254, 243, 199)"], [style*="color: rgb(254, 252, 232)"], [style*="color: rgb(255, 247, 237)"], [style*="color: rgb(255, 251, 235)"]) {
   color: #b45309 !important;
 }
 
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is([style*="color: #fca5a5"], [style*="color: #fecaca"], [style*="color: #f87171"],
-  [style*="color: rgb(252, 165, 165)"], [style*="color: rgb(254, 202, 202)"], [style*="color: rgb(248, 113, 113)"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
+  [style*="color: #fca5a5"], [style*="color: #fecaca"], [style*="color: #f87171"], [style*="color: #fda4af"], [style*="color: #fecdd3"], [style*="color: #fee2e2"], [style*="color: #ffe4e6"], [style*="color: #fef2f2"], [style*="color: #fff1f2"], [style*="color: #ffebeb"],
+  [style*="color: rgb(252, 165, 165)"], [style*="color: rgb(254, 202, 202)"], [style*="color: rgb(248, 113, 113)"], [style*="color: rgb(253, 164, 175)"], [style*="color: rgb(254, 205, 211)"], [style*="color: rgb(254, 226, 226)"], [style*="color: rgb(255, 228, 230)"], [style*="color: rgb(254, 242, 242)"], [style*="color: rgb(255, 241, 242)"], [style*="color: rgb(255, 235, 235)"]) {
   color: #b91c1c !important;
 }
 
-body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is([style*="color: #c4b5fd"], [style*="color: #ddd6fe"], [style*="color: #a78bfa"], [style*="color: #c084fc"],
-  [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(167, 139, 250)"], [style*="color: rgb(192, 132, 252)"]) {
+body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(.printable-area *):not(.btn-primary):is(
+  [style*="color: #c4b5fd"], [style*="color: #ddd6fe"], [style*="color: #a78bfa"], [style*="color: #c084fc"], [style*="color: #d8b4fe"], [style*="color: #e9d5ff"], [style*="color: #ede9fe"], [style*="color: #f3e8ff"], [style*="color: #f5f3ff"], [style*="color: #faf5ff"], [style*="color: #fbcfe8"], [style*="color: #fce7f3"], [style*="color: #fdf2f8"],
+  [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(167, 139, 250)"], [style*="color: rgb(192, 132, 252)"], [style*="color: rgb(216, 180, 254)"], [style*="color: rgb(233, 213, 255)"], [style*="color: rgb(237, 233, 254)"], [style*="color: rgb(243, 232, 255)"], [style*="color: rgb(245, 243, 255)"], [style*="color: rgb(250, 245, 255)"], [style*="color: rgb(251, 207, 232)"], [style*="color: rgb(252, 231, 243)"], [style*="color: rgb(253, 242, 248)"]) {
   color: #6d28d9 !important;
 }
 
@@ -944,7 +970,7 @@ body.light-theme-active :is(span, div, p, label, td, th, strong, a, button):not(
   color: #475569 !important;
 }
 
-/* Preserve Crisp White Text on Solid Gradient / Primary / Colored Action Buttons & Badges */
+/* Preserve Crisp White Text on Solid Gradient / Primary / Colored Action Buttons & Badges (Excluding Light Pastel Containers) */
 html[data-theme="light"] body.light-theme-active .btn-primary,
 html[data-theme="light"] body.light-theme-active .btn-primary *,
 html[data-theme="light"] body.light-theme-active .nav-item.active,
@@ -955,13 +981,16 @@ html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.ac
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button.active *,
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"],
 html[data-theme="light"] body.light-theme-active aside#erp-sidebar-nav button[aria-current="page"] *,
-html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):not(.phoenix-chat-feed):not(.phoenix-chat-feed *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):not([style*="255, 255, 255"]):not([style*="#fff"]):not([style*="248, 250, 252"]):not([style*="240, 253, 244"]):not([style*="236, 253, 245"]):not([style*="245, 243, 255"]):not([style*="239, 246, 255"]):not([style*="255, 251, 235"]):not([style*="255, 241, 242"]):not([style*="255, 247, 237"]):not([style*="255, 237, 213"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):not(.phoenix-chat-feed):not(.phoenix-chat-feed *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):not([style*="255, 255, 255"]):not([style*="#fff"]):not([style*="248, 250, 252"]):not([style*="241, 245, 249"]):not([style*="226, 232, 240"]):not([style*="250, 251, 252"]):not([style*="240, 253, 244"]):not([style*="236, 253, 245"]):not([style*="209, 250, 229"]):not([style*="220, 252, 231"]):not([style*="245, 243, 255"]):not([style*="243, 232, 255"]):not([style*="250, 245, 255"]):not([style*="238, 242, 255"]):not([style*="239, 246, 255"]):not([style*="219, 234, 254"]):not([style*="224, 242, 254"]):not([style*="240, 249, 255"]):not([style*="240, 247, 255"]):not([style*="255, 251, 235"]):not([style*="254, 252, 232"]):not([style*="254, 243, 199"]):not([style*="255, 241, 242"]):not([style*="254, 242, 242"]):not([style*="254, 226, 226"]):not([style*="255, 247, 237"]):not([style*="255, 237, 213"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
   [style*="background: rgb(29, 78, 216)"], [style*="background-color: rgb(29, 78, 216)"], [style*="background: #1d4ed8"],
+  [style*="background: rgb(30, 58, 138)"], [style*="background-color: rgb(30, 58, 138)"], [style*="background: #1e3a8a"],
   [style*="background: rgb(79, 70, 229)"], [style*="background-color: rgb(79, 70, 229)"], [style*="background: #4f46e5"],
   [style*="background: rgb(99, 102, 241)"], [style*="background-color: rgb(99, 102, 241)"], [style*="background: #6366f1"],
   [style*="background: rgb(124, 58, 237)"], [style*="background-color: rgb(124, 58, 237)"], [style*="background: #7c3aed"],
+  [style*="background: rgb(91, 33, 182)"], [style*="background-color: rgb(91, 33, 182)"], [style*="background: #5b21b6"],
+  [style*="background: rgb(107, 33, 168)"], [style*="background-color: rgb(107, 33, 168)"], [style*="background: #6b21a8"],
   [style*="background: rgb(2, 132, 199)"], [style*="background-color: rgb(2, 132, 199)"], [style*="background: #0284c7"],
   [style*="background: rgb(14, 165, 233)"], [style*="background-color: rgb(14, 165, 233)"], [style*="background: #0ea5e9"],
   [style*="background: rgb(16, 185, 129)"], [style*="background-color: rgb(16, 185, 129)"], [style*="background: #10b981"],
@@ -971,21 +1000,28 @@ html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.
   [style*="background: rgb(37, 211, 102)"], [style*="background-color: rgb(37, 211, 102)"], [style*="background: #25d366"],
   [style*="background: rgb(239, 68, 68)"], [style*="background-color: rgb(239, 68, 68)"], [style*="background: #ef4444"],
   [style*="background: rgb(220, 38, 38)"], [style*="background-color: rgb(220, 38, 38)"], [style*="background: #dc2626"],
+  [style*="background: rgb(185, 28, 28)"], [style*="background-color: rgb(185, 28, 28)"], [style*="background: #b91c1c"],
+  [style*="background: rgb(153, 27, 27)"], [style*="background-color: rgb(153, 27, 27)"], [style*="background: #991b1b"],
   [style*="background: rgb(225, 29, 72)"], [style*="background-color: rgb(225, 29, 72)"], [style*="background: #e11d48"],
   [style*="background: rgb(190, 18, 60)"], [style*="background-color: rgb(190, 18, 60)"], [style*="background: #be123c"],
   [style*="background: rgb(234, 88, 12)"], [style*="background-color: rgb(234, 88, 12)"], [style*="background: #ea580c"],
   [style*="background: rgb(217, 119, 6)"], [style*="background-color: rgb(217, 119, 6)"], [style*="background: #d97706"],
   [style*="background: rgb(245, 158, 11)"], [style*="background-color: rgb(245, 158, 11)"], [style*="background: #f59e0b"],
   [style*="background: rgb(100, 116, 139)"], [style*="background-color: rgb(100, 116, 139)"], [style*="background: #64748b"]),
-html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):not(.phoenix-chat-feed):not(.phoenix-chat-feed *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):not([style*="255, 255, 255"]):not([style*="#fff"]):not([style*="248, 250, 252"]):not([style*="240, 253, 244"]):not([style*="236, 253, 245"]):not([style*="245, 243, 255"]):not([style*="239, 246, 255"]):not([style*="255, 251, 235"]):not([style*="255, 241, 242"]):not([style*="255, 247, 237"]):not([style*="255, 237, 213"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
+html[data-theme="light"] body.light-theme-active :is(button, a, span, div):not(.printable-area *):not(.phoenix-chat-stream):not(.phoenix-chat-stream *):not(.phoenix-chat-feed):not(.phoenix-chat-feed *):not(.ent-stat-card):not(.stat-card):not(.metric-card):not(.glass-card):not(.glass-panel):not([style*="15, 23, 42"]):not([style*="30, 41, 59"]):not([style*="11, 17, 32"]):not([style*="#0f172a"]):not([style*="#1e293b"]):not([style*="255, 255, 255"]):not([style*="#fff"]):not([style*="248, 250, 252"]):not([style*="241, 245, 249"]):not([style*="226, 232, 240"]):not([style*="250, 251, 252"]):not([style*="240, 253, 244"]):not([style*="236, 253, 245"]):not([style*="209, 250, 229"]):not([style*="220, 252, 231"]):not([style*="245, 243, 255"]):not([style*="243, 232, 255"]):not([style*="250, 245, 255"]):not([style*="238, 242, 255"]):not([style*="239, 246, 255"]):not([style*="219, 234, 254"]):not([style*="224, 242, 254"]):not([style*="240, 249, 255"]):not([style*="240, 247, 255"]):not([style*="255, 251, 235"]):not([style*="254, 252, 232"]):not([style*="254, 243, 199"]):not([style*="255, 241, 242"]):not([style*="254, 242, 242"]):not([style*="254, 226, 226"]):not([style*="255, 247, 237"]):not([style*="255, 237, 213"]):is([style*="linear-gradient"]:not([style*="gradient(135deg, rgba("]):not([style*="gradient(to "]),
   [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: #2563eb"],
   [style*="background: rgb(59, 130, 246)"], [style*="background-color: rgb(59, 130, 246)"], [style*="background: #3b82f6"],
+  [style*="background: rgb(30, 58, 138)"], [style*="background-color: rgb(30, 58, 138)"], [style*="background: #1e3a8a"],
   [style*="background: rgb(79, 70, 229)"], [style*="background-color: rgb(79, 70, 229)"], [style*="background: #4f46e5"],
   [style*="background: rgb(124, 58, 237)"], [style*="background-color: rgb(124, 58, 237)"], [style*="background: #7c3aed"],
+  [style*="background: rgb(91, 33, 182)"], [style*="background-color: rgb(91, 33, 182)"], [style*="background: #5b21b6"],
+  [style*="background: rgb(107, 33, 168)"], [style*="background-color: rgb(107, 33, 168)"], [style*="background: #6b21a8"],
   [style*="background: rgb(16, 185, 129)"], [style*="background-color: rgb(16, 185, 129)"], [style*="background: #10b981"],
   [style*="background: rgb(5, 150, 105)"], [style*="background-color: rgb(5, 150, 105)"], [style*="background: #059669"],
   [style*="background: rgb(239, 68, 68)"], [style*="background-color: rgb(239, 68, 68)"], [style*="background: #ef4444"],
   [style*="background: rgb(220, 38, 38)"], [style*="background-color: rgb(220, 38, 38)"], [style*="background: #dc2626"],
+  [style*="background: rgb(185, 28, 28)"], [style*="background-color: rgb(185, 28, 28)"], [style*="background: #b91c1c"],
+  [style*="background: rgb(153, 27, 27)"], [style*="background-color: rgb(153, 27, 27)"], [style*="background: #991b1b"],
   [style*="background: rgb(217, 119, 6)"], [style*="background-color: rgb(217, 119, 6)"], [style*="background: #d97706"]) * {
   color: #ffffff !important;
 }
