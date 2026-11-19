@@ -2347,9 +2347,33 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 ))}
               </div>
 
-              {/* Action Buttons: + Contra Entry & + New Entry */}
+              {/* Action Buttons: Customer Payment In, Vendor Payment Out, Contra Entry & General Entry */}
               {canCreateExpense && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginLeft: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginLeft: 'auto', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreate('IN', 'PARTY')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: 800,
+                      padding: '0.25rem 0.75rem', height: '32px', borderRadius: '6px',
+                      border: '1px solid rgba(16, 185, 129, 0.45)', background: 'rgba(16, 185, 129, 0.16)', color: '#34d399',
+                      cursor: 'pointer', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <ArrowDownLeft size={14} /> + Customer Payment In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreate('OUT', 'VENDOR')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: 800,
+                      padding: '0.25rem 0.75rem', height: '32px', borderRadius: '6px',
+                      border: '1px solid rgba(239, 68, 68, 0.45)', background: 'rgba(239, 68, 68, 0.16)', color: '#f87171',
+                      cursor: 'pointer', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <ArrowUpRight size={14} /> + Vendor Payment Out
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -2801,8 +2825,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <span>👥 Party</span>
-                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Bill Payment (IN)</span>
+                    <span>👥 Customer In</span>
+                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Customer Payment (IN)</span>
                   </button>
 
                   {/* 4. Vendor */}
@@ -2819,8 +2843,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <span>🏢 Vendor</span>
-                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Supplier (OUT)</span>
+                    <span>🏢 Vendor Out</span>
+                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Vendor Payment (OUT)</span>
                   </button>
 
                   {/* 5. Contra Entry */}

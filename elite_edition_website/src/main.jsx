@@ -1,5 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { erpQueryClient } from './lib/queryClient'
 import './styles/tokens.css'
 import './index.css'
 import App from './App.jsx'
@@ -45,11 +47,13 @@ enforceGlobalDDMMYYYYFormat()
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <RootErrorBoundary>
-      <SocketProvider>
-        <HotkeyProvider>
-          <App />
-        </HotkeyProvider>
-      </SocketProvider>
+      <QueryClientProvider client={erpQueryClient}>
+        <SocketProvider>
+          <HotkeyProvider>
+            <App />
+          </HotkeyProvider>
+        </SocketProvider>
+      </QueryClientProvider>
     </RootErrorBoundary>
   </StrictMode>,
 )

@@ -329,7 +329,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
   }, [showCreateModal, showEditModal, showLogWorkModal, showExportModal, selectedTask, showMobileViewMenu, showMobileScopeMenu, showMobileFilterMenu]);
 
   const KANBAN_COLUMNS = [
-    { id: 'Backlog', label: 'Backlog', color: '#64748b', bg: '#f1f5f9' },
     { id: 'To Do', label: 'To Do', color: '#2563eb', bg: '#eff6ff' },
     { id: 'In Progress', label: 'In Progress', color: '#0284c7', bg: '#e0f2fe' },
     { id: 'In Review', label: 'In Review', color: '#7c3aed', bg: '#f3e8ff' },
@@ -1817,7 +1816,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
           .task-desktop-header-wrap { display: none !important; }
           .task-mobile-control-card { display: flex !important; flex-direction: column !important; }
           .kanban-grid-responsive {
-            grid-template-columns: repeat(5, minmax(84vw, 1fr)) !important;
+            grid-template-columns: repeat(4, minmax(84vw, 1fr)) !important;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
           }
@@ -1834,7 +1833,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
           .task-mobile-control-card { display: none !important; }
           .task-mobile-col-bar { display: none !important; }
           .kanban-grid-responsive {
-            grid-template-columns: repeat(5, minmax(260px, 1fr)) !important;
+            grid-template-columns: repeat(4, minmax(260px, 1fr)) !important;
           }
         }
 
@@ -2908,7 +2907,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 <span className="task-mobile-col-count">{filteredTasks.length}</span>
               </button>
               {KANBAN_COLUMNS.map((col) => {
-                const count = filteredTasks.filter(t => (t.status || '').trim().toLowerCase() === col.id.toLowerCase()).length;
+                const count = filteredTasks.filter((t) => {
+                  const s = (t.status || '').trim().toLowerCase();
+                  const norm = (!s || s === 'backlog') ? 'to do' : s;
+                  return norm === col.id.toLowerCase();
+                }).length;
                 return (
                   <button
                     key={col.id}
@@ -2929,7 +2932,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
               className={`kanban-grid-responsive ${mobileKanbanCol !== 'all' ? 'single-col-mode' : ''}`}
               style={{
                 display: 'grid',
-                gridTemplateColumns: mobileKanbanCol !== 'all' ? '1fr' : 'repeat(5, minmax(260px, 1fr))',
+                gridTemplateColumns: mobileKanbanCol !== 'all' ? '1fr' : 'repeat(4, minmax(260px, 1fr))',
                 gap: '0.75rem',
                 flex: 1,
                 minHeight: 0,
@@ -2939,7 +2942,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
               }}
             >
               {(mobileKanbanCol === 'all' ? KANBAN_COLUMNS : KANBAN_COLUMNS.filter(c => c.id === mobileKanbanCol)).map((col) => {
-                const colTasks = filteredTasks.filter((t) => (t.status || '').trim().toLowerCase() === col.id.toLowerCase());
+                const colTasks = filteredTasks.filter((t) => {
+                  const s = (t.status || '').trim().toLowerCase();
+                  const norm = (!s || s === 'backlog') ? 'to do' : s;
+                  return norm === col.id.toLowerCase();
+                });
 
                 return (
                   <div
