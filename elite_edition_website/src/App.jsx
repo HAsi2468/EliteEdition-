@@ -168,6 +168,7 @@ import SpotlightSearchModal from './components/SpotlightSearchModal';
 import CompanySwitchCurtain from './components/CompanySwitchCurtain';
 import { EnterpriseHUDThemeController } from './components/common/EnterpriseHUDThemeController';
 import { ChangelogDrawer } from './components/common/ChangelogDrawer';
+import { EyeComfortControl } from './components/common/EyeComfortControl';
 import { QuickTipPill } from './components/common/QuickTipPill';
 import { GuidedTourController } from './components/common/GuidedTourController';
 import GlobalQuickActions from './components/common/GlobalQuickActions';
@@ -2949,6 +2950,8 @@ export default function App() {
                 {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
+              <EyeComfortControl compact />
+
               <button
                 type="button"
                 onClick={() => setShowNotificationDrawer(true)}
@@ -3184,6 +3187,8 @@ export default function App() {
                 {themeMode === 'dark' ? <Sun size={15} style={{ flexShrink: 0 }} /> : <Moon size={15} style={{ flexShrink: 0 }} />}
                 <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
               </button>
+
+              <EyeComfortControl />
 
               {/* What's New Feature Changelog Drawer */}
               <ChangelogDrawer />
