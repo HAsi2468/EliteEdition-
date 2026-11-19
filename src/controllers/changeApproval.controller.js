@@ -825,6 +825,15 @@ const getUserDataEntries = async (req, res) => {
     // Escape special regex chars
     const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+    // Always resolve the TRUE database creation timestamp (never date-only 00:00:00Z -> 5:30:00 am IST)
+    const getRealCreatedAt = (doc) => {
+      if (doc.createdAt) return doc.createdAt;
+      if (doc.created_at) return doc.created_at;
+      if (doc.created_date_time) return doc.created_date_time;
+      if (doc._id && typeof doc._id.getTimestamp === 'function') return doc._id.getTimestamp();
+      return doc.date ? new Date(doc.date) : new Date();
+    };
+
     // Normalize company name (e.g. handle 'Elite Digital Prints' vs 'Elite Digital Print')
     const normalizeCompany = (c) => (c || '').replace(/Prints$/i, 'Print').trim();
 
@@ -953,7 +962,7 @@ const getUserDataEntries = async (req, res) => {
             const rawParty = doc.partyName || doc.party || doc.clientName || 'Internal';
             const rawFabric = doc.fabric || doc.fabricName || doc.fabricType || 'Fabric';
             const rawMtr = doc.totalMtr || doc.freshMtr || doc.fusingMtr || 0;
-            const parsedDate = doc.created_date_time || (doc.date ? new Date(doc.date) : (doc.createdAt || new Date()));
+            const parsedDate = getRealCreatedAt(doc);
             const actualEdits = Array.isArray(doc.auditTrail)
               ? doc.auditTrail.filter(at => at.action === 'EDIT' || at.action === 'UPDATE')
               : [];
@@ -1018,7 +1027,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.date || doc.created_date_time || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const meters = doc.meters || 0;
             const isEdited = doc.modified_date_time && Math.abs(new Date(doc.modified_date_time).getTime() - new Date(doc.created_date_time || parsedDate).getTime()) > 5000;
             return {
@@ -1076,7 +1085,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.date || doc.created_date_time || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const fresh = doc.freshMtr || 0;
             const waste = doc.totalWastageMtr || 0;
             const isEdited = doc.modified_date_time && Math.abs(new Date(doc.modified_date_time).getTime() - new Date(doc.created_date_time || parsedDate).getTime()) > 5000;
@@ -1142,7 +1151,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const lastAudit = Array.isArray(doc.auditLogs) && doc.auditLogs.length > 0
               ? doc.auditLogs[doc.auditLogs.length - 1]
               : null;
@@ -1215,7 +1224,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.date || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const rawParty = doc.partyName || doc.vendorName || (doc.type === 'INWARD' ? 'Vendor Inward' : 'Party Outward');
             const rolls = doc.totalTp || (doc.tpDetails?.length || 0);
             return {
@@ -1283,7 +1292,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.date || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const partyStr = doc.type === 'INWARD' ? (doc.vendorName || 'Supplier Inward') : (doc.issuedTo || 'Internal Issue');
             const editorName = doc.updatedByName || doc.updatedBy || '';
             return {
@@ -1341,7 +1350,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const partyStr = Array.isArray(doc.parties) && doc.parties.length ? doc.parties.join(', ') : 'Catalog';
             return {
               id: doc._id,
@@ -1405,7 +1414,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.date ? new Date(doc.date) : (doc.createdAt || new Date());
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.updatedByName || doc.updatedBy || '';
             return {
               id: doc._id,
@@ -1466,7 +1475,7 @@ const getUserDataEntries = async (req, res) => {
           .lean()
           .then(docs => docs.map(doc => {
             const pcs = doc.totalPieces || doc.pieces || 0;
-            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.updatedByName || doc.updatedBy || '';
             const editorDate = doc.modified_date_time || doc.updatedAt || null;
             return {
@@ -1540,7 +1549,7 @@ const getUserDataEntries = async (req, res) => {
             const total = Number(doc.grandTotal || doc.totalAmount || 0);
             const paid = Number(doc.paidAmount || 0);
             const due = Number(doc.balanceDue || (total - paid));
-            const parsedDate = doc.invoiceDate || doc.created_at || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.uploadedByName || doc.approvedByName || doc.updatedByName || doc.updatedBy || '';
             const editorDate = doc.approvedAt || doc.updated_at || doc.updatedAt || null;
             return {
@@ -1594,7 +1603,7 @@ const getUserDataEntries = async (req, res) => {
           .lean()
           .then(docs => docs.map(doc => {
             const amt = Number(doc.totalAmount || 0);
-            const parsedDate = doc.date || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             return {
               id: doc._id,
               module: 'BillingPurchase',
@@ -1668,7 +1677,7 @@ const getUserDataEntries = async (req, res) => {
           .then(docs => docs.map(doc => {
             const rawParty = doc.paidToOrReceivedFrom || doc.partyName || doc.vendorName || doc.title || 'General';
             const amt = Number(doc.amount || 0);
-            const parsedDate = doc.date ? new Date(doc.date) : (doc.createdAt || new Date());
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.updatedByName || doc.updatedBy || '';
             const editorDate = doc.updatedAt || null;
             return {
@@ -1737,7 +1746,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.createdAt || (doc.date ? new Date(doc.date) : new Date());
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.updatedByName || doc.updatedBy || '';
             return {
               id: doc._id,
@@ -1806,7 +1815,7 @@ const getUserDataEntries = async (req, res) => {
           .then(docs => docs.map(doc => {
             const mtr = doc.totalMtr || doc.totalMeters || doc.freshMtr || 0;
             const rolls = doc.totalRolls || (doc.tpDetails?.length || 0);
-            const parsedDate = doc.date || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.updatedByName || doc.updatedBy || '';
             const editorDate = doc.updatedAt || null;
             return {
@@ -1871,7 +1880,7 @@ const getUserDataEntries = async (req, res) => {
           .lean()
           .then(docs => docs.map(doc => {
             const pcs = doc.totalPieces || doc.pieces || 0;
-            const parsedDate = doc.created_date_time || doc.date || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const editorName = doc.updatedByName || doc.updatedBy || '';
             const editorDate = doc.updatedAt || null;
             return {
@@ -1932,7 +1941,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             const qty = doc.quantity || 0;
             const unit = doc.unit || 'Units';
             const editorName = doc.updatedByName || doc.updatedBy || '';
@@ -1983,7 +1992,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const parsedDate = getRealCreatedAt(doc);
             return {
               id: doc._id,
               module: 'StockOut',
@@ -2033,7 +2042,7 @@ const getUserDataEntries = async (req, res) => {
           .limit(maxFetch)
           .lean()
           .then(docs => docs.map(doc => {
-            const parsedDate = doc.createdAt || (doc.orderDate ? new Date(doc.orderDate) : new Date());
+            const parsedDate = getRealCreatedAt(doc);
             const cust = doc.shippingAddressName || doc.billingAddressName || 'Online Order';
             const price = doc.totalPrice ? `₹${Number(doc.totalPrice).toLocaleString('en-IN')}` : 'Order Item';
             return {
