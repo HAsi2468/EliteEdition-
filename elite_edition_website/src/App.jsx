@@ -169,6 +169,7 @@ import CompanySwitchCurtain from './components/CompanySwitchCurtain';
 import { EnterpriseHUDThemeController } from './components/common/EnterpriseHUDThemeController';
 import { ChangelogDrawer } from './components/common/ChangelogDrawer';
 import { EyeComfortControl } from './components/common/EyeComfortControl';
+import { TopProgressBar } from './components/common/TopProgressBar';
 import { QuickTipPill } from './components/common/QuickTipPill';
 import { GuidedTourController } from './components/common/GuidedTourController';
 import GlobalQuickActions from './components/common/GlobalQuickActions';
@@ -3189,6 +3190,8 @@ export default function App() {
               </button>
 
               <EyeComfortControl />
+
+              <TopProgressBar activeTab={activeTab} selectedCompany={selectedCompany} />
 
               {/* What's New Feature Changelog Drawer */}
               <ChangelogDrawer />

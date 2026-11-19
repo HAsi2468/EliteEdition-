@@ -1,0 +1,191 @@
+/* ============================================================================
+ * ELITE ERP — 60FPS GPU MICRO-INTERACTIONS & SMOOTHNESS LAYER
+ * Strictly GPU-composited (transform + opacity). Auto-disabled in Calm Mode.
+ * ============================================================================ */
+
+@keyframes erpModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.975) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes erpBackdropFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes erpDrawerSlideIn {
+  from {
+    opacity: 0.6;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes erpTabCrossFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 1. Tactile Press Feedback on Buttons, Tabs & Pills */
+button:not(:disabled),
+.btn-primary,
+.btn-secondary,
+.nav-item,
+.glass-subtab-btn,
+.company-segment-pill {
+  transition: transform 95ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+button:not(:disabled):active,
+.btn-primary:active,
+.btn-secondary:active,
+.nav-item:active,
+.glass-subtab-btn:active,
+.company-segment-pill:active {
+  transform: scale(0.97);
+}
+
+/* 2. Smooth Modal, Backdrop & Drawer Entrances */
+.modal-backdrop,
+.modal-overlay {
+  animation: erpBackdropFade 150ms ease-out both;
+}
+
+.modal-backdrop > div,
+.modal-overlay > div,
+[role="dialog"]:not(.no-pop-anim) {
+  animation: erpModalPop 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.notification-drawer,
+.erp-side-drawer {
+  animation: erpDrawerSlideIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 3. Gentle Tab / View Cross-Fade */
+.erp-tab-view-enter {
+  animation: erpTabCrossFade 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 4. Soft Keyboard Focus-Ring Glide */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+body.glass-theme-active :is(input, select, textarea, button):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.26) !important;
+}
+
+body.light-theme-active :is(input, select, textarea, button):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22) !important;
+}
+
+/* 5. Slim Frosted Scrollbars (Both Dark & Light Mode) */
+* {
+  scrollbar-width: thin;
+}
+
+body.glass-theme-active * {
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+}
+
+body.light-theme-active * {
+  scrollbar-color: rgba(100, 116, 139, 0.28) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.glass-theme-active ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.26);
+  border-radius: 999px;
+}
+
+body.glass-theme-active ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.52);
+}
+
+body.light-theme-active ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.26);
+  border-radius: 999px;
+}
+
+body.light-theme-active ::-webkit-scrollbar-thumb:hover {
+  background: rgba(37, 99, 235, 0.48);
+}
+
+/* 6. Sleek Top Route / Tab Loading Progress Bar */
+.erp-top-progress-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  z-index: 2147483645;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.erp-top-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8 0%, #2563eb 55%, #818cf8 100%);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+  transform-origin: left center;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
+}
+
+/* 7. Eye-Safety & Reduced-Motion Guard */
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal-overlay,
+  .modal-backdrop > div,
+  .modal-overlay > div,
+  [role="dialog"],
+  .notification-drawer,
+  .erp-side-drawer,
+  .erp-tab-view-enter {
+    animation: none !important;
+  }
+  button:active,
+  .btn-primary:active,
+  .btn-secondary:active,
+  .nav-item:active {
+    transform: none !important;
+  }
+}
+
+html[data-calm-mode="on"] .erp-top-progress-track {
+  display: none !important;
+}
+
+@media print {
+  .erp-top-progress-track {
+    display: none !important;
+  }
+}
