@@ -4085,6 +4085,126 @@ const getVendors = async (req, res) => {
     }
 
     const filter = buildPurchaseCompanyFilter(activeCompany);
+
+    // Auto-backfill any Weavers, Mills, or Purchase Vendors for this company that are not yet in BillingVendor
+    try {
+      const PrintConfig = require('../db/models/printConfig.model');
+      const [pConfig, existingVendors, companyPurchases] = await Promise.all([
+        PrintConfig.findOne({ companyEntity: activeCompany }).lean().catch(() => null),
+        BillingVendor.find(filter, 'name businessName gstin phone billingAddress').lean(),
+        BillingPurchase.find(filter, 'vendorName vendor purchaseType').lean().catch(() => [])
+      ]);
+
+      const existingMap = new Map();
+      (existingVendors || []).forEach(v => {
+        if (v.name) existingMap.set(String(v.name).trim().toLowerCase(), v);
+        if (v.businessName) existingMap.set(String(v.businessName).trim().toLowerCase(), v);
+      });
+
+      const toSync = new Map();
+      if (pConfig) {
+        if (Array.isArray(pConfig.weavers)) {
+          pConfig.weavers.forEach(w => {
+            const name = (typeof w === 'string' ? w : (w?.name || w?.businessName || '')).trim();
+            if (!name) return;
+            toSync.set(name.toLowerCase(), {
+              name: (typeof w === 'object' && w?.contactPerson) ? w.contactPerson.trim() : name,
+              businessName: name,
+              phone: (typeof w === 'object' ? (w.phone || '') : '').trim(),
+              gstin: (typeof w === 'object' ? (w.gst || w.gstin || '') : '').trim().toUpperCase(),
+              billingAddress: (typeof w === 'object' ? (w.address || w.billingAddress || '') : '').trim(),
+              city: (typeof w === 'object' ? (w.city || 'Surat, Gujarat') : 'Surat, Gujarat').trim(),
+              vendorType: 'Fabric'
+            });
+          });
+        }
+        if (Array.isArray(pConfig.mills)) {
+          pConfig.mills.forEach(m => {
+            const name = (typeof m === 'string' ? m : (m?.name || m?.businessName || '')).trim();
+            if (!name) return;
+            const prev = toSync.get(name.toLowerCase()) || {};
+            toSync.set(name.toLowerCase(), {
+              name: (typeof m === 'object' && m?.contactPerson) ? m.contactPerson.trim() : (prev.name || name),
+              businessName: name,
+              phone: (typeof m === 'object' && m?.phone ? m.phone.trim() : '') || prev.phone || '',
+              gstin: (typeof m === 'object' && (m?.gst || m?.gstin) ? (m.gst || m.gstin).trim().toUpperCase() : '') || prev.gstin || '',
+              billingAddress: (typeof m === 'object' && (m?.address || m?.billingAddress) ? (m.address || m.billingAddress).trim() : '') || prev.billingAddress || '',
+              city: (typeof m === 'object' && m?.city ? m.city.trim() : '') || prev.city || 'Surat, Gujarat',
+              vendorType: prev.vendorType || 'General Supplier'
+            });
+          });
+        }
+      }
+
+      (companyPurchases || []).forEach(p => {
+        if (p.entryType === 'contra' || p.purchaseType === 'contra') return;
+        const vName = (p.vendor?.businessName || p.vendorName || p.vendor?.name || '').trim();
+        if (!vName) return;
+        const key = vName.toLowerCase();
+        const prev = toSync.get(key) || {};
+        toSync.set(key, {
+          name: (p.vendor?.name && p.vendor.name.trim()) || prev.name || vName,
+          businessName: vName,
+          phone: (p.vendor?.phone && p.vendor.phone.trim()) || prev.phone || '',
+          gstin: (p.vendor?.gstin && p.vendor.gstin.trim().toUpperCase()) || prev.gstin || '',
+          billingAddress: (p.vendor?.billingAddress && p.vendor.billingAddress.trim()) || prev.billingAddress || '',
+          city: (p.vendor?.city && p.vendor.city.trim()) || prev.city || 'Surat, Gujarat',
+          vendorType: prev.vendorType || (/inventory/i.test(p.purchaseType) ? 'Fabric' : 'General Supplier')
+        });
+      });
+
+      const ops = [];
+      for (const [key, info] of toSync.entries()) {
+        const existing = existingMap.get(key);
+        if (!existing) {
+          ops.push({
+            insertOne: {
+              document: {
+                name: info.name || info.businessName,
+                businessName: info.businessName,
+                phone: info.phone || '',
+                email: '',
+                gstin: info.gstin || '',
+                billingAddress: info.billingAddress || '',
+                shippingAddress: info.billingAddress || '',
+                pincode: '',
+                city: info.city || 'Surat, Gujarat',
+                state: 'Gujarat',
+                stateCode: '24',
+                country: 'India',
+                vendorType: info.vendorType || 'General Supplier',
+                companyEntity: activeCompany
+              }
+            }
+          });
+        } else if (
+          (!existing.gstin && info.gstin) ||
+          (!existing.phone && info.phone) ||
+          (!existing.billingAddress && info.billingAddress)
+        ) {
+          const patch = {};
+          if (!existing.gstin && info.gstin) patch.gstin = info.gstin;
+          if (!existing.phone && info.phone) patch.phone = info.phone;
+          if (!existing.billingAddress && info.billingAddress) {
+            patch.billingAddress = info.billingAddress;
+            patch.shippingAddress = info.billingAddress;
+          }
+          ops.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: { $set: patch }
+            }
+          });
+        }
+      }
+
+      if (ops.length > 0) {
+        await BillingVendor.bulkWrite(ops, { ordered: false }).catch(() => {});
+      }
+    } catch (syncErr) {
+      // Non-blocking sync
+    }
+
     const vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: vendors || [] });
   } catch (error) {
@@ -4416,6 +4536,66 @@ const updateCompanySettings = async (req, res) => {
       }
     }
 
+    // Sync Weavers and Processing Mills from PrintConfig into BillingVendor directory so Finance Department always has full vendor master data
+    const syncPartiesToVendors = [];
+    if (Array.isArray(otherFields.weavers)) {
+      otherFields.weavers.forEach(w => syncPartiesToVendors.push({ party: w, type: 'Fabric' }));
+    }
+    if (Array.isArray(otherFields.mills)) {
+      otherFields.mills.forEach(m => syncPartiesToVendors.push({ party: m, type: 'General Supplier' }));
+    }
+    if (syncPartiesToVendors.length > 0) {
+      for (const entry of syncPartiesToVendors) {
+        const raw = entry.party;
+        const pName = (typeof raw === 'string' ? raw : (raw?.name || raw?.businessName || '')).trim();
+        if (!pName) continue;
+        const pGstin = (typeof raw === 'object' ? (raw.gst || raw.gstin || '') : '').trim().toUpperCase();
+        const pPhone = (typeof raw === 'object' ? (raw.phone || '') : '').trim();
+        const pAddress = (typeof raw === 'object' ? (raw.address || raw.billingAddress || '') : '').trim();
+        const pCity = (typeof raw === 'object' ? (raw.city || 'Surat, Gujarat') : 'Surat, Gujarat').trim();
+        const pContact = (typeof raw === 'object' ? (raw.contactPerson || '') : '').trim();
+        const escapedName = pName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const setFields = {};
+        if (pGstin) setFields.gstin = pGstin;
+        if (pPhone) setFields.phone = pPhone;
+        if (pAddress) {
+          setFields.billingAddress = pAddress;
+          setFields.shippingAddress = pAddress;
+        }
+        if (pCity) setFields.city = pCity;
+
+        BillingVendor.findOneAndUpdate(
+          {
+            companyEntity,
+            $or: [
+              { name: { $regex: new RegExp(`^${escapedName}$`, 'i') } },
+              { businessName: { $regex: new RegExp(`^${escapedName}$`, 'i') } }
+            ]
+          },
+          {
+            ...(Object.keys(setFields).length > 0 ? { $set: setFields } : {}),
+            $setOnInsert: {
+              name: pContact || pName,
+              businessName: pName,
+              ...(!setFields.phone ? { phone: '' } : {}),
+              email: '',
+              ...(!setFields.gstin ? { gstin: '' } : {}),
+              ...(!setFields.billingAddress ? { billingAddress: '', shippingAddress: '' } : {}),
+              pincode: '',
+              ...(!setFields.city ? { city: 'Surat, Gujarat' } : {}),
+              state: 'Gujarat',
+              stateCode: '24',
+              country: 'India',
+              vendorType: entry.type,
+              companyEntity
+            }
+          },
+          { upsert: true, new: true }
+        ).catch(() => {});
+      }
+    }
+
     const PrintConfig = require('../db/models/printConfig.model');
     const updated = await PrintConfig.findOneAndUpdate(
       { companyEntity },
@@ -4479,6 +4659,127 @@ const getPurchases = async (req, res) => {
       }
     }
     const purchases = await BillingPurchase.find(query).sort({ date: -1, createdAt: -1 }).lean();
+
+    // Auto-backfill missing vendor snapshots or missing 5% GST on historical Mill Jobwork / Gray Fabric purchases
+    if (purchases.length > 0 && activeCompany && activeCompany !== 'ALL') {
+      try {
+        const PrintConfig = require('../db/models/printConfig.model');
+        const pConfig = await PrintConfig.findOne({ companyEntity: activeCompany }).lean().catch(() => null);
+        const partyMap = new Map();
+        if (pConfig) {
+          (pConfig.weavers || []).forEach(w => {
+            const name = (typeof w === 'string' ? w : (w?.name || w?.businessName || '')).trim();
+            if (name && typeof w === 'object') partyMap.set(name.toLowerCase(), w);
+          });
+          (pConfig.mills || []).forEach(m => {
+            const name = (typeof m === 'string' ? m : (m?.name || m?.businessName || '')).trim();
+            if (name && typeof m === 'object') partyMap.set(name.toLowerCase(), m);
+          });
+        }
+        const rfdLotMap = new Map();
+        if (pConfig && Array.isArray(pConfig.rfdLots)) {
+          pConfig.rfdLots.forEach(lot => {
+            if (lot?.lotNumber) rfdLotMap.set(String(lot.lotNumber).trim().toLowerCase(), lot);
+            if (lot?.purchaseNo) rfdLotMap.set(String(lot.purchaseNo).trim().toLowerCase(), lot);
+          });
+        }
+
+        const fixOps = [];
+        purchases.forEach(p => {
+          if (p.entryType === 'contra' || p.purchaseType === 'contra') return;
+          let needsDbUpdate = false;
+          const setPatch = {};
+
+          // 1. Enrich vendor snapshot if missing gstin/phone/address
+          const vName = (p.vendorName || p.vendor?.businessName || p.vendor?.name || '').trim();
+          const matchedParty = vName ? partyMap.get(vName.toLowerCase()) : null;
+          if (matchedParty && (!p.vendor || (!p.vendor.gstin && matchedParty.gst) || (!p.vendor.phone && matchedParty.phone) || (!p.vendor.billingAddress && matchedParty.address))) {
+            const pGst = (matchedParty.gst || matchedParty.gstin || p.vendor?.gstin || '').trim().toUpperCase();
+            const isInter = pGst && !pGst.startsWith('24');
+            const enrichedVendor = {
+              ...(p.vendor || {}),
+              name: p.vendor?.name || matchedParty.contactPerson || vName,
+              businessName: p.vendor?.businessName || vName,
+              phone: p.vendor?.phone || matchedParty.phone || '',
+              gstin: pGst,
+              billingAddress: p.vendor?.billingAddress || matchedParty.address || '',
+              shippingAddress: p.vendor?.shippingAddress || matchedParty.address || '',
+              city: p.vendor?.city || matchedParty.city || 'Surat, Gujarat',
+              state: p.vendor?.state || (isInter ? 'Inter-State' : 'Gujarat'),
+              stateCode: p.vendor?.stateCode || (isInter ? pGst.slice(0, 2) : '24'),
+              country: p.vendor?.country || 'India'
+            };
+            p.vendor = enrichedVendor;
+            setPatch.vendor = enrichedVendor;
+            needsDbUpdate = true;
+          }
+
+          // 2. Repair Mill Jobwork / RFD purchases where gstRate was accidentally saved as 0 due to missing form default
+          const isMillJobwork = /Mill Processing Jobwork|Mill Job Work/i.test(p.itemName || p.notes || p.items?.[0]?.itemName || '');
+          const curTax = Number(p.totalTax || p.gstAmount || 0);
+          const curSub = Number(p.subtotal || p.taxableAmount || 0);
+          if (isMillJobwork && curTax === 0 && curSub > 0) {
+            const linkedLot = rfdLotMap.get(String(p.ourChallanNo || '').trim().toLowerCase()) || rfdLotMap.get(String(p.purchaseNo || '').trim().toLowerCase());
+            const intendedRate = (linkedLot && Number(linkedLot.gstRate) > 0) ? Number(linkedLot.gstRate) : 5;
+            const taxAmt = parseFloat(((curSub * intendedRate) / 100).toFixed(2));
+            const rawTotal = curSub + taxAmt;
+            const grandTotal = Math.round(rawTotal);
+            const roundOff = parseFloat((grandTotal - rawTotal).toFixed(2));
+            const halfTax = parseFloat((taxAmt / 2).toFixed(2));
+
+            p.gstRate = intendedRate;
+            p.totalTax = taxAmt;
+            p.gstAmount = taxAmt;
+            p.cgstAmount = halfTax;
+            p.sgstAmount = halfTax;
+            p.roundOff = roundOff;
+            p.grandTotal = grandTotal;
+            p.totalAmount = grandTotal;
+            if (!p.paidAmount || Number(p.paidAmount) === 0) {
+              p.balanceDue = grandTotal;
+            }
+            if (Array.isArray(p.items) && p.items.length > 0) {
+              p.items = p.items.map(it => ({
+                ...it,
+                taxRate: intendedRate,
+                taxAmount: taxAmt,
+                amount: curSub,
+                totalAmount: curSub
+              }));
+              setPatch.items = p.items;
+            }
+            Object.assign(setPatch, {
+              gstRate: intendedRate,
+              totalTax: taxAmt,
+              gstAmount: taxAmt,
+              cgstAmount: halfTax,
+              sgstAmount: halfTax,
+              roundOff,
+              grandTotal,
+              totalAmount: grandTotal,
+              ...((!p.paidAmount || Number(p.paidAmount) === 0) ? { balanceDue: grandTotal } : {})
+            });
+            needsDbUpdate = true;
+          }
+
+          if (needsDbUpdate && p._id) {
+            fixOps.push({
+              updateOne: {
+                filter: { _id: p._id },
+                update: { $set: setPatch }
+              }
+            });
+          }
+        });
+
+        if (fixOps.length > 0) {
+          BillingPurchase.bulkWrite(fixOps, { ordered: false }).catch(() => {});
+        }
+      } catch (repairErr) {
+        // Non-blocking auto-repair
+      }
+    }
+
     res.json({ success: true, data: purchases });
   } catch (error) {
     logger.error('Error creating billing purchase: %s', error.stack || error.message);
@@ -4585,6 +4886,84 @@ const createPurchase = async (req, res) => {
     }
     if (purchaseData._id && !mongoose.Types.ObjectId.isValid(purchaseData._id)) {
       delete purchaseData._id;
+    }
+
+    // Normalize Purchase GST & Financial Totals so 5% / 12% / 18% GST is never lost when items or gstRate are provided
+    if (!isContra) {
+      const topRate = purchaseData.gstRate !== undefined && purchaseData.gstRate !== null && purchaseData.gstRate !== ''
+        ? parseFloat(purchaseData.gstRate)
+        : (Array.isArray(purchaseData.items) && purchaseData.items[0]?.taxRate !== undefined
+          ? parseFloat(purchaseData.items[0].taxRate)
+          : 5);
+      const effectiveGstRate = !isNaN(topRate) ? topRate : 5;
+      purchaseData.gstRate = effectiveGstRate;
+
+      let computedSubtotal = 0;
+      let computedTaxTotal = 0;
+      if (Array.isArray(purchaseData.items) && purchaseData.items.length > 0) {
+        purchaseData.items = purchaseData.items.map(it => {
+          const q = parseFloat(it.qty ?? it.quantity) || 0;
+          const r = parseFloat(it.unitPrice ?? it.rate) || 0;
+          const discPct = parseFloat(it.discountPct) || 0;
+          const baseAmt = q * r;
+          const discAmt = (baseAmt * discPct) / 100;
+          const lineTaxable = parseFloat(Math.max(0, baseAmt - discAmt).toFixed(2));
+          const itRateRaw = it.taxRate !== undefined && it.taxRate !== null && it.taxRate !== '' ? parseFloat(it.taxRate) : effectiveGstRate;
+          const itRate = !isNaN(itRateRaw) ? itRateRaw : effectiveGstRate;
+          const itTaxAmt = parseFloat(((lineTaxable * itRate) / 100).toFixed(2));
+          computedSubtotal += lineTaxable;
+          computedTaxTotal += itTaxAmt;
+          return {
+            ...it,
+            qty: q,
+            quantity: q,
+            unitPrice: r,
+            rate: r,
+            taxRate: itRate,
+            taxAmount: it.taxAmount !== undefined && Number(it.taxAmount) > 0 ? Number(it.taxAmount) : itTaxAmt,
+            amount: lineTaxable,
+            totalAmount: lineTaxable
+          };
+        });
+      }
+
+      const sub = Number(purchaseData.subtotal || purchaseData.subtotalAmount || purchaseData.taxableAmount || computedSubtotal || 0);
+      const taxable = Number(purchaseData.taxableAmount || sub || 0);
+      purchaseData.subtotal = parseFloat(sub.toFixed(2));
+      purchaseData.subtotalAmount = parseFloat(sub.toFixed(2));
+      purchaseData.taxableAmount = parseFloat(taxable.toFixed(2));
+
+      let totalTax = Number(purchaseData.totalTax || purchaseData.gstAmount || 0);
+      if (totalTax <= 0 && effectiveGstRate > 0 && taxable > 0) {
+        totalTax = computedTaxTotal > 0 ? parseFloat(computedTaxTotal.toFixed(2)) : parseFloat(((taxable * effectiveGstRate) / 100).toFixed(2));
+      }
+      purchaseData.totalTax = totalTax;
+      purchaseData.gstAmount = totalTax;
+
+      const isIgst = purchaseData.taxType === 'IGST';
+      if (isIgst) {
+        purchaseData.igstAmount = Number(purchaseData.igstAmount) > 0 ? Number(purchaseData.igstAmount) : totalTax;
+        purchaseData.cgstAmount = 0;
+        purchaseData.sgstAmount = 0;
+      } else {
+        purchaseData.taxType = 'CGST_SGST';
+        const halfTax = parseFloat((totalTax / 2).toFixed(2));
+        purchaseData.cgstAmount = Number(purchaseData.cgstAmount) > 0 ? Number(purchaseData.cgstAmount) : halfTax;
+        purchaseData.sgstAmount = Number(purchaseData.sgstAmount) > 0 ? Number(purchaseData.sgstAmount) : halfTax;
+        purchaseData.igstAmount = 0;
+      }
+
+      if (taxable > 0 && totalTax > 0) {
+        const expectedRawTotal = taxable + totalTax;
+        const currentGrand = Number(purchaseData.grandTotal || purchaseData.totalAmount || 0);
+        // If caller accidentally sent untaxed subtotal as grandTotal, add the GST and round off
+        if (currentGrand <= taxable + 0.01) {
+          const roundedGrand = purchaseData.enableRoundOff !== false ? Math.round(expectedRawTotal) : parseFloat(expectedRawTotal.toFixed(2));
+          purchaseData.roundOff = parseFloat((roundedGrand - expectedRawTotal).toFixed(2));
+          purchaseData.grandTotal = roundedGrand;
+          purchaseData.totalAmount = roundedGrand;
+        }
+      }
     }
 
     // Contra Entry Specific Normalization
@@ -4704,38 +5083,54 @@ const createPurchase = async (req, res) => {
 
     const purchase = await BillingPurchase.create(purchaseData);
 
-    // Auto-upsert into BillingVendor if vendor info is present so user never loses entered vendor
-    if (purchaseData.vendor && (purchaseData.vendor.name || purchaseData.vendor.businessName)) {
-      const vName = (purchaseData.vendor.name || purchaseData.vendor.businessName).trim();
-      const vBusiness = (purchaseData.vendor.businessName || purchaseData.vendor.name).trim();
-      const companyEntity = purchaseData.companyEntity || 'Elite Digital Print';
-      BillingVendor.findOneAndUpdate(
-        {
-          $or: [
-            { name: vName },
-            { businessName: vBusiness }
-          ]
-        },
-        {
-          $setOnInsert: {
-            name: vName,
-            businessName: vBusiness,
-            phone: purchaseData.vendor.phone || '',
-            email: purchaseData.vendor.email || '',
-            gstin: purchaseData.vendor.gstin || '',
-            billingAddress: purchaseData.vendor.billingAddress || '',
-            shippingAddress: purchaseData.vendor.shippingAddress || '',
-            pincode: purchaseData.vendor.pincode || '',
-            city: purchaseData.vendor.city || '',
-            state: purchaseData.vendor.state || 'Gujarat',
-            stateCode: purchaseData.vendor.stateCode || '24',
-            country: purchaseData.vendor.country || 'India',
-            vendorType: 'General Supplier',
-            companyEntity
-          }
-        },
-        { upsert: true, new: true }
-      ).catch(() => {});
+    // Auto-upsert into BillingVendor if vendor info or vendorName is present so user never loses entered vendor in Finance Department
+    if (!isContra && (purchaseData.vendorName || (purchaseData.vendor && (purchaseData.vendor.name || purchaseData.vendor.businessName)))) {
+      const vName = (purchaseData.vendor?.name || purchaseData.vendor?.businessName || purchaseData.vendorName || '').trim();
+      const vBusiness = (purchaseData.vendor?.businessName || purchaseData.vendorName || purchaseData.vendor?.name || '').trim();
+      const companyEntity = purchaseData.companyEntity || 'Elite Digital Prints';
+      if (vName || vBusiness) {
+        const targetBiz = vBusiness || vName;
+        const escapedBiz = targetBiz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const setFields = {};
+        if (purchaseData.vendor?.phone && String(purchaseData.vendor.phone).trim()) setFields.phone = String(purchaseData.vendor.phone).trim();
+        if (purchaseData.vendor?.email && String(purchaseData.vendor.email).trim()) setFields.email = String(purchaseData.vendor.email).trim();
+        if (purchaseData.vendor?.gstin && String(purchaseData.vendor.gstin).trim()) setFields.gstin = String(purchaseData.vendor.gstin).trim().toUpperCase();
+        if (purchaseData.vendor?.billingAddress && String(purchaseData.vendor.billingAddress).trim()) {
+          setFields.billingAddress = String(purchaseData.vendor.billingAddress).trim();
+          setFields.shippingAddress = String(purchaseData.vendor.shippingAddress || purchaseData.vendor.billingAddress).trim();
+        }
+        if (purchaseData.vendor?.city && String(purchaseData.vendor.city).trim()) setFields.city = String(purchaseData.vendor.city).trim();
+        if (purchaseData.vendor?.pincode && String(purchaseData.vendor.pincode).trim()) setFields.pincode = String(purchaseData.vendor.pincode).trim();
+
+        BillingVendor.findOneAndUpdate(
+          {
+            companyEntity,
+            $or: [
+              { name: { $regex: new RegExp(`^${escapedBiz}$`, 'i') } },
+              { businessName: { $regex: new RegExp(`^${escapedBiz}$`, 'i') } }
+            ]
+          },
+          {
+            ...(Object.keys(setFields).length > 0 ? { $set: setFields } : {}),
+            $setOnInsert: {
+              name: vName || targetBiz,
+              businessName: targetBiz,
+              ...(!setFields.phone ? { phone: '' } : {}),
+              ...(!setFields.email ? { email: '' } : {}),
+              ...(!setFields.gstin ? { gstin: '' } : {}),
+              ...(!setFields.billingAddress ? { billingAddress: '', shippingAddress: '' } : {}),
+              ...(!setFields.pincode ? { pincode: '' } : {}),
+              ...(!setFields.city ? { city: 'Surat, Gujarat' } : {}),
+              state: purchaseData.vendor?.state || 'Gujarat',
+              stateCode: purchaseData.vendor?.stateCode || '24',
+              country: purchaseData.vendor?.country || 'India',
+              vendorType: purchaseData.vendor?.vendorType || (/inventory/i.test(purchaseData.purchaseType) ? 'Fabric' : 'General Supplier'),
+              companyEntity
+            }
+          },
+          { upsert: true, new: true }
+        ).catch(() => {});
+      }
     }
 
     // BUG-074: Only upsert into BillingItem catalog if user explicitly opted in (saveItemsToCatalog)
@@ -4797,6 +5192,85 @@ const updatePurchase = async (req, res) => {
       }
     }
     delete purchaseData._id;
+
+    // Normalize Purchase GST & Financial Totals on Edit so 5% / 12% / 18% GST is always preserved
+    if (purchaseData.entryType !== 'contra' && purchaseData.purchaseType !== 'contra') {
+      const topRate = purchaseData.gstRate !== undefined && purchaseData.gstRate !== null && purchaseData.gstRate !== ''
+        ? parseFloat(purchaseData.gstRate)
+        : (Array.isArray(purchaseData.items) && purchaseData.items[0]?.taxRate !== undefined
+          ? parseFloat(purchaseData.items[0].taxRate)
+          : 5);
+      const effectiveGstRate = !isNaN(topRate) ? topRate : 5;
+      purchaseData.gstRate = effectiveGstRate;
+
+      let computedSubtotal = 0;
+      let computedTaxTotal = 0;
+      if (Array.isArray(purchaseData.items) && purchaseData.items.length > 0) {
+        purchaseData.items = purchaseData.items.map(it => {
+          const q = parseFloat(it.qty ?? it.quantity) || 0;
+          const r = parseFloat(it.unitPrice ?? it.rate) || 0;
+          const discPct = parseFloat(it.discountPct) || 0;
+          const baseAmt = q * r;
+          const discAmt = (baseAmt * discPct) / 100;
+          const lineTaxable = parseFloat(Math.max(0, baseAmt - discAmt).toFixed(2));
+          const itRateRaw = it.taxRate !== undefined && it.taxRate !== null && it.taxRate !== '' ? parseFloat(it.taxRate) : effectiveGstRate;
+          const itRate = !isNaN(itRateRaw) ? itRateRaw : effectiveGstRate;
+          const itTaxAmt = parseFloat(((lineTaxable * itRate) / 100).toFixed(2));
+          computedSubtotal += lineTaxable;
+          computedTaxTotal += itTaxAmt;
+          return {
+            ...it,
+            qty: q,
+            quantity: q,
+            unitPrice: r,
+            rate: r,
+            taxRate: itRate,
+            taxAmount: it.taxAmount !== undefined && Number(it.taxAmount) > 0 ? Number(it.taxAmount) : itTaxAmt,
+            amount: lineTaxable,
+            totalAmount: lineTaxable
+          };
+        });
+      }
+
+      const sub = Number(purchaseData.subtotal || purchaseData.subtotalAmount || purchaseData.taxableAmount || computedSubtotal || 0);
+      const taxable = Number(purchaseData.taxableAmount || sub || 0);
+      if (sub > 0) {
+        purchaseData.subtotal = parseFloat(sub.toFixed(2));
+        purchaseData.subtotalAmount = parseFloat(sub.toFixed(2));
+        purchaseData.taxableAmount = parseFloat(taxable.toFixed(2));
+      }
+
+      let totalTax = Number(purchaseData.totalTax || purchaseData.gstAmount || 0);
+      if (totalTax <= 0 && effectiveGstRate > 0 && taxable > 0) {
+        totalTax = computedTaxTotal > 0 ? parseFloat(computedTaxTotal.toFixed(2)) : parseFloat(((taxable * effectiveGstRate) / 100).toFixed(2));
+      }
+      purchaseData.totalTax = totalTax;
+      purchaseData.gstAmount = totalTax;
+
+      const isIgst = purchaseData.taxType === 'IGST';
+      if (isIgst) {
+        purchaseData.igstAmount = Number(purchaseData.igstAmount) > 0 ? Number(purchaseData.igstAmount) : totalTax;
+        purchaseData.cgstAmount = 0;
+        purchaseData.sgstAmount = 0;
+      } else {
+        purchaseData.taxType = 'CGST_SGST';
+        const halfTax = parseFloat((totalTax / 2).toFixed(2));
+        purchaseData.cgstAmount = Number(purchaseData.cgstAmount) > 0 ? Number(purchaseData.cgstAmount) : halfTax;
+        purchaseData.sgstAmount = Number(purchaseData.sgstAmount) > 0 ? Number(purchaseData.sgstAmount) : halfTax;
+        purchaseData.igstAmount = 0;
+      }
+
+      if (taxable > 0 && totalTax > 0) {
+        const expectedRawTotal = taxable + totalTax;
+        const currentGrand = Number(purchaseData.grandTotal || purchaseData.totalAmount || 0);
+        if (currentGrand <= taxable + 0.01) {
+          const roundedGrand = purchaseData.enableRoundOff !== false ? Math.round(expectedRawTotal) : parseFloat(expectedRawTotal.toFixed(2));
+          purchaseData.roundOff = parseFloat((roundedGrand - expectedRawTotal).toFixed(2));
+          purchaseData.grandTotal = roundedGrand;
+          purchaseData.totalAmount = roundedGrand;
+        }
+      }
+    }
 
     // ── Duplicate Purchase Bill Guard on Edit ──
     const vName = (purchaseData.vendorName || purchaseData.vendor?.businessName || purchaseData.vendor?.name || '').trim();
@@ -4891,38 +5365,54 @@ const updatePurchase = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Purchase record not found' });
     }
 
-    // Auto-upsert into BillingVendor if vendor info is present
-    if (purchaseData.vendor && (purchaseData.vendor.name || purchaseData.vendor.businessName)) {
-      const vName = (purchaseData.vendor.name || purchaseData.vendor.businessName).trim();
-      const vBusiness = (purchaseData.vendor.businessName || purchaseData.vendor.name).trim();
-      const companyEntity = purchaseData.companyEntity || 'Elite Digital Print';
-      BillingVendor.findOneAndUpdate(
-        {
-          $or: [
-            { name: vName },
-            { businessName: vBusiness }
-          ]
-        },
-        {
-          $setOnInsert: {
-            name: vName,
-            businessName: vBusiness,
-            phone: purchaseData.vendor.phone || '',
-            email: purchaseData.vendor.email || '',
-            gstin: purchaseData.vendor.gstin || '',
-            billingAddress: purchaseData.vendor.billingAddress || '',
-            shippingAddress: purchaseData.vendor.shippingAddress || '',
-            pincode: purchaseData.vendor.pincode || '',
-            city: purchaseData.vendor.city || '',
-            state: purchaseData.vendor.state || 'Gujarat',
-            stateCode: purchaseData.vendor.stateCode || '24',
-            country: purchaseData.vendor.country || 'India',
-            vendorType: 'General Supplier',
-            companyEntity
-          }
-        },
-        { upsert: true, new: true }
-      ).catch(() => {});
+    // Auto-upsert into BillingVendor if vendor info or vendorName is present
+    if (purchaseData.entryType !== 'contra' && (purchaseData.vendorName || (purchaseData.vendor && (purchaseData.vendor.name || purchaseData.vendor.businessName)))) {
+      const vName = (purchaseData.vendor?.name || purchaseData.vendor?.businessName || purchaseData.vendorName || '').trim();
+      const vBusiness = (purchaseData.vendor?.businessName || purchaseData.vendorName || purchaseData.vendor?.name || '').trim();
+      const companyEntity = purchaseData.companyEntity || 'Elite Digital Prints';
+      if (vName || vBusiness) {
+        const targetBiz = vBusiness || vName;
+        const escapedBiz = targetBiz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const setFields = {};
+        if (purchaseData.vendor?.phone && String(purchaseData.vendor.phone).trim()) setFields.phone = String(purchaseData.vendor.phone).trim();
+        if (purchaseData.vendor?.email && String(purchaseData.vendor.email).trim()) setFields.email = String(purchaseData.vendor.email).trim();
+        if (purchaseData.vendor?.gstin && String(purchaseData.vendor.gstin).trim()) setFields.gstin = String(purchaseData.vendor.gstin).trim().toUpperCase();
+        if (purchaseData.vendor?.billingAddress && String(purchaseData.vendor.billingAddress).trim()) {
+          setFields.billingAddress = String(purchaseData.vendor.billingAddress).trim();
+          setFields.shippingAddress = String(purchaseData.vendor.shippingAddress || purchaseData.vendor.billingAddress).trim();
+        }
+        if (purchaseData.vendor?.city && String(purchaseData.vendor.city).trim()) setFields.city = String(purchaseData.vendor.city).trim();
+        if (purchaseData.vendor?.pincode && String(purchaseData.vendor.pincode).trim()) setFields.pincode = String(purchaseData.vendor.pincode).trim();
+
+        BillingVendor.findOneAndUpdate(
+          {
+            companyEntity,
+            $or: [
+              { name: { $regex: new RegExp(`^${escapedBiz}$`, 'i') } },
+              { businessName: { $regex: new RegExp(`^${escapedBiz}$`, 'i') } }
+            ]
+          },
+          {
+            ...(Object.keys(setFields).length > 0 ? { $set: setFields } : {}),
+            $setOnInsert: {
+              name: vName || targetBiz,
+              businessName: targetBiz,
+              ...(!setFields.phone ? { phone: '' } : {}),
+              ...(!setFields.email ? { email: '' } : {}),
+              ...(!setFields.gstin ? { gstin: '' } : {}),
+              ...(!setFields.billingAddress ? { billingAddress: '', shippingAddress: '' } : {}),
+              ...(!setFields.pincode ? { pincode: '' } : {}),
+              ...(!setFields.city ? { city: 'Surat, Gujarat' } : {}),
+              state: purchaseData.vendor?.state || 'Gujarat',
+              stateCode: purchaseData.vendor?.stateCode || '24',
+              country: purchaseData.vendor?.country || 'India',
+              vendorType: purchaseData.vendor?.vendorType || (/inventory/i.test(purchaseData.purchaseType) ? 'Fabric' : 'General Supplier'),
+              companyEntity
+            }
+          },
+          { upsert: true, new: true }
+        ).catch(() => {});
+      }
     }
 
     // Auto-upsert into BillingItem catalog so any newly entered line item is saved with its details

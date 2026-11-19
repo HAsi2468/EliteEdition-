@@ -804,8 +804,12 @@ export default function EliteBillingDepartment({
       }
 
       items[index] = updatedItem;
+      const nextGstRate = field === 'taxRate'
+        ? (parseFloat(value) != null && !isNaN(parseFloat(value)) ? parseFloat(value) : prev.gstRate)
+        : prev.gstRate;
       return {
         ...prev,
+        gstRate: nextGstRate,
         items
       };
     });
@@ -922,6 +926,13 @@ export default function EliteBillingDepartment({
         ourChallanNo: ''
       }];
 
+    const pVendorName = (p.vendorName || p.vendor?.businessName || p.vendor?.name || '').trim();
+    const matchedVendorMaster = (vendorsList || []).find(v => {
+      const b = String(v.businessName || v.name || '').trim().toLowerCase();
+      const c = String(v.name || '').trim().toLowerCase();
+      return (b && b === pVendorName.toLowerCase()) || (c && c === pVendorName.toLowerCase());
+    });
+
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
       billNo: p.billNo || '',
@@ -929,24 +940,24 @@ export default function EliteBillingDepartment({
       ourChallanNo: p.ourChallanNo || '',
       date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : new Date().toISOString().split('T')[0],
       vendor: {
-        vendorId: p.vendor?.vendorId || '',
-        name: p.vendor?.name || p.vendorName || '',
-        businessName: p.vendor?.businessName || p.vendorName || '',
-        phone: p.vendor?.phone || '',
-        email: p.vendor?.email || '',
-        gstin: p.vendor?.gstin || '',
-        billingAddress: p.vendor?.billingAddress || '',
-        shippingAddress: p.vendor?.shippingAddress || '',
-        pincode: p.vendor?.pincode || '',
-        city: p.vendor?.city || '',
-        state: p.vendor?.state || 'Gujarat',
-        stateCode: p.vendor?.stateCode || '24',
-        country: p.vendor?.country || 'India'
+        vendorId: p.vendor?.vendorId || matchedVendorMaster?._id || matchedVendorMaster?.id || '',
+        name: p.vendor?.name || matchedVendorMaster?.name || p.vendorName || '',
+        businessName: p.vendor?.businessName || matchedVendorMaster?.businessName || p.vendorName || '',
+        phone: p.vendor?.phone || matchedVendorMaster?.phone || '',
+        email: p.vendor?.email || matchedVendorMaster?.email || '',
+        gstin: p.vendor?.gstin || matchedVendorMaster?.gstin || '',
+        billingAddress: p.vendor?.billingAddress || matchedVendorMaster?.billingAddress || matchedVendorMaster?.address || '',
+        shippingAddress: p.vendor?.shippingAddress || matchedVendorMaster?.shippingAddress || matchedVendorMaster?.billingAddress || matchedVendorMaster?.address || '',
+        pincode: p.vendor?.pincode || matchedVendorMaster?.pincode || '',
+        city: p.vendor?.city || matchedVendorMaster?.city || '',
+        state: p.vendor?.state || matchedVendorMaster?.state || 'Gujarat',
+        stateCode: p.vendor?.stateCode || matchedVendorMaster?.stateCode || '24',
+        country: p.vendor?.country || matchedVendorMaster?.country || 'India'
       },
-      vendorName: p.vendorName || p.vendor?.businessName || p.vendor?.name || '',
+      vendorName: pVendorName,
       items: pItems,
       enableRoundOff: p.enableRoundOff !== false,
-      manualRoundOff: p.roundOff !== undefined ? p.roundOff : undefined,
+      manualRoundOff: undefined,
       discountType: p.discountType || 'flat',
       discountValue: p.discountValue || 0,
       taxType: p.taxType || p.gstType || 'CGST_SGST',
@@ -1229,6 +1240,7 @@ export default function EliteBillingDepartment({
     const handleRefresh = (e) => {
       if (!e || !e.detail || e.detail === 'billing' || e.detail?.source === 'billing') {
         fetchPurchases();
+        fetchMasterData();
       }
     };
     window.addEventListener('elite-data-refresh', handleRefresh);
@@ -1490,7 +1502,8 @@ export default function EliteBillingDepartment({
         unitPrice: parseFloat(item.unitPrice) || 0,
         rate: parseFloat(item.unitPrice) || 0,
         discountPct: parseFloat(item.discountPct) || 0,
-        taxRate: parseFloat(item.taxRate) || 0,
+        taxRate: parseFloat(item.taxRate !== undefined && item.taxRate !== null && item.taxRate !== '' ? item.taxRate : (purchaseForm.gstRate ?? 5)) || 0,
+        taxAmount: parseFloat((((parseFloat(item.totalAmount) || 0) * (parseFloat(item.taxRate !== undefined && item.taxRate !== null && item.taxRate !== '' ? item.taxRate : (purchaseForm.gstRate ?? 5)) || 0)) / 100).toFixed(2)),
         amount: parseFloat(item.totalAmount) || 0,
         totalAmount: parseFloat(item.totalAmount) || 0
       })),
@@ -1505,7 +1518,7 @@ export default function EliteBillingDepartment({
       discountValue: parseFloat(purchaseForm.discountValue) || 0,
       discountTotal: calculatedPurchase.discountTotal,
       taxType: purchaseForm.taxType || 'CGST_SGST',
-      gstRate: parseFloat(purchaseForm.gstRate) || 0,
+      gstRate: parseFloat(validItems[0]?.taxRate ?? purchaseForm.gstRate ?? 5) || 0,
       cgstAmount: calculatedPurchase.cgstAmount,
       sgstAmount: calculatedPurchase.sgstAmount,
       igstAmount: calculatedPurchase.igstAmount,
@@ -1547,6 +1560,7 @@ export default function EliteBillingDepartment({
         const res = await api.createBillingPurchase(payload);
         const saved = (res && res.data) ? res.data : { ...payload, id: `pur_${Date.now()}` };
         setPurchases(prev => [saved, ...prev]);
+        fetchMasterData();
       }
     } catch (err) {
       console.error('Error saving purchase to DB:', err);

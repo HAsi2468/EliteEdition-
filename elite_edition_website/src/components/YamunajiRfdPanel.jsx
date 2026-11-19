@@ -2650,22 +2650,45 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     else if (hasSent && !hasRemainingInStock) newStatus = 'Fully at Mill';
 
     const ratePerMtr = parseFloat(editGrayLotForm.ratePerMeter) || 0;
-    const gstPct = parseFloat(editGrayLotForm.gstRate) || 0;
+    const rawGst = parseFloat(editGrayLotForm.gstRate);
+    const gstPct = !isNaN(rawGst) ? rawGst : 5;
     const taxableAmt = parseFloat((roundMtrs * ratePerMtr).toFixed(2));
     const gstAmt = parseFloat(((taxableAmt * gstPct) / 100).toFixed(2));
     const totalInvAmt = Math.round(taxableAmt + gstAmt);
+    const roundOffVal = parseFloat((totalInvAmt - (taxableAmt + gstAmt)).toFixed(2));
 
     // If already linked to a Billing Purchase ID, update it
     if (editGrayLotForm.purchaseId) {
       try {
+        const weaverNameClean = (editGrayLotForm.weaverParty || '').trim();
+        const foundWeaver = (configs.weavers || []).find(w => getPartyName(w).toLowerCase() === weaverNameClean.toLowerCase());
+        const normWeaver = foundWeaver ? normalizeParty(foundWeaver) : null;
+        const weaverGstin = (normWeaver?.gst || '').trim().toUpperCase();
+        const isInterStateWeaver = weaverGstin && !weaverGstin.startsWith('24');
+
         const updatePayload = {
+          companyEntity,
           billNo: (editGrayLotForm.invoiceNo || editGrayLotForm.weaverChallanNo || editGrayLotForm.lotNumber).trim(),
           date: editGrayLotForm.invoiceDate || editGrayLotForm.inwardDate,
-          vendorName: editGrayLotForm.weaverParty,
+          vendorName: weaverNameClean,
+          vendor: {
+            name: normWeaver?.contactPerson || weaverNameClean,
+            businessName: weaverNameClean,
+            phone: normWeaver?.phone || '',
+            gstin: weaverGstin,
+            billingAddress: normWeaver?.address || '',
+            shippingAddress: normWeaver?.address || '',
+            city: normWeaver?.city || 'Surat, Gujarat',
+            state: isInterStateWeaver ? 'Inter-State' : 'Gujarat',
+            stateCode: isInterStateWeaver ? weaverGstin.slice(0, 2) : '24',
+            country: 'India',
+            vendorType: 'Fabric'
+          },
           purchaseType: editGrayLotForm.purchaseType || 'Inventory Purchase',
           items: [{
             itemName: `${editGrayLotForm.fabricQuality} (Gray Fabric)`,
             fabric: editGrayLotForm.fabricQuality,
+            fabricName: editGrayLotForm.fabricQuality,
             lotNo: editGrayLotForm.lotNumber.trim(),
             partyChallan: editGrayLotForm.weaverChallanNo,
             hsnCode: editGrayLotForm.hsnCode || '5208',
@@ -2681,10 +2704,17 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           }],
           quantity: roundMtrs,
           subtotal: taxableAmt,
+          subtotalAmount: taxableAmt,
           taxableAmount: taxableAmt,
+          taxType: isInterStateWeaver ? 'IGST' : 'CGST_SGST',
           gstRate: gstPct,
+          cgstAmount: isInterStateWeaver ? 0 : parseFloat((gstAmt / 2).toFixed(2)),
+          sgstAmount: isInterStateWeaver ? 0 : parseFloat((gstAmt / 2).toFixed(2)),
+          igstAmount: isInterStateWeaver ? gstAmt : 0,
           totalTax: gstAmt,
           gstAmount: gstAmt,
+          enableRoundOff: true,
+          roundOff: roundOffVal,
           grandTotal: totalInvAmt,
           totalAmount: totalInvAmt,
           terms: editGrayLotForm.paymentTerms || '30 Days'
@@ -2801,7 +2831,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         receivedRollsCount: String(challan.totalTps || ''),
         isChallanClosed: true,
         isChallanClosedUserOverridden: false,
-        notes: `Received from Mill Challan ${challan.challanNo}`
+        notes: `Received from Mill Challan ${challan.challanNo}`,
+        invoiceNo: '',
+        invoiceDate: new Date().toISOString().split('T')[0],
+        processRatePerMeter: '',
+        hsnCode: '998821',
+        gstRate: '5',
+        paymentTerms: '30 Days',
+        postToPurchase: false
       });
     } else {
       setInwardRfdForm({
@@ -2818,7 +2855,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         receivedRollsCount: '',
         isChallanClosed: true,
         isChallanClosedUserOverridden: false,
-        notes: ''
+        notes: '',
+        invoiceNo: '',
+        invoiceDate: new Date().toISOString().split('T')[0],
+        processRatePerMeter: '',
+        hsnCode: '998821',
+        gstRate: '5',
+        paymentTerms: '30 Days',
+        postToPurchase: false
       });
     }
     setShowInwardRfdModal(true);
@@ -2837,7 +2881,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         shortagePercent: '',
         shortageMeters: '',
         receivedRollsCount: '',
-        notes: ''
+        notes: '',
+        gstRate: prev.gstRate !== undefined && prev.gstRate !== '' ? prev.gstRate : '5',
+        hsnCode: prev.hsnCode || '998821',
+        paymentTerms: prev.paymentTerms || '30 Days',
+        invoiceDate: prev.invoiceDate || new Date().toISOString().split('T')[0]
       }));
       return;
     }
@@ -2868,7 +2916,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       receivedRollsCount: String(ch.totalTps || ''),
       isChallanClosed: true,
       isChallanClosedUserOverridden: false,
-      notes: `Received from Mill Challan ${ch.challanNo}`
+      notes: `Received from Mill Challan ${ch.challanNo}`,
+      gstRate: prev.gstRate !== undefined && prev.gstRate !== '' ? prev.gstRate : '5',
+      hsnCode: prev.hsnCode || '998821',
+      paymentTerms: prev.paymentTerms || '30 Days',
+      invoiceDate: prev.invoiceDate || new Date().toISOString().split('T')[0]
     }));
   };
 
@@ -2917,12 +2969,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     let createdPurchaseNo = '';
     let createdPurchaseId = '';
     const procRate = parseFloat(inwardRfdForm.processRatePerMeter) || 0;
-    const gstPct = parseFloat(inwardRfdForm.gstRate) || 0;
+    const rawGst = parseFloat(inwardRfdForm.gstRate);
+    const gstPct = !isNaN(rawGst) ? rawGst : 5;
     const taxableAmt = parseFloat((receivedRfd * procRate).toFixed(2));
     const gstAmt = parseFloat(((taxableAmt * gstPct) / 100).toFixed(2));
     const totalInvAmt = Math.round(taxableAmt + gstAmt);
+    const roundOffVal = parseFloat((totalInvAmt - (taxableAmt + gstAmt)).toFixed(2));
+    const shouldPostPurchase = Boolean(inwardRfdForm.postToPurchase || procRate > 0 || (inwardRfdForm.invoiceNo && inwardRfdForm.invoiceNo.trim()));
 
-    if (inwardRfdForm.postToPurchase && procRate > 0) {
+    if (shouldPostPurchase && procRate > 0) {
       try {
         let nextPurNo = '';
         try {
@@ -2937,6 +2992,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           nextPurNo = `PUR-${curYear}-${String(Date.now()).slice(-4)}`;
         }
 
+        const millNameClean = inwardRfdForm.millParty.trim();
+        const foundMill = (configs.mills || []).find(m => getPartyName(m).toLowerCase() === millNameClean.toLowerCase());
+        const normMill = foundMill ? normalizeParty(foundMill) : null;
+        const millGstin = (normMill?.gst || '').trim().toUpperCase();
+        const isInterStateMill = millGstin && !millGstin.startsWith('24');
+
+        let dueDateObj = new Date(inwardRfdForm.invoiceDate || inwardRfdForm.inwardDate || new Date());
+        const term = inwardRfdForm.paymentTerms || '30 Days';
+        if (term === '15 Days') dueDateObj.setDate(dueDateObj.getDate() + 15);
+        else if (term === '45 Days') dueDateObj.setDate(dueDateObj.getDate() + 45);
+        else if (term === '60 Days') dueDateObj.setDate(dueDateObj.getDate() + 60);
+        else if (term === 'Immediate Cash') { /* same day */ }
+        else dueDateObj.setDate(dueDateObj.getDate() + 30);
+
         const purPayload = {
           companyEntity,
           purchaseNo: nextPurNo,
@@ -2944,42 +3013,84 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           purchaseType: 'expense',
           ourChallanNo: lotNumber,
           date: inwardRfdForm.invoiceDate || inwardRfdForm.inwardDate,
-          vendorName: inwardRfdForm.millParty.trim(),
+          dueDate: dueDateObj.toISOString().split('T')[0],
+          vendorName: millNameClean,
+          vendor: {
+            name: normMill?.contactPerson || millNameClean,
+            businessName: millNameClean,
+            phone: normMill?.phone || '',
+            gstin: millGstin,
+            billingAddress: normMill?.address || '',
+            shippingAddress: normMill?.address || '',
+            city: normMill?.city || 'Surat, Gujarat',
+            state: isInterStateMill ? 'Inter-State' : 'Gujarat',
+            stateCode: isInterStateMill ? millGstin.slice(0, 2) : '24',
+            country: 'India',
+            vendorType: 'General Supplier'
+          },
           items: [{
             itemName: `${inwardRfdForm.fabricQuality} - Mill Processing Jobwork`,
-            description: `RFD Inward Lot ${lotNumber} from ${inwardRfdForm.millParty.trim()}`,
+            description: `RFD Inward Lot ${lotNumber} from ${millNameClean}`,
             fabric: inwardRfdForm.fabricQuality,
+            fabricName: inwardRfdForm.fabricQuality,
             lotNo: lotNumber,
             partyChallan: inwardRfdForm.millChallanNo,
+            ourChallanNo: lotNumber,
             hsnCode: inwardRfdForm.hsnCode || '998821',
             quantity: receivedRfd,
             qty: receivedRfd,
             unit: 'Meters',
             rate: procRate,
             unitPrice: procRate,
+            discountPct: 0,
+            discountAmt: 0,
             taxRate: gstPct,
             taxAmount: gstAmt,
             amount: taxableAmt,
             totalAmount: totalInvAmt
           }],
+          itemName: `${inwardRfdForm.fabricQuality} - Mill Processing Jobwork`,
           quantity: receivedRfd,
+          unit: 'Meters',
           rate: procRate,
           subtotal: taxableAmt,
+          subtotalAmount: taxableAmt,
           taxableAmount: taxableAmt,
+          discountType: 'flat',
+          discountValue: 0,
+          discountTotal: 0,
+          taxType: isInterStateMill ? 'IGST' : 'CGST_SGST',
           gstRate: gstPct,
+          cgstAmount: isInterStateMill ? 0 : parseFloat((gstAmt / 2).toFixed(2)),
+          sgstAmount: isInterStateMill ? 0 : parseFloat((gstAmt / 2).toFixed(2)),
+          igstAmount: isInterStateMill ? gstAmt : 0,
           totalTax: gstAmt,
           gstAmount: gstAmt,
+          enableRoundOff: true,
+          roundOff: roundOffVal,
           grandTotal: totalInvAmt,
           totalAmount: totalInvAmt,
+          paidAmount: 0,
+          balanceDue: totalInvAmt,
           paymentStatus: 'UNPAID',
           notes: `Mill Job Work Bill for RFD Lot ${lotNumber}`,
-          terms: inwardRfdForm.paymentTerms || '30 Days'
+          terms: term
         };
 
         const purRes = await api.createBillingPurchase(purPayload);
         const savedPur = (purRes && purRes.data) ? purRes.data : { ...purPayload, id: `pur_${Date.now()}` };
         createdPurchaseNo = savedPur.purchaseNo || nextPurNo;
         createdPurchaseId = savedPur._id || savedPur.id || '';
+
+        try {
+          const cacheKey = `elite_purchases_${companyEntity}`;
+          const cached = localStorage.getItem(cacheKey);
+          let currentList = cached ? JSON.parse(cached) : [];
+          if (!Array.isArray(currentList)) currentList = [];
+          currentList.unshift(savedPur);
+          localStorage.setItem(cacheKey, JSON.stringify(currentList));
+        } catch (cErr) {}
+
         window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'billing' } }));
       } catch (purErr) {
         console.warn('Failed to auto-create mill purchase:', purErr);
@@ -3119,32 +3230,172 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       stillAtMillMeters: lot.stillAtMillMeters || 0,
       receivedRollsCount: lot.receivedRollsCount || 1,
       status: lot.status || 'In Stock',
-      notes: lot.notes || ''
+      notes: lot.notes || '',
+      invoiceNo: lot.invoiceNo || '',
+      invoiceDate: lot.invoiceDate || lot.inwardDate || new Date().toISOString().split('T')[0],
+      processRatePerMeter: lot.processRatePerMeter || '',
+      hsnCode: lot.hsnCode || '998821',
+      gstRate: String(lot.gstRate !== undefined && lot.gstRate !== '' ? lot.gstRate : '5'),
+      paymentTerms: lot.paymentTerms || '30 Days',
+      purchaseNo: lot.purchaseNo || '',
+      purchaseId: lot.purchaseId || '',
+      postToPurchase: Boolean(lot.purchaseId || lot.purchaseNo || lot.processRatePerMeter > 0)
     });
   };
 
-  const handleSaveEditRfdLot = (e) => {
+  const handleSaveEditRfdLot = async (e) => {
     e.preventDefault();
     if (!editingRfdLot || !editRfdLotForm) return;
 
+    const graySent = parseFloat(editRfdLotForm.graySentMeters) || 0;
+    const receivedRfd = parseFloat(editRfdLotForm.receivedRfdMeters) || 0;
+    let shortagePct = parseFloat(editRfdLotForm.shortagePercent);
+    let shortageMtr = parseFloat(editRfdLotForm.shortageMeters);
+
+    if (!isNaN(shortagePct) && graySent > 0) {
+      shortageMtr = parseFloat(((graySent * shortagePct) / 100).toFixed(1));
+    } else if (!isNaN(shortageMtr) && graySent > 0) {
+      shortagePct = parseFloat(((shortageMtr / graySent) * 100).toFixed(2));
+    } else {
+      shortageMtr = 0;
+      shortagePct = 0;
+    }
+
+    const stillAtMill = parseFloat(editRfdLotForm.stillAtMillMeters) || 0;
+    const procRate = parseFloat(editRfdLotForm.processRatePerMeter) || 0;
+    const rawGst = parseFloat(editRfdLotForm.gstRate);
+    const gstPct = !isNaN(rawGst) ? rawGst : 5;
+    const taxableAmt = parseFloat((receivedRfd * procRate).toFixed(2));
+    const gstAmt = parseFloat(((taxableAmt * gstPct) / 100).toFixed(2));
+    const totalInvAmt = Math.round(taxableAmt + gstAmt);
+    const roundOffVal = parseFloat((totalInvAmt - (taxableAmt + gstAmt)).toFixed(2));
+
+    let savedPurchaseNo = editRfdLotForm.purchaseNo || editingRfdLot.purchaseNo || null;
+    let savedPurchaseId = editRfdLotForm.purchaseId || editingRfdLot.purchaseId || null;
+
+    const shouldSyncPurchase = Boolean(editRfdLotForm.postToPurchase || procRate > 0 || (editRfdLotForm.invoiceNo && editRfdLotForm.invoiceNo.trim()));
+    if (shouldSyncPurchase && procRate > 0) {
+      try {
+        const millNameClean = (editRfdLotForm.millParty || '').trim();
+        const foundMill = (configs.mills || []).find(m => getPartyName(m).toLowerCase() === millNameClean.toLowerCase());
+        const normMill = foundMill ? normalizeParty(foundMill) : null;
+        const millGstin = (normMill?.gst || '').trim().toUpperCase();
+        const isInterStateMill = millGstin && !millGstin.startsWith('24');
+
+        let dueDateObj = new Date(editRfdLotForm.invoiceDate || editRfdLotForm.inwardDate || new Date());
+        const term = editRfdLotForm.paymentTerms || '30 Days';
+        if (term === '15 Days') dueDateObj.setDate(dueDateObj.getDate() + 15);
+        else if (term === '45 Days') dueDateObj.setDate(dueDateObj.getDate() + 45);
+        else if (term === '60 Days') dueDateObj.setDate(dueDateObj.getDate() + 60);
+        else if (term === 'Immediate Cash') { /* same day */ }
+        else dueDateObj.setDate(dueDateObj.getDate() + 30);
+
+        const lotNumber = (editRfdLotForm.lotNumber || editingRfdLot.lotNumber || '').trim();
+        const purPayload = {
+          companyEntity,
+          billNo: (editRfdLotForm.invoiceNo || editRfdLotForm.millChallanNo || lotNumber).trim(),
+          purchaseType: 'expense',
+          ourChallanNo: lotNumber,
+          date: editRfdLotForm.invoiceDate || editRfdLotForm.inwardDate,
+          dueDate: dueDateObj.toISOString().split('T')[0],
+          vendorName: millNameClean,
+          vendor: {
+            name: normMill?.contactPerson || millNameClean,
+            businessName: millNameClean,
+            phone: normMill?.phone || '',
+            gstin: millGstin,
+            billingAddress: normMill?.address || '',
+            shippingAddress: normMill?.address || '',
+            city: normMill?.city || 'Surat, Gujarat',
+            state: isInterStateMill ? 'Inter-State' : 'Gujarat',
+            stateCode: isInterStateMill ? millGstin.slice(0, 2) : '24',
+            country: 'India',
+            vendorType: 'General Supplier'
+          },
+          items: [{
+            itemName: `${editRfdLotForm.fabricQuality} - Mill Processing Jobwork`,
+            description: `RFD Inward Lot ${lotNumber} from ${millNameClean}`,
+            fabric: editRfdLotForm.fabricQuality,
+            fabricName: editRfdLotForm.fabricQuality,
+            lotNo: lotNumber,
+            partyChallan: editRfdLotForm.millChallanNo,
+            ourChallanNo: lotNumber,
+            hsnCode: editRfdLotForm.hsnCode || '998821',
+            quantity: receivedRfd,
+            qty: receivedRfd,
+            unit: 'Meters',
+            rate: procRate,
+            unitPrice: procRate,
+            discountPct: 0,
+            discountAmt: 0,
+            taxRate: gstPct,
+            taxAmount: gstAmt,
+            amount: taxableAmt,
+            totalAmount: totalInvAmt
+          }],
+          itemName: `${editRfdLotForm.fabricQuality} - Mill Processing Jobwork`,
+          quantity: receivedRfd,
+          unit: 'Meters',
+          rate: procRate,
+          subtotal: taxableAmt,
+          subtotalAmount: taxableAmt,
+          taxableAmount: taxableAmt,
+          discountType: 'flat',
+          discountValue: 0,
+          discountTotal: 0,
+          taxType: isInterStateMill ? 'IGST' : 'CGST_SGST',
+          gstRate: gstPct,
+          cgstAmount: isInterStateMill ? 0 : parseFloat((gstAmt / 2).toFixed(2)),
+          sgstAmount: isInterStateMill ? 0 : parseFloat((gstAmt / 2).toFixed(2)),
+          igstAmount: isInterStateMill ? gstAmt : 0,
+          totalTax: gstAmt,
+          gstAmount: gstAmt,
+          enableRoundOff: true,
+          roundOff: roundOffVal,
+          grandTotal: totalInvAmt,
+          totalAmount: totalInvAmt,
+          notes: `Mill Job Work Bill for RFD Lot ${lotNumber}`,
+          terms: term
+        };
+
+        if (savedPurchaseId && /^[0-9a-fA-F]{24}$/.test(savedPurchaseId)) {
+          const purRes = await api.updateBillingPurchase(savedPurchaseId, purPayload);
+          if (purRes?.data) {
+            savedPurchaseNo = purRes.data.purchaseNo || savedPurchaseNo;
+          }
+        } else {
+          let nextPurNo = savedPurchaseNo || '';
+          if (!nextPurNo) {
+            try {
+              const numRes = await api.getNextPurchaseNo(companyEntity);
+              if (numRes && (numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data)) {
+                nextPurNo = numRes.purchaseNo || numRes.nextPurchaseNo || numRes.data;
+              }
+            } catch (numErr) {}
+          }
+          if (!nextPurNo) {
+            nextPurNo = `PUR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+          }
+          const purRes = await api.createBillingPurchase({
+            ...purPayload,
+            purchaseNo: nextPurNo,
+            paidAmount: 0,
+            balanceDue: totalInvAmt,
+            paymentStatus: 'UNPAID'
+          });
+          if (purRes?.data) {
+            savedPurchaseNo = purRes.data.purchaseNo || nextPurNo;
+            savedPurchaseId = purRes.data._id || purRes.data.id || savedPurchaseId;
+          }
+        }
+        window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'billing' } }));
+      } catch (purErr) {
+        console.warn('Failed to sync mill purchase on edit RFD lot:', purErr);
+      }
+    }
+
     const updatedRfdLots = rfdLots.map(l => {
       if (l.id === editingRfdLot.id) {
-        const graySent = parseFloat(editRfdLotForm.graySentMeters) || 0;
-        const receivedRfd = parseFloat(editRfdLotForm.receivedRfdMeters) || 0;
-        let shortagePct = parseFloat(editRfdLotForm.shortagePercent);
-        let shortageMtr = parseFloat(editRfdLotForm.shortageMeters);
-
-        if (!isNaN(shortagePct) && graySent > 0) {
-          shortageMtr = parseFloat(((graySent * shortagePct) / 100).toFixed(1));
-        } else if (!isNaN(shortageMtr) && graySent > 0) {
-          shortagePct = parseFloat(((shortageMtr / graySent) * 100).toFixed(2));
-        } else {
-          shortageMtr = 0;
-          shortagePct = 0;
-        }
-
-        const stillAtMill = parseFloat(editRfdLotForm.stillAtMillMeters) || 0;
-
         return {
           ...l,
           ...editRfdLotForm,
@@ -3152,7 +3403,17 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           receivedRfdMeters: receivedRfd,
           shrinkageLossMeters: shortageMtr,
           shrinkagePercent: shortagePct,
-          stillAtMillMeters: stillAtMill
+          stillAtMillMeters: stillAtMill,
+          invoiceNo: (editRfdLotForm.invoiceNo || '').trim(),
+          invoiceDate: editRfdLotForm.invoiceDate || editRfdLotForm.inwardDate,
+          processRatePerMeter: procRate,
+          hsnCode: editRfdLotForm.hsnCode || '998821',
+          gstRate: gstPct,
+          taxableAmount: taxableAmt,
+          gstAmount: gstAmt,
+          grandTotal: totalInvAmt,
+          purchaseNo: savedPurchaseNo,
+          purchaseId: savedPurchaseId
         };
       }
       return l;
@@ -9130,8 +9391,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <input
                         type="text"
                         placeholder="e.g. MB-908"
-                        value={inwardRfdForm.invoiceNo}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, invoiceNo: e.target.value })}
+                        value={inwardRfdForm.invoiceNo || ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setInwardRfdForm(prev => ({
+                            ...prev,
+                            invoiceNo: val,
+                            postToPurchase: val.trim() ? true : prev.postToPurchase
+                          }));
+                        }}
                         className="input-field"
                         style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
                       />
@@ -9143,8 +9411,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       </label>
                       <input
                         type="date"
-                        value={inwardRfdForm.invoiceDate}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, invoiceDate: e.target.value })}
+                        value={inwardRfdForm.invoiceDate || inwardRfdForm.inwardDate || ''}
+                        onChange={e => setInwardRfdForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
                         className="input-field"
                         style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
                       />
@@ -9158,8 +9426,15 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         type="number"
                         step="0.01"
                         placeholder="e.g. 8.50"
-                        value={inwardRfdForm.processRatePerMeter}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, processRatePerMeter: e.target.value })}
+                        value={inwardRfdForm.processRatePerMeter || ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setInwardRfdForm(prev => ({
+                            ...prev,
+                            processRatePerMeter: val,
+                            postToPurchase: parseFloat(val) > 0 ? true : prev.postToPurchase
+                          }));
+                        }}
                         className="input-field"
                         style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
                       />
@@ -9170,8 +9445,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         GST Rate %
                       </label>
                       <select
-                        value={inwardRfdForm.gstRate}
-                        onChange={e => setInwardRfdForm({ ...inwardRfdForm, gstRate: e.target.value })}
+                        value={inwardRfdForm.gstRate !== undefined && inwardRfdForm.gstRate !== '' ? inwardRfdForm.gstRate : '5'}
+                        onChange={e => setInwardRfdForm(prev => ({ ...prev, gstRate: e.target.value }))}
                         className="input-field"
                         style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
                       >
@@ -9189,7 +9464,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         Jobwork Subtotal: <strong>₹{(modalReceivedRfd * parseFloat(inwardRfdForm.processRatePerMeter)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
                       </span>
                       <span style={{ fontWeight: 800, color: '#16a34a' }}>
-                        Total + GST ({inwardRfdForm.gstRate}%): ₹{(Math.round((modalReceivedRfd * parseFloat(inwardRfdForm.processRatePerMeter)) * (1 + parseFloat(inwardRfdForm.gstRate) / 100))).toLocaleString('en-IN')}
+                        Total + GST ({inwardRfdForm.gstRate !== undefined && inwardRfdForm.gstRate !== '' ? inwardRfdForm.gstRate : '5'}%): ₹{(Math.round((modalReceivedRfd * parseFloat(inwardRfdForm.processRatePerMeter)) * (1 + (parseFloat(inwardRfdForm.gstRate !== undefined && inwardRfdForm.gstRate !== '' ? inwardRfdForm.gstRate : '5') || 0) / 100))).toLocaleString('en-IN')}
                       </span>
                     </div>
                   )}
@@ -9606,6 +9881,114 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: 6 }}
                   />
                 </div>
+              </div>
+
+              {/* Mill Job Work / Processing Bill in Edit RFD Lot */}
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, background: '#f8fafc', padding: '0.75rem 1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FileText size={15} color="#0284c7" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                      Mill Job Work / Processing Bill {editRfdLotForm.purchaseNo ? `(#${editRfdLotForm.purchaseNo})` : '(Optional)'}
+                    </span>
+                  </div>
+
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: 700, color: editRfdLotForm.postToPurchase ? '#0369a1' : '#64748b', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editRfdLotForm.postToPurchase)}
+                      onChange={e => setEditRfdLotForm(prev => ({ ...prev, postToPurchase: e.target.checked }))}
+                      style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#0284c7' }}
+                    />
+                    Post / Update Mill Bill in Purchases
+                  </label>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Mill Bill / Inv #
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. MB-908"
+                      value={editRfdLotForm.invoiceNo || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditRfdLotForm(prev => ({
+                          ...prev,
+                          invoiceNo: val,
+                          postToPurchase: val.trim() ? true : prev.postToPurchase
+                        }));
+                      }}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Bill Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editRfdLotForm.invoiceDate || editRfdLotForm.inwardDate || ''}
+                      onChange={e => setEditRfdLotForm(prev => ({ ...prev, invoiceDate: e.target.value }))}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Job Rate / Mtr (₹)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 8.50"
+                      value={editRfdLotForm.processRatePerMeter || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditRfdLotForm(prev => ({
+                          ...prev,
+                          processRatePerMeter: val,
+                          postToPurchase: parseFloat(val) > 0 ? true : prev.postToPurchase
+                        }));
+                      }}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      GST Rate %
+                    </label>
+                    <select
+                      value={editRfdLotForm.gstRate !== undefined && editRfdLotForm.gstRate !== '' ? editRfdLotForm.gstRate : '5'}
+                      onChange={e => setEditRfdLotForm(prev => ({ ...prev, gstRate: e.target.value }))}
+                      className="input-field"
+                      style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                    >
+                      <option value="5">5% (Textile Jobwork)</option>
+                      <option value="12">12%</option>
+                      <option value="18">18%</option>
+                      <option value="0">0%</option>
+                    </select>
+                  </div>
+                </div>
+
+                {parseFloat(editRfdLotForm.processRatePerMeter) > 0 && parseFloat(editRfdLotForm.receivedRfdMeters) > 0 && (
+                  <div style={{ marginTop: '0.5rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 10px', fontSize: '0.74rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>
+                      Jobwork Subtotal: <strong>₹{((parseFloat(editRfdLotForm.receivedRfdMeters) || 0) * parseFloat(editRfdLotForm.processRatePerMeter)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                    </span>
+                    <span style={{ fontWeight: 800, color: '#16a34a' }}>
+                      Total + GST ({editRfdLotForm.gstRate !== undefined && editRfdLotForm.gstRate !== '' ? editRfdLotForm.gstRate : '5'}%): ₹{(Math.round(((parseFloat(editRfdLotForm.receivedRfdMeters) || 0) * parseFloat(editRfdLotForm.processRatePerMeter)) * (1 + (parseFloat(editRfdLotForm.gstRate !== undefined && editRfdLotForm.gstRate !== '' ? editRfdLotForm.gstRate : '5') || 0) / 100))).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
