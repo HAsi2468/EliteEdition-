@@ -3191,7 +3191,7 @@ export default function App() {
 
               <EyeComfortControl />
 
-              <TopProgressBar activeTab={activeTab} selectedCompany={selectedCompany} />
+              <TopProgressBar activeTab={activeTab} />
 
               {/* What's New Feature Changelog Drawer */}
               <ChangelogDrawer />
