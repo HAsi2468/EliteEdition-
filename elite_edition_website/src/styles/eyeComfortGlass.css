@@ -65,8 +65,8 @@ html[data-eye-comfort="on"] body::after {
 }
 
 html[data-eye-comfort="on"] body.glass-theme-active::after {
-  background: rgba(255, 164, 72, 0.075);
-  mix-blend-mode: screen;
+  background: rgba(255, 160, 60, 0.065);
+  mix-blend-mode: normal;
 }
 
 @media print {
@@ -103,13 +103,13 @@ html[data-calm-mode="on"] body.light-theme-active :is(.glass-panel, .glass-card,
 
 /* 5. Text Size / Reading Comfort Density */
 html[data-text-density="compact"] {
-  font-size: 13.5px;
+  font-size: 13.5px !important;
 }
 
 html[data-text-density="comfort"] {
-  font-size: 15px;
+  font-size: 15px !important;
 }
 
 html[data-text-density="large"] {
-  font-size: 16.5px;
+  font-size: 16.5px !important;
 }

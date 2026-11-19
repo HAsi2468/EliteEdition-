@@ -38,6 +38,14 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
+// Hydrate saved Eye Comfort, Calm Mode & Reading Size immediately at boot (all screens incl. Login & Client Portal)
+try {
+  const root = document.documentElement;
+  root.setAttribute('data-eye-comfort', localStorage.getItem('elite_erp_eye_comfort') || 'off');
+  root.setAttribute('data-calm-mode', localStorage.getItem('elite_erp_calm_mode') || 'off');
+  root.setAttribute('data-text-density', localStorage.getItem('elite_erp_text_density') || 'comfort');
+} catch (_) {}
+
 // Initialize device & hardware telemetry, enterprise dialog, global error and cross-tab sync listeners
 initERPTelemetry()
 installGlobalDialogInterceptors()

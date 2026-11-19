@@ -22,6 +22,32 @@ export function EyeComfortControl({ compact = false }) {
   const wrapRef = useRef(null);
 
   useEffect(() => {
+    const handleSync = (ev) => {
+      const d = ev?.detail;
+      if (!d) return;
+      if (typeof d.eyeComfort === 'boolean') setEyeComfort(d.eyeComfort);
+      if (typeof d.calmMode === 'boolean') setCalmMode(d.calmMode);
+      if (typeof d.textDensity === 'string') setTextDensity(d.textDensity);
+    };
+    window.addEventListener('elite-eye-comfort-sync', handleSync);
+    return () => window.removeEventListener('elite-eye-comfort-sync', handleSync);
+  }, []);
+
+  const updateSettings = (patch) => {
+    const next = {
+      eyeComfort: patch.eyeComfort !== undefined ? patch.eyeComfort : eyeComfort,
+      calmMode: patch.calmMode !== undefined ? patch.calmMode : calmMode,
+      textDensity: patch.textDensity !== undefined ? patch.textDensity : textDensity,
+    };
+    setEyeComfort(next.eyeComfort);
+    setCalmMode(next.calmMode);
+    setTextDensity(next.textDensity);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('elite-eye-comfort-sync', { detail: next }));
+    }
+  };
+
+  useEffect(() => {
     if (typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-eye-comfort', eyeComfort ? 'on' : 'off');
     try { localStorage.setItem(LS_EYE, eyeComfort ? 'on' : 'off'); } catch (_) {}
@@ -116,7 +142,7 @@ export function EyeComfortControl({ compact = false }) {
           {/* 1. Eye Comfort Warm Blue-Light Filter */}
           <button
             type="button"
-            onClick={() => setEyeComfort((v) => !v)}
+            onClick={() => updateSettings({ eyeComfort: !eyeComfort })}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -144,7 +170,7 @@ export function EyeComfortControl({ compact = false }) {
           {/* 2. Calm / Low-Motion Mode */}
           <button
             type="button"
-            onClick={() => setCalmMode((v) => !v)}
+            onClick={() => updateSettings({ calmMode: !calmMode })}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -185,7 +211,7 @@ export function EyeComfortControl({ compact = false }) {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setTextDensity(opt.id)}
+                    onClick={() => updateSettings({ textDensity: opt.id })}
                     style={{
                       padding: '5px 4px',
                       borderRadius: '7px',
