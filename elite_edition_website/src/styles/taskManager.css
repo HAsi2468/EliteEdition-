@@ -517,6 +517,9 @@ body.glass-theme-active .task-select {
   flex-direction: column;
   gap: 8px;
   position: relative;
+  flex-shrink: 0 !important;
+  height: auto !important;
+  min-height: fit-content !important;
 }
 
 .task-card:hover {
@@ -902,7 +905,22 @@ body.glass-theme-active .task-card-action-btn.delete-action:hover {
 
 @media (max-width: 768px) {
   .task-mobile-col-bar {
-    display: flex;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 6px !important;
+    padding: 2px 2px 6px !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .task-mobile-col-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .task-mobile-col-pill {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
   }
 
   .task-kanban-board {
@@ -914,12 +932,32 @@ body.glass-theme-active .task-card-action-btn.delete-action:hover {
   }
 
   .task-kanban-col {
-    max-height: none;
-    min-height: 300px;
+    max-height: calc(100dvh - 235px) !important;
+    min-height: 260px !important;
+  }
+
+  .kanban-grid-responsive.single-col-mode .task-kanban-col {
+    max-height: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .kanban-grid-responsive.single-col-mode .task-kanban-cards-stream {
+    overflow-y: visible !important;
+  }
+
+  .task-card {
+    padding: 11px 12px !important;
+    gap: 7px !important;
+  }
+
+  .task-card-status-group {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
   }
 
   .task-unified-header {
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .task-search-wrap {

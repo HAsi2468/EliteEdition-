@@ -3066,6 +3066,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                               className={`task-card ${isOverdue ? 'overdue' : ''}`}
                               style={{
                                 cursor: 'grab',
+                                flexShrink: 0,
                                 opacity: draggingTaskId === taskId ? 0.45 : 1,
                                 transition: 'transform 0.15s, box-shadow 0.15s, opacity 0.15s'
                               }}
