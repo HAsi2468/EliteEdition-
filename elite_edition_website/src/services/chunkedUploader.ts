@@ -81,13 +81,10 @@ export async function uploadLargeFile(
   // ─────────────────────────────────────────────────────────────────────────────
   if (totalBytes <= MULTIPART_THRESHOLD) {
     try {
-      const presignedRes = await api.request('/upload/presign', {
-        method: 'POST',
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type || 'application/octet-stream',
-          folder,
-        }),
+      const presignedRes = await api.post('/upload/presign', {
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        folder,
       });
 
       if (presignedRes?.uploadUrl) {
@@ -120,13 +117,10 @@ export async function uploadLargeFile(
   // ─────────────────────────────────────────────────────────────────────────────
   // PATH B: Large File (> 10MB) -> Client-Side Sliced S3/R2 Multipart Upload
   // ─────────────────────────────────────────────────────────────────────────────
-  const initiateRes = await api.request('/upload/multipart/initiate', {
-    method: 'POST',
-    body: JSON.stringify({
-      fileName: file.name,
-      fileType: file.type || 'application/octet-stream',
-      folder,
-    }),
+  const initiateRes = await api.post('/upload/multipart/initiate', {
+    fileName: file.name,
+    fileType: file.type || 'application/octet-stream',
+    folder,
   });
 
   const { uploadId, key } = initiateRes;
@@ -145,10 +139,7 @@ export async function uploadLargeFile(
       const chunk = file.slice(start, end);
 
       // 1. Request part presigned URL from backend
-      const partUrlRes = await api.request('/upload/multipart/part-url', {
-        method: 'POST',
-        body: JSON.stringify({ key, uploadId, partNumber }),
-      });
+      const partUrlRes = await api.post('/upload/multipart/part-url', { key, uploadId, partNumber });
 
       // 2. Upload sliced chunk directly to Cloudflare R2 / AWS S3
       const etag = await uploadPartWithRetry(
@@ -180,13 +171,10 @@ export async function uploadLargeFile(
   // ─────────────────────────────────────────────────────────────────────────────
   // Step 3: Complete Multipart Upload on Backend
   // ─────────────────────────────────────────────────────────────────────────────
-  const completeRes = await api.request('/upload/multipart/complete', {
-    method: 'POST',
-    body: JSON.stringify({
-      key,
-      uploadId,
-      parts: completedParts,
-    }),
+  const completeRes = await api.post('/upload/multipart/complete', {
+    key,
+    uploadId,
+    parts: completedParts,
   });
 
   if (onProgress) {

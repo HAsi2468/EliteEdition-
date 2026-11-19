@@ -272,7 +272,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
       const [pRes, cfg, uRes] = await Promise.all([
         api.getParties({ limit: 1000 }).catch(() => ({ data: [] })),
         api.getPrintConfig(companyEntity).catch(() => ({})),
-        api.getUsers({ limit: 500 }).catch(() => ({ results: [], data: [] }))
+        api.getCommunicationStaff(300).catch(() => ({ results: [], data: [] }))
       ]);
 
       // 1. Party Names from Print Settings Parties (Clients) + Party Master

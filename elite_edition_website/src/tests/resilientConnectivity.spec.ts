@@ -46,7 +46,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
       const manager = new ResilientLifecycleManager({ pingEndpoint: '/ping-test' });
 
       // Mock fetch returning 401 Unauthorized (which proves WAN/LAN connectivity to our API server)
-      global.fetch = vi.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
       } as Response);
@@ -59,7 +59,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
     it('transitions to RECONNECTING and then OFFLINE on consecutive fetch failures', async () => {
       const manager = new ResilientLifecycleManager({ pingEndpoint: '/ping-test' });
 
-      global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
 
       // 2 consecutive failures -> RECONNECTING
       await manager.probeNow('attempt-1');
@@ -85,6 +85,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
         method: 'POST',
         actionName: 'LOT_DEDUCT',
         body: { lotId: 'LOT-101', quantity: 50 },
+        maxRetries: 3,
       });
 
       const item2 = await queue.enqueue({
@@ -92,6 +93,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
         method: 'PATCH',
         actionName: 'JOB_STATUS',
         body: { jobCardId: 'JC-900', status: 'STITCHING_COMPLETE' },
+        maxRetries: 3,
       });
 
       expect(item1.idempotencyKey).toMatch(/^idem_lot_deduct_\d+_[a-f0-9]+$/);
@@ -111,10 +113,11 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
         method: 'POST',
         actionName: 'STOCK_ADJUST',
         body: { sku: 'COTTON-60', delta: -10 },
+        maxRetries: 3,
       });
 
       // Mock server accepting the replay with Idempotent-Replayed: true header
-      global.fetch = vi.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: new Headers({ 'idempotent-replayed': 'true' }),
@@ -124,7 +127,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
 
       const remaining = await queue.getPendingCount();
       expect(remaining).toBe(0);
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         '/v1/inventory/adjust',
         expect.objectContaining({
           method: 'POST',
@@ -152,7 +155,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
       // - Calls to /v1/auth/refresh-tokens succeed with new tokens
       // - Initial calls to /v1/orders fail with 401 if using 'expired_access_token'
       // - Retried calls to /v1/orders succeed if using 'new_fresh_token'
-      global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
         if (url.includes('/v1/auth/refresh-tokens')) {
           refreshCallsCount++;
           return {
@@ -213,7 +216,7 @@ describe('Enterprise ERP Resilient Connectivity & Network Recovery Suite', () =>
       window.addEventListener('elite-session-expired', expiredHandler);
 
       // Mock refresh failure (e.g. 401 invalid refresh token)
-      global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
         if (url.includes('/v1/auth/refresh-tokens')) {
           return {
             ok: false,

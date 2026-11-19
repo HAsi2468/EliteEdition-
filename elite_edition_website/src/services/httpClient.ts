@@ -53,6 +53,7 @@ export const isMutatingMethod = (method?: string): boolean => {
 
 export interface ExtendedRequestConfig extends InternalAxiosRequestConfig {
   _csrfRetried?: boolean;
+  _retry?: boolean;
 }
 
 /**
@@ -219,7 +220,7 @@ httpClient.interceptors.request.use(
           // Token not found — warn in development so the issue is visible
           // The request still goes through; the server CSRF middleware will
           // reject it with 403 if it genuinely requires a token.
-          if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+          if (import.meta.env?.DEV) {
             console.warn(
               `[httpClient] No CSRF token available for ${config.method?.toUpperCase()} ${url}. ` +
               'Ensure the CSRF handshake (GET /api/v1/auth/csrf-token) has been called at app startup.',

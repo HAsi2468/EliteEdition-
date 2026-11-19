@@ -278,7 +278,7 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
     if (typeof fallback === 'function' && error && incidentId) {
       return fallback({ error, incidentId, reset: this.handleReset });
     }
-    if (fallback) {
+    if (fallback && typeof fallback !== 'function') {
       return fallback;
     }
 

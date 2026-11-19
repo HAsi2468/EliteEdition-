@@ -9,14 +9,39 @@
 const winston = require('winston');
 const config = require('./config');
 
+const SPLAT = Symbol.for('splat');
+
+const sanitizeErrorArg = (arg) => {
+  if (!arg || typeof arg !== 'object') return arg;
+  if (arg.isAxiosError || (arg.config && arg.response)) {
+    return {
+      name: arg.name || 'AxiosError',
+      message: arg.message,
+      code: arg.code,
+      status: arg.response?.status,
+      url: arg.config?.url,
+      method: arg.config?.method,
+    };
+  }
+  return arg;
+};
+
 const enumerateErrorFormat = winston.format((info) => {
+  if (Array.isArray(info[SPLAT])) {
+    info[SPLAT] = info[SPLAT].map(sanitizeErrorArg);
+  }
   if (info instanceof Error) {
     Object.assign(info, {
       message: info.message,
-      stack: info.stack,
+      stack: info.isAxiosError ? undefined : info.stack,
       code: info.code,
-      statusCode: info.statusCode,
+      statusCode: info.statusCode || info.response?.status,
     });
+    if (info.isAxiosError) {
+      delete info.config;
+      delete info.request;
+      delete info.response;
+    }
   }
   return info;
 });

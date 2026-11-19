@@ -27,14 +27,14 @@ describe('Web Push Notification Client Suite', () => {
     const manager = new WebPushClientManager();
     localStorage.setItem('elite_user', JSON.stringify({ id: 'user_123' }));
 
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ success: true }),
     } as Response);
 
     manager.setActiveRoom('room_fabric_dept');
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       '/v1/notifications/focus',
       expect.objectContaining({
         method: 'POST',

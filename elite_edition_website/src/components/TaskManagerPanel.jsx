@@ -462,7 +462,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     try {
       let usersRes = null;
       try {
-        usersRes = await api.getUsers({ limit: 150 });
+        usersRes = await api.getCommunicationStaff(150);
       } catch (err) {
         usersRes = await api.getCommunicationUsers(myId).catch(() => null);
       }

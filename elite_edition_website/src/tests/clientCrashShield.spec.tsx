@@ -305,7 +305,7 @@ describe('Phase 1: Silent Client-Side Crashes & Resilient Error Telemetry', () =
         { id: 'delete', label: 'Delete', onClick: vi.fn() },
       ];
 
-      const { container } = render(<SmartActionGroup actions={fourActions} />);
+      const { container } = render(<SmartActionGroup actions={fourActions as any} />);
 
       const multiRowContainer = container.querySelector('.smart-action-group-2rows');
       expect(multiRowContainer).toBeNull();
@@ -328,7 +328,7 @@ describe('Phase 1: Silent Client-Side Crashes & Resilient Error Telemetry', () =
         { id: 'delete', label: 'Delete', onClick: vi.fn() },
       ];
 
-      const { container } = render(<SmartActionGroup actions={sevenActions} />);
+      const { container } = render(<SmartActionGroup actions={sevenActions as any} />);
 
       // Must render the 2-row container
       const multiRowContainer = container.querySelector('.smart-action-group-2rows');
