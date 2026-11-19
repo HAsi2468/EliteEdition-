@@ -998,7 +998,23 @@ const deleteReminder = async (req, res) => {
   }
 };
 
+// Safe minimal staff directory for authenticated chat/task assignment (non-admin accessible, no PII/secrets)
+const getChatStaffDirectory = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 150, 1), 300);
+    const staff = await User.find({ isActive: { $ne: false } })
+      .select('_id name username role department avatarUrl')
+      .sort({ name: 1 })
+      .limit(limit)
+      .lean();
+    return res.json({ success: true, data: staff, results: staff });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to load staff directory', error: err.message });
+  }
+};
+
 module.exports = {
+  getChatStaffDirectory,
   togglePinRoom,
   toggleMarkUnread,
   setChatLock,

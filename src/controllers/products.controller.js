@@ -564,7 +564,12 @@ const readFile = async (url, accesstoken) => {
         }
         logger.info('Fetched data for SKU: %s', skuCode);
       } catch (error) {
-        logger.error('Error fetching data for SKU: %s %o', skuCode, error);
+        logger.error(
+          'Error fetching data for SKU: %s (%s: %s)',
+          skuCode,
+          error?.response?.status || error?.code || 'ERR',
+          error?.message || String(error)
+        );
       }
     });
     await Promise.all(productDataPromises);

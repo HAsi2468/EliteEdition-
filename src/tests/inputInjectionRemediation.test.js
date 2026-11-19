@@ -330,7 +330,7 @@ describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
       const invalidRes = await request(app).get('/api/documents/invalid-uuid-format');
       assert.strictEqual(invalidRes.status, 400);
       assert.strictEqual(invalidRes.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(invalidRes.body.message, 'Invalid request payload');
+      assert.strictEqual(invalidRes.body.message, 'Invalid payload');
     });
 
     it('should validate and coerce positive integer route parameter via positiveIntParamSchema', async () => {

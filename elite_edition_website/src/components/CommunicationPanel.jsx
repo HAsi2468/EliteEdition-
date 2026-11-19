@@ -1367,7 +1367,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   useEffect(() => {
-    api.getUsers({ limit: 100 })
+    api.getCommunicationStaff(100)
       .then(res => {
         const uList = Array.isArray(res) ? res : (res?.data || res?.results || []);
         if (Array.isArray(uList)) setStaffUsers(uList);

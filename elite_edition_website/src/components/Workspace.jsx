@@ -228,7 +228,7 @@ const Workspace = ({ currentUser }) => {
 
   const fetchUsers = async () => {
     try {
-      const res = await api.getUsers({ limit: 100 });
+      const res = await api.getCommunicationStaff(100);
       if (res && res.users && res.users.rows) {
         setAllUsers(res.users.rows);
       } else if (res && res.data) {

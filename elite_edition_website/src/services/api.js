@@ -2958,6 +2958,10 @@ export const api = {
       });
     },
 
+  async getCommunicationStaff(limit = 150) {
+      return request(`/communication/staff?limit=${encodeURIComponent(limit)}`);
+    },
+
   async getChatPreferences() {
       return request('/communication/preferences');
     },

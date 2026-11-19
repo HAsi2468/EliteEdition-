@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 // 2. Groups & Channels
+router.get('/staff', communicationWhatsAppController.getChatStaffDirectory);
 router.get('/groups', communicationController.getGroups);
 router.post('/groups', communicationController.createGroup);
 router.patch('/groups/:groupId', requireGroupAccess, communicationController.updateGroup);

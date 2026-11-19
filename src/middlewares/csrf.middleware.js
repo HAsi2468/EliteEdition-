@@ -76,7 +76,7 @@ const createCsrfMiddleware = (options = {}) => {
       path.includes('/auth/csrf-token') ||
       path.includes('/auth/login') ||
       path.includes('/auth/logout') ||
-      path.includes('/notifications/focus') ||
+      path.includes('/notifications/') ||
       path.includes('/telemetry') ||
       path.includes('/challanVerification') ||
       path.startsWith('/verify/challan') ||
