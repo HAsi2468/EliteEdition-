@@ -834,6 +834,14 @@ const getUserDataEntries = async (req, res) => {
       return doc.date ? new Date(doc.date) : new Date();
     };
 
+    // Resolve the business/form date filled by the user inside the form (separate from true createdAt timestamp)
+    const getFormDate = (doc) => {
+      const raw = doc.date || doc.invoiceDate || doc.challanDate || doc.orderDate || doc.fusingDate || doc.printDate || doc.dueDate || doc.targetDate || null;
+      if (!raw) return null;
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
+
     // Normalize company name (e.g. handle 'Elite Digital Prints' vs 'Elite Digital Print')
     const normalizeCompany = (c) => (c || '').replace(/Prints$/i, 'Print').trim();
 
@@ -983,6 +991,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.fusingStatus || doc.printStatus || doc.status || doc.productionStage || 'Production',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1043,6 +1052,7 @@ const getUserDataEntries = async (req, res) => {
               status: `${doc.shift || 'General'} Shift`,
               createdBy: doc.operatorName || 'Printing Operator',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: isEdited ? (doc.operatorName || 'Operator') : '',
               updatedByName: isEdited ? (doc.operatorName || 'Operator') : '',
               updatedAt: isEdited ? doc.modified_date_time : null,
@@ -1102,6 +1112,7 @@ const getUserDataEntries = async (req, res) => {
               status: `${doc.rollCompleted || 'Complete'}`,
               createdBy: doc.operatorName || 'Fusing Operator',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: isEdited ? (doc.operatorName || 'Operator') : '',
               updatedByName: isEdited ? (doc.operatorName || 'Operator') : '',
               updatedAt: isEdited ? doc.modified_date_time : null,
@@ -1175,6 +1186,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'To Do',
               createdBy: creatorName,
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1240,6 +1252,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.type === 'INWARD' ? 'Stock Inward' : 'Stock Outward',
               createdBy: doc.companyEntity || 'Fabric Dept',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: '',
               updatedByName: '',
               updatedAt: doc.updatedAt || null,
@@ -1310,6 +1323,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.type === 'INWARD' ? 'RM Inward' : 'RM Outward',
               createdBy: doc.createdByName || doc.createdBy || doc.receivedBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: doc.updatedAt || null,
@@ -1365,6 +1379,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.designerName || 'Design Team',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: '',
               updatedByName: '',
               updatedAt: doc.modified_date_time || doc.updatedAt || null,
@@ -1429,6 +1444,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Pending',
               createdBy: doc.createdByName || doc.createdBy || doc.designerName || 'Design Team',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: doc.updatedAt || null,
@@ -1491,6 +1507,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1565,6 +1582,7 @@ const getUserDataEntries = async (req, res) => {
               status: `${doc.paymentStatus || 'UNPAID'} (${doc.invoiceStatus || 'FINAL'})`,
               createdBy: doc.createdByName || doc.createdBy || 'Billing Team',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1617,6 +1635,7 @@ const getUserDataEntries = async (req, res) => {
               status: 'Purchase Bill',
               createdBy: 'Accounts / Purchase',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: '',
               updatedByName: '',
               updatedAt: doc.updatedAt || null,
@@ -1693,6 +1712,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.type === 'IN' ? 'Cash IN' : 'Cash OUT',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1761,6 +1781,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Open',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: doc.updatedAt || null,
@@ -1831,6 +1852,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.createdByName || doc.createdBy || doc.deliveryBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1896,6 +1918,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.createdByName || doc.createdBy || doc.workerName || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -1959,6 +1982,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.type || doc.category || 'In Stock',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: editorName,
               updatedByName: editorName,
               updatedAt: editorDate,
@@ -2006,6 +2030,7 @@ const getUserDataEntries = async (req, res) => {
               status: 'Dispatched',
               createdBy: doc.facility || 'Warehouse Staff',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: '',
               updatedByName: '',
               updatedAt: doc.modified_date_time || doc.updatedAt || null,
@@ -2058,6 +2083,7 @@ const getUserDataEntries = async (req, res) => {
               status: doc.saleOrderItemStatus || doc.saleOrderStatus || 'Pending',
               createdBy: 'Marketplace / Web',
               createdAt: parsedDate,
+              formDate: getFormDate(doc),
               updatedBy: '',
               updatedByName: '',
               updatedAt: doc.updatedAt || null,

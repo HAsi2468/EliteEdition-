@@ -727,15 +727,57 @@ export default function AdminUserDataReview({ companyEntity }) {
                 </div>
               </div>
 
-              {/* Middle: Creator, Editor & Timestamps */}
-              <div style={{ textAlign: 'right', minWidth: '190px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+              {/* Middle: Creator, Form Date vs Created Timestamp & Late Entry Badge */}
+              <div style={{ textAlign: 'right', minWidth: '215px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
                   <User size={13} color="#2563eb" />
                   <span>Created: {item.createdBy || 'Staff User'}</span>
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                  {item.createdAt ? new Date(item.createdAt).toLocaleString('en-IN') : 'N/A'}
-                </div>
+                {(() => {
+                  const r = item.rawDoc || {};
+                  const formDateRaw = item.formDate || r.date || r.invoiceDate || r.challanDate || r.orderDate || r.fusingDate || r.printDate || r.dueDate || null;
+                  const formDateObj = formDateRaw ? new Date(formDateRaw) : null;
+                  const createdObj = item.createdAt ? new Date(item.createdAt) : null;
+                  const validFormDate = formDateObj && !isNaN(formDateObj.getTime()) ? formDateObj : null;
+                  const validCreated = createdObj && !isNaN(createdObj.getTime()) ? createdObj : null;
+                  let lateDays = 0;
+                  if (validFormDate && validCreated) {
+                    const toIstDayMs = (d) => {
+                      const ist = new Date(d.getTime() + 5.5 * 3600 * 1000);
+                      return Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate());
+                    };
+                    lateDays = Math.round((toIstDayMs(validCreated) - toIstDayMs(validFormDate)) / 86400000);
+                  }
+                  return (
+                    <>
+                      {validFormDate && (
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0ea5e9' }}>
+                          📅 Form Date: {validFormDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        🕒 Saved: {validCreated ? validCreated.toLocaleString('en-IN') : 'N/A'}
+                      </div>
+                      {lateDays >= 1 && (
+                        <div style={{
+                          marginTop: '1px',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          color: '#dc2626',
+                          background: 'rgba(239, 68, 68, 0.14)',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          padding: '1px 6px',
+                          borderRadius: '5px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}>
+                          ⏱️ Entered {lateDays}d late
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 {!(item.updatedByName || item.updatedBy) && (
                   <div style={{
                     marginTop: '2px',
@@ -1003,13 +1045,23 @@ export default function AdminUserDataReview({ companyEntity }) {
                   </div>
                 </div>
                 <div style={{ background: '#f8faff', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Created By</div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Created By (Saved Timestamp)</div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
                     {inspectEntry.createdBy || 'Staff User'}
                   </div>
                   <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                    {inspectEntry.createdAt ? new Date(inspectEntry.createdAt).toLocaleString('en-IN') : 'N/A'}
+                    🕒 {inspectEntry.createdAt ? new Date(inspectEntry.createdAt).toLocaleString('en-IN') : 'N/A'}
                   </div>
+                  {(() => {
+                    const fRaw = inspectEntry.formDate || raw.date || raw.invoiceDate || raw.challanDate || raw.orderDate || raw.fusingDate || raw.printDate || raw.dueDate || null;
+                    const fDate = fRaw ? new Date(fRaw) : null;
+                    if (!fDate || isNaN(fDate.getTime())) return null;
+                    return (
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0ea5e9', marginTop: '2px' }}>
+                        📅 Form Date: {fDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div style={{
                   background: (inspectEntry.updatedByName || inspectEntry.updatedBy) ? '#fffbeb' : '#f8faff',
