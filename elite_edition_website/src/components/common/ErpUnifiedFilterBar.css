@@ -95,9 +95,9 @@
   padding: 0.45rem 0.75rem;
   min-height: 36px;
   border-radius: 8px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: var(--danger-bg, #fef2f2);
+  border: 1px solid var(--danger-border, #fecaca);
+  color: var(--danger-text, #b91c1c);
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
@@ -106,10 +106,15 @@
   box-shadow: 0 1px 2px rgba(239, 68, 68, 0.05);
 }
 
+.erp-filter-reset-btn span,
+.erp-filter-reset-btn svg {
+  color: inherit !important;
+}
+
 .erp-filter-reset-btn:hover {
-  background: #fee2e2;
+  background: rgba(239, 68, 68, 0.22);
   border-color: #f87171;
-  color: #991b1b;
+  color: var(--danger-text, #991b1b);
   transform: translateY(-0.5px);
 }
 
@@ -120,8 +125,8 @@
   padding: 0.45rem 0.85rem;
   min-height: 36px;
   border-radius: 8px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-subtle, #f1f5f9);
+  border: 1px solid var(--border-color, #e2e8f0);
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-primary, #0f172a);

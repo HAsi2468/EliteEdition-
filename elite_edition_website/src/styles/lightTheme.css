@@ -463,6 +463,28 @@ body.light-theme-active .ufp-trigger-btn .ufp-badge {
   color: #ffffff !important;
 }
 
+body.light-theme-active .erp-filter-reset-btn {
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  color: #b91c1c !important;
+}
+
+body.light-theme-active .erp-filter-reset-btn span,
+body.light-theme-active .erp-filter-reset-btn svg {
+  color: #b91c1c !important;
+}
+
+body.light-theme-active .erp-filter-reset-btn:hover {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #991b1b !important;
+}
+
+body.light-theme-active .erp-filter-reset-btn:hover span,
+body.light-theme-active .erp-filter-reset-btn:hover svg {
+  color: #991b1b !important;
+}
+
 body.light-theme-active .ufp-popover,
 body.light-theme-active .ufp-options-panel,
 body.light-theme-active .changelog-drawer-header,
