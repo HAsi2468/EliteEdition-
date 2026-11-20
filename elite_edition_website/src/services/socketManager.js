@@ -330,12 +330,11 @@ class SocketManager {
       }
     });
 
-    // Handle force reload if emitted by admin
+    // Handle system update request emitted by admin — non-mandatory so active users are never interrupted
     this.socket.on('force-system-reload', () => {
-      if ('caches' in window) {
-        caches.keys().then((names) => names.forEach((k) => caches.delete(k)));
-      }
-      setTimeout(() => window.location.reload(true), 300);
+      try {
+        window.dispatchEvent(new CustomEvent('elite-optional-update-available'));
+      } catch (_) {}
     });
 
     // Real-time system lock / maintenance mode status

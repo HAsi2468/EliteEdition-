@@ -84,6 +84,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService
 import PdfPreviewModal from './components/PdfPreviewModal';
 import PrintOptionsModal from './components/PrintOptionsModal';
 import AutoUpdateNotification from './components/AutoUpdateNotification';
+import LiquidGlassInteractionEngine from './components/common/LiquidGlassInteractionEngine';
 import { webPushClient } from './services/webPushClient';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
@@ -5022,8 +5023,9 @@ export default function App() {
       <PrintOptionsModal />
 
 
-      {/* Zero-Hard-Refresh Hot Update Notification */}
+      {/* Non-Mandatory, User-Controlled Update Notification & Liquid Glass Interaction Engine */}
       <AutoUpdateNotification />
+      <LiquidGlassInteractionEngine />
 
       {/* Hardware & Web Device Permissions Hub Modal */}
       <WebDevicePermissionsModal

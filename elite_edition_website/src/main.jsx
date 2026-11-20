@@ -115,12 +115,16 @@ if ('serviceWorker' in navigator && isAllowedPwaHost) {
       });
   });
 
-  // Reload page when new service worker takes control
+  // Reload page ONLY when the user explicitly clicked "Update Now"
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
+    const userRequested = sessionStorage.getItem('elite_user_requested_update') === '1';
+    if (!refreshing && userRequested) {
       refreshing = true;
+      sessionStorage.removeItem('elite_user_requested_update');
       window.location.reload();
+    } else if (!userRequested) {
+      window.dispatchEvent(new CustomEvent('elite-optional-update-available'));
     }
   });
 }

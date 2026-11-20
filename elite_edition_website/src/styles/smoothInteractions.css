@@ -160,7 +160,245 @@ body.light-theme-active ::-webkit-scrollbar-thumb:hover {
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
 }
 
-/* 7. Eye-Safety & Reduced-Motion Guard */
+/* ============================================================================
+ * 8. NEWLY SAVED ROW "EMERALD PULSE HIGHLIGHT" (Dark & Light Mode)
+ * ============================================================================ */
+@keyframes erpEmeraldRowPulseDark {
+  0% {
+    opacity: 0.4;
+    transform: translateX(-8px);
+    background-color: rgba(16, 185, 129, 0.34);
+    box-shadow: inset 3px 0 0 #10b981, 0 0 18px rgba(16, 185, 129, 0.25);
+  }
+  35% {
+    opacity: 1;
+    transform: translateX(0);
+    background-color: rgba(16, 185, 129, 0.22);
+    box-shadow: inset 3px 0 0 #10b981, 0 0 12px rgba(16, 185, 129, 0.18);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+@keyframes erpEmeraldRowPulseLight {
+  0% {
+    opacity: 0.4;
+    transform: translateX(-8px);
+    background-color: rgba(16, 185, 129, 0.24);
+    box-shadow: inset 3px 0 0 #059669, 0 0 14px rgba(16, 185, 129, 0.18);
+  }
+  35% {
+    opacity: 1;
+    transform: translateX(0);
+    background-color: rgba(16, 185, 129, 0.14);
+    box-shadow: inset 3px 0 0 #059669;
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+body.glass-theme-active tr.erp-row-emerald-pulse {
+  animation: erpEmeraldRowPulseDark 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+body.light-theme-active tr.erp-row-emerald-pulse {
+  animation: erpEmeraldRowPulseLight 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* ============================================================================
+ * 9. TACTILE BUTTON RIPPLE & SUBMIT CONFIRMATION PULSE
+ * ============================================================================ */
+@keyframes erpTactileButtonRipple {
+  0% {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(0.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.8);
+  }
+}
+
+@keyframes erpSaveButtonSuccessRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
+  }
+}
+
+.erp-tactile-ripple-active {
+  position: relative;
+  overflow: hidden;
+}
+
+.erp-tactile-ripple-active::after {
+  content: '';
+  position: absolute;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  width: 110px;
+  height: 110px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0) 72%);
+  pointer-events: none;
+  animation: erpTactileButtonRipple 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.erp-btn-save-pulse {
+  animation: erpSaveButtonSuccessRing 560ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================================================
+ * 10. STATUS BADGE LIVE BREATHING GLOW (Pending / Overdue / Still at Mill)
+ * ============================================================================ */
+@keyframes erpStatusBadgeBreatheDark {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.38);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes erpStatusBadgeBreatheLight {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.30);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(217, 119, 6, 0);
+  }
+}
+
+body.glass-theme-active .erp-status-attention-breathe {
+  animation: erpStatusBadgeBreatheDark 3s ease-in-out infinite;
+}
+
+body.light-theme-active .erp-status-attention-breathe {
+  animation: erpStatusBadgeBreatheLight 3s ease-in-out infinite;
+}
+
+/* ============================================================================
+ * 11. MODAL BACKDROP 3D DEPTH SCALE ("macOS Sheet Depth")
+ * ============================================================================ */
+.glass-viewport > main,
+.glass-viewport > header,
+.glass-viewport > aside {
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), filter 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.erp-modal-depth-active .glass-viewport > main {
+  transform: scale(0.993);
+}
+
+/* ============================================================================
+ * 12. INTERACTIVE FOCUS HALO & ACTIVE FIELD SECTION ILLUMINATION (:focus-within)
+ * ============================================================================ */
+body.glass-theme-active :is(.glass-panel, .glass-card, form > div):focus-within {
+  border-color: rgba(var(--entity-accent-rgb, 56, 189, 248), 0.36);
+}
+
+body.light-theme-active :is(.glass-panel, .glass-card, form > div):focus-within {
+  border-color: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.34);
+}
+
+/* ============================================================================
+ * 13. FROSTED STICKY TABLE HEADER WITH SCROLL-DEPTH BLUR
+ * ============================================================================ */
+body.glass-theme-active table:not(.printable-area table) thead th {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition: box-shadow 200ms ease, background-color 200ms ease;
+}
+
+body.light-theme-active table:not(.printable-area table) thead th {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition: box-shadow 200ms ease, background-color 200ms ease;
+}
+
+body.glass-theme-active thead.is-scrolled th,
+body.glass-theme-active .is-scrolled-y thead th {
+  box-shadow: 0 6px 16px -4px rgba(2, 6, 23, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.light-theme-active thead.is-scrolled th,
+body.light-theme-active .is-scrolled-y thead th {
+  box-shadow: 0 6px 14px -4px rgba(15, 23, 42, 0.10), inset 0 -1px 0 rgba(148, 163, 184, 0.32);
+}
+
+/* ============================================================================
+ * 14. SMOOTH ACCORDION, DRAWER & POPOVER HEIGHT PHYSICS
+ * ============================================================================ */
+@keyframes erpAccordionSpringOpen {
+  0% {
+    opacity: 0;
+    transform: translateY(-5px) scaleY(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+details[open] > *:not(summary),
+.accordion-content-open,
+.expanded-row-detail {
+  transform-origin: top center;
+  animation: erpAccordionSpringOpen 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ============================================================================
+ * 15. LAYERED GLASS ELEVATION SHADOW SYSTEM (3-Tier Depth) & ANTI-GLARE MATTE
+ * ============================================================================ */
+body.glass-theme-active,
+body.light-theme-active {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tier 2: Floating Dropdowns & Popovers */
+body.glass-theme-active :is(.ufp-popover, .entity-switcher-dropdown, .fap-popover, .tfb-dropdown, .sag-dropdown-menu, .quick-action-dropdown) {
+  box-shadow:
+    0 18px 42px -8px rgba(2, 6, 23, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+}
+
+body.light-theme-active :is(.ufp-popover, .entity-switcher-dropdown, .fap-popover, .tfb-dropdown, .sag-dropdown-menu, .quick-action-dropdown) {
+  box-shadow:
+    0 18px 40px -8px rgba(15, 23, 42, 0.16),
+    0 4px 12px -2px rgba(15, 23, 42, 0.06),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1) !important;
+}
+
+/* Tier 3: Active Modals */
+body.glass-theme-active :is(.modal-overlay > div:not(.printable-area), .modal-backdrop > div:not(.printable-area), [role="dialog"]:not(.printable-area)) {
+  box-shadow:
+    0 28px 70px -12px rgba(2, 6, 23, 0.82),
+    0 0 28px -8px rgba(var(--entity-accent-rgb, 56, 189, 248), 0.20),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+body.light-theme-active :is(.modal-overlay > div:not(.printable-area), .modal-backdrop > div:not(.printable-area), [role="dialog"]:not(.printable-area)) {
+  box-shadow:
+    0 28px 68px -12px rgba(15, 23, 42, 0.22),
+    0 6px 20px -4px rgba(15, 23, 42, 0.08),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.28) !important;
+}
+
+/* 16. Eye-Safety & Reduced-Motion Guard */
 @media (prefers-reduced-motion: reduce) {
   .modal-backdrop,
   .modal-overlay,
@@ -169,19 +407,30 @@ body.light-theme-active ::-webkit-scrollbar-thumb:hover {
   [role="dialog"],
   .notification-drawer,
   .erp-side-drawer,
-  .erp-tab-view-enter {
+  .erp-tab-view-enter,
+  tr.erp-row-emerald-pulse,
+  .erp-tactile-ripple-active::after,
+  .erp-btn-save-pulse,
+  .erp-status-attention-breathe {
     animation: none !important;
   }
   button:active,
   .btn-primary:active,
   .btn-secondary:active,
-  .nav-item:active {
+  .nav-item:active,
+  body.erp-modal-depth-active .glass-viewport > main {
     transform: none !important;
   }
 }
 
-html[data-calm-mode="on"] .erp-top-progress-track {
+html[data-calm-mode="on"] .erp-top-progress-track,
+html[data-calm-mode="on"] .erp-tactile-ripple-active::after {
   display: none !important;
+}
+
+html[data-calm-mode="on"] .erp-status-attention-breathe,
+html[data-calm-mode="on"] tr.erp-row-emerald-pulse {
+  animation: none !important;
 }
 
 @media print {

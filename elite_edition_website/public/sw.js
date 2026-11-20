@@ -41,7 +41,8 @@ const PRECACHE_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  // Do NOT call self.skipWaiting() automatically here so active users are never interrupted mid-work.
+  // Instead, wait until the user clicks "Update Now" (which posts SKIP_WAITING) or closes all tabs.
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
       return cache.addAll(PRECACHE_ASSETS);
