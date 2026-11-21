@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const { CostExplorerClient, GetCostAndUsageCommand } = require('@aws-sdk/client-cost-explorer');
 const { CloudWatchClient, GetMetricDataCommand } = require('@aws-sdk/client-cloudwatch');
 const InfrastructureBill = require('../db/models/infrastructureBill.model');
+const awsCostExplorerService = require('../services/awsCostExplorer.service');
 const logger = require('../config/logger');
 
 const DEFAULT_USD_TO_INR = 86.5;
@@ -58,43 +59,19 @@ const getAwsMetrics = async (req, res) => {
       services: [],
     };
 
-    // 1. Query AWS Cost Explorer
+    // 1. Query AWS Cost Explorer via 24-Hour Locked Cache Service
     try {
-      const ceClient = getCostExplorerClient();
-      const ceCommand = new GetCostAndUsageCommand({
-        TimePeriod: { Start: startOfMonth, End: tomorrow },
-        Granularity: 'MONTHLY',
-        Metrics: ['UnblendedCost'],
-        GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
-      });
-
-      const ceResponse = await ceClient.send(ceCommand);
-      const groups = ceResponse.ResultsByTime?.[0]?.Groups || [];
-
-      let totalUsd = 0;
-      const services = [];
-
-      groups.forEach((g) => {
-        const serviceName = g.Keys?.[0] || 'Other AWS Service';
-        const amountUsd = parseFloat(g.Metrics?.UnblendedCost?.Amount || '0');
-        if (amountUsd > 0.0001) {
-          totalUsd += amountUsd;
-          services.push({
-            service: serviceName,
-            amountUsd: Number(amountUsd.toFixed(2)),
-            amountInr: Number((amountUsd * exchangeRate).toFixed(2)),
-          });
-        }
-      });
-
-      // Filter/highlight core services
-      services.sort((a, b) => b.amountUsd - a.amountUsd);
-
-      costData = {
-        totalUsd: Number(totalUsd.toFixed(2)),
-        totalInr: Number((totalUsd * exchangeRate).toFixed(2)),
-        services,
-      };
+      const costRes = await awsCostExplorerService.fetchAwsMonthlyCosts({ exchangeRate });
+      if (costRes && costRes.success && costRes.results && costRes.results.length > 0) {
+        const currentMonthData = costRes.results[costRes.results.length - 1];
+        costData = {
+          totalUsd: currentMonthData.totalUsd,
+          totalInr: currentMonthData.totalInr,
+          services: currentMonthData.services,
+          cached: costRes.cached || false,
+          nextRefreshInHours: costRes.nextRefreshInHours,
+        };
+      }
     } catch (ceErr) {
       logger.warn(`[AWS Cost Explorer Notice]: ${ceErr.message}`);
       // Fallback to recent database bill estimate if AWS credentials not configured
@@ -974,31 +951,14 @@ const performAllProvidersSync = async (exchangeRate = DEFAULT_USD_TO_INR) => {
   let awsAmountUsd = 5.04;
   let awsBreakdown = [];
 
-  // 1. Fetch AWS
+  // 1. Fetch AWS via 24-Hour Locked Cache Service
   try {
-    const ceClient = getCostExplorerClient();
-    const ceCommand = new GetCostAndUsageCommand({
-      TimePeriod: { Start: startOfMonth, End: tomorrow },
-      Granularity: 'MONTHLY',
-      Metrics: ['UnblendedCost'],
-      GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
-    });
-    const ceResponse = await ceClient.send(ceCommand);
-    const groups = ceResponse.ResultsByTime?.[0]?.Groups || [];
-    let totalUsd = 0;
-    groups.forEach((g) => {
-      const sName = g.Keys?.[0] || 'Other';
-      const amt = parseFloat(g.Metrics?.UnblendedCost?.Amount || '0');
-      if (amt > 0.0001) {
-        totalUsd += amt;
-        awsBreakdown.push({
-          service: sName,
-          amountUsd: Number(amt.toFixed(2)),
-          amountInr: Number((amt * exchangeRate).toFixed(2)),
-        });
-      }
-    });
-    if (totalUsd > 0) awsAmountUsd = totalUsd;
+    const costRes = await awsCostExplorerService.fetchAwsMonthlyCosts({ exchangeRate });
+    if (costRes && costRes.success && costRes.results && costRes.results.length > 0) {
+      const currentMonthData = costRes.results[costRes.results.length - 1];
+      if (currentMonthData.totalUsd > 0) awsAmountUsd = currentMonthData.totalUsd;
+      awsBreakdown = currentMonthData.services || [];
+    }
   } catch (e) {
     logger.warn(`SyncAllProviders AWS notice: ${e.message}`);
   }

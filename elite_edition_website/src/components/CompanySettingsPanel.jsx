@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import ToggleSwitch from './common/ToggleSwitch';
 import { api } from '../services/api';
-import { 
-  Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, 
-  Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key, 
+import {
+  Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon,
+  Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key,
   Lock, Check, X, Search, Edit2, Palette, Package, Tag, Layers, Landmark, Star,
   ShieldCheck
 } from 'lucide-react';
@@ -27,8 +28,8 @@ export const getInitialFormForCompany = (companyEntity) => {
   const baseForm = {
     companyName: isYJ ? 'YAMUNAJI CREATION' : (companyEntity || 'Elite Edition').toUpperCase(),
     companyGstin: isEE ? '24BSWPA7682P1ZS' : (isYJ ? '24AAEFY0361N1ZZ' : ''),
-    companyAddress: isEE 
-      ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' 
+    companyAddress: isEE
+      ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010'
       : (isYJ ? 'GROUND FLOOR PLOT NO-115/116 Kohinoor 2 Textile Plaza CANAL ROAD NR. AVADH MARKET Punagam Surat' : ''),
     companyPhone: isEE ? '+91 76006 65058' : (isYJ ? '9979112777' : ''),
     companyEmail: isEE ? 'INFO.ELITEEDITION@GMAIL.COM' : '',
@@ -104,7 +105,7 @@ export const getInitialFormForCompany = (companyEntity) => {
         return { ...baseForm, ...parsed };
       }
     }
-  } catch (e) {}
+  } catch (e) { }
   return baseForm;
 };
 
@@ -147,7 +148,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
     try {
       const res = await api.getUsers({ limit: 200 });
       if (res && res.users) {
-        const companyStaff = (res.users.rows || []).filter(u => 
+        const companyStaff = (res.users.rows || []).filter(u =>
           Array.isArray(u.allowedCompanies) && u.allowedCompanies.includes(companyEntity)
         );
         setUsers(companyStaff);
@@ -272,13 +273,13 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
             ? res.data.companyBanks
             : (res.data.companyBankName || f.companyBankName)
               ? [{
-                  bankName: res.data.companyBankName || f.companyBankName,
-                  accountNo: res.data.companyAccountNo || f.companyAccountNo || '',
-                  ifscCode: res.data.companyIfscCode || f.companyIfscCode || '',
-                  branch: res.data.companyBranch || '',
-                  accountType: 'Current',
-                  isDefault: true
-                }]
+                bankName: res.data.companyBankName || f.companyBankName,
+                accountNo: res.data.companyAccountNo || f.companyAccountNo || '',
+                ifscCode: res.data.companyIfscCode || f.companyIfscCode || '',
+                branch: res.data.companyBranch || '',
+                accountType: 'Current',
+                isDefault: true
+              }]
               : [];
 
           const updated = {
@@ -304,7 +305,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
           };
           try {
             localStorage.setItem(`elite_company_settings_${companyEntity}`, JSON.stringify(updated));
-          } catch (e) {}
+          } catch (e) { }
           return updated;
         });
       }
@@ -959,653 +960,655 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
       {/* FORM FOR PROFILE */}
       {activeTab === 'profile' && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Company Logo & Letterhead Header */}
-        <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid ${accentColor}` }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: accentColor, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <ImageIcon size={18} /> Company Letterhead Logo (Printed on Invoice PDFs)
-          </h3>
+          {/* Company Logo & Letterhead Header */}
+          <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid ${accentColor}` }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: accentColor, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <ImageIcon size={18} /> Company Letterhead Logo (Printed on Invoice PDFs)
+            </h3>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap' }}>
-            <div
-              style={{
-                width: '200px',
-                height: '85px',
-                borderRadius: '12px',
-                border: `2px dashed ${form.companyLogo ? accentColor : 'var(--border-light)'}`,
-                background: '#f8fafc',
-                display: 'flex',
-                alignItems: 'center',
-                justify: 'center',
-                overflow: 'hidden',
-                position: 'relative',
-                boxShadow: form.companyLogo ? `0 4px 16px ${accentColor}25` : 'none'
-              }}
-            >
-              {form.companyLogo ? (
-                <img src={form.companyLogo} alt="Company Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-              ) : (
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem' }}>
-                  No Logo Uploaded (Default will be used)
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <label
-                  className="btn-primary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    cursor: 'pointer',
-                    padding: '0.65rem 1.25rem',
-                    background: accentColor,
-                    borderColor: accentColor
-                  }}
-                >
-                  <Upload size={16} /> Upload Company Logo Image
-                  <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleLogoUpload} style={{ display: 'none' }} />
-                </label>
-
-                {form.companyLogo && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveLogo}
-                    style={{
-                      color: '#ef4444',
-                      background: 'rgba(239,68,68,0.1)',
-                      border: '1px solid rgba(239,68,68,0.25)',
-                      padding: '0.6rem 1rem',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem'
-                    }}
-                  >
-                    <Trash2 size={14} /> Remove Logo
-                  </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  width: '200px',
+                  height: '85px',
+                  borderRadius: '12px',
+                  border: `2px dashed ${form.companyLogo ? accentColor : 'var(--border-light)'}`,
+                  background: '#f8fafc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'center',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  boxShadow: form.companyLogo ? `0 4px 16px ${accentColor}25` : 'none'
+                }}
+              >
+                {form.companyLogo ? (
+                  <img src={form.companyLogo} alt="Company Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem' }}>
+                    No Logo Uploaded (Default will be used)
+                  </span>
                 )}
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Recommended: Transparent PNG logo (Max 2MB). This exact logo will print at the top left of all Tax Invoice PDFs for <strong>{companyEntity}</strong>.
-              </span>
-            </div>
-          </div>
-        </div>
 
-        {/* Company Business Profile */}
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <Building size={18} color={accentColor} /> Legal Business Profile & GSTIN
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label className="form-label">Company / Firm Legal Name *</label>
-              <input
-                type="text"
-                name="companyName"
-                value={form.companyName}
-                onChange={handleChange}
-                className="form-control"
-                style={{ fontWeight: 600 }}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="form-label">GSTIN Number</label>
-              <input
-                type="text"
-                name="companyGstin"
-                value={form.companyGstin}
-                onChange={handleCompanyGstinChange}
-                placeholder="24AAAAA0000A1Z5"
-                className="form-control"
-                style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Phone / Mobile</label>
-              <input
-                type="text"
-                name="companyPhone"
-                value={form.companyPhone}
-                onChange={handleChange}
-                placeholder="+91 98765 43210"
-                className="form-control"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                name="companyEmail"
-                value={form.companyEmail}
-                onChange={handleChange}
-                placeholder="billing@company.com"
-                className="form-control"
-              />
-            </div>
-          </div>
-
-          <div style={{ marginTop: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
-            <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-              Registered Office & Factory Address (Street / Building)
-            </label>
-            <textarea
-              name="companyAddress"
-              value={form.companyAddress}
-              onChange={handleChange}
-              rows={2}
-              className="form-control"
-              placeholder="e.g. Plot No-B/37, Siddheshwar Soc., Punagam Road"
-            />
-          </div>
-
-          {/* Geo-Location 4-Column Address Grid with Free Pincode Auto-Fill */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', marginTop: '0.85rem' }}>
-            <div>
-              <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                PIN Code {pincodeLoading && <RefreshCw size={12} className="spin" color="#2563eb" />}
-              </label>
-              <input
-                type="text"
-                maxLength={6}
-                value={form.companyPincode || ''}
-                onChange={handleCompanyPincodeChange}
-                onBlur={() => resolvePincode(form.companyPincode)}
-                placeholder="e.g. 395006 or 110024"
-                className="form-control"
-                style={{ fontWeight: 700, letterSpacing: '1px' }}
-              />
-              <span style={{ fontSize: '0.68rem', color: '#2563eb', display: 'block', marginTop: '2px' }}>
-                ⚡ Auto-fetches City, State & GST
-              </span>
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>City / District</label>
-              <input
-                type="text"
-                name="companyCity"
-                value={form.companyCity || ''}
-                onChange={handleCompanyCityChange}
-                onBlur={() => handleCompanyCityChange({ target: { value: form.companyCity } })}
-                placeholder="e.g. Surat, Delhi, Mumbai"
-                className="form-control"
-              />
-              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
-                ⚡ Auto-sets State & Pincode
-              </span>
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>State</label>
-              <input
-                type="text"
-                name="companyState"
-                value={form.companyState || ''}
-                onChange={handleCompanyStateChange}
-                placeholder="e.g. Gujarat"
-                className="form-control"
-              />
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>State GST Code</label>
-              <input
-                type="text"
-                name="companyStateCode"
-                value={form.companyStateCode || ''}
-                onChange={handleChange}
-                placeholder="24"
-                className="form-control"
-                style={{ fontWeight: 700, textAlign: 'center' }}
-              />
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>Country</label>
-              <input
-                type="text"
-                name="companyCountry"
-                value={form.companyCountry || 'India'}
-                onChange={handleChange}
-                placeholder="India"
-                className="form-control"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Bank & Payment Details - Dynamic Multi-Bank Per Company */}
-        <div className="glass-panel" style={{ padding: '1.5rem', borderTop: '3px solid #10b981' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#059669', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                <Landmark size={18} /> Company Bank Accounts (Dynamic Multi-Bank)
-              </h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
-                Every company can add, manage, and use multiple bank accounts. The <strong>Primary Account</strong> is printed on Tax Invoices & Delivery Challans.
-              </p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.78rem', background: '#ecfdf5', color: '#047857', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, border: '1px solid #a7f3d0' }}>
-                {(form.companyBanks || []).length} Bank Account{(form.companyBanks || []).length === 1 ? '' : 's'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowAddBankForm(prev => !prev)}
-                className={showAddBankForm ? 'btn-secondary' : 'btn-primary'}
-                style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '7px' }}
-              >
-                {showAddBankForm ? <X size={14} /> : <Plus size={14} />}
-                <span>{showAddBankForm ? 'Cancel' : '+ Add Bank Account'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Inline Add Bank Form */}
-          {showAddBankForm && (
-            <div style={{
-              background: '#f8fafc',
-              border: '1.5px dashed #10b981',
-              borderRadius: '10px',
-              padding: '1.25rem',
-              marginBottom: '1.5rem',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
-            }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#047857', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Plus size={15} /> Add New Bank Account for {companyEntity}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Bank Name *</label>
-                  <input
-                    type="text"
-                    value={newBankInput.bankName}
-                    onChange={e => setNewBankInput(p => ({ ...p, bankName: e.target.value }))}
-                    placeholder="e.g. HDFC Bank, ICICI Bank, Kotak"
-                    className="form-control"
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Account Number *</label>
-                  <input
-                    type="text"
-                    value={newBankInput.accountNo}
-                    onChange={e => setNewBankInput(p => ({ ...p, accountNo: e.target.value }))}
-                    placeholder="e.g. 50200012345678"
-                    className="form-control"
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem' }}>IFSC Code</label>
-                  <input
-                    type="text"
-                    value={newBankInput.ifscCode}
-                    onChange={e => setNewBankInput(p => ({ ...p, ifscCode: e.target.value.toUpperCase() }))}
-                    placeholder="e.g. HDFC0001234"
-                    className="form-control"
-                    style={{ textTransform: 'uppercase' }}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Branch Name</label>
-                  <input
-                    type="text"
-                    value={newBankInput.branch}
-                    onChange={e => setNewBankInput(p => ({ ...p, branch: e.target.value }))}
-                    placeholder="e.g. Ring Road Branch, Surat"
-                    className="form-control"
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Account Type</label>
-                  <select
-                    value={newBankInput.accountType}
-                    onChange={e => setNewBankInput(p => ({ ...p, accountType: e.target.value }))}
-                    className="form-control"
-                  >
-                    <option value="Current">Current Account</option>
-                    <option value="Savings">Savings Account</option>
-                    <option value="CC / OD">Cash Credit / OD</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                  <input
-                    type="checkbox"
-                    checked={newBankInput.isDefault || (form.companyBanks || []).length === 0}
-                    onChange={e => setNewBankInput(p => ({ ...p, isDefault: e.target.checked }))}
-                    style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
-                  />
-                  <span>Set as Primary Bank (Printed on Tax Invoices & Challans)</span>
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddBankForm(false)}
-                    className="btn-secondary"
-                    style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddCompanyBank}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <label
                     className="btn-primary"
-                    style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem', background: '#10b981', borderColor: '#10b981' }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      cursor: 'pointer',
+                      padding: '0.65rem 1.25rem',
+                      background: accentColor,
+                      borderColor: accentColor
+                    }}
                   >
-                    Save Bank
-                  </button>
+                    <Upload size={16} /> Upload Company Logo Image
+                    <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                  </label>
+
+                  {form.companyLogo && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      style={{
+                        color: '#ef4444',
+                        background: 'rgba(239,68,68,0.1)',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                        padding: '0.6rem 1rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <Trash2 size={14} /> Remove Logo
+                    </button>
+                  )}
                 </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Recommended: Transparent PNG logo (Max 2MB). This exact logo will print at the top left of all Tax Invoice PDFs for <strong>{companyEntity}</strong>.
+                </span>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* List of Configured Company Bank Cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {(!form.companyBanks || form.companyBanks.length === 0) ? (
-              <div style={{
-                padding: '2rem 1rem',
-                textAlign: 'center',
-                background: '#f8fafc',
-                borderRadius: '8px',
-                border: '1px dashed #cbd5e1',
-                color: '#64748b',
-                fontSize: '0.86rem'
-              }}>
-                <Landmark size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5, color: '#10b981' }} />
-                <p style={{ margin: 0, fontWeight: 600 }}>No bank accounts configured for {companyEntity} yet.</p>
-                <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
-                  Click <strong>"+ Add Bank Account"</strong> to add this company's bank accounts.
+          {/* Company Business Profile */}
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <Building size={18} color={accentColor} /> Legal Business Profile & GSTIN
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label className="form-label">Company / Firm Legal Name *</label>
+                <input
+                  type="text"
+                  name="companyName"
+                  value={form.companyName}
+                  onChange={handleChange}
+                  className="form-control"
+                  style={{ fontWeight: 600 }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label">GSTIN Number</label>
+                <input
+                  type="text"
+                  name="companyGstin"
+                  value={form.companyGstin}
+                  onChange={handleCompanyGstinChange}
+                  placeholder="24AAAAA0000A1Z5"
+                  className="form-control"
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Phone / Mobile</label>
+                <input
+                  type="text"
+                  name="companyPhone"
+                  value={form.companyPhone}
+                  onChange={handleChange}
+                  placeholder="+91 98765 43210"
+                  className="form-control"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Email Address</label>
+                <input
+                  type="email"
+                  name="companyEmail"
+                  value={form.companyEmail}
+                  onChange={handleChange}
+                  placeholder="billing@company.com"
+                  className="form-control"
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                Registered Office & Factory Address (Street / Building)
+              </label>
+              <textarea
+                name="companyAddress"
+                value={form.companyAddress}
+                onChange={handleChange}
+                rows={2}
+                className="form-control"
+                placeholder="e.g. Plot No-B/37, Siddheshwar Soc., Punagam Road"
+              />
+            </div>
+
+            {/* Geo-Location 4-Column Address Grid with Free Pincode Auto-Fill */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', marginTop: '0.85rem' }}>
+              <div>
+                <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  PIN Code {pincodeLoading && <RefreshCw size={12} className="spin" color="#2563eb" />}
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={form.companyPincode || ''}
+                  onChange={handleCompanyPincodeChange}
+                  onBlur={() => resolvePincode(form.companyPincode)}
+                  placeholder="e.g. 395006 or 110024"
+                  className="form-control"
+                  style={{ fontWeight: 700, letterSpacing: '1px' }}
+                />
+                <span style={{ fontSize: '0.68rem', color: '#2563eb', display: 'block', marginTop: '2px' }}>
+                  ⚡ Auto-fetches City, State & GST
+                </span>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>City / District</label>
+                <input
+                  type="text"
+                  name="companyCity"
+                  value={form.companyCity || ''}
+                  onChange={handleCompanyCityChange}
+                  onBlur={() => handleCompanyCityChange({ target: { value: form.companyCity } })}
+                  placeholder="e.g. Surat, Delhi, Mumbai"
+                  className="form-control"
+                />
+                <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                  ⚡ Auto-sets State & Pincode
+                </span>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>State</label>
+                <input
+                  type="text"
+                  name="companyState"
+                  value={form.companyState || ''}
+                  onChange={handleCompanyStateChange}
+                  placeholder="e.g. Gujarat"
+                  className="form-control"
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>State GST Code</label>
+                <input
+                  type="text"
+                  name="companyStateCode"
+                  value={form.companyStateCode || ''}
+                  onChange={handleChange}
+                  placeholder="24"
+                  className="form-control"
+                  style={{ fontWeight: 700, textAlign: 'center' }}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>Country</label>
+                <input
+                  type="text"
+                  name="companyCountry"
+                  value={form.companyCountry || 'India'}
+                  onChange={handleChange}
+                  placeholder="India"
+                  className="form-control"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bank & Payment Details - Dynamic Multi-Bank Per Company */}
+          <div className="glass-panel" style={{ padding: '1.5rem', borderTop: '3px solid #10b981' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#059669', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <Landmark size={18} /> Company Bank Accounts (Dynamic Multi-Bank)
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Every company can add, manage, and use multiple bank accounts. The <strong>Primary Account</strong> is printed on Tax Invoices & Delivery Challans.
                 </p>
               </div>
-            ) : (
-              form.companyBanks.map((b, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: b.isDefault ? '#f0fdf4' : '#ffffff',
-                    border: b.isDefault ? '1.5px solid #10b981' : '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '1rem 1.25rem',
-                    boxShadow: b.isDefault ? '0 2px 8px rgba(16, 185, 129, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
-                    transition: 'all 0.15s ease'
-                  }}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.78rem', background: '#ecfdf5', color: '#047857', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, border: '1px solid #a7f3d0' }}>
+                  {(form.companyBanks || []).length} Bank Account{(form.companyBanks || []).length === 1 ? '' : 's'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddBankForm(prev => !prev)}
+                  className={showAddBankForm ? 'btn-secondary' : 'btn-primary'}
+                  style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '7px' }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: b.isDefault ? '#10b981' : '#e2e8f0',
-                        color: b.isDefault ? '#ffffff' : '#475569',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Landmark size={17} />
-                      </span>
-                      <div>
-                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
-                          {b.bankName || 'Unnamed Bank'}
-                        </span>
+                  {showAddBankForm ? <X size={14} /> : <Plus size={14} />}
+                  <span>{showAddBankForm ? 'Cancel' : '+ Add Bank Account'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Inline Add Bank Form */}
+            {showAddBankForm && (
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px dashed #10b981',
+                borderRadius: '10px',
+                padding: '1.25rem',
+                marginBottom: '1.5rem',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#047857', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Plus size={15} /> Add New Bank Account for {companyEntity}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Bank Name *</label>
+                    <input
+                      type="text"
+                      value={newBankInput.bankName}
+                      onChange={e => setNewBankInput(p => ({ ...p, bankName: e.target.value }))}
+                      placeholder="e.g. HDFC Bank, ICICI Bank, Kotak"
+                      className="form-control"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Account Number *</label>
+                    <input
+                      type="text"
+                      value={newBankInput.accountNo}
+                      onChange={e => setNewBankInput(p => ({ ...p, accountNo: e.target.value }))}
+                      placeholder="e.g. 50200012345678"
+                      className="form-control"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>IFSC Code</label>
+                    <input
+                      type="text"
+                      value={newBankInput.ifscCode}
+                      onChange={e => setNewBankInput(p => ({ ...p, ifscCode: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. HDFC0001234"
+                      className="form-control"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Branch Name</label>
+                    <input
+                      type="text"
+                      value={newBankInput.branch}
+                      onChange={e => setNewBankInput(p => ({ ...p, branch: e.target.value }))}
+                      placeholder="e.g. Ring Road Branch, Surat"
+                      className="form-control"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Account Type</label>
+                    <select
+                      value={newBankInput.accountType}
+                      onChange={e => setNewBankInput(p => ({ ...p, accountType: e.target.value }))}
+                      className="form-control"
+                    >
+                      <option value="Current">Current Account</option>
+                      <option value="Savings">Savings Account</option>
+                      <option value="CC / OD">Cash Credit / OD</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                    <ToggleSwitch
+                      checked={Boolean(newBankInput.isDefault || (form.companyBanks || []).length === 0)}
+                      onChange={(next) => setNewBankInput(p => ({ ...p, isDefault: next }))}
+                      size="sm"
+                      accent="emerald"
+                      showLabel={false}
+                      ariaLabel="Set as default bank"
+                    />
+                    <span>Set as Primary Bank (Printed on Tax Invoices & Challans)</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddBankForm(false)}
+                      className="btn-secondary"
+                      style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCompanyBank}
+                      className="btn-primary"
+                      style={{ padding: '0.45rem 1.25rem', fontSize: '0.82rem', background: '#10b981', borderColor: '#10b981' }}
+                    >
+                      Save Bank
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* List of Configured Company Bank Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {(!form.companyBanks || form.companyBanks.length === 0) ? (
+                <div style={{
+                  padding: '2rem 1rem',
+                  textAlign: 'center',
+                  background: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px dashed #cbd5e1',
+                  color: '#64748b',
+                  fontSize: '0.86rem'
+                }}>
+                  <Landmark size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5, color: '#10b981' }} />
+                  <p style={{ margin: 0, fontWeight: 600 }}>No bank accounts configured for {companyEntity} yet.</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                    Click <strong>"+ Add Bank Account"</strong> to add this company's bank accounts.
+                  </p>
+                </div>
+              ) : (
+                form.companyBanks.map((b, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: b.isDefault ? '#f0fdf4' : '#ffffff',
+                      border: b.isDefault ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '1rem 1.25rem',
+                      boxShadow: b.isDefault ? '0 2px 8px rgba(16, 185, 129, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{
-                          marginLeft: '8px',
-                          fontSize: '0.7rem',
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          background: '#f1f5f9',
-                          color: '#475569',
-                          fontWeight: 700
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '8px',
+                          background: b.isDefault ? '#10b981' : '#e2e8f0',
+                          color: b.isDefault ? '#ffffff' : '#475569',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
                         }}>
-                          {b.accountType || 'Current'}
+                          <Landmark size={17} />
                         </span>
+                        <div>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
+                            {b.bankName || 'Unnamed Bank'}
+                          </span>
+                          <span style={{
+                            marginLeft: '8px',
+                            fontSize: '0.7rem',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            fontWeight: 700
+                          }}>
+                            {b.accountType || 'Current'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {b.isDefault ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            background: '#10b981',
+                            color: '#ffffff',
+                            boxShadow: '0 1px 4px rgba(16,185,129,0.3)'
+                          }}>
+                            <Star size={12} fill="#ffffff" /> Primary (Printed on Invoices)
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSetDefaultCompanyBank(idx)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: '#475569',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                            title="Make this bank the primary bank printed on Invoices and Challans"
+                          >
+                            Set as Primary
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCompanyBank(idx)}
+                          style={{
+                            padding: '5px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#ef4444',
+                            cursor: 'pointer'
+                          }}
+                          title="Delete this bank account"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {b.isDefault ? (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.74rem',
-                          fontWeight: 800,
-                          padding: '4px 10px',
-                          borderRadius: '12px',
-                          background: '#10b981',
-                          color: '#ffffff',
-                          boxShadow: '0 1px 4px rgba(16,185,129,0.3)'
-                        }}>
-                          <Star size={12} fill="#ffffff" /> Primary (Printed on Invoices)
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSetDefaultCompanyBank(idx)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
-                            background: '#ffffff',
-                            color: '#475569',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                          title="Make this bank the primary bank printed on Invoices and Challans"
-                        >
-                          Set as Primary
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCompanyBank(idx)}
-                        style={{
-                          padding: '5px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#ef4444',
-                          cursor: 'pointer'
-                        }}
-                        title="Delete this bank account"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    {/* Bank Details Inputs */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Bank Name</label>
+                        <input
+                          type="text"
+                          value={b.bankName || ''}
+                          onChange={e => handleUpdateCompanyBank(idx, 'bankName', e.target.value)}
+                          className="form-control"
+                          style={{ fontSize: '0.84rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Account Number</label>
+                        <input
+                          type="text"
+                          value={b.accountNo || ''}
+                          onChange={e => handleUpdateCompanyBank(idx, 'accountNo', e.target.value)}
+                          className="form-control"
+                          style={{ fontSize: '0.84rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>IFSC Code</label>
+                        <input
+                          type="text"
+                          value={b.ifscCode || ''}
+                          onChange={e => handleUpdateCompanyBank(idx, 'ifscCode', e.target.value.toUpperCase())}
+                          className="form-control"
+                          style={{ fontSize: '0.84rem', textTransform: 'uppercase' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Branch</label>
+                        <input
+                          type="text"
+                          value={b.branch || ''}
+                          onChange={e => handleUpdateCompanyBank(idx, 'branch', e.target.value)}
+                          placeholder="Branch Name (Optional)"
+                          className="form-control"
+                          style={{ fontSize: '0.84rem' }}
+                        />
+                      </div>
                     </div>
                   </div>
-
-                  {/* Bank Details Inputs */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Bank Name</label>
-                      <input
-                        type="text"
-                        value={b.bankName || ''}
-                        onChange={e => handleUpdateCompanyBank(idx, 'bankName', e.target.value)}
-                        className="form-control"
-                        style={{ fontSize: '0.84rem' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Account Number</label>
-                      <input
-                        type="text"
-                        value={b.accountNo || ''}
-                        onChange={e => handleUpdateCompanyBank(idx, 'accountNo', e.target.value)}
-                        className="form-control"
-                        style={{ fontSize: '0.84rem' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>IFSC Code</label>
-                      <input
-                        type="text"
-                        value={b.ifscCode || ''}
-                        onChange={e => handleUpdateCompanyBank(idx, 'ifscCode', e.target.value.toUpperCase())}
-                        className="form-control"
-                        style={{ fontSize: '0.84rem', textTransform: 'uppercase' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.74rem', color: '#64748b' }}>Branch</label>
-                      <input
-                        type="text"
-                        value={b.branch || ''}
-                        onChange={e => handleUpdateCompanyBank(idx, 'branch', e.target.value)}
-                        placeholder="Branch Name (Optional)"
-                        className="form-control"
-                        style={{ fontSize: '0.84rem' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Invoice Numbering & Sequence */}
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <FileText size={18} /> Invoice Prefix, Starting Sequence & Suffix Settings
-          </h3>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1.15rem' }}>
-            Configure invoice numbering format: place a Prefix (before / front), Starting Sequence Number (middle), and Suffix (behind / after). Both sides are customizable based on your business requirements.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>
-                1. Prefix (Before / Front)
-              </label>
-              <input
-                type="text"
-                name="invoicePrefix"
-                value={form.invoicePrefix || ''}
-                onChange={handleChange}
-                placeholder={companyEntity === 'Elite Fabtex' ? 'EF-2627-' : 'EE-2627-'}
-                className="form-control"
-              />
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                Text before number (e.g. <code>{companyEntity === 'Elite Fabtex' ? 'EF-2627-' : 'EE-2627-'}</code> or <code>INV/</code>)
-              </span>
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>
-                2. Starting Sequence Number
-              </label>
-              <input
-                type="number"
-                name="startingInvoiceNo"
-                value={form.startingInvoiceNo}
-                onChange={handleChange}
-                className="form-control"
-              />
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                Next counter (e.g. <code>1</code> or <code>1001</code>)
-              </span>
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 700 }}>
-                3. Suffix (Behind / After)
-              </label>
-              <input
-                type="text"
-                name="invoiceSuffix"
-                value={form.invoiceSuffix || ''}
-                onChange={handleChange}
-                placeholder="e.g. /26-27 or -GST (Optional)"
-                className="form-control"
-              />
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                Optional text behind number (e.g. <code>/26-27</code>)
-              </span>
+                ))
+              )}
             </div>
           </div>
 
-          {/* Live Invoice Preview Box */}
-          <div style={{
-            marginTop: '1.15rem',
-            padding: '0.85rem 1.15rem',
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.04))',
-            borderRadius: '10px',
-            border: '1.5px solid rgba(245, 158, 11, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '0.75rem'
-          }}>
-            <div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', letterSpacing: '0.5px', display: 'block' }}>
-                Live Invoice Number Preview
-              </span>
-              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#92400e', marginTop: '3px', fontFamily: 'monospace' }}>
-                {form.invoicePrefix || ''}
-                <span style={{ color: '#2563eb', textDecoration: 'underline' }}>
-                  {(form.invoicePrefix || '').endsWith('-') ? String(form.startingInvoiceNo || 1).padStart(4, '0') : (form.startingInvoiceNo || 1)}
+          {/* Invoice Numbering & Sequence */}
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <FileText size={18} /> Invoice Prefix, Starting Sequence & Suffix Settings
+            </h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1.15rem' }}>
+              Configure invoice numbering format: place a Prefix (before / front), Starting Sequence Number (middle), and Suffix (behind / after). Both sides are customizable based on your business requirements.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>
+                  1. Prefix (Before / Front)
+                </label>
+                <input
+                  type="text"
+                  name="invoicePrefix"
+                  value={form.invoicePrefix || ''}
+                  onChange={handleChange}
+                  placeholder={companyEntity === 'Elite Fabtex' ? 'EF-2627-' : 'EE-2627-'}
+                  className="form-control"
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                  Text before number (e.g. <code>{companyEntity === 'Elite Fabtex' ? 'EF-2627-' : 'EE-2627-'}</code> or <code>INV/</code>)
                 </span>
-                {form.invoiceSuffix || ''}
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>
+                  2. Starting Sequence Number
+                </label>
+                <input
+                  type="number"
+                  name="startingInvoiceNo"
+                  value={form.startingInvoiceNo}
+                  onChange={handleChange}
+                  className="form-control"
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                  Next counter (e.g. <code>1</code> or <code>1001</code>)
+                </span>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700 }}>
+                  3. Suffix (Behind / After)
+                </label>
+                <input
+                  type="text"
+                  name="invoiceSuffix"
+                  value={form.invoiceSuffix || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. /26-27 or -GST (Optional)"
+                  className="form-control"
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                  Optional text behind number (e.g. <code>/26-27</code>)
+                </span>
               </div>
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#78350f', background: '#fef3c7', padding: '0.35rem 0.65rem', borderRadius: '6px', fontWeight: 700, border: '1px solid #fde68a' }}>
-              Format: [Prefix] + [Sequence] + [Suffix]
+
+            {/* Live Invoice Preview Box */}
+            <div style={{
+              marginTop: '1.15rem',
+              padding: '0.85rem 1.15rem',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.04))',
+              borderRadius: '10px',
+              border: '1.5px solid rgba(245, 158, 11, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', letterSpacing: '0.5px', display: 'block' }}>
+                  Live Invoice Number Preview
+                </span>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#92400e', marginTop: '3px', fontFamily: 'monospace' }}>
+                  {form.invoicePrefix || ''}
+                  <span style={{ color: '#2563eb', textDecoration: 'underline' }}>
+                    {(form.invoicePrefix || '').endsWith('-') ? String(form.startingInvoiceNo || 1).padStart(4, '0') : (form.startingInvoiceNo || 1)}
+                  </span>
+                  {form.invoiceSuffix || ''}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#78350f', background: '#fef3c7', padding: '0.35rem 0.65rem', borderRadius: '6px', fontWeight: 700, border: '1px solid #fde68a' }}>
+                Format: [Prefix] + [Sequence] + [Suffix]
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem' }}>
+              <label className="form-label">Terms & Conditions (Printed on Invoice Footer)</label>
+              <textarea
+                name="companyTerms"
+                value={form.companyTerms}
+                onChange={handleChange}
+                rows={3}
+                className="form-control"
+              />
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label className="form-label">Terms & Conditions (Printed on Invoice Footer)</label>
-            <textarea
-              name="companyTerms"
-              value={form.companyTerms}
-              onChange={handleChange}
-              rows={3}
-              className="form-control"
-            />
+
+
+          {/* Save Action */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-primary"
+              style={{
+                padding: '0.85rem 3rem',
+                fontSize: '1rem',
+                fontWeight: 800,
+                background: `linear-gradient(135deg, ${accentColor} 0%, #4c1d95 100%)`,
+                borderColor: accentColor,
+                boxShadow: `0 4px 18px ${accentColor}40`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.6rem'
+              }}
+            >
+              {saving ? <RefreshCw className="spin" size={18} /> : <CheckCircle2 size={18} />} Save All Company Settings
+            </button>
           </div>
-        </div>
-
-
-
-        {/* Save Action */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn-primary"
-            style={{
-              padding: '0.85rem 3rem',
-              fontSize: '1rem',
-              fontWeight: 800,
-              background: `linear-gradient(135deg, ${accentColor} 0%, #4c1d95 100%)`,
-              borderColor: accentColor,
-              boxShadow: `0 4px 18px ${accentColor}40`,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.6rem'
-            }}
-          >
-            {saving ? <RefreshCw className="spin" size={18} /> : <CheckCircle2 size={18} />} Save All Company Settings
-          </button>
-        </div>
-      </form>
+        </form>
       )}
 
       {/* TAB 3: DYNAMIC DROPDOWNS & TAGS */}

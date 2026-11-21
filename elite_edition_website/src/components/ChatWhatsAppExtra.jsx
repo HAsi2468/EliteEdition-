@@ -787,7 +787,9 @@ export const MessageReminderModal = ({ message, existingReminders = [], onClose,
             disabled={saving || !customDateTime}
             onClick={() => {
               const dt = new Date(customDateTime);
-              if (Number.isNaN(dt.getTime())) return alert('Invalid date/time');
+              if (Number.isNaN(dt.getTime()) || dt.getTime() <= Date.now()) {
+                return alert('Please choose a valid future date and time');
+              }
               scheduleAt(dt);
             }}
             style={btn}

@@ -16,9 +16,11 @@ const invoiceItemSchema = new mongoose.Schema({
   qty: { type: Number, required: true, default: 1 },
   unit: { type: String, default: 'Meters' },
   unitPrice: { type: Number, required: true, default: 0 },
+  effectivePrice: { type: Number, default: 0 },
   butterPaper: { type: Boolean, default: false },
   discountPct: { type: Number, default: 0 },
   discountAmt: { type: Number, default: 0 },
+  taxableAmount: { type: Number, default: 0 },
   taxRate: { type: Number, default: 18 }, // GST %
   taxAmount: { type: Number, default: 0 },
   totalAmount: { type: Number, required: true, default: 0 }

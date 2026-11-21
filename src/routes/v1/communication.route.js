@@ -52,11 +52,11 @@ router.get('/users', communicationController.getUsersForDM);
 router.post('/direct', communicationController.createOrGetDirectRoom);
 
 // 4B. Advanced Chat Features (Mute, Archive, Disappear, Starred, Threads, Info, Bulk, Schedule, Link Preview)
-router.post('/groups/:groupId/mute', communicationAdvancedController.toggleMuteRoom);
-router.post('/groups/:groupId/archive', communicationAdvancedController.toggleArchiveRoom);
-router.post('/groups/:groupId/disappear', communicationAdvancedController.updateDisappearTimer);
-router.post('/groups/:groupId/schedule', communicationAdvancedController.scheduleMessage);
-router.get('/groups/:groupId/scheduled', communicationAdvancedController.getScheduledMessages);
+router.post('/groups/:groupId/mute', requireGroupAccess, communicationAdvancedController.toggleMuteRoom);
+router.post('/groups/:groupId/archive', requireGroupAccess, communicationAdvancedController.toggleArchiveRoom);
+router.post('/groups/:groupId/disappear', requireGroupAccess, communicationAdvancedController.updateDisappearTimer);
+router.post('/groups/:groupId/schedule', requireGroupAccess, communicationAdvancedController.scheduleMessage);
+router.get('/groups/:groupId/scheduled', requireGroupAccess, communicationAdvancedController.getScheduledMessages);
 router.delete('/messages/scheduled/:messageId', communicationAdvancedController.cancelScheduledMessage);
 router.post('/messages/:messageId/star', communicationAdvancedController.toggleStarMessage);
 router.get('/messages/starred', communicationAdvancedController.getStarredMessages);
@@ -66,16 +66,16 @@ router.post('/messages/bulk', communicationAdvancedController.bulkMessageAction)
 router.get('/link-preview', communicationAdvancedController.getLinkPreview);
 
 // 4C. WhatsApp-Parity Features (Pin Room, Mark Unread, Chat Lock, Invites, Broadcasts, View-Once, Transcripts, Preferences, Storage)
-router.post('/groups/:groupId/pin-room', communicationWhatsAppController.togglePinRoom);
-router.post('/groups/:groupId/mark-unread', communicationWhatsAppController.toggleMarkUnread);
-router.post('/groups/:groupId/lock', communicationWhatsAppController.setChatLock);
-router.post('/groups/:groupId/unlock', communicationWhatsAppController.verifyChatLock);
-router.get('/groups/:groupId/invite', communicationWhatsAppController.getInviteLink);
-router.post('/groups/:groupId/invite/reset', communicationWhatsAppController.resetInviteLink);
-router.patch('/groups/:groupId/invite/settings', communicationWhatsAppController.toggleJoinApproval);
-router.post('/groups/:groupId/join-requests/:targetUserId', communicationWhatsAppController.handleJoinRequest);
+router.post('/groups/:groupId/pin-room', requireGroupAccess, communicationWhatsAppController.togglePinRoom);
+router.post('/groups/:groupId/mark-unread', requireGroupAccess, communicationWhatsAppController.toggleMarkUnread);
+router.post('/groups/:groupId/lock', requireGroupAccess, communicationWhatsAppController.setChatLock);
+router.post('/groups/:groupId/unlock', requireGroupAccess, communicationWhatsAppController.verifyChatLock);
+router.get('/groups/:groupId/invite', requireGroupAccess, communicationWhatsAppController.getInviteLink);
+router.post('/groups/:groupId/invite/reset', requireGroupAccess, communicationWhatsAppController.resetInviteLink);
+router.patch('/groups/:groupId/invite/settings', requireGroupAccess, communicationWhatsAppController.toggleJoinApproval);
+router.post('/groups/:groupId/join-requests/:targetUserId', requireGroupAccess, communicationWhatsAppController.handleJoinRequest);
 router.post('/invite/:token/join', communicationWhatsAppController.joinByInviteToken);
-router.post('/broadcasts/:groupId/send', communicationWhatsAppController.sendBroadcastMessage);
+router.post('/broadcasts/:groupId/send', requireGroupAccess, communicationWhatsAppController.sendBroadcastMessage);
 router.post('/messages/:messageId/view-once', communicationWhatsAppController.markViewOnceOpened);
 router.patch('/messages/:messageId/transcript', communicationWhatsAppController.saveVoiceTranscript);
 router.post('/messages/:messageId/transcribe', communicationWhatsAppController.transcribeVoiceMessage);
@@ -84,8 +84,8 @@ router.get('/preferences', communicationWhatsAppController.getUserChatPreference
 router.patch('/preferences', communicationWhatsAppController.updateUserChatPreferences);
 router.get('/storage', communicationWhatsAppController.getStorageUsage);
 router.post('/messages/:messageId/rsvp', communicationWhatsAppController.rsvpGroupEvent);
-router.post('/groups/:groupId/call-link', communicationWhatsAppController.createCallLink);
-router.post('/groups/:groupId/e2ee', communicationWhatsAppController.toggleRoomE2EE);
+router.post('/groups/:groupId/call-link', requireGroupAccess, communicationWhatsAppController.createCallLink);
+router.post('/groups/:groupId/e2ee', requireGroupAccess, communicationWhatsAppController.toggleRoomE2EE);
 router.post('/communities', communicationWhatsAppController.createCommunity);
 router.post('/communities/:communityId/groups', communicationWhatsAppController.linkCommunityGroups);
 router.post('/saved-messages', communicationWhatsAppController.getOrCreateSavedMessagesRoom);

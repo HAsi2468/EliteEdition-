@@ -422,12 +422,12 @@ body.light-theme-active .glass-viewport {
 }
 
 /* Genuine Translucent Liquid Glass Surfaces + Curved Top Lens Gloss (Dark Mode) */
-body.glass-theme-active :is(.app-header, aside#erp-sidebar-nav, .glass-subtabs-bar, .glass-title-capsule, .glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
+body.glass-theme-active :is(.app-header, aside#erp-sidebar-nav, .mobile-drawer-content, .mobile-bottom-nav, .glass-subtabs-bar, .glass-title-capsule, .glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(15, 23, 42, 0.0) 100%),
-    rgba(15, 23, 42, 0.48) !important;
-  backdrop-filter: blur(32px) saturate(220%) brightness(1.08) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(220%) brightness(1.08) !important;
+    rgba(15, 23, 42, 0.56) !important;
+  backdrop-filter: blur(34px) saturate(220%) brightness(1.08) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(220%) brightness(1.08) !important;
   border: 1px solid rgba(255, 255, 255, 0.20) !important;
   box-shadow:
     0 16px 40px -10px rgba(2, 6, 23, 0.62),
@@ -437,12 +437,12 @@ body.glass-theme-active :is(.app-header, aside#erp-sidebar-nav, .glass-subtabs-b
 }
 
 /* Genuine Translucent Liquid Glass Surfaces + Curved Top Lens Gloss (Light Mode) */
-body.light-theme-active :is(.app-header, aside#erp-sidebar-nav, .glass-subtabs-bar, .glass-title-capsule, .glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
+body.light-theme-active :is(.app-header, aside#erp-sidebar-nav, .mobile-drawer-content, .mobile-bottom-nav, .glass-subtabs-bar, .glass-title-capsule, .glass-panel, .glass-card, .glass-card-item, .ent-stat-card, .glass-calc-card, .phoenix-card, .phoenix-kpi-card, .fusing-metric-card, .task-card) {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.34) 42%, rgba(255, 255, 255, 0.46) 100%),
-    rgba(255, 255, 255, 0.50) !important;
-  backdrop-filter: blur(32px) saturate(215%) contrast(1.03) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(215%) contrast(1.03) !important;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0.42) 42%, rgba(255, 255, 255, 0.54) 100%),
+    rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(34px) saturate(215%) contrast(1.03) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(215%) contrast(1.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.88) !important;
   box-shadow:
     0 14px 36px -10px rgba(15, 23, 42, 0.12),
@@ -485,6 +485,7 @@ body.light-theme-active :is(.glass-title-capsule, .glass-subtabs-bar, .erp-hotke
   .glass-view-toggle button.active,
   .company-segment-pill.active,
   .nav-item.active,
+  .mobile-drawer-item.active,
   aside#erp-sidebar-nav button.active
 ) {
   box-shadow:
@@ -565,3 +566,886 @@ body.light-theme-active :is(.erp-shimmer-box, .skeleton-shimmer) {
     animation: none !important;
   }
 }
+
+/* ============================================================================
+   PHASE 7: APPLE-GRADE LIQUID GLASS SIDEBAR NAVIGATION DOCK (DARK + LIGHT)
+   ============================================================================ */
+.sidebar-liquid-tile {
+  position: relative !important;
+  border-radius: 14px !important;
+  margin: 4px auto !important;
+  width: 48px !important;
+  height: 48px !important;
+  max-width: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  box-sizing: border-box !important;
+  border-left: none !important;
+}
+
+/* Specular caustic light reflex on top edge */
+.sidebar-liquid-tile::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Dark Mode Liquid Glass Tile */
+body:not(.light-theme-active) .sidebar-liquid-tile {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.42) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  color: #94a3b8 !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-tile:hover {
+  transform: translateY(-3px) scale(1.08) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(59, 130, 246, 0.18) 100%) !important;
+  border: 1px solid rgba(147, 197, 253, 0.5) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35), 0 0 16px rgba(96, 165, 250, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+  color: #ffffff !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-tile.active {
+  transform: scale(1.04) !important;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.45) 0%, rgba(30, 58, 138, 0.65) 100%) !important;
+  border: 1px solid rgba(96, 165, 250, 0.7) !important;
+  border-top: 1px solid rgba(191, 219, 254, 0.95) !important;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45), 0 0 20px rgba(59, 130, 246, 0.38), inset 0 1px 2px rgba(255, 255, 255, 0.7) !important;
+  color: #60a5fa !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-tile.active::after {
+  content: '';
+  position: absolute;
+  left: -7px;
+  width: 4px;
+  height: 24px;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 10px #38bdf8, 0 0 20px #0284c7;
+}
+
+/* Light Mode Liquid Glass Tile */
+body.light-theme-active .sidebar-liquid-tile {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.7) 100%) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  border-top: 1px solid #ffffff !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06), inset 0 1px 1px #ffffff !important;
+  color: #475569 !important;
+}
+
+body.light-theme-active .sidebar-liquid-tile:hover {
+  transform: translateY(-3px) scale(1.08) !important;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(239, 246, 255, 0.95) 100%) !important;
+  border: 1px solid #bfdbfe !important;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16), 0 0 14px rgba(59, 130, 246, 0.22), inset 0 1px 1px #ffffff !important;
+  color: #2563eb !important;
+}
+
+body.light-theme-active .sidebar-liquid-tile.active {
+  transform: scale(1.04) !important;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.6) !important;
+  border-top: 1px solid #ffffff !important;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.18), inset 0 1px 2px #ffffff !important;
+  color: #1d4ed8 !important;
+}
+
+body.light-theme-active .sidebar-liquid-tile.active::after {
+  content: '';
+  position: absolute;
+  left: -7px;
+  width: 4px;
+  height: 24px;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.5);
+}
+
+/* Expanded Sidebar Liquid Item */
+.sidebar-liquid-item {
+  position: relative !important;
+  border-radius: 12px !important;
+  margin: 3px 6px !important;
+  width: calc(100% - 12px) !important;
+  padding: 8px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  box-sizing: border-box !important;
+  border-left: none !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-item {
+  background: transparent !important;
+  color: #94a3b8 !important;
+  border: 1px solid transparent !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-item:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.42) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translateX(3px) !important;
+  color: #ffffff !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-item.active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.38) 0%, rgba(30, 58, 138, 0.55) 100%) !important;
+  border: 1px solid rgba(96, 165, 250, 0.6) !important;
+  border-top: 1px solid rgba(191, 219, 254, 0.88) !important;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.5) !important;
+  color: #60a5fa !important;
+  font-weight: 700 !important;
+}
+
+body:not(.light-theme-active) .sidebar-liquid-item.active::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  width: 3px;
+  height: 60%;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 10px #38bdf8;
+}
+
+body.light-theme-active .sidebar-liquid-item {
+  background: transparent !important;
+  color: #475569 !important;
+  border: 1px solid transparent !important;
+}
+
+body.light-theme-active .sidebar-liquid-item:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.7) 100%) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  border-top: 1px solid #ffffff !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), inset 0 1px 1px #ffffff !important;
+  transform: translateX(3px) !important;
+  color: #1e293b !important;
+}
+
+body.light-theme-active .sidebar-liquid-item.active {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.5) !important;
+  border-top: 1px solid #ffffff !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15), inset 0 1px 1px #ffffff !important;
+  color: #1d4ed8 !important;
+  font-weight: 700 !important;
+}
+
+body.light-theme-active .sidebar-liquid-item.active::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  width: 3px;
+  height: 60%;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.4);
+}
+
+/* ============================================================================
+   PHASE 8: STRICT SYSTEM-WIDE 3D LIQUID GLASS POLISH ACROSS ALL SCREENS
+   ============================================================================ */
+
+/* 1. Universal 3D Prismatic Specular Bevel & Refractive Backdrop on All Cards */
+body.glass-theme-active :is(
+  .glass-panel,
+  .glass-card,
+  .glass-card-item,
+  .ent-stat-card,
+  .glass-calc-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .fusing-metric-card,
+  .task-card,
+  .complaint-modern-card,
+  .filter-toolbar,
+  .date-range-picker,
+  .modal-glass-card,
+  .admin-card,
+  .data-review-card,
+  .stitching-card,
+  .sales-stat-card
+) {
+  backdrop-filter: blur(26px) saturate(190%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.04) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.42) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow:
+    0 16px 36px -6px rgba(2, 6, 23, 0.55),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4) !important;
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.26s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease !important;
+}
+
+body.light-theme-active :is(
+  .glass-panel,
+  .glass-card,
+  .glass-card-item,
+  .ent-stat-card,
+  .glass-calc-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .fusing-metric-card,
+  .task-card,
+  .complaint-modern-card,
+  .filter-toolbar,
+  .date-range-picker,
+  .modal-glass-card,
+  .admin-card,
+  .data-review-card,
+  .stitching-card,
+  .sales-stat-card
+) {
+  backdrop-filter: blur(26px) saturate(195%) contrast(1.02) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(195%) contrast(1.02) !important;
+  border-top: 1.5px solid #ffffff !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-right: 1px solid rgba(203, 213, 225, 0.6) !important;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.6) !important;
+  box-shadow:
+    0 14px 32px -6px rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(15, 23, 42, 0.03),
+    inset 0 1.5px 0 #ffffff,
+    inset 0 -1px 0 rgba(203, 213, 225, 0.3) !important;
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.26s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease !important;
+}
+
+/* 2. Critically Damped 3D Spring Hover Lift across All Metric & Action Cards */
+:is(body.glass-theme-active, body.light-theme-active) :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card,
+  .sales-stat-card
+):hover {
+  transform: translate3d(0, -3px, 0) scale(1.008) !important;
+}
+
+body.glass-theme-active :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card,
+  .sales-stat-card
+):hover {
+  box-shadow:
+    0 22px 45px -8px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(var(--entity-accent-rgb, 56, 189, 248), 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45) !important;
+}
+
+body.light-theme-active :is(
+  .glass-card-item,
+  .glass-calc-card,
+  .ent-stat-card,
+  .stat-card,
+  .metric-card,
+  .fusing-metric-card,
+  .phoenix-card,
+  .phoenix-kpi-card,
+  .task-card,
+  .sales-stat-card
+):hover {
+  box-shadow:
+    0 20px 40px -8px rgba(15, 23, 42, 0.12),
+    0 0 20px rgba(37, 99, 235, 0.14),
+    inset 0 1.5px 0 #ffffff !important;
+}
+
+/* 3. 3D Liquid Glass Tables (Sticky Refractive Headers & Alternating Row Refractions) */
+:is(body.glass-theme-active, body.light-theme-active) table thead th {
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+}
+
+body.glass-theme-active table thead th {
+  background: rgba(15, 23, 42, 0.88) !important;
+  color: #f8fafc !important;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+body.light-theme-active table thead th {
+  background: rgba(248, 250, 252, 0.94) !important;
+  color: #0f172a !important;
+  border-bottom: 1.5px solid rgba(203, 213, 225, 0.8) !important;
+  box-shadow: inset 0 -1px 0 rgba(203, 213, 225, 0.5) !important;
+}
+
+body.glass-theme-active table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.05) !important;
+  transition: background 0.18s ease !important;
+}
+
+body.light-theme-active table tbody tr:hover td {
+  background: rgba(239, 246, 255, 0.7) !important;
+  transition: background 0.18s ease !important;
+}
+
+/* 4. Liquid Glass Modals, Drawers & Popups (Full Depth Layering) */
+:is(body.glass-theme-active, body.light-theme-active) :is(
+  [role="dialog"]:not(.printable-area),
+  .modal-content,
+  .dialog-surface,
+  .drawer-content,
+  .erp-modal
+) {
+  backdrop-filter: blur(32px) saturate(210%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(210%) !important;
+  border-radius: 20px !important;
+}
+
+body.glass-theme-active :is(
+  [role="dialog"]:not(.printable-area),
+  .modal-content,
+  .dialog-surface,
+  .drawer-content,
+  .erp-modal
+) {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(10, 16, 30, 0.96) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.55) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.65), 0 0 30px rgba(37, 99, 235, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+}
+
+body.light-theme-active :is(
+  [role="dialog"]:not(.printable-area),
+  .modal-content,
+  .dialog-surface,
+  .drawer-content,
+  .erp-modal
+) {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
+  border-top: 1.5px solid #ffffff !important;
+  border-left: 1px solid #ffffff !important;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.14), 0 0 25px rgba(37, 99, 235, 0.1), inset 0 1.5px 2px #ffffff !important;
+}
+
+/* 5. Liquid Glass Buttons & Interactive Controls */
+body.glass-theme-active :is(.btn-primary, .ent-btn-primary, .glass-btn-primary) {
+  border-top: 1.5px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+}
+
+body.light-theme-active :is(.btn-primary, .ent-btn-primary, .glass-btn-primary) {
+  border-top: 1.5px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25), inset 0 1px 1px #ffffff !important;
+}
+
+body.glass-theme-active :is(.btn-secondary, .ent-btn-secondary, .glass-btn-secondary) {
+  background: rgba(30, 41, 59, 0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+  color: #f1f5f9 !important;
+}
+
+body.light-theme-active :is(.btn-secondary, .ent-btn-secondary, .glass-btn-secondary) {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(203, 213, 225, 0.8) !important;
+  border-top: 1px solid #ffffff !important;
+  color: #1e293b !important;
+}
+
+/* ============================================================================
+   PHASE 9: 3D KANBAN DRAG TILT & PRISMATIC SKELETON SHIMMER
+   ============================================================================ */
+
+/* 3D Drag-and-Drop Tilt Physics for Kanban Cards */
+.kanban-card-dragging,
+.task-card.kanban-card-dragging {
+  transform: rotateZ(3.5deg) scale(1.04) translate3d(0, -8px, 0) !important;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45), 0 0 25px rgba(56, 189, 248, 0.35) !important;
+  opacity: 0.92 !important;
+  z-index: 9999 !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Prismatic Crystal Shimmer Skeleton Loader */
+@keyframes crystalPrismaticShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-crystal-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.15) 25%,
+    rgba(56, 189, 248, 0.2) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    rgba(255, 255, 255, 0.04) 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: crystalPrismaticShimmer 1.8s infinite linear !important;
+  border-radius: 8px !important;
+}
+
+body.light-theme-active .skeleton-crystal-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 0%,
+    rgba(0, 0, 0, 0.08) 25%,
+    rgba(37, 99, 235, 0.12) 50%,
+    rgba(0, 0, 0, 0.08) 75%,
+    rgba(0, 0, 0, 0.04) 100%
+  ) !important;
+  background-size: 200% 100% !important;
+}
+
+/* ============================================================================
+   PHASE 10: REFINED SEGMENTED SUBTABS, STATS DENSITY & USER TABLE POLISH
+   ============================================================================ */
+
+/* Segmented Subtabs bar — single-row scrollable without ugly wrapping */
+.glass-subtabs-bar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  gap: 4px !important;
+  padding: 4px 6px !important;
+  border-radius: 10px !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.glass-subtabs-bar::-webkit-scrollbar {
+  display: none !important;
+}
+
+.glass-subtab-btn {
+  padding: 6px 13px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  border-radius: 7px !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-subtab-btn.active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.85), rgba(30, 58, 138, 0.95)) !important;
+  border: 1px solid rgba(147, 197, 253, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* Polished Table Heights & Cell Vertical Alignment */
+.admin-users-table th,
+.admin-users-table td {
+  vertical-align: middle !important;
+}
+
+.admin-users-table tbody tr {
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.admin-users-table tbody tr:hover {
+  background: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* ============================================================================
+   PHASE 10: 3D LIQUID GLASS MOBILE NAVIGATION ICONS (DARK + LIGHT)
+   ============================================================================ */
+.liquid-icon-3d {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 55%, rgba(15, 23, 42, 0.22) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 4px 10px -2px rgba(2, 6, 23, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.40),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
+  overflow: hidden;
+}
+
+.liquid-icon-3d::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 15%;
+  right: 15%;
+  height: 1.5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.85) 50%, transparent 100%);
+  pointer-events: none;
+}
+
+.liquid-icon-3d.active {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 4px 12px rgba(2, 6, 23, 0.32),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.65),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.18);
+  transform: scale(1.05);
+}
+
+body.light-theme-active .liquid-icon-3d {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.72) 100%);
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  border-top: 1px solid #ffffff;
+  box-shadow:
+    0 4px 10px -2px rgba(15, 23, 42, 0.10),
+    inset 0 1.5px 1px #ffffff,
+    inset 0 -1px 2px rgba(148, 163, 184, 0.22);
+}
+
+body.light-theme-active .liquid-icon-3d.active {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.14) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-top: 1px solid #ffffff;
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.18),
+    inset 0 1px 1px rgba(255, 255, 255, 0.75);
+}
+
+/* Mobile Bottom Nav 3D Liquid Glass Icon Pill */
+.mobile-bottom-icon-3d {
+  position: relative;
+  width: 34px;
+  height: 26px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.mobile-bottom-icon-3d.active {
+  background: linear-gradient(145deg, rgba(59, 130, 246, 0.28) 0%, rgba(37, 99, 235, 0.14) 100%);
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  border-top: 1px solid rgba(191, 219, 254, 0.78);
+  box-shadow:
+    0 4px 14px -2px rgba(37, 99, 235, 0.42),
+    inset 0 1px 1px rgba(255, 255, 255, 0.52);
+  transform: translateY(-1px) scale(1.04);
+}
+
+body.light-theme-active .mobile-bottom-icon-3d.active {
+  background: linear-gradient(145deg, rgba(59, 130, 246, 0.18) 0%, rgba(37, 99, 235, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.38);
+  border-top: 1px solid #ffffff;
+  box-shadow:
+    0 4px 12px -2px rgba(37, 99, 235, 0.22),
+    inset 0 1px 1px #ffffff;
+}
+
+/* 3D Liquid Glass Company Quick-Switch Bottom Sheet (Dark + Light) */
+.company-quick-sheet-panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 34%, rgba(15, 23, 42, 0.0) 100%),
+    rgba(11, 18, 34, 0.76) !important;
+  backdrop-filter: blur(38px) saturate(220%) brightness(1.08) !important;
+  -webkit-backdrop-filter: blur(38px) saturate(220%) brightness(1.08) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow:
+    0 -18px 50px rgba(2, 6, 23, 0.68),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.36) !important;
+}
+
+body.light-theme-active .company-quick-sheet-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(248, 250, 252, 0.68) 100%),
+    rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(38px) saturate(220%) !important;
+  -webkit-backdrop-filter: blur(38px) saturate(220%) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.96) !important;
+  box-shadow:
+    0 -16px 44px rgba(15, 23, 42, 0.16),
+    inset 0 1.5px 0 #ffffff !important;
+}
+
+.company-quick-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0.82rem 0.95rem;
+  border-radius: 16px;
+  cursor: pointer;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.30) !important;
+  box-shadow:
+    0 6px 18px -4px rgba(2, 6, 23, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+
+.company-quick-card:active {
+  transform: scale(0.985);
+}
+
+.company-quick-card.active {
+  background: linear-gradient(145deg, rgba(59, 130, 246, 0.22) 0%, rgba(30, 58, 138, 0.16) 100%) !important;
+  border: 1.5px solid rgba(96, 165, 250, 0.68) !important;
+  border-top: 1.5px solid rgba(191, 219, 254, 0.85) !important;
+}
+
+body.light-theme-active .company-quick-card {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(241, 245, 249, 0.72) 100%) !important;
+  border: 1px solid rgba(203, 213, 225, 0.75) !important;
+  border-top: 1px solid #ffffff !important;
+  box-shadow:
+    0 6px 16px -4px rgba(15, 23, 42, 0.08),
+    inset 0 1.5px 0 #ffffff !important;
+}
+
+body.light-theme-active .company-quick-card.active {
+  background: linear-gradient(145deg, rgba(239, 246, 255, 0.96) 0%, rgba(219, 234, 254, 0.84) 100%) !important;
+  border: 1.5px solid rgba(59, 130, 246, 0.65) !important;
+  border-top: 1.5px solid #ffffff !important;
+}
+
+.company-quick-icon-3d {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+}
+
+.company-quick-icon-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 46%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.0) 100%);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   PHASE 11: FULL MOTION & VISUAL PACK (AURA MORPH, iOS DEPTH, WAVE GAUGE, TOAST)
+   ============================================================================ */
+
+/* 1. Company-Switch Reactive Canvas Aura Morph */
+body.glass-theme-active,
+body.light-theme-active {
+  transition: background 0.55s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* 2. iOS-Style Background Depth Scale when Mobile Drawer / Bottom Sheet Opens */
+.main-layout-container,
+.app-header {
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), filter 0.34s ease;
+}
+
+body.erp-sheet-depth-active .main-layout-container {
+  transform: scale(0.972) translateZ(0);
+  filter: blur(2.5px) brightness(0.88);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+/* 3. Interactive 3D Liquid Glass Toast Stack + Countdown Progress Bar */
+.liquid-glass-toast-card {
+  backdrop-filter: blur(26px) saturate(210%) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(210%) !important;
+  box-shadow:
+    0 14px 34px -6px rgba(2, 6, 23, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  animation: liquidToastSlideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  touch-action: pan-x;
+}
+
+@keyframes liquidToastSlideIn {
+  0% { opacity: 0; transform: translate3d(28px, -6px, 0) scale(0.95); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.liquid-toast-countdown {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2.5px;
+  width: 100%;
+  opacity: 0.85;
+  transform-origin: left center;
+  animation: toastCountdownShrink 5s linear forwards;
+  pointer-events: none;
+}
+
+@keyframes toastCountdownShrink {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* 4. Liquid Fluid Wave Progress Gauges */
+.liquid-wave-gauge {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.liquid-wave-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--entity-accent-rgb, 37, 99, 235), 0.85), #38bdf8);
+  overflow: hidden;
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.liquid-wave-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.45) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: liquidWaveShimmer 2.2s ease-in-out infinite;
+}
+
+@keyframes liquidWaveShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 5. Breathing Status Halo Rings for Live Operational Indicators */
+.erp-status-halo-live {
+  position: relative;
+}
+
+.erp-status-halo-live::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1.5px solid currentColor;
+  opacity: 0;
+  animation: erpHaloPulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes erpHaloPulse {
+  0% { transform: scale(0.95); opacity: 0.6; }
+  70% { transform: scale(1.18); opacity: 0; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+/* ============================================================================
+   PHASE 12 (WAVE 2): PRISMATIC REFRACTION, VALIDATION SHAKE & 3D FLIP CARDS
+   ============================================================================ */
+
+/* 1. Apple VisionOS Prismatic Top-Edge Refraction on Hover/Active */
+:is(body.glass-theme-active, body.light-theme-active) :is(.glass-calc-card:hover, .company-quick-card.active, .btn-primary:hover) {
+  border-top-color: rgba(186, 230, 253, 0.85) !important;
+  box-shadow:
+    0 12px 30px -6px rgba(56, 189, 248, 0.28),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 rgba(167, 139, 250, 0.28) !important;
+}
+
+/* 2. Form Validation Micro-Shake + Red Glass Halo */
+.erp-field-shake {
+  animation: erpFieldShake 0.34s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.28) !important;
+}
+
+@keyframes erpFieldShake {
+  15%, 85% { transform: translate3d(-3px, 0, 0); }
+  30%, 70% { transform: translate3d(5px, 0, 0); }
+  45%, 60% { transform: translate3d(-4px, 0, 0); }
+}
+
+/* 3. 3D Flip KPI Card Utility */
+.kpi-flip-card {
+  perspective: 900px;
+}
+.kpi-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-style: preserve-3d;
+}
+.kpi-flip-card.flipped .kpi-flip-inner {
+  transform: rotateY(180deg);
+}
+.kpi-flip-front,
+.kpi-flip-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.kpi-flip-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+
+
+
+

@@ -538,15 +538,17 @@ async function dispatchChatMessage({
           webPushService.sendPushToUsers(recipientIds, {
             title,
             body: bodyText.length > 100 ? bodyText.slice(0, 100) + '...' : bodyText,
-            icon: '/Logo.png',
-            badge: '/Logo.png',
-            tag: `msg-${populatedMessage?._id}`,
+            icon: '/pwa-192x192.png',
+            badge: '/pwa-maskable-192x192.png',
+            tag: `chat-room-${strRoomId}`,
+            renotify: true,
             data: {
-              url: '/communication',
+              url: `/communication?room=${encodeURIComponent(strRoomId)}${populatedMessage?._id ? `&msg=${encodeURIComponent(String(populatedMessage._id))}` : ''}`,
               roomId: strRoomId,
+              messageId: populatedMessage?._id ? String(populatedMessage._id) : null,
               type: 'chat_message'
             }
-          }, { urgency: priority === 'urgent' ? 'high' : 'normal' }).catch(err => {
+          }, { urgency: 'high', TTL: 86400 }).catch(err => {
             console.warn('[dispatchChatMessage push notification warning]:', err.message);
           });
         }

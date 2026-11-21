@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ToggleSwitch from './common/ToggleSwitch';
 import {
   Bell,
   BellOff,
@@ -223,17 +224,15 @@ export function NotificationPreferences({ onClose }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleTogglePush}
+          <ToggleSwitch
+            checked={isSubscribed}
             disabled={isLoading}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 ${
-              isSubscribed
-                ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30'
-            }`}
-          >
-            {isLoading ? 'Processing...' : isSubscribed ? 'Disable' : 'Enable'}
-          </button>
+            onChange={() => handleTogglePush()}
+            accent="emerald"
+            onLabel={isLoading ? '...' : 'ON'}
+            offLabel={isLoading ? '...' : 'OFF'}
+            ariaLabel="Toggle System Web Push"
+          />
         </div>
 
         {/* Toggle Notification Sound */}
@@ -247,16 +246,12 @@ export function NotificationPreferences({ onClose }) {
               <p className="text-xs text-slate-400">Play subtle chime on incoming chat and job card alerts</p>
             </div>
           </div>
-          <button
-            onClick={handleToggleSound}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              soundEnabled
-                ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
-            }`}
-          >
-            {soundEnabled ? 'Enabled' : 'Muted'}
-          </button>
+          <ToggleSwitch
+            checked={soundEnabled}
+            onChange={() => handleToggleSound()}
+            accent="emerald"
+            ariaLabel="Toggle Sound Effects"
+          />
         </div>
 
         {/* iOS Notice & Prompt Trigger */}

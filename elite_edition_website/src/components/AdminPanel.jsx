@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import ToggleSwitch from './common/ToggleSwitch';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -48,7 +49,10 @@ import {
   Send,
   Clock,
   CheckCircle2,
-  MoreVertical
+  MoreVertical,
+  Building2,
+  CheckSquare,
+  MessageSquare
 } from 'lucide-react';
 import { triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
@@ -198,11 +202,27 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
   const [modalError, setModalError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeActionMenuUserId, setActiveActionMenuUserId] = useState(null);
+  const [activePermissionsPopover, setActivePermissionsPopover] = useState(null);
+
+  const formatScreenName = useCallback((p) => {
+    if (!p) return '';
+    const screenObj = AVAILABLE_SCREENS.find((s) => s.id === p);
+    if (screenObj) return screenObj.label;
+    if (p === 'complaint_dashboard') return 'Complaints Center';
+    if (p === 'task_management') return 'Task Manager';
+    if (p === 'workspace') return 'Workspace / Chat';
+    return String(p)
+      .replace(/[_-]/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }, []);
 
   useEffect(() => {
     const handleDocumentClick = (e) => {
       if (!e.target.closest('.user-action-menu-container')) {
         setActiveActionMenuUserId(null);
+      }
+      if (!e.target.closest('.user-permissions-popover-container')) {
+        setActivePermissionsPopover(null);
       }
     };
     document.addEventListener('click', handleDocumentClick);
@@ -1566,31 +1586,52 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
       </div>
 
       {/* ── TIER 3: HORIZONTAL CALCULATION CARDS SCROLL TRACK ── */}
-      <div className="glass-scroll-track" style={{ marginTop: '0.85rem' }}>
-        <div className="glass-calc-card">
-          <span className="glass-calc-title">Registered Users</span>
-          <span className="glass-calc-value" style={{ color: '#ffffff' }}>{users.length || 0}</span>
-          <span className="glass-calc-sub">Active ERP staff</span>
+      <div className="glass-scroll-track" style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
+        <div className="glass-calc-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px', padding: '0.85rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="glass-calc-title" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Registered Users</span>
+            <Users size={16} style={{ color: '#38bdf8', opacity: 0.9 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="glass-calc-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#f8fafc' }}>{users.length || 0}</span>
+            <span className="glass-calc-sub" style={{ fontSize: '0.72rem', color: '#94a3b8' }}>active ERP staff</span>
+          </div>
         </div>
 
-        <div className="glass-calc-card">
-          <span className="glass-calc-title">Pending Approvals</span>
-          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{pendingApprovalsCount || 0}</span>
-          <span className="glass-calc-sub">Authorization requests</span>
+        <div className="glass-calc-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px', padding: '0.85rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="glass-calc-title" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Pending Approvals</span>
+            <ShieldAlert size={16} style={{ color: '#fbbf24', opacity: 0.9 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="glass-calc-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: pendingApprovalsCount > 0 ? '#fbbf24' : '#f8fafc' }}>{pendingApprovalsCount || 0}</span>
+            <span className="glass-calc-sub" style={{ fontSize: '0.72rem', color: '#94a3b8' }}>authorization requests</span>
+          </div>
         </div>
 
-        <div className="glass-calc-card">
-          <span className="glass-calc-title">Selected Company</span>
-          <span className="glass-calc-value" style={{ color: '#38bdf8', fontSize: '1.15rem' }}>{selectedCompany}</span>
-          <span className="glass-calc-sub">Active scope</span>
+        <div className="glass-calc-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px', padding: '0.85rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="glass-calc-title" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Selected Company</span>
+            <Building2 size={16} style={{ color: '#818cf8', opacity: 0.9 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', marginTop: '6px' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {selectedCompany || 'All Companies'}
+            </span>
+          </div>
         </div>
 
-        <div className="glass-calc-card">
-          <span className="glass-calc-title">System Status</span>
-          <span className="glass-calc-value" style={{ color: isSystemLocked ? '#f87171' : '#34d399', fontSize: '1.1rem' }}>
-            {isSystemLocked ? 'LOCKED (404)' : 'OPERATIONAL'}
-          </span>
-          <span className="glass-calc-sub">Security policy</span>
+        <div className="glass-calc-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px', padding: '0.85rem 1.15rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="glass-calc-title" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>System Status</span>
+            <ShieldCheck size={16} style={{ color: isSystemLocked ? '#f87171' : '#34d399', opacity: 0.9 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: isSystemLocked ? '#f87171' : '#34d399', boxShadow: isSystemLocked ? '0 0 8px #f87171' : '0 0 8px #34d399' }} />
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: isSystemLocked ? '#f87171' : '#34d399', letterSpacing: '0.02em' }}>
+              {isSystemLocked ? 'LOCKED' : 'OPERATIONAL'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1888,16 +1929,16 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                   </button>
                 </div>
               ) : (
-                <table>
+                <table className="admin-users-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px' }}>
                   <thead>
                     <tr>
-                      <th>Account & Status</th>
-                      <th>Email & Department</th>
-                      <th>Role & Hierarchy</th>
-                      <th>Allocated Companies</th>
-                      <th>Action Privileges</th>
-                      <th>Allowed Functionalities</th>
-                      <th className="text-center">Actions</th>
+                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>User Profile</th>
+                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Email & Department</th>
+                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Access Level</th>
+                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Assigned Companies</th>
+                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Action Privileges</th>
+                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Allowed Screens</th>
+                      <th className="text-center" style={{ padding: '10px 14px', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1912,8 +1953,13 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         const isInactive = u.status === 'Inactive';
 
                         return (
-                          <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? 'rgba(37, 99, 235, 0.14)' : isInactive ? 'rgba(239, 68, 68, 0.08)' : 'transparent', transition: 'background 0.15s', opacity: isInactive ? 0.78 : 1 }}>
-                            <td>
+                          <tr key={u.id || u._id} style={{
+                            background: isCurrentlyEditing ? 'rgba(37, 99, 235, 0.14)' : isInactive ? 'rgba(239, 68, 68, 0.06)' : 'rgba(15, 23, 42, 0.35)',
+                            transition: 'background 0.15s',
+                            opacity: isInactive ? 0.78 : 1,
+                            borderRadius: '8px'
+                          }}>
+                            <td style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                                 <div style={styles.avatar(checkAdmin)}>
                                   {u.name ? u.name[0].toUpperCase() : 'U'}
@@ -1941,7 +1987,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 </div>
                               </div>
                             </td>
-                            <td>
+                            <td style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
                               <div style={{ color: '#cbd5e1', fontWeight: 600, fontSize: '0.82rem' }}>{u.email}</div>
                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
                                 <span style={{
@@ -1970,7 +2016,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 )}
                               </div>
                             </td>
-                            <td>
+                            <td style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
                               <span style={{
                                 fontSize: '0.7rem',
                                 fontWeight: 800,
@@ -1984,57 +2030,158 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                                 {isMain ? '👑 MAIN ADMIN' : checkAdmin ? '🛡️ COMPANY ADMIN' : '👤 USER'}
                               </span>
                             </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            <td style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                                 {isMain ? (
                                   <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#6ee7b7', background: 'rgba(16, 185, 129, 0.16)', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
-                                    🌐 ALL COMPANIES (MASTER)
+                                    🌐 ALL COMPANIES
                                   </span>
-                                ) : userCompanies.map(c => (
-                                  <span key={c} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#cbd5e1', background: 'rgba(148, 163, 184, 0.14)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(148, 163, 184, 0.25)' }}>
-                                    {c}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                                <span title="Task Assignment Rights" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canManageTasks !== false) ? 'rgba(59, 130, 246, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canManageTasks !== false) ? '#93c5fd' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
-                                  📋 Tasks: {(u.canManageTasks !== false) ? 'YES' : 'NO'}
-                                </span>
-                                <span title="Chat Announcement Broadcasting" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canBroadcastChat !== false) ? 'rgba(16, 185, 129, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canBroadcastChat !== false) ? '#6ee7b7' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
-                                  💬 Chat: {(u.canBroadcastChat !== false) ? 'YES' : 'NO'}
-                                </span>
-                                <span title="Export Excel/PDF" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canExportReports !== false) ? 'rgba(168, 85, 247, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canExportReports !== false) ? '#d8b4fe' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
-                                  📥 Export: {(u.canExportReports !== false) ? 'YES' : 'NO'}
-                                </span>
-                                <span title="Edit/Delete Master Records" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canDeleteRecords !== false) ? 'rgba(249, 115, 22, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canDeleteRecords !== false) ? '#fdba74' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
-                                  ✏️ Edit/Del: {(u.canDeleteRecords !== false) ? 'YES' : 'NO'}
-                                </span>
-                                <span title="View Purchase Rates & Financial Margins" style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: (u.canViewFinancials !== false) ? 'rgba(234, 179, 8, 0.16)' : 'rgba(148, 163, 184, 0.1)', color: (u.canViewFinancials !== false) ? '#fde047' : '#64748b', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
-                                  💰 Price: {(u.canViewFinancials !== false) ? 'YES' : 'NO'}
-                                </span>
-                              </div>
-                            </td>
-                            <td>
-                              <div style={styles.permissionsList}>
-                                {checkAdmin ? (
-                                  <span style={styles.adminAllBadge}>⚡ FULL SYSTEM ACCESS</span>
-                                ) : u.permissions && u.permissions.length > 0 ? (
-                                  u.permissions.map(p => {
-                                    const screenObj = AVAILABLE_SCREENS.find(s => s.id === p);
-                                    return (
-                                      <span key={p} style={styles.permissionBadge}>
-                                        {screenObj ? screenObj.label : p}
-                                      </span>
-                                    );
-                                  })
+                                ) : userCompanies.length === 0 ? (
+                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>None</span>
+                                ) : userCompanies.length <= 2 ? (
+                                  userCompanies.map(c => (
+                                    <span key={c} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#cbd5e1', background: 'rgba(148, 163, 184, 0.14)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(148, 163, 184, 0.25)' }}>
+                                      {c}
+                                    </span>
+                                  ))
                                 ) : (
-                                  <span style={styles.noScreensBadge}>NO ACCESS GRANTED</span>
+                                  <>
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#cbd5e1', background: 'rgba(148, 163, 184, 0.14)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(148, 163, 184, 0.25)' }}>
+                                      {userCompanies[0]}
+                                    </span>
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#93c5fd', background: 'rgba(59, 130, 246, 0.14)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.3)' }} title={userCompanies.join(', ')}>
+                                      +{userCompanies.length - 1} more
+                                    </span>
+                                  </>
                                 )}
                               </div>
                             </td>
-                            <td>
+                            <td style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
+                              {/* Clean Micro-Dock for Action Privileges */}
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: 'rgba(15, 23, 42, 0.65)',
+                                padding: '4px 8px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(148, 163, 184, 0.2)'
+                              }}>
+                                <span title={`Task Assignment: ${u.canManageTasks !== false ? 'Granted' : 'Restricted'}`} style={{ color: (u.canManageTasks !== false) ? '#38bdf8' : '#475569', opacity: (u.canManageTasks !== false) ? 1 : 0.35, display: 'flex', cursor: 'help' }}>
+                                  <CheckSquare size={14} />
+                                </span>
+                                <span title={`Chat Broadcast: ${u.canBroadcastChat !== false ? 'Granted' : 'Restricted'}`} style={{ color: (u.canBroadcastChat !== false) ? '#34d399' : '#475569', opacity: (u.canBroadcastChat !== false) ? 1 : 0.35, display: 'flex', cursor: 'help' }}>
+                                  <MessageSquare size={14} />
+                                </span>
+                                <span title={`Export Excel/PDF: ${u.canExportReports !== false ? 'Granted' : 'Restricted'}`} style={{ color: (u.canExportReports !== false) ? '#a78bfa' : '#475569', opacity: (u.canExportReports !== false) ? 1 : 0.35, display: 'flex', cursor: 'help' }}>
+                                  <Download size={14} />
+                                </span>
+                                <span title={`Edit/Delete Records: ${u.canDeleteRecords !== false ? 'Granted' : 'Restricted'}`} style={{ color: (u.canDeleteRecords !== false) ? '#fb923c' : '#475569', opacity: (u.canDeleteRecords !== false) ? 1 : 0.35, display: 'flex', cursor: 'help' }}>
+                                  <Edit2 size={14} />
+                                </span>
+                                <span title={`View Financials & Margins: ${u.canViewFinancials !== false ? 'Granted' : 'Restricted'}`} style={{ color: (u.canViewFinancials !== false) ? '#facc15' : '#475569', opacity: (u.canViewFinancials !== false) ? 1 : 0.35, display: 'flex', cursor: 'help' }}>
+                                  <DollarSign size={14} />
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
+                              {/* Allowed Screens with +X more Popover */}
+                              <div className="user-permissions-popover-container" style={{ position: 'relative' }}>
+                                {checkAdmin ? (
+                                  <span style={styles.adminAllBadge}>⚡ FULL ACCESS</span>
+                                ) : u.permissions && u.permissions.length > 0 ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    {u.permissions.slice(0, 2).map((p) => {
+                                      const label = formatScreenName(p);
+                                      return (
+                                        <span key={p} style={{
+                                          fontSize: '0.68rem',
+                                          fontWeight: 600,
+                                          background: 'rgba(59, 130, 246, 0.16)',
+                                          border: '1px solid rgba(59, 130, 246, 0.32)',
+                                          color: '#93c5fd',
+                                          padding: '2px 7px',
+                                          borderRadius: '5px',
+                                          whiteSpace: 'nowrap',
+                                          maxWidth: '120px',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis'
+                                        }} title={label}>
+                                          {label}
+                                        </span>
+                                      );
+                                    })}
+                                    {u.permissions.length > 2 && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const uId = u.id || u._id;
+                                            setActivePermissionsPopover(activePermissionsPopover === uId ? null : uId);
+                                          }}
+                                          style={{
+                                            fontSize: '0.68rem',
+                                            fontWeight: 800,
+                                            color: '#38bdf8',
+                                            background: 'rgba(56, 189, 248, 0.16)',
+                                            border: '1px solid rgba(56, 189, 248, 0.38)',
+                                            padding: '2px 6px',
+                                            borderRadius: '5px',
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                        >
+                                          +{u.permissions.length - 2} more
+                                        </button>
+                                        {activePermissionsPopover === (u.id || u._id) && (
+                                          <div style={{
+                                            position: 'absolute',
+                                            bottom: 'calc(100% + 6px)',
+                                            left: 0,
+                                            background: 'rgba(15, 23, 42, 0.96)',
+                                            backdropFilter: 'blur(16px)',
+                                            border: '1px solid rgba(255, 255, 255, 0.18)',
+                                            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.25)',
+                                            borderRadius: '10px',
+                                            padding: '8px 10px',
+                                            zIndex: 1000,
+                                            minWidth: '220px',
+                                            maxWidth: '280px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '5px'
+                                          }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+                                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f8fafc' }}>
+                                                All {u.permissions.length} Assigned Screens
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); setActivePermissionsPopover(null); }}
+                                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                                              >
+                                                <X size={12} />
+                                              </button>
+                                            </div>
+                                            <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                              {u.permissions.map(p => (
+                                                <div key={p} style={{ fontSize: '0.68rem', color: '#cbd5e1', padding: '3px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}>
+                                                  ✓ {formatScreenName(p)}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span style={styles.noScreensBadge}>NO SCREENS</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="text-center" style={{ verticalAlign: 'middle', padding: '10px 14px' }}>
                               <div className="user-action-menu-container" style={{ ...styles.actionsCell, position: 'relative', overflow: 'visible' }}>
                                 <button
                                   onClick={() => handleEditClick(u)}
@@ -2762,26 +2909,26 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             <span>🌟 System & General Operations</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
-                            <label style={styles.microLabel(formData.canManageTasks)}>
-                              <input type="checkbox" checked={formData.canManageTasks} onChange={e => setFormData(p => ({ ...p, canManageTasks: e.target.checked }))} />
-                              <span>📋 Task Creation & Assignment</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canBroadcastChat)}>
-                              <input type="checkbox" checked={formData.canBroadcastChat} onChange={e => setFormData(p => ({ ...p, canBroadcastChat: e.target.checked }))} />
+                            <div style={{ ...styles.microLabel(formData.canManageTasks), justifyContent: 'space-between' }}>
+                              <span>📋 Task Creation &amp; Assignment</span>
+                              <ToggleSwitch checked={Boolean(formData.canManageTasks)} onChange={(next) => setFormData(p => ({ ...p, canManageTasks: next }))} size="sm" accent="emerald" showLabel={false} ariaLabel="Task Creation and Assignment" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canBroadcastChat), justifyContent: 'space-between' }}>
                               <span>💬 Chat Broadcast Announcements</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canExportReports)}>
-                              <input type="checkbox" checked={formData.canExportReports} onChange={e => setFormData(p => ({ ...p, canExportReports: e.target.checked }))} />
-                              <span>📥 Excel & PDF Report Export</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canDeleteRecords)}>
-                              <input type="checkbox" checked={formData.canDeleteRecords} onChange={e => setFormData(p => ({ ...p, canDeleteRecords: e.target.checked }))} />
-                              <span>⚠️ Edit & Delete Master Data</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canViewFinancials)}>
-                              <input type="checkbox" checked={formData.canViewFinancials} onChange={e => setFormData(p => ({ ...p, canViewFinancials: e.target.checked }))} />
-                              <span>💰 Purchase Cost & Margin Visibility</span>
-                            </label>
+                              <ToggleSwitch checked={Boolean(formData.canBroadcastChat)} onChange={(next) => setFormData(p => ({ ...p, canBroadcastChat: next }))} size="sm" accent="emerald" showLabel={false} ariaLabel="Chat Broadcast Announcements" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canExportReports), justifyContent: 'space-between' }}>
+                              <span>📥 Excel &amp; PDF Report Export</span>
+                              <ToggleSwitch checked={Boolean(formData.canExportReports)} onChange={(next) => setFormData(p => ({ ...p, canExportReports: next }))} size="sm" accent="emerald" showLabel={false} ariaLabel="Excel and PDF Report Export" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canDeleteRecords), justifyContent: 'space-between' }}>
+                              <span>⚠️ Edit &amp; Delete Master Data</span>
+                              <ToggleSwitch checked={Boolean(formData.canDeleteRecords)} onChange={(next) => setFormData(p => ({ ...p, canDeleteRecords: next }))} size="sm" accent="amber" showLabel={false} ariaLabel="Edit and Delete Master Data" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canViewFinancials), justifyContent: 'space-between' }}>
+                              <span>💰 Purchase Cost &amp; Margin Visibility</span>
+                              <ToggleSwitch checked={Boolean(formData.canViewFinancials)} onChange={(next) => setFormData(p => ({ ...p, canViewFinancials: next }))} size="sm" accent="emerald" showLabel={false} ariaLabel="Purchase Cost and Margin Visibility" />
+                            </div>
                           </div>
                         </div>
 
@@ -2791,26 +2938,26 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             <span>📦 Digital Printing & Job Cards</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
-                            <label style={styles.microLabel(formData.canCreateJobCards)}>
-                              <input type="checkbox" checked={formData.canCreateJobCards} onChange={e => setFormData(p => ({ ...p, canCreateJobCards: e.target.checked }))} />
+                            <div style={{ ...styles.microLabel(formData.canCreateJobCards), justifyContent: 'space-between' }}>
                               <span>➕ Create New Job Cards</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canEditJobCards)}>
-                              <input type="checkbox" checked={formData.canEditJobCards} onChange={e => setFormData(p => ({ ...p, canEditJobCards: e.target.checked }))} />
+                              <ToggleSwitch checked={Boolean(formData.canCreateJobCards)} onChange={(next) => setFormData(p => ({ ...p, canCreateJobCards: next }))} size="sm" accent="blue" showLabel={false} ariaLabel="Create New Job Cards" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canEditJobCards), justifyContent: 'space-between' }}>
                               <span>✏️ Edit Job Card Details</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canAdvanceJobStage)}>
-                              <input type="checkbox" checked={formData.canAdvanceJobStage} onChange={e => setFormData(p => ({ ...p, canAdvanceJobStage: e.target.checked }))} />
+                              <ToggleSwitch checked={Boolean(formData.canEditJobCards)} onChange={(next) => setFormData(p => ({ ...p, canEditJobCards: next }))} size="sm" accent="blue" showLabel={false} ariaLabel="Edit Job Card Details" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canAdvanceJobStage), justifyContent: 'space-between' }}>
                               <span>⚡ Production Stage Transition</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canViewJobCosts)}>
-                              <input type="checkbox" checked={formData.canViewJobCosts} onChange={e => setFormData(p => ({ ...p, canViewJobCosts: e.target.checked }))} />
-                              <span>💰 View Printing Costs & Margins</span>
-                            </label>
-                            <label style={styles.microLabel(formData.canDeleteJobCards)}>
-                              <input type="checkbox" checked={formData.canDeleteJobCards} onChange={e => setFormData(p => ({ ...p, canDeleteJobCards: e.target.checked }))} />
+                              <ToggleSwitch checked={Boolean(formData.canAdvanceJobStage)} onChange={(next) => setFormData(p => ({ ...p, canAdvanceJobStage: next }))} size="sm" accent="sky" showLabel={false} ariaLabel="Production Stage Transition" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canViewJobCosts), justifyContent: 'space-between' }}>
+                              <span>💰 View Printing Costs &amp; Margins</span>
+                              <ToggleSwitch checked={Boolean(formData.canViewJobCosts)} onChange={(next) => setFormData(p => ({ ...p, canViewJobCosts: next }))} size="sm" accent="emerald" showLabel={false} ariaLabel="View Printing Costs and Margins" />
+                            </div>
+                            <div style={{ ...styles.microLabel(formData.canDeleteJobCards), justifyContent: 'space-between' }}>
                               <span>🗑️ Delete Job Cards</span>
-                            </label>
+                              <ToggleSwitch checked={Boolean(formData.canDeleteJobCards)} onChange={(next) => setFormData(p => ({ ...p, canDeleteJobCards: next }))} size="sm" accent="amber" showLabel={false} ariaLabel="Delete Job Cards" />
+                            </div>
                           </div>
                         </div>
 
@@ -2820,10 +2967,10 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             <span>🎨 Design Catalogue & Assets</span>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
-                            <label style={styles.microLabel(formData.canInputNewDesign)}>
-                              <input type="checkbox" checked={formData.canInputNewDesign} onChange={e => setFormData(p => ({ ...p, canInputNewDesign: e.target.checked }))} />
-                              <span>➕ "+ New Sample Design" Button & Upload</span>
-                            </label>
+                            <div style={{ ...styles.microLabel(formData.canInputNewDesign), justifyContent: 'space-between' }}>
+                              <span>➕ &quot;+ New Sample Design&quot; Button &amp; Upload</span>
+                              <ToggleSwitch checked={Boolean(formData.canInputNewDesign)} onChange={(next) => setFormData(p => ({ ...p, canInputNewDesign: next }))} size="sm" accent="sky" showLabel={false} ariaLabel="New Sample Design Button and Upload" />
+                            </div>
                             <label style={styles.microLabel(formData.canCreateDesigns)}>
                               <input type="checkbox" checked={formData.canCreateDesigns} onChange={e => setFormData(p => ({ ...p, canCreateDesigns: e.target.checked }))} />
                               <span>🎨 Create & Upload Catalog Designs</span>

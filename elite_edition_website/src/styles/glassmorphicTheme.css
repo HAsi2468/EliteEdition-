@@ -488,11 +488,22 @@ body.glass-theme-active select option {
   background: #0f172a;
   color: #ffffff;
 }
-/* Wrapped numeric fields keep the wrapper's glass, not a second box */
-body.glass-theme-active .standard-numeric-wrapper input.standard-numeric-input {
+/* Wrapped numeric & search fields keep the wrapper's glass, not a second box */
+body.glass-theme-active .standard-numeric-wrapper input.standard-numeric-input,
+body.glass-theme-active .phoenix-search-box input.phoenix-search-input,
+body.glass-theme-active .phoenix-search-box input.phoenix-search-input:focus,
+body.glass-theme-active .inv-search-box input,
+body.glass-theme-active .inv-search-box input:focus,
+body.glass-theme-active .erp-search-box input,
+body.glass-theme-active .erp-search-box input:focus {
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  outline: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
 }
 body.glass-theme-active input::placeholder,
 body.glass-theme-active textarea::placeholder {
@@ -1104,6 +1115,46 @@ body.glass-theme-active textarea::placeholder {
   border-radius: 999px;
 }
 
+@media (max-width: 640px) {
+  .glass-scroll-track {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    overflow-x: visible !important;
+    padding-bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .glass-scroll-track > *,
+  .glass-scroll-track > .glass-card,
+  .glass-scroll-track > .glass-calc-card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: none !important;
+    padding: 0.72rem 0.78rem !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  .glass-scroll-track > :last-child:nth-child(odd) {
+    grid-column: 1 / -1 !important;
+  }
+  .glass-scroll-track > .glass-card > div:nth-child(2) {
+    font-size: clamp(1rem, 4.5vw, 1.25rem) !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .glass-scroll-track > .glass-card > div:nth-child(3) {
+    font-size: 0.66rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+
 /* Calculation Cards inside Horizontal Scroll Track (Tier 3) */
 .glass-calc-card {
   background: rgba(15, 23, 42, 0.78) !important;
@@ -1180,6 +1231,32 @@ body.glass-theme-active textarea::placeholder {
   color: rgba(255, 255, 255, 0.65) !important;
   margin-top: 2px !important;
   display: block !important;
+}
+
+@media (max-width: 640px) {
+  .glass-calc-card {
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 0.70rem 0.75rem !important;
+    box-sizing: border-box !important;
+  }
+  .glass-calc-title {
+    font-size: 0.68rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    letter-spacing: 0.02em !important;
+  }
+  .glass-calc-value {
+    font-size: 1.15rem !important;
+    line-height: 1.2 !important;
+  }
+  .glass-calc-sub {
+    font-size: 0.62rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
 }
 
 /* Segmented View Mode Toggle (Table View vs Card View) */

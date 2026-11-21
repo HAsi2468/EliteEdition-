@@ -356,6 +356,7 @@ html, body, #root, .app-container, .main-content, .workspace-container {
 @media (max-width: 768px) {
   html, body, #root, .app-container {
     overscroll-behavior-y: contain;
+    overscroll-behavior-x: none !important;
     overflow-x: hidden;
   }
 }
@@ -1603,9 +1604,21 @@ tr:hover td {
 @media (max-width: 850px) {
   .mobile-company-pill {
     display: inline-flex !important;
+    max-width: 125px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
   .mobile-menu-toggle {
     display: inline-flex !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    width: 34px !important;
+    height: 34px !important;
+    padding: 6px !important;
+    border-radius: 8px !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
   .sidebar-wrap {
     display: none !important;
@@ -1614,13 +1627,16 @@ tr:hover td {
     display: none !important;
   }
   .app-header {
-    height: calc(52px + env(safe-area-inset-top, 0px)) !important;
+    height: auto !important;
     min-height: calc(52px + env(safe-area-inset-top, 0px)) !important;
-    max-height: calc(52px + env(safe-area-inset-top, 0px)) !important;
-    padding-top: env(safe-area-inset-top, 0px) !important;
-    padding-left: calc(12px + env(safe-area-inset-left, 0px)) !important;
-    padding-right: calc(12px + env(safe-area-inset-right, 0px)) !important;
-    padding-bottom: 0 !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+    padding-left: calc(10px + env(safe-area-inset-left, 0px)) !important;
+    padding-right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
   }
   .main-layout-container {
     height: calc(100% - 52px) !important;
@@ -1640,17 +1656,19 @@ tr:hover td {
 .mobile-drawer-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 9999;
   display: flex;
 }
 
 .mobile-drawer-content {
-  background: rgba(11, 17, 32, 0.94);
+  background: var(--bg-card, rgba(11, 17, 32, 0.96));
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  width: 300px;
-  max-width: 85vw;
+  width: 310px;
+  max-width: 86vw;
   height: 100dvh;
   padding: 16px;
   display: flex;
@@ -1658,9 +1676,10 @@ tr:hover td {
   gap: 8px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  border-right: 1px solid var(--border-color);
-  padding-top: calc(16px + var(--sat));
-  padding-bottom: calc(16px + var(--sab));
+  border-right: 1px solid var(--border-light, rgba(255, 255, 255, 0.12));
+  padding-top: calc(20px + env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
 }
 
 .mobile-drawer-item {

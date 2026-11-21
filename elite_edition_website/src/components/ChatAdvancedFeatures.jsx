@@ -292,10 +292,15 @@ export function ScheduleMessageModal({ roomId, initialText = '', onClose, onSche
   const handleSchedule = async (e) => {
     e.preventDefault();
     if (!content.trim() || !scheduledAt) return;
+    const dt = new Date(scheduledAt);
+    if (Number.isNaN(dt.getTime()) || dt.getTime() <= Date.now()) {
+      setErrMsg('Please choose a valid future date and time');
+      return;
+    }
     setSaving(true);
     setErrMsg('');
     try {
-      const res = await api.scheduleChatMessage(roomId, content.trim(), new Date(scheduledAt).toISOString());
+      const res = await api.scheduleChatMessage(roomId, content.trim(), dt.toISOString());
       if (res?.success) {
         setContent('');
         loadPending();
@@ -311,8 +316,13 @@ export function ScheduleMessageModal({ roomId, initialText = '', onClose, onSche
   };
 
   const handleCancel = async (id) => {
-    await api.cancelScheduledChatMessage(id).catch(() => {});
-    loadPending();
+    try {
+      await api.cancelScheduledChatMessage(id);
+      loadPending();
+      if (onScheduled) onScheduled();
+    } catch (err) {
+      setErrMsg(err?.message || 'Failed to cancel scheduled message');
+    }
   };
 
   return (
@@ -342,6 +352,42 @@ export function ScheduleMessageModal({ roomId, initialText = '', onClose, onSche
               fontSize: '13.5px',
             }}
           />
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'In 30m', getDate: () => new Date(Date.now() + 30 * 60000) },
+              { label: 'In 2h', getDate: () => new Date(Date.now() + 120 * 60000) },
+              {
+                label: 'Tomorrow 9 AM',
+                getDate: () => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 1);
+                  d.setHours(9, 0, 0, 0);
+                  return d;
+                }
+              }
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => {
+                  const dt = preset.getDate();
+                  setScheduledAt(`${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`);
+                }}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  color: '#38bdf8',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
           <input
             type="datetime-local"
             value={scheduledAt}

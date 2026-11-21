@@ -46,8 +46,10 @@ function setCachedUser(id, user, isClient = false) {
  */
 const requireAuth = async (req, res, next) => {
   try {
-    const origin = String(req.headers.origin || req.headers.host || '');
-    const isDevLocal = origin.includes('localhost') || origin.includes('127.0.0.1') || req.ip === '127.0.0.1' || req.ip === '::1';
+    const isLocalIp = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+    const hostHeader = String(req.headers.host || '').toLowerCase();
+    const isLocalHost = hostHeader.startsWith('localhost:') || hostHeader === 'localhost' || hostHeader.startsWith('127.0.0.1');
+    const isDevLocal = process.env.NODE_ENV !== 'production' && isLocalIp && isLocalHost;
 
     let token = null;
     const authHeader = req.headers.authorization;

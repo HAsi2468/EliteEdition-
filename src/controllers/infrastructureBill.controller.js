@@ -427,7 +427,12 @@ const syncAwsCosts = async (req, res) => {
 
     res.status(httpStatus.OK).json({
       success: true,
-      message: `Successfully synced ${syncedBills.length} monthly bill(s) from AWS Cost Explorer.`,
+      message: costData.cached
+        ? `Served from 24-Hour Cache Lock (Zero AWS API Fee). Next live query allowed in ${costData.nextRefreshInHours} hours.`
+        : `Successfully synced ${syncedBills.length} monthly bill(s) from live AWS Cost Explorer ($0.01). 24-hour cache lock armed.`,
+      cached: costData.cached || false,
+      nextRefreshInHours: costData.nextRefreshInHours,
+      lockExpiresAt: costData.lockExpiresAt,
       bills: syncedBills,
     });
   } catch (error) {

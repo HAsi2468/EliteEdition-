@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { api, getBaseUrl, setBaseUrl } from './services/api';
+import { soundEffects } from './services/soundEffects';
 import Login from './components/Login';
 
 // Dynamic code-splitting with auto-retry and chunk recovery
@@ -76,7 +77,6 @@ const ReturnsManager = lazyWithRetry(() => import('./components/ReturnsManager')
 const ScanAndPackScreen = lazyWithRetry(() => import('./components/ScanAndPackScreen'));
 const DesignerModule = lazyWithRetry(() => import('./components/DesignerModule'));
 const DesignerScreen = lazyWithRetry(() => import('./components/DesignerScreen'));
-const LedgerReconciliationPanel = lazyWithRetry(() => import('./components/LedgerReconciliationPanel'));
 const DesignCatalogue = lazyWithRetry(() => import('./components/DesignCatalogue'));
 
 import EliteModalDialog from './components/EliteModalDialog';
@@ -85,6 +85,9 @@ import PdfPreviewModal from './components/PdfPreviewModal';
 import PrintOptionsModal from './components/PrintOptionsModal';
 import AutoUpdateNotification from './components/AutoUpdateNotification';
 import LiquidGlassInteractionEngine from './components/common/LiquidGlassInteractionEngine';
+import MobileGestureEngine from './components/common/MobileGestureEngine';
+import ToggleSwitch from './components/common/ToggleSwitch';
+import SpotlightCommandPalette from './components/common/SpotlightCommandPalette';
 import { webPushClient } from './services/webPushClient';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
@@ -729,15 +732,6 @@ export default function App() {
       description: 'Receipts Voucher',
     },
     {
-      combo: 'f7',
-      handler: () => {
-        setActiveTab('reconciliation');
-        return true;
-      },
-      priority: 10,
-      description: 'Journal Voucher / Reconciliation',
-    },
-    {
       combo: 'f8',
       handler: () => {
         setActiveTab('voucher_entry');
@@ -804,7 +798,7 @@ export default function App() {
     applyThemeDom(themeMode);
     try {
       localStorage.setItem('elite_erp_theme', themeMode);
-    } catch (e) {}
+    } catch (e) { }
   }, [themeMode]);
 
   const toggleThemeMode = (e) => {
@@ -1032,17 +1026,123 @@ export default function App() {
     return () => window.removeEventListener('pwa-update-available', handlePwaUpdate);
   }, []);
 
-  // Back button / gesture navigation handling: close drawer or modals before exit
+  // Mobile / PWA Back-Gesture & Edge-Swipe Protection (prevents accidental app exit on left-to-right swipe)
+  const mobileTabHistoryRef = useRef([]);
+  const prevTabForHistoryRef = useRef(activeTab);
+  const lastMobileExitSwipeRef = useRef(0);
+  const isPoppingHistoryTabRef = useRef(false);
+  const [showExitSwipeHint, setShowExitSwipeHint] = useState(false);
+
   useEffect(() => {
-    const handlePopState = () => {
+    const prev = prevTabForHistoryRef.current;
+    if (prev && prev !== activeTab) {
+      if (!isPoppingHistoryTabRef.current) {
+        const stack = mobileTabHistoryRef.current;
+        if (stack[stack.length - 1] !== prev) {
+          stack.push(prev);
+          if (stack.length > 15) stack.shift();
+        }
+      }
+      isPoppingHistoryTabRef.current = false;
+      prevTabForHistoryRef.current = activeTab;
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobileOrPwa = () =>
+      window.innerWidth <= 1024 ||
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      window.navigator?.standalone === true;
+
+    // Seed a single root history guard entry on mobile/PWA so 1 accidental swipe never exits the app
+    if (isMobileOrPwa() && !window.history.state?.eliteAppGuard && !window.history.state?.eliteChatRoom) {
+      try {
+        window.history.pushState({ eliteAppGuard: true }, '');
+      } catch (_) {}
+    }
+
+    const handlePopState = (e) => {
+      // If an open chat room inside Communication is being closed by Back, NEVER leave Communication
+      if (
+        window.__eliteChatRoomOpen ||
+        (Date.now() - (window.__eliteChatConsumedBackAt || 0) < 450)
+      ) {
+        if (isMobileOrPwa() && !window.history.state?.eliteAppGuard) {
+          try { window.history.pushState({ eliteAppGuard: true }, ''); } catch (_) {}
+        }
+        return;
+      }
+
+      // If we just popped back from a sub-view (like an open chat room) onto our guard state, let that view handle it
+      if (e.state?.eliteAppGuard) {
+        return;
+      }
+
       if (mobileMenuOpen) {
         setMobileMenuOpen(false);
-      } else if (showCompanyQuickSheet) {
+        if (isMobileOrPwa()) {
+          try { window.history.pushState({ eliteAppGuard: true }, ''); } catch (_) {}
+        }
+        return;
+      }
+
+      if (showCompanyQuickSheet) {
         setShowCompanyQuickSheet(false);
+        if (isMobileOrPwa()) {
+          try { window.history.pushState({ eliteAppGuard: true }, ''); } catch (_) {}
+        }
+        return;
+      }
+
+      if (!isMobileOrPwa()) return;
+
+      // Navigate back to previous in-app tab if history exists
+      if (mobileTabHistoryRef.current.length > 0) {
+        const previousTab = mobileTabHistoryRef.current.pop();
+        if (previousTab && previousTab !== activeTabRef.current) {
+          isPoppingHistoryTabRef.current = true;
+          setActiveTab(previousTab);
+          try { window.history.pushState({ eliteAppGuard: true }, ''); } catch (_) {}
+          return;
+        }
+      }
+
+      // At root screen: require a second Back swipe/press within 2.2s to exit app
+      const now = Date.now();
+      if (now - lastMobileExitSwipeRef.current < 2200) {
+        setShowExitSwipeHint(false);
+        return; // Allow OS/browser to exit
+      }
+
+      lastMobileExitSwipeRef.current = now;
+      try { window.history.pushState({ eliteAppGuard: true }, ''); } catch (_) {}
+      setShowExitSwipeHint(true);
+      setTimeout(() => {
+        if (Date.now() - lastMobileExitSwipeRef.current >= 2100) {
+          setShowExitSwipeHint(false);
+        }
+      }, 2200);
+    };
+
+    // Prevent iOS Safari left-edge swipe from triggering OS back-snapshot accidentally
+    const handleEdgeTouchStart = (e) => {
+      if (!isMobileOrPwa()) return;
+      if (e.touches && e.touches.length === 1) {
+        const x = e.touches[0].clientX;
+        const tag = e.target?.tagName;
+        if (x >= 0 && x <= 26 && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+          e.preventDefault();
+        }
       }
     };
+
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('touchstart', handleEdgeTouchStart, { passive: false });
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('touchstart', handleEdgeTouchStart);
+    };
   }, [mobileMenuOpen, showCompanyQuickSheet]);
 
   // Keep navigation in app scope: external links open in browser
@@ -1497,7 +1597,20 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const active = mobileMenuOpen || showCompanyQuickSheet;
+    document.body.classList.toggle('erp-sheet-depth-active', active);
+    if (active) {
+      soundEffects.playGlassWhoosh();
+    }
+    return () => {
+      document.body.classList.remove('erp-sheet-depth-active');
+    };
+  }, [mobileMenuOpen, showCompanyQuickSheet]);
+
   const handleSwitchDepartment = (dept) => {
+    soundEffects.playGlassWhoosh();
     // Clear any pending curtain timers
     curtainTimersRef.current.forEach((id) => clearTimeout(id));
     curtainTimersRef.current = [];
@@ -1553,6 +1666,58 @@ export default function App() {
       setActiveTab('exedp_invoices');
     }
   };
+
+  // Handle Service Worker notification click routing (Android/iOS background push -> exact chat room/message)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const routeFromPushPayload = (urlStr, data = {}) => {
+      try {
+        const parsed = new URL(urlStr || '/communication', window.location.origin);
+        const roomId = data?.roomId || parsed.searchParams.get('room') || '';
+        const messageId = data?.messageId || parsed.searchParams.get('msg') || null;
+        if (roomId || parsed.pathname.includes('/communication') || data?.type === 'chat_message' || data?.type === 'mention') {
+          if (roomId) {
+            const jumpDetail = { roomId: String(roomId), messageId: messageId ? String(messageId) : null };
+            window.__elitePendingChatJump = jumpDetail;
+            setActiveTab('communication');
+            setMobileMenuOpen(false);
+            setShowNotificationDrawer(false);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('elite-open-chat-room', { detail: jumpDetail }));
+            }, 60);
+          } else {
+            setActiveTab('communication');
+            setMobileMenuOpen(false);
+            setShowNotificationDrawer(false);
+          }
+        }
+      } catch (_) {}
+    };
+
+    // Cold-start URL check (when tapping an OS push notification while app was closed)
+    const params = new URLSearchParams(window.location.search || '');
+    const urlRoom = params.get('room');
+    const urlMsg = params.get('msg');
+    if (urlRoom || window.location.pathname === '/communication') {
+      routeFromPushPayload(window.location.href, { roomId: urlRoom, messageId: urlMsg });
+    }
+
+    const handleSwMessage = (event) => {
+      if (event?.data?.type === 'NAVIGATE_TO_ROUTE') {
+        routeFromPushPayload(event.data.url, event.data.data || {});
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, []);
 
   // Auto-request Push Notification permission on site open & register browser Web Push
   useEffect(() => {
@@ -2687,19 +2852,33 @@ export default function App() {
                 onClick={() => setShowCompanyQuickSheet(true)}
                 className="btn-secondary mobile-company-pill"
                 style={{
-                  minHeight: '38px',
-                  padding: '6px 12px',
-                  fontSize: 'var(--font-size-body, 0.88rem)',
+                  height: '34px',
+                  minHeight: '34px',
+                  maxHeight: '34px',
+                  maxWidth: '125px',
+                  padding: '4px 8px',
+                  fontSize: '0.80rem',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '4px',
+                  borderRadius: '8px',
+                  flexShrink: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden'
                 }}
                 title="Switch company"
                 type="button"
               >
-                <span>{isCommActive ? 'Communication' : (activeComp?.name || 'Elite Digital Prints')}</span>
-                <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', color: 'var(--text-muted)' }}>▾</span>
+                <span style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '95px'
+                }}>
+                  {activeTab === 'task_management' ? 'Tasks' : isCommActive ? 'Chat' : (activeComp?.shortName || activeComp?.code || (activeComp?.name ? activeComp.name.replace('Elite ', '') : 'Company'))}
+                </span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0 }}>▾</span>
               </button>
             );
           })()}
@@ -2884,7 +3063,7 @@ export default function App() {
 
         <div style={styles.headerRight} className="header-right-wrap">
           {isMobile ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', position: 'relative', flexShrink: 0 }}>
               <OfflineSyncBadge />
               <button
                 type="button"
@@ -2892,9 +3071,11 @@ export default function App() {
                 className="btn-icon"
                 title="Quick Actions"
                 style={{
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '8px',
+                  minWidth: '34px',
+                  minHeight: '34px',
+                  width: '34px',
+                  height: '34px',
+                  padding: '6px',
                   borderRadius: '8px',
                   border: '1px solid #bfdbfe',
                   background: '#eff6ff',
@@ -2902,10 +3083,11 @@ export default function App() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0
                 }}
               >
-                <Plus size={18} strokeWidth={2.5} />
+                <Plus size={16} strokeWidth={2.5} />
               </button>
               <button
                 type="button"
@@ -2913,46 +3095,24 @@ export default function App() {
                 className="btn-icon"
                 title="Global Search"
                 style={{
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '8px',
+                  minWidth: '34px',
+                  minHeight: '34px',
+                  width: '34px',
+                  height: '34px',
+                  padding: '6px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
-                  background: '#ffffff',
-                  color: '#475569',
+                  background: 'var(--bg-card, #ffffff)',
+                  color: 'var(--text-secondary, #475569)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0
                 }}
               >
-                <Search size={18} />
+                <Search size={16} />
               </button>
-
-              <button
-                type="button"
-                onClick={toggleThemeMode}
-                className="btn-icon"
-                title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                aria-label={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                style={{
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  border: themeMode === 'dark' ? '1px solid rgba(251, 191, 36, 0.38)' : '1px solid #cbd5e1',
-                  background: themeMode === 'dark' ? 'rgba(30, 41, 59, 0.85)' : '#ffffff',
-                  color: themeMode === 'dark' ? '#fcd34d' : '#1e293b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-              >
-                {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
-
-              <EyeComfortControl compact />
 
               <button
                 type="button"
@@ -2960,28 +3120,31 @@ export default function App() {
                 className="btn-icon"
                 title="Notifications & Alerts"
                 style={{
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '8px',
+                  minWidth: '34px',
+                  minHeight: '34px',
+                  width: '34px',
+                  height: '34px',
+                  padding: '6px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
-                  background: '#ffffff',
-                  color: '#475569',
+                  background: 'var(--bg-card, #ffffff)',
+                  color: 'var(--text-secondary, #475569)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   position: 'relative',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0
                 }}
               >
-                <Bell size={18} />
+                <Bell size={16} />
                 {unreadNotifCount > 0 && (
                   <span style={{
                     position: 'absolute',
-                    top: '4px',
-                    right: '4px',
-                    width: '8px',
-                    height: '8px',
+                    top: '3px',
+                    right: '3px',
+                    width: '7px',
+                    height: '7px',
                     borderRadius: '50%',
                     background: '#ef4444'
                   }} />
@@ -2994,20 +3157,23 @@ export default function App() {
                 className="btn-icon"
                 title="More Actions"
                 style={{
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '8px',
+                  minWidth: '34px',
+                  minHeight: '34px',
+                  width: '34px',
+                  height: '34px',
+                  padding: '6px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
-                  background: mobileHeaderMoreOpen ? '#f1f5f9' : '#ffffff',
-                  color: '#475569',
+                  background: mobileHeaderMoreOpen ? '#f1f5f9' : 'var(--bg-card, #ffffff)',
+                  color: 'var(--text-secondary, #475569)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0
                 }}
               >
-                <MoreHorizontal size={18} />
+                <MoreHorizontal size={16} />
               </button>
 
               {mobileHeaderMoreOpen && (
@@ -3022,10 +3188,10 @@ export default function App() {
                       top: 'calc(100% + 6px)',
                       right: 0,
                       width: '210px',
-                      background: '#ffffff',
+                      background: 'var(--bg-card, #ffffff)',
                       borderRadius: '10px',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+                      border: '1px solid var(--border-light, #e2e8f0)',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12), 0 8px 10px -6px rgba(0,0,0,0.06)',
                       zIndex: 1000,
                       padding: '6px',
                       display: 'flex',
@@ -3034,9 +3200,129 @@ export default function App() {
                       animation: 'fadeInMenu 0.12s ease-out'
                     }}
                   >
+                    <div
+                      onClick={() => {
+                        toggleThemeMode();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary, #1e293b)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        {themeMode === 'dark' ? <Moon size={15} color="#818cf8" /> : <Sun size={15} color="#fbbf24" />}
+                        <span>Dark Mode</span>
+                      </span>
+                      <ToggleSwitch
+                        checked={themeMode === 'dark'}
+                        onChange={() => toggleThemeMode()}
+                        size="sm"
+                        accent="blue"
+                        showLabel={false}
+                        ariaLabel="Toggle Dark Mode"
+                      />
+                    </div>
+
+                    <div style={{ padding: '6px 8px', borderRadius: '8px', background: 'rgba(148, 163, 184, 0.08)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          padding: '2px',
+                          fontSize: '0.80rem',
+                          fontWeight: 600,
+                          color: 'var(--text-primary, #1e293b)'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                          <BellRing size={14} color={soundEffects.enabled ? '#38bdf8' : '#94a3b8'} />
+                          <span>System Sounds</span>
+                        </span>
+                        <ToggleSwitch
+                          checked={Boolean(soundEffects.enabled)}
+                          onChange={(next) => {
+                            soundEffects.setEnabled(next);
+                            if (next) soundEffects.playMilestone();
+                            setMobileHeaderMoreOpen((v) => v);
+                            if (typeof window !== 'undefined' && window.showToast) {
+                              window.showToast(next ? 'System Sounds Enabled' : 'System Sounds Muted', 'info');
+                            }
+                          }}
+                          size="sm"
+                          accent="emerald"
+                          showLabel={false}
+                          playSound={false}
+                          ariaLabel="Toggle System Sounds"
+                        />
+                      </div>
+                      {soundEffects.enabled && (
+                        <>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {[
+                              { id: 'apple', label: 'Apple' },
+                              { id: 'mechanical', label: 'Mech' },
+                              { id: 'synth', label: 'Synth' }
+                            ].map((p) => {
+                              const active = soundEffects.personality === p.id;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => {
+                                    soundEffects.setPersonality(p.id);
+                                    soundEffects.playClick();
+                                    setMobileHeaderMoreOpen(false);
+                                    setTimeout(() => setMobileHeaderMoreOpen(true), 0);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '3px 4px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.68rem',
+                                    fontWeight: active ? 700 : 500,
+                                    border: active ? '1px solid #38bdf8' : '1px solid rgba(148,163,184,0.25)',
+                                    background: active ? 'rgba(56, 189, 248, 0.22)' : 'transparent',
+                                    color: active ? '#38bdf8' : 'var(--text-muted, #64748b)',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {p.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="1"
+                            step="0.1"
+                            defaultValue={soundEffects.volume}
+                            onChange={(e) => {
+                              soundEffects.setVolume(parseFloat(e.target.value));
+                              soundEffects.playScrollTick();
+                            }}
+                            aria-label="Sound Volume"
+                            style={{ width: '100%', accentColor: '#38bdf8', height: '4px', cursor: 'pointer' }}
+                          />
+                        </>
+                      )}
+                    </div>
+
+                    <EyeComfortControl compact />
                     <button
                       type="button"
                       onClick={() => {
+                        soundEffects.playRefresh();
                         setMobileHeaderMoreOpen(false);
                         fetchData();
                         triggerGlobalDataRefresh();
@@ -3320,30 +3606,60 @@ export default function App() {
       {mobileMenuOpen && (
         <div className="mobile-drawer-overlay" onClick={() => setMobileMenuOpen(false)}>
           <div className="mobile-drawer-content" onClick={(e) => e.stopPropagation()}>
-            {/* Header: Company Name + Close Button */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <div>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', display: 'block' }}>
-                  {getCompanyById(activeDepartment)?.name || 'Elite Digital Prints'}
-                </span>
-                <span style={{ fontSize: 'var(--size-meta, 0.75rem)', color: 'var(--text-muted)' }}>
-                  Navigation & Company Switcher
-                </span>
-              </div>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="btn-icon"
-                aria-label="Close menu"
-                style={{ minHeight: '44px', minWidth: '44px' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
+            {/* Header: Active Company Card with Logo Badge + Close Button */}
+            {(() => {
+              const activeComp = getCompanyById(activeDepartment) || { name: 'Elite Digital Prints', code: 'EDP', type: 'Digital Textile Printing', badgeColor: '#1d4ed8' };
+              return (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid var(--border-light, rgba(255, 255, 255, 0.12))',
+                  paddingBottom: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: activeComp.badgeColor || '#2563eb',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                    }}>
+                      {activeComp.code || 'EE'}
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: '0.96rem', color: 'var(--text-primary)', display: 'block', lineHeight: 1.2 }}>
+                        {activeComp.name}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {activeComp.type || 'Workspace'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="btn-icon"
+                    aria-label="Close menu"
+                    style={{ minHeight: '38px', minWidth: '38px', width: '38px', height: '38px' }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              );
+            })()}
 
-            {/* Section 1: Company Switcher (Plain text list) */}
-            <div style={{ marginTop: '8px' }}>
-              <div className="nav-section-header">Switch Company</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+            {/* Section 1: Company Switcher (Liquid Glass with Code Badges & Icons) */}
+            <div style={{ marginTop: '10px' }}>
+              <div className="nav-section-header" style={{ fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                Switch Company
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {COMPANIES.map(company => {
                   if (!isCompanyAllowed(company.id) && !isCompanyAllowed(company.name)) return null;
                   if (company.id === 'elite_online' && !hasEliteOnlineAccess) return null;
@@ -3362,12 +3678,42 @@ export default function App() {
                       key={company.id}
                       onClick={() => { handleSwitchDepartment(company.id); setMobileMenuOpen(false); }}
                       className={`mobile-drawer-item ${isCurrent ? 'active' : ''}`}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: isCurrent ? (company.gradient || 'linear-gradient(135deg, #2563eb, #1d4ed8)') : 'transparent',
+                        color: isCurrent ? '#ffffff' : 'var(--text-primary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.86rem',
+                        fontWeight: isCurrent ? 700 : 500
+                      }}
                     >
-                      <span>{company.name}</span>
-                      {isCurrent && <span style={{ fontSize: '0.75rem' }}>Active</span>}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                        <span style={{
+                          minWidth: '34px',
+                          textAlign: 'center',
+                          fontSize: '0.66rem',
+                          fontWeight: 800,
+                          padding: '2px 5px',
+                          borderRadius: '6px',
+                          background: isCurrent ? 'rgba(255,255,255,0.22)' : `${company.badgeColor || '#3b82f6'}22`,
+                          color: isCurrent ? '#ffffff' : (company.badgeColor || '#60a5fa'),
+                          border: isCurrent ? '1px solid rgba(255,255,255,0.28)' : `1px solid ${company.badgeColor || '#3b82f6'}38`
+                        }}>
+                          {company.code || company.name.substring(0, 2).toUpperCase()}
+                        </span>
+                        <span>{company.name}</span>
+                      </span>
+                      {isCurrent && <Check size={15} style={{ flexShrink: 0 }} />}
                     </button>
                   );
                 })}
+
+                <div style={{ height: '1px', background: 'var(--border-light, rgba(255,255,255,0.1))', margin: '4px 2px' }} />
 
                 {hasCommunicationAccess && (
                   <button
@@ -3379,9 +3725,19 @@ export default function App() {
                       }
                     }}
                     className={`mobile-drawer-item ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
+                    style={{ padding: '7px 10px', borderRadius: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   >
-                    <span>Communication</span>
-                    {chatUnreadCount > 0 && <span style={{ fontSize: '0.75rem' }}>({chatUnreadCount})</span>}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+                      <span className={`liquid-icon-3d ${(activeTab === 'communication' || activeTab === 'workspace') ? 'active' : ''}`}>
+                        <MessageSquare size={15} style={{ color: (activeTab === 'communication' || activeTab === 'workspace') ? '#ffffff' : '#38bdf8' }} />
+                      </span>
+                      <span>Communication</span>
+                    </span>
+                    {chatUnreadCount > 0 && (
+                      <span style={{ fontSize: '0.70rem', background: '#ef4444', color: '#fff', padding: '1px 6px', borderRadius: '999px', fontWeight: 700 }}>
+                        {chatUnreadCount}
+                      </span>
+                    )}
                   </button>
                 )}
 
@@ -3394,265 +3750,210 @@ export default function App() {
                       });
                     }}
                     className={`mobile-drawer-item ${activeTab === 'task_management' ? 'active' : ''}`}
+                    style={{ padding: '7px 10px', borderRadius: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   >
-                    <span>Tasks</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+                      <span className={`liquid-icon-3d ${activeTab === 'task_management' ? 'active' : ''}`}>
+                        <CheckSquare size={15} style={{ color: activeTab === 'task_management' ? '#ffffff' : '#34d399' }} />
+                      </span>
+                      <span>Tasks</span>
+                    </span>
                   </button>
                 )}
-
-                <button
-                  onClick={() => {
-                    setActiveTab('reconciliation');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`mobile-drawer-item ${activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? 'active' : ''}`}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <Scale size={16} style={{ flexShrink: 0 }} />
-                    <span>Reconciliation</span>
-                  </span>
-                </button>
               </div>
             </div>
 
-            {/* Section 2: Department Navigation Links (Plain text links only) */}
-            <div style={{ marginTop: '8px', flex: 1 }}>
-              <div className="nav-section-header">Modules</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                {activeDepartment === 'exedp' ? (
-                  <button onClick={() => { setActiveTab('exedp_invoices'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'exedp_invoices' ? 'active' : ''}`}>
-                    Finance
-                  </button>
-                ) : activeDepartment === 'stitching' ? (
-                  <>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) && (
-                      <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_list' ? 'active' : ''}`}>
-                        Jobcard
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('stitching_design')) && (
-                      <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_catalogue' ? 'active' : ''}`}>
-                        Design Room
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('es_raw_materials')) && (
-                      <button onClick={() => { setActiveTab('es_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'es_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) && (
-                      <button onClick={() => { setActiveTab('jobcards_stitching_challan'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') ? 'active' : ''}`}>
-                        Challan
-                      </button>
-                    )}
-                    <button onClick={() => { setActiveTab('es_complaints'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'es_complaints' ? 'active' : ''}`}>
-                      Complaints
-                    </button>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) && (
-                      <button onClick={() => { setActiveTab('jobcards_stitching_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_stitching_settings' ? 'active' : ''}`}>
-                        Settings
-                      </button>
-                    )}
-                  </>
-                ) : activeDepartment === 'digital_print' ? (
-                  <>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
-                      <button onClick={() => { setActiveTab('jobcards'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards' ? 'active' : ''}`}>
-                        Prints Dashboard
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards') || currentUser.permissions?.includes('jobcards_status_dashboard')) && (
-                      <button onClick={() => { setActiveTab('jobcards_status_dashboard'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'jobcards_status_dashboard' || activeTab === 'jobcards_status') ? 'active' : ''}`}>
-                        Pending Status Overview
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
-                      <button onClick={() => { setActiveTab('jobcards_printing_log'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_printing_log' ? 'active' : ''}`}>
-                        Printing Department
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fusing_log') || currentUser.permissions?.includes('jobcards')) && (
-                      <button onClick={() => { setActiveTab('jobcards_fusing_log'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_fusing_log' ? 'active' : ''}`}>
-                        Fusing Department
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
-                      <button onClick={() => { setActiveTab('jobcards_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
-                      <button onClick={() => { setActiveTab('jobcards_fabric'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_fabric' ? 'active' : ''}`}>
-                        Fabric Management
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) && (
-                      <button onClick={() => { setActiveTab('jobcards_billing'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_billing' ? 'active' : ''}`}>
-                        Finance
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) && (
-                      <button onClick={() => { setActiveTab('jobcards_costing'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_costing' ? 'active' : ''}`}>
-                        Costing
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) && (
-                      <button onClick={() => { setActiveTab('jobcards_crm'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_crm' ? 'active' : ''}`}>
-                        CRM Department
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
-                      <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_list' ? 'active' : ''}`}>
-                        Job Card
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master') || currentUser.permissions?.includes('jobcards_sample')) && (
-                      <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_master' || activeTab === 'jobcards_sample') ? 'active' : ''}`}>
-                        Design Catalog
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module') || currentUser.permissions?.includes('jobcards_sample')) && (
-                      <button onClick={() => { setActiveTab('designer_screen'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'designer_screen' || activeTab === 'jobcards_sample') ? 'active' : ''}`}>
-                        Designer Screen
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
-                      <button onClick={() => { setActiveTab('jobcards_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_settings' ? 'active' : ''}`}>
-                        Print Settings
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints') || currentUser.permissions?.includes('complaint_dashboard') || currentUser.permissions?.includes('complaint_create')) && (
-                      <button onClick={() => { setActiveTab('jobcards_complain'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_complain' ? 'active' : ''}`}>
-                        Complaints
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard') || currentUser.permissions?.includes('elite_online')) && (
-                      <button onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
-                        Dashboard Overview
-                      </button>
-                    )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
-                      <button onClick={() => { setActiveTab('inventory'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'inventory' ? 'active' : ''}`}>
-                        Store Inventory
-                      </button>
-                    )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
-                      <button onClick={() => { setActiveTab('returns'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'returns' ? 'active' : ''}`}>
-                        Returns Department
-                      </button>
-                    )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
-                      <button onClick={() => { setActiveTab('sales'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'sales' ? 'active' : ''}`}>
-                        Sales Orders
-                      </button>
-                    )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_scan_pack')) && (
-                      <button onClick={() => { setActiveTab('eo_scan_pack'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_scan_pack' ? 'active' : ''}`}>
-                        Scan & Pack
-                      </button>
-                    )}
-                    <button onClick={() => { setActiveTab('eo_complaints'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_complaints' ? 'active' : ''}`}>
-                      Complaints
-                    </button>
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
-                      <button onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'reports' ? 'active' : ''}`}>
-                        Reports Center
-                      </button>
-                    )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
-                      <button onClick={() => { setActiveTab('unicommerce'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'unicommerce' ? 'active' : ''}`}>
-                        Uniware Integrations
-                      </button>
-                    )}
-                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
-                      <button onClick={() => { setActiveTab('myntra'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'myntra' ? 'active' : ''}`} style={{ color: activeTab === 'myntra' ? '#e11d48' : '#be123c', fontWeight: 600 }}>
-                        Myntra Integrations
-                      </button>
-                    )}
-                    {activeDepartment === 'ethno_wear' && (
-                      <>
-                        {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_design') || currentUser.permissions?.includes('jobcards_catalogue')) && (
-                          <button onClick={() => { setActiveTab('ew_design'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ew_design' ? 'active' : ''}`}>
-                            Design Room
-                          </button>
-                        )}
-                        <button onClick={() => { setActiveTab('ew_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ew_raw_materials' ? 'active' : ''}`}>
-                          Raw Materials
-                        </button>
-                      </>
-                    )}
-                    {activeDepartment === 'yamunaji' && (
-                      <>
-                        <button onClick={() => { setActiveTab('yj_dashboard'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_dashboard' ? 'active' : ''}`}>
-                          Dashboard
-                        </button>
-                        <button onClick={() => { setActiveTab('yj_rfd'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_rfd' ? 'active' : ''}`}>
-                          Fabric Process
-                        </button>
-                        <button onClick={() => { setActiveTab('yj_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_raw_materials' ? 'active' : ''}`}>
-                          Raw Materials
-                        </button>
-                        <button onClick={() => { setActiveTab('yj_invoices'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_invoices' ? 'active' : ''}`}>
-                          Finance
-                        </button>
-                        <button onClick={() => { setActiveTab('yj_complaints'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_complaints' ? 'active' : ''}`}>
-                          Complaints
-                        </button>
-                        <button onClick={() => { setActiveTab('yj_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_settings' ? 'active' : ''}`}>
-                          Settings
-                        </button>
-                      </>
-                    )}
-                    {activeDepartment === 'elite_edition' && (
-                      <button onClick={() => { setActiveTab('ee_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ee_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
-                    )}
-                    {activeDepartment === 'elite_fabtex' && (
-                      <>
-                        <button onClick={() => { setActiveTab('ef_rfd'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ef_rfd' ? 'active' : ''}`}>
-                          Fabric Process
-                        </button>
-                        <button onClick={() => { setActiveTab('ef_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ef_raw_materials' ? 'active' : ''}`}>
-                          Raw Materials
-                        </button>
-                      </>
-                    )}
-                    {activeDepartment === 'sobise' && (
-                      <button onClick={() => { setActiveTab('so_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'so_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
-                    )}
-                    {activeDepartment === 'elite_online' && (
-                      <button onClick={() => { setActiveTab('eo_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
-                    )}
-                    {activeDepartment === 'elite_online' && (!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) && (
-                      <button onClick={() => { setActiveTab('eo_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_settings' ? 'active' : ''}`}>
-                        Settings
-                      </button>
-                    )}
-                  </>
-                )}
+            {/* Section 2: Active Company Modules */}
+            <div style={{ marginTop: '12px', flex: 1 }}>
+              <div className="nav-section-header" style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                {getCompanyById(activeDepartment)?.name || 'Company'} Modules
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {(() => {
+                  let modules = [];
+                  if (activeDepartment === 'stitching') {
+                    modules = [
+                      { id: 'es_dashboard', label: 'Production Dashboard', icon: LayoutDashboard },
+                      { id: 'jobcards_list', label: 'Garment Job Cards', icon: FileText, perm: 'stitching_jobcards' },
+                      { id: 'jobcards_catalogue', label: 'Design Room', icon: BookOpen, perm: 'stitching_design' },
+                      { id: 'es_raw_materials', label: 'Raw Materials', icon: Layers, perm: 'es_raw_materials' },
+                      { id: 'jobcards_stitching_challan', label: 'Stitching Challans', icon: Database, perm: 'jobcards_stitching_challan' },
+                      { id: 'es_complaints', label: 'Complaints', icon: AlertTriangle },
+                      { id: 'es_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'es_invoices' },
+                      { id: 'es_settings', label: 'Settings', icon: Settings, perm: 'stitching_settings' }
+                    ];
+                  } else if (activeDepartment === 'digital_print') {
+                    modules = [
+                      { id: 'jobcards', label: 'Prints Dashboard & Reports', icon: BarChart3, perm: 'jobcards' },
+                      { id: 'jobcards_printing_log', label: 'Printing Department', icon: Printer, perm: 'jobcards_printing_log' },
+                      { id: 'jobcards_fusing_log', label: 'Fusing Department', icon: Flame, perm: 'jobcards_fusing_log' },
+                      { id: 'jobcards_fabric', label: 'Fabric Management', icon: Database, perm: 'jobcards_fabric' },
+                      { id: 'jobcards_billing', label: 'Finance', icon: Receipt, perm: 'jobcards_billing' },
+                      { id: 'jobcards_costing', label: 'Costing', icon: TrendingUp, perm: 'jobcards_costing' },
+                      { id: 'jobcards_crm', label: 'CRM Department', icon: Users, perm: 'jobcards_crm' },
+                      { id: 'jobcards_business_connection', label: 'Business Connection', icon: Users, perm: 'jobcards_business_connection' },
+                      { id: 'jobcards_list', label: 'Job Card', icon: FileText, perm: 'jobcards_list' },
+                      { id: 'jobcards_catalogue', label: 'Design Catalog', icon: BookOpen, perm: 'jobcards_catalogue' },
+                      { id: 'designer_screen', label: 'Designer Screen', icon: Palette, perm: 'designer_screen' },
+                      { id: 'jobcards_settings', label: 'Print Settings', icon: Settings, perm: 'jobcards_settings' },
+                      { id: 'jobcards_raw_materials', label: 'Raw Materials', icon: ShoppingBag, perm: 'jobcards_raw_materials' },
+                      { id: 'jobcards_complain', label: 'Complain Module', icon: AlertTriangle, perm: 'jobcards_complain' },
+                      { id: 'jobcards_qa', label: 'QA & Quality Checking', icon: ShieldCheck, perm: 'jobcards_qa' }
+                    ];
+                  } else if (activeDepartment === 'yamunaji') {
+                    modules = [
+                      { id: 'yj_dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'yj_dashboard' },
+                      { id: 'yj_rfd', label: 'Fabric Process', icon: Layers, perm: 'yj_rfd' },
+                      { id: 'yj_raw_materials', label: 'Raw Materials', icon: PackageCheck, perm: 'yj_raw_materials' },
+                      { id: 'yj_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'yj_invoices' },
+                      { id: 'yj_complaints', label: 'Complaints', icon: AlertTriangle, perm: 'yj_complaints' },
+                      { id: 'yj_settings', label: 'Settings', icon: Settings, perm: 'yj_settings' }
+                    ];
+                  } else if (activeDepartment === 'ethno_wear') {
+                    modules = [
+                      { id: 'ew_dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'ew_dashboard' },
+                      { id: 'ew_design', label: 'Design Room', icon: BookOpen, perm: 'ew_design' },
+                      { id: 'ew_rfd', label: 'Fabric Process', icon: Layers, perm: 'ew_rfd' },
+                      { id: 'ew_raw_materials', label: 'Raw Materials', icon: Layers, perm: 'ew_raw_materials' },
+                      { id: 'ew_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'ew_invoices' },
+                      { id: 'ew_complaints', label: 'Complaints', icon: AlertTriangle, perm: 'ew_complaints' },
+                      { id: 'ew_settings', label: 'Settings', icon: Settings, perm: 'ew_settings' }
+                    ];
+                  } else if (activeDepartment === 'elite_edition') {
+                    modules = [
+                      { id: 'ee_dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'ee_dashboard' },
+                      { id: 'ee_rfd', label: 'Fabric Process', icon: Layers, perm: 'ee_rfd' },
+                      { id: 'ee_raw_materials', label: 'Raw Materials', icon: Layers, perm: 'ee_raw_materials' },
+                      { id: 'ee_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'ee_invoices' },
+                      { id: 'ee_complaints', label: 'Complaints', icon: AlertTriangle, perm: 'ee_complaints' },
+                      { id: 'ee_settings', label: 'Settings', icon: Settings, perm: 'ee_settings' }
+                    ];
+                  } else if (activeDepartment === 'elite_fabtex') {
+                    modules = [
+                      { id: 'ef_dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'ef_dashboard' },
+                      { id: 'ef_rfd', label: 'Fabric Process', icon: Layers, perm: 'ef_rfd' },
+                      { id: 'ef_raw_materials', label: 'Raw Materials', icon: PackageCheck, perm: 'ef_raw_materials' },
+                      { id: 'ef_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'ef_invoices' },
+                      { id: 'ef_complaints', label: 'Complaints', icon: AlertTriangle, perm: 'ef_complaints' },
+                      { id: 'ef_settings', label: 'Settings', icon: Settings, perm: 'ef_settings' }
+                    ];
+                  } else if (activeDepartment === 'sobise') {
+                    modules = [
+                      { id: 'so_dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'so_dashboard' },
+                      { id: 'so_rfd', label: 'Fabric Process', icon: Layers, perm: 'so_rfd' },
+                      { id: 'so_raw_materials', label: 'Raw Materials', icon: Layers, perm: 'so_raw_materials' },
+                      { id: 'so_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'so_invoices' },
+                      { id: 'so_complaints', label: 'Complaints', icon: AlertTriangle, perm: 'so_complaints' },
+                      { id: 'so_settings', label: 'Settings', icon: Settings, perm: 'so_settings' }
+                    ];
+                  } else if (activeDepartment === 'elite_online') {
+                    modules = [
+                      { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
+                      { id: 'inventory', label: 'Store Inventory', icon: Database, perm: 'inventory' },
+                      { id: 'returns', label: 'Returns Department', icon: PackageMinus, perm: 'returns' },
+                      { id: 'sales', label: 'Sales Orders', icon: ShoppingBag, perm: 'sales' },
+                      { id: 'eo_scan_pack', label: 'Scan & Pack', icon: PackageCheck, perm: 'eo_scan_pack' },
+                      { id: 'eo_complaints', label: 'Complaints', icon: AlertTriangle },
+                      { id: 'reports', label: 'Reports Center', icon: BarChart3, perm: 'reports' },
+                      { id: 'unicommerce', label: 'Uniware Integrations', icon: RefreshCw, perm: 'unicommerce' },
+                      { id: 'myntra', label: 'Myntra Integrations', icon: ShoppingBag, perm: 'myntra', badge: 'PPMP' },
+                      { id: 'eo_raw_materials', label: 'Raw Materials', icon: Layers, perm: 'eo_raw_materials' },
+                      { id: 'eo_invoices', label: 'Finance', icon: Receipt, perm: 'eo_invoices' },
+                      { id: 'eo_settings', label: 'Settings', icon: Settings, perm: 'eo_settings' }
+                    ];
+                  } else if (activeDepartment === 'exedp') {
+                    modules = [
+                      { id: 'exedp_invoices', label: 'Finance & Invoices', icon: Receipt, perm: 'exedp_invoices' }
+                    ];
+                  }
 
-                {/* Direct Integrations Access for Quick Switching */}
-                {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && activeDepartment !== 'elite_online' && (
-                  <button
-                    onClick={() => { setActiveTab('myntra'); setMobileMenuOpen(false); }}
-                    className={`mobile-drawer-item ${activeTab === 'myntra' ? 'active' : ''}`}
-                    style={{ color: '#e11d48', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                  >
-                    <span>Myntra Integrations</span>
-                    <span style={{ fontSize: '0.72rem', background: '#ffe4e6', color: '#e11d48', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>PPMP</span>
-                  </button>
-                )}
+                  return modules.map((mod) => {
+                    if (mod.perm && currentUser && currentUser.role !== 'admin' && !isSuperOrAdmin && !currentUser.permissions?.includes(mod.perm)) {
+                      return null;
+                    }
+
+                    const isActive = activeTab === mod.id || (mod.id === 'jobcards_stitching_challan' && activeTab === 'jobcards_fabric');
+                    const ModIcon = mod.icon || LayoutDashboard;
+
+                    return (
+                      <button
+                        key={mod.id}
+                        onClick={() => {
+                          setActiveTab(mod.id);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: isActive ? 'linear-gradient(135deg, var(--entity-accent, #2563eb), #1d4ed8)' : 'transparent',
+                          color: isActive ? '#ffffff' : 'var(--text-primary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.86rem',
+                          fontWeight: isActive ? 700 : 500,
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className={`liquid-icon-3d ${isActive ? 'active' : ''}`}>
+                            <ModIcon
+                              size={15}
+                              style={{
+                                color: isActive ? '#ffffff' : (
+                                  mod.id === 'myntra' ? '#fb7185' :
+                                  mod.id.includes('fusing') ? '#fb923c' :
+                                  mod.id.includes('complain') ? '#f59e0b' :
+                                  mod.id.includes('billing') || mod.id.includes('invoice') ? '#34d399' :
+                                  mod.id.includes('costing') || mod.id.includes('qa') ? '#c084fc' :
+                                  mod.id.includes('designer') || mod.id.includes('catalogue') || mod.id.includes('design') ? '#f472b6' :
+                                  mod.id.includes('settings') ? '#94a3b8' :
+                                  '#38bdf8'
+                                ),
+                                flexShrink: 0
+                              }}
+                            />
+                          </span>
+                          <span>{mod.label}</span>
+                        </div>
+                        {mod.badge && !isActive ? (
+                          <span style={{ fontSize: '0.66rem', background: 'rgba(225, 29, 72, 0.16)', color: '#fb7185', padding: '2px 7px', borderRadius: '999px', fontWeight: 700 }}>{mod.badge}</span>
+                        ) : isActive ? (
+                          <Check size={15} style={{ flexShrink: 0 }} />
+                        ) : null}
+                      </button>
+                    );
+                  });
+                })()}
 
                 {currentUser && (isSuperOrAdmin || currentUser.role === 'admin') && (
-                  <button onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'admin' ? 'active' : ''}`}>
-                    Admin Panel
+                  <button
+                    onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
+                    className={`mobile-drawer-item ${activeTab === 'admin' ? 'active' : ''}`}
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: activeTab === 'admin' ? 'var(--primary, #2563eb)' : 'transparent',
+                      color: activeTab === 'admin' ? '#ffffff' : 'var(--text-primary)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.86rem',
+                      fontWeight: activeTab === 'admin' ? 700 : 500
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className={`liquid-icon-3d ${activeTab === 'admin' ? 'active' : ''}`}>
+                        <Settings size={15} style={{ flexShrink: 0, color: activeTab === 'admin' ? '#ffffff' : '#60a5fa' }} />
+                      </span>
+                      <span>Admin Panel</span>
+                    </div>
+                    {activeTab === 'admin' && <Check size={15} style={{ flexShrink: 0 }} />}
                   </button>
                 )}
               </div>
@@ -3787,48 +4088,24 @@ export default function App() {
                         aria-current={isActive ? 'page' : undefined}
                         onClick={() => handleNavClick(tabKey)}
                         title={`${label} ${itemShortcutNum ? `(Alt + ${itemShortcutNum})` : ''}`}
-                        className="sidebar-nav-collapsed-btn"
-                        style={{
-                          background: isActive ? '#eff6ff' : 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          width: '100%',
-                          padding: '8px 4px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          borderRadius: '6px',
-                          color: isActive ? '#1d4ed8' : '#64748b',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          transition: 'all 0.15s ease',
-                          borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent',
-                          position: 'relative'
-                        }}
-                        onMouseEnter={e => {
-                          if (!isActive) e.currentTarget.style.background = '#f8fafc';
-                        }}
-                        onMouseLeave={e => {
-                          if (!isActive) e.currentTarget.style.background = 'transparent';
-                        }}
+                        className={`sidebar-nav-collapsed-btn sidebar-liquid-tile ${isActive ? 'active' : ''}`}
+                        style={{ outline: 'none' }}
                       >
                         <NavIcon
                           size={20}
-                          color={customColor || (isActive ? '#2563eb' : '#64748b')}
+                          color={customColor || 'currentColor'}
                           style={{ flexShrink: 0 }}
                         />
                         <span
                           style={{
-                            fontSize: '0.66rem',
+                            fontSize: '0.64rem',
                             fontWeight: isActive ? 700 : 500,
-                            lineHeight: 1.15,
-                            color: isActive ? '#1d4ed8' : '#64748b',
+                            lineHeight: 1.1,
                             wordBreak: 'break-word',
-                            maxWidth: '64px',
-                            textAlign: 'center'
+                            maxWidth: '44px',
+                            textAlign: 'center',
+                            marginTop: '2px',
+                            opacity: isActive ? 1 : 0.85
                           }}
                         >
                           {displayShort}
@@ -3847,35 +4124,15 @@ export default function App() {
                       aria-current={isActive ? 'page' : undefined}
                       onClick={() => handleNavClick(tabKey)}
                       title={`${label} ${itemShortcutNum ? `(Alt + ${itemShortcutNum})` : ''}`}
+                      className={`sidebar-nav-item sidebar-liquid-item ${isActive ? 'active' : ''}`}
                       style={{
-                        background: isActive ? '#eff6ff' : 'transparent',
-                        border: 'none',
-                        width: '100%',
-                        padding: '8px 12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        gap: '10px',
-                        borderRadius: '6px',
-                        color: isActive ? '#1d4ed8' : '#334155',
+                        outline: 'none',
                         fontSize: '0.86rem',
-                        fontWeight: isActive ? '700' : '500',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.15s ease',
-                        borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent',
                         whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        position: 'relative'
-                      }}
-                      onMouseEnter={e => {
-                        if (!isActive) e.currentTarget.style.background = '#f8fafc';
-                      }}
-                      onMouseLeave={e => {
-                        if (!isActive) e.currentTarget.style.background = 'transparent';
+                        overflow: 'hidden'
                       }}
                     >
-                      <NavIcon size={17} color={customColor || (isActive ? '#2563eb' : '#64748b')} style={{ flexShrink: 0 }} />
+                      <NavIcon size={18} color={customColor || 'currentColor'} style={{ flexShrink: 0 }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{label}</span>
                     </button>
                   );
@@ -4464,8 +4721,6 @@ export default function App() {
                     <MyntraHub />
                   ) : activeTab === 'designer_screen' || activeTab === 'designer_module' || activeTab === 'designer' ? (
                     <DesignerScreen currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
-                  ) : activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? (
-                    <LedgerReconciliationPanel />
                   ) : activeTab === 'admin' ? (
                     <AdminPanel
                       companyEntity={
@@ -4721,7 +4976,10 @@ export default function App() {
       <NotificationHistoryDrawer
         isOpen={showNotificationDrawer}
         onClose={() => setShowNotificationDrawer(false)}
-        onSelectTab={(tab) => setActiveTab(tab)}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setMobileMenuOpen(false);
+        }}
       />
 
       {/* Modal Dialogs with Deferred Suspense Loading */}
@@ -4799,43 +5057,48 @@ export default function App() {
           }}
         >
           <div
+            className="company-quick-sheet-panel"
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#ffffff',
-              borderTopLeftRadius: '22px',
-              borderTopRightRadius: '22px',
-              padding: '1.25rem 1.25rem 2.25rem 1.25rem',
-              boxShadow: '0 -10px 40px rgba(0,0,0,0.3)',
-              borderTop: '1px solid #e2e8f0',
+              borderTopLeftRadius: '26px',
+              borderTopRightRadius: '26px',
+              padding: '1rem 1.15rem calc(1.75rem + env(safe-area-inset-bottom, 0px)) 1.15rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem',
-              maxHeight: '85vh',
+              gap: '0.85rem',
+              maxHeight: '86vh',
               overflowY: 'auto'
             }}
           >
             {/* Drag Handle Indicator */}
-            <div style={{ width: '42px', height: '4px', background: '#cbd5e1', borderRadius: '2px', alignSelf: 'center', marginBottom: '0.15rem' }} />
+            <div style={{ width: '44px', height: '4px', background: 'rgba(148, 163, 184, 0.45)', borderRadius: '999px', alignSelf: 'center', marginBottom: '0.1rem' }} />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  🏢 Switch Active Company
-                </h3>
-                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  Tap any company to switch workspace instantly
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="liquid-icon-3d active" style={{ width: '36px', height: '36px', borderRadius: '11px' }}>
+                  <Building size={18} color="#38bdf8" />
                 </span>
+                <div>
+                  <h3 style={{ fontSize: '1.08rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+                    Switch Active Company
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Tap any company to switch workspace instantly
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setShowCompanyQuickSheet(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b', padding: '0.2rem' }}
+                className="liquid-icon-3d"
+                aria-label="Close"
+                style={{ width: '34px', height: '34px', borderRadius: '999px', cursor: 'pointer', color: 'var(--text-primary)' }}
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
 
             {/* List of Companies */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.15rem' }}>
               {COMPANIES.map(company => {
                 if (!isCompanyAllowed(company.id) && !isCompanyAllowed(company.name)) return null;
                 if (company.id === 'elite_online' && !hasEliteOnlineAccess) return null;
@@ -4848,64 +5111,54 @@ export default function App() {
                 if (company.id === 'yamunaji' && !hasYamunajiAccess) return null;
                 if (company.id === 'exedp' && !hasExedpAccess) return null;
 
-                const isActive = activeDepartment === company.id && activeTab !== 'workspace';
+                const isActive = activeDepartment === company.id && !['workspace', 'communication', 'task_management'].includes(activeTab);
                 const CompIcon = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : company.iconName === 'Layers' ? Layers : Building;
                 const brandColor = company.iconColor || '#6366f1';
 
                 return (
                   <div
                     key={company.id}
+                    className={`company-quick-card ${isActive ? 'active' : ''}`}
                     onClick={() => {
                       handleSwitchDepartment(company.id);
                       setShowCompanyQuickSheet(false);
                       setMobileMenuOpen(false);
                     }}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.85rem 1rem',
-                      borderRadius: '14px',
-                      border: isActive ? `2px solid ${brandColor}` : '1px solid #e2e8f0',
-                      background: isActive ? `${brandColor}0d` : '#ffffff',
-                      cursor: 'pointer',
-                      boxShadow: isActive ? `0 4px 14px ${brandColor}35` : '0 1px 3px rgba(0,0,0,0.03)',
-                      transition: 'all 0.15s ease'
+                      '--card-brand': brandColor,
+                      borderColor: isActive ? brandColor : undefined,
+                      boxShadow: isActive ? `0 8px 26px -4px ${brandColor}55, inset 0 1.5px 0 rgba(255,255,255,0.42)` : undefined
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                      <div style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '12px',
-                        background: company.gradient || 'linear-gradient(135deg, #6366f1, #0891b2)',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        boxShadow: `0 3px 10px ${brandColor}40`
-                      }}>
-                        <CompIcon size={20} color="#ffffff" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
+                      <div
+                        className="company-quick-icon-3d"
+                        style={{
+                          background: company.gradient || `linear-gradient(145deg, ${brandColor}, ${brandColor}bb)`,
+                          boxShadow: `0 6px 16px -2px ${brandColor}66, inset 0 1.5px 1px rgba(255, 255, 255, 0.55), inset 0 -2px 4px rgba(0, 0, 0, 0.28)`
+                        }}
+                      >
+                        <CompIcon size={20} color="#ffffff" strokeWidth={2.1} />
                       </div>
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                          <span style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {company.name}
                           </span>
                           <span style={{
-                            fontSize: '0.68rem',
+                            fontSize: '0.66rem',
                             fontWeight: 800,
-                            padding: '2px 6px',
+                            padding: '2px 7px',
                             borderRadius: '6px',
-                            background: `${brandColor}18`,
+                            background: `${brandColor}24`,
                             color: brandColor,
-                            border: `1px solid ${brandColor}30`
+                            border: `1px solid ${brandColor}45`,
+                            flexShrink: 0
                           }}>
                             {company.code}
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {company.type}
                         </div>
                       </div>
@@ -4913,25 +5166,27 @@ export default function App() {
 
                     {isActive ? (
                       <span style={{
-                        padding: '0.28rem 0.75rem',
-                        borderRadius: '20px',
-                        background: brandColor,
+                        padding: '0.3rem 0.75rem',
+                        borderRadius: '999px',
+                        background: company.gradient || brandColor,
                         color: '#ffffff',
-                        fontSize: '0.75rem',
+                        fontSize: '0.73rem',
                         fontWeight: 800,
-                        boxShadow: `0 2px 8px ${brandColor}50`
+                        boxShadow: `0 4px 14px ${brandColor}66, inset 0 1px 1px rgba(255,255,255,0.5)`,
+                        flexShrink: 0
                       }}>
                         Active ✓
                       </span>
                     ) : (
-                      <ChevronRight size={18} color="#94a3b8" />
+                      <ChevronRight size={18} color="var(--text-muted)" style={{ flexShrink: 0, opacity: 0.7 }} />
                     )}
                   </div>
                 );
               })}
 
-              {hasWorkspaceAccess && (
+              {hasCommunicationAccess && (
                 <div
+                  className={`company-quick-card ${(activeTab === 'communication' || activeTab === 'workspace') ? 'active' : ''}`}
                   onClick={() => {
                     setActiveTab('communication');
                     setShowCompanyQuickSheet(false);
@@ -4941,46 +5196,33 @@ export default function App() {
                     }
                   }}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.85rem 1rem',
-                    borderRadius: '14px',
-                    border: (activeTab === 'communication' || activeTab === 'workspace') ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    background: (activeTab === 'communication' || activeTab === 'workspace') ? '#eff6ff' : '#ffffff',
-                    cursor: 'pointer',
-                    boxShadow: (activeTab === 'communication' || activeTab === 'workspace') ? '0 4px 14px rgba(37,99,235,0.25)' : '0 1px 3px rgba(0,0,0,0.03)',
-                    transition: 'all 0.15s ease'
+                    borderColor: (activeTab === 'communication' || activeTab === 'workspace') ? '#0ea5e9' : undefined,
+                    boxShadow: (activeTab === 'communication' || activeTab === 'workspace') ? '0 8px 26px -4px rgba(14, 165, 233, 0.55), inset 0 1.5px 0 rgba(255,255,255,0.42)' : undefined
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <div style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      boxShadow: '0 3px 10px rgba(37,99,235,0.4)'
-                    }}>
-                      <MessageSquare size={20} color="#ffffff" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
+                    <div
+                      className="company-quick-icon-3d"
+                      style={{
+                        background: 'linear-gradient(145deg, #38bdf8 0%, #2563eb 100%)',
+                        boxShadow: '0 6px 16px -2px rgba(37, 99, 235, 0.65), inset 0 1.5px 1px rgba(255, 255, 255, 0.55), inset 0 -2px 4px rgba(0, 0, 0, 0.28)'
+                      }}
+                    >
+                      <MessageSquare size={20} color="#ffffff" strokeWidth={2.1} />
                     </div>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
-                          Inter-Dept Communication
+                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          Communication
                         </span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                          CHAT &amp; TASKS
+                        <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: 'rgba(14, 165, 233, 0.22)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.42)', flexShrink: 0 }}>
+                          CHAT
                         </span>
                         {chatUnreadCount > 0 && (
                           <span style={{
                             background: '#ef4444',
                             color: '#ffffff',
-                            borderRadius: '10px',
+                            borderRadius: '999px',
                             minWidth: '18px',
                             height: '18px',
                             fontSize: '0.62rem',
@@ -4988,23 +5230,91 @@ export default function App() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: '0 5px'
+                            padding: '0 5px',
+                            flexShrink: 0
                           }}>
                             {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                        Real-time Team Chat, Channels &amp; Task Stream
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Real-time Team Chat &amp; Department Channels
                       </div>
                     </div>
                   </div>
                   {(activeTab === 'communication' || activeTab === 'workspace') ? (
-                    <span style={{ padding: '0.28rem 0.75rem', borderRadius: '20px', background: '#2563eb', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800 }}>
+                    <span style={{
+                      padding: '0.3rem 0.75rem',
+                      borderRadius: '999px',
+                      background: 'linear-gradient(135deg, #38bdf8, #2563eb)',
+                      color: '#ffffff',
+                      fontSize: '0.73rem',
+                      fontWeight: 800,
+                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.6), inset 0 1px 1px rgba(255,255,255,0.5)',
+                      flexShrink: 0
+                    }}>
                       Active ✓
                     </span>
                   ) : (
-                    <ChevronRight size={18} color="#94a3b8" />
+                    <ChevronRight size={18} color="var(--text-muted)" style={{ flexShrink: 0, opacity: 0.7 }} />
+                  )}
+                </div>
+              )}
+
+              {hasTaskAccess && (
+                <div
+                  className={`company-quick-card ${activeTab === 'task_management' ? 'active' : ''}`}
+                  onClick={() => {
+                    runViewTransition(() => {
+                      setActiveTab('task_management');
+                      setShowCompanyQuickSheet(false);
+                      setMobileMenuOpen(false);
+                    });
+                  }}
+                  style={{
+                    borderColor: activeTab === 'task_management' ? '#10b981' : undefined,
+                    boxShadow: activeTab === 'task_management' ? '0 8px 26px -4px rgba(16, 185, 129, 0.55), inset 0 1.5px 0 rgba(255,255,255,0.42)' : undefined
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
+                    <div
+                      className="company-quick-icon-3d"
+                      style={{
+                        background: 'linear-gradient(145deg, #34d399 0%, #059669 100%)',
+                        boxShadow: '0 6px 16px -2px rgba(16, 185, 129, 0.65), inset 0 1.5px 1px rgba(255, 255, 255, 0.55), inset 0 -2px 4px rgba(0, 0, 0, 0.28)'
+                      }}
+                    >
+                      <CheckSquare size={20} color="#ffffff" strokeWidth={2.1} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          Tasks
+                        </span>
+                        <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.22)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.42)', flexShrink: 0 }}>
+                          TASKS
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Task Management &amp; Staff Workloads
+                      </div>
+                    </div>
+                  </div>
+                  {activeTab === 'task_management' ? (
+                    <span style={{
+                      padding: '0.3rem 0.75rem',
+                      borderRadius: '999px',
+                      background: 'linear-gradient(135deg, #34d399, #059669)',
+                      color: '#ffffff',
+                      fontSize: '0.73rem',
+                      fontWeight: 800,
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.6), inset 0 1px 1px rgba(255,255,255,0.5)',
+                      flexShrink: 0
+                    }}>
+                      Active ✓
+                    </span>
+                  ) : (
+                    <ChevronRight size={18} color="var(--text-muted)" style={{ flexShrink: 0, opacity: 0.7 }} />
                   )}
                 </div>
               )}
@@ -5026,6 +5336,19 @@ export default function App() {
       {/* Non-Mandatory, User-Controlled Update Notification & Liquid Glass Interaction Engine */}
       <AutoUpdateNotification />
       <LiquidGlassInteractionEngine />
+      <MobileGestureEngine
+        onRefresh={() => {
+          window.dispatchEvent(new CustomEvent('elite-pull-refresh'));
+          window.dispatchEvent(new CustomEvent('erp-force-refresh'));
+        }}
+        onCloseDrawer={() => setMobileMenuOpen(false)}
+        onCloseSheets={() => {
+          setShowCompanyQuickSheet(false);
+          setMobileMenuOpen(false);
+        }}
+        onOpenCompanySheet={() => setShowCompanyQuickSheet(true)}
+        onOpenSpotlight={() => setShowGlobalSearch(true)}
+      />
 
       {/* Hardware & Web Device Permissions Hub Modal */}
       <WebDevicePermissionsModal
@@ -5051,6 +5374,35 @@ export default function App() {
         />
       )}
 
+      {/* Mobile Back-Gesture Exit Confirmation Pill */}
+      {showExitSwipeHint && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 78px)',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            padding: '10px 18px',
+            borderRadius: '999px',
+            background: 'rgba(15, 23, 42, 0.92)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            color: '#f8fafc',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.45)',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none'
+          }}
+        >
+          Swipe or press Back again to exit
+        </div>
+      )}
+
       {/* Mobile Bottom Navigation (Company-Specific Quick Screens, text only, safe-area inset) */}
       {isMobile && isAuthenticated && !['communication', 'workspace', 'task_management'].includes(activeTab) && (
         <MobileBottomNav
@@ -5070,6 +5422,15 @@ export default function App() {
         onClose={() => setShowGlobalSearch(false)}
         onSelectResult={handleSelectSearchResult}
         activeCompanyId={activeDepartment}
+      />
+
+      {/* Frosted Glass Spotlight Command Palette */}
+      <SpotlightCommandPalette
+        onNavigate={(tab) => {
+          if (tab) setActiveTab(tab);
+        }}
+        activeTab={activeTab}
+        currentCompany={getCompanyById(activeDepartment)?.name || 'Elite Edition'}
       />
 
       {/* Dynamic Multi-Entity Luminous Accent Perimeter */}

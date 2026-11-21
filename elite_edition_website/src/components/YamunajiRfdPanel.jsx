@@ -7470,10 +7470,23 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                               ...(showPrintChallanModal.tps || []).map(t => t.weaverChallanNo),
                               ...matchedLots.map(l => l.weaverChallanNo)
                             ].filter(Boolean))).join(', ');
-                            const weaverParties = showPrintChallanModal.weaverParty || Array.from(new Set([
+                            const weaverPartiesRaw = showPrintChallanModal.weaverParty || Array.from(new Set([
                               ...(showPrintChallanModal.tps || []).map(t => t.weaverParty),
                               ...matchedLots.map(l => l.weaverParty)
                             ].filter(Boolean))).join(', ');
+                            const weaverParties = weaverPartiesRaw
+                              ? String(weaverPartiesRaw)
+                                  .split(',')
+                                  .map((part) => {
+                                    const cleaned = part.trim().replace(/[^a-zA-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                                    if (!cleaned) return '';
+                                    const words = cleaned.split(' ').filter(Boolean);
+                                    if (words.length >= 2) return words.map((w) => w[0].toUpperCase()).join('');
+                                    return words[0].slice(0, 3).toUpperCase();
+                                  })
+                                  .filter(Boolean)
+                                  .join(', ')
+                              : '';
 
                             return (
                               <>

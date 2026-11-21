@@ -3960,44 +3960,46 @@ export default function EliteBillingDepartment({
       return sum + (taxable * rate / 100);
     }, 0);
 
+    // Mandatory Half-Up Rupee Rounding: decimal >= .50 -> +1, decimal < .50 -> drop decimal
+    const roundHalfUpRupee = (val) => {
+      const totalPaise = Math.round((Number(val) || 0) * 100);
+      const whole = Math.floor(totalPaise / 100);
+      const paise = totalPaise - whole * 100;
+      return paise >= 50 ? whole + 1 : whole;
+    };
+
     let cgstAmount = 0;
     let sgstAmount = 0;
     let igstAmount = 0;
 
     if (invoiceForm.taxType === 'IGST') {
-      igstAmount = totalTax;
+      igstAmount = Math.round(totalTax * 100) / 100;
     } else {
-      cgstAmount = totalTax / 2;
-      sgstAmount = totalTax / 2;
+      cgstAmount = Math.round((totalTax / 2) * 100) / 100;
+      sgstAmount = Math.round((totalTax / 2) * 100) / 100;
+    }
+    const displayTotalTax = invoiceForm.taxType === 'IGST'
+      ? igstAmount
+      : parseFloat((cgstAmount + sgstAmount).toFixed(2));
+
+    const rawGrandTotal = parseFloat((netSubtotal + displayTotalTax).toFixed(2));
+    let grandTotal = roundHalfUpRupee(rawGrandTotal);
+    let roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
+
+    // Mandatory Round Off (only respects explicit manual override if entered)
+    if (invoiceForm.manualRoundOff !== undefined && invoiceForm.manualRoundOff !== '') {
+      roundOff = parseFloat(invoiceForm.manualRoundOff) || 0;
+      grandTotal = parseFloat((rawGrandTotal + roundOff).toFixed(2));
     }
 
-    const rawGrandTotal = netSubtotal + totalTax;
-    let grandTotal = rawGrandTotal;
-    let roundOff = 0;
-
-    if (invoiceForm.enableRoundOff !== false) {
-      if (invoiceForm.manualRoundOff !== undefined && invoiceForm.manualRoundOff !== '') {
-        // Manual override: use user-specified round off value
-        roundOff = parseFloat(invoiceForm.manualRoundOff);
-        grandTotal = parseFloat((rawGrandTotal + roundOff).toFixed(2));
-      } else {
-        // Auto round off
-        grandTotal = Math.round(rawGrandTotal);
-        roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
-      }
-    } else {
-      grandTotal = parseFloat(rawGrandTotal.toFixed(2));
-      roundOff = 0;
-    }
-
-    // TDS (Tax Deducted at Source) Calculation
+    // TDS (Tax Deducted at Source) Calculation — Mandatory Half-Up Whole Rupee Rounding (>= .50 -> +1)
     let tdsAmount = 0;
     if (invoiceForm.enableTds) {
       if (invoiceForm.manualTdsAmount !== undefined && invoiceForm.manualTdsAmount !== '') {
-        tdsAmount = parseFloat((parseFloat(invoiceForm.manualTdsAmount) || 0).toFixed(2));
+        tdsAmount = roundHalfUpRupee(parseFloat(invoiceForm.manualTdsAmount) || 0);
       } else {
         const rate = parseFloat(invoiceForm.tdsRate) || 0;
-        tdsAmount = parseFloat(((netSubtotal * rate) / 100).toFixed(2));
+        tdsAmount = roundHalfUpRupee((netSubtotal * rate) / 100);
       }
     }
 
@@ -4012,7 +4014,7 @@ export default function EliteBillingDepartment({
       cgstAmount: parseFloat(cgstAmount.toFixed(2)),
       sgstAmount: parseFloat(sgstAmount.toFixed(2)),
       igstAmount: parseFloat(igstAmount.toFixed(2)),
-      totalTax: parseFloat(totalTax.toFixed(2)),
+      totalTax: displayTotalTax,
       roundOff,
       rawGrandTotal: parseFloat(rawGrandTotal.toFixed(2)),
       grandTotal,
@@ -4073,32 +4075,37 @@ export default function EliteBillingDepartment({
   };
 
   const handleAddItemRow = () => {
-    setInvoiceForm(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        isCorporateEntity ? {
-          itemName: '',
-          hsnCode: '',
-          qty: 1,
-          unit: 'Pcs',
-          unitPrice: 0,
-          discountPct: 0,
-          taxRate: 5,
-          totalAmount: 0
-        } : {
-          itemName: '',
-          hsnCode: '998821',
-          qty: 1,
-          unit: 'Meters',
-          unitPrice: 0,
-          discountPct: 0,
-          taxRate: 5,
-          butterPaper: false,
-          totalAmount: 0
-        }
-      ]
-    }));
+    setInvoiceForm(prev => {
+      const inheritedTaxRate = prev.gstRate !== undefined && prev.gstRate !== null
+        ? parseFloat(prev.gstRate)
+        : parseFloat(prev.items?.[0]?.taxRate ?? 5);
+      return {
+        ...prev,
+        items: [
+          ...prev.items,
+          isCorporateEntity ? {
+            itemName: '',
+            hsnCode: '',
+            qty: 1,
+            unit: 'Pcs',
+            unitPrice: 0,
+            discountPct: 0,
+            taxRate: isNaN(inheritedTaxRate) ? 5 : inheritedTaxRate,
+            totalAmount: 0
+          } : {
+            itemName: '',
+            hsnCode: '998821',
+            qty: 1,
+            unit: 'Meters',
+            unitPrice: 0,
+            discountPct: 0,
+            taxRate: isNaN(inheritedTaxRate) ? 5 : inheritedTaxRate,
+            butterPaper: false,
+            totalAmount: 0
+          }
+        ]
+      };
+    });
   };
 
   const handleRemoveItemRow = (index) => {
@@ -6027,7 +6034,6 @@ export default function EliteBillingDepartment({
                       <th style={{ padding: '0.5rem 0.4rem', width: '80px', minWidth: '80px', textAlign: 'center' }}>🧈 Butter</th>
                     )}
                     <th style={{ padding: '0.5rem 0.4rem', width: '75px', minWidth: '75px' }}>Disc %</th>
-                    <th style={{ padding: '0.5rem 0.4rem', width: '90px', minWidth: '90px' }}>GST %</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '120px', minWidth: '120px', textAlign: 'right' }}>Total (₹)</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '38px', minWidth: '38px', textAlign: 'center' }}></th>
                   </tr>
@@ -6303,19 +6309,6 @@ export default function EliteBillingDepartment({
                             style={{ ...rowInputStyle, textAlign: 'right' }}
                           />
                         </td>
-                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
-                          <select
-                            value={it.taxRate}
-                            onChange={e => handleItemChange(idx, 'taxRate', e.target.value)}
-                            style={{ ...rowInputStyle, padding: '0.35rem 0.35rem', cursor: 'pointer', textAlign: 'center' }}
-                          >
-                            <option value={0}>0%</option>
-                            <option value={5}>5%</option>
-                            <option value={12}>12%</option>
-                            <option value={18}>18%</option>
-                            <option value={28}>28%</option>
-                          </select>
-                        </td>
                         <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'right' }}>
                           <div style={{
                             height: '36px',
@@ -6426,9 +6419,52 @@ export default function EliteBillingDepartment({
                   <Calculator size={16} style={{ color: '#60a5fa' }} />
                   <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>Tax & Financial Summary</span>
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '9999px', background: 'rgba(59, 130, 246, 0.16)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
-                  {invoiceForm.taxType === 'IGST' ? '⚡ IGST 5%' : '⚡ CGST 2.5% + SGST 2.5%'}
-                </span>
+                {(() => {
+                  const activeGstRate = invoiceForm.gstRate !== undefined && invoiceForm.gstRate !== null
+                    ? parseFloat(invoiceForm.gstRate)
+                    : parseFloat(invoiceForm.items?.[0]?.taxRate ?? 5);
+                  const safeRate = isNaN(activeGstRate) ? 5 : activeGstRate;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1' }}>
+                        <span>GST:</span>
+                        <select
+                          value={safeRate}
+                          onChange={e => {
+                            const nextRate = parseFloat(e.target.value);
+                            setInvoiceForm(f => ({
+                              ...f,
+                              gstRate: nextRate,
+                              items: (f.items || []).map(item => ({ ...item, taxRate: nextRate }))
+                            }));
+                          }}
+                          style={{
+                            height: '26px',
+                            padding: '0 0.4rem',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            background: 'rgba(15, 23, 42, 0.92)',
+                            border: '1px solid rgba(59, 130, 246, 0.5)',
+                            borderRadius: '6px',
+                            color: '#93c5fd',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                          title="Select GST rate applied at bottom summary"
+                        >
+                          <option value={0}>0%</option>
+                          <option value={5}>5%</option>
+                          <option value={12}>12%</option>
+                          <option value={18}>18%</option>
+                          <option value={28}>28%</option>
+                        </select>
+                      </label>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '9999px', background: 'rgba(59, 130, 246, 0.16)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
+                        {invoiceForm.taxType === 'IGST' ? `⚡ IGST ${safeRate}%` : `⚡ CGST ${safeRate / 2}% + SGST ${safeRate / 2}%`}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Breakdown Rows */}
@@ -6477,11 +6513,12 @@ export default function EliteBillingDepartment({
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', color: '#e2e8f0' }}>
                     <input
                       type="checkbox"
-                      checked={invoiceForm.enableRoundOff !== false}
-                      onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked, manualRoundOff: undefined }))}
+                      checked={true}
+                      readOnly
+                      disabled
                       style={{ accentColor: '#3b82f6' }}
                     />
-                    Round Off Total
+                    Round Off Total (Mandatory)
                   </label>
                   <input
                     type="number"

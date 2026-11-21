@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import { soundEffects } from '../../services/soundEffects';
+import { celebration } from '../../services/celebrationEffects';
 
 /**
  * LiquidGlassInteractionEngine
@@ -78,8 +80,28 @@ export function LiquidGlassInteractionEngine() {
       void btn.offsetWidth;
       btn.classList.add('erp-tactile-ripple-active');
 
-      // If this is a primary Save/Submit action button, trigger subtle emerald confirmation pulse
+      // Trigger context-aware tactile acoustic sound & haptic vibration
       const text = (btn.textContent || '').trim().toLowerCase();
+      const isDeleteAction =
+        btn.classList.contains('btn-danger') ||
+        text === 'delete' ||
+        text.startsWith('delete ') ||
+        text.startsWith('remove ');
+      const isPaymentAction =
+        text.includes('payment') ||
+        text.includes('voucher') ||
+        text.includes('generate invoice') ||
+        text.includes('record in');
+      const isPrintAction =
+        text.includes('print') ||
+        text.includes('pdf') ||
+        text.includes('sticker') ||
+        text.includes('export');
+      const isMilestoneAction =
+        text.includes('mark paid') ||
+        text.includes('mark done') ||
+        text.includes('dispatch') ||
+        text.includes('complete');
       const isSaveAction =
         btn.getAttribute('type') === 'submit' ||
         text.startsWith('save') ||
@@ -87,10 +109,26 @@ export function LiquidGlassInteractionEngine() {
         text.startsWith('update ') ||
         text.includes('inward rfd') ||
         text.includes('confirm');
+
+      if (isDeleteAction) {
+        soundEffects.playDelete();
+      } else if (isPrintAction) {
+        soundEffects.playPrintJob();
+      } else if (isMilestoneAction) {
+        soundEffects.playMilestone();
+        celebration.sparkleBurst(ev.clientX, ev.clientY);
+      } else if (isPaymentAction) {
+        soundEffects.playPaymentSuccess();
+        celebration.sparkleBurst(ev.clientX, ev.clientY, ['#34d399', '#38bdf8', '#fbbf24']);
+      } else {
+        soundEffects.playClick();
+      }
+
       if (isSaveAction) {
         btn.classList.remove('erp-btn-save-pulse');
         void btn.offsetWidth;
         btn.classList.add('erp-btn-save-pulse');
+        soundEffects.triggerHaptic(15);
       }
     };
 
@@ -272,8 +310,21 @@ export function LiquidGlassInteractionEngine() {
       characterData: true,
     });
 
+    // Global HTML5 form validation micro-shake + soft validation sound
+    const onInvalidField = (ev) => {
+      if (prefersReducedMotion()) return;
+      const target = ev.target;
+      if (!(target instanceof HTMLElement)) return;
+      target.classList.remove('erp-field-shake');
+      void target.offsetWidth;
+      target.classList.add('erp-field-shake');
+      soundEffects.playValidationError();
+      window.setTimeout(() => target.classList.remove('erp-field-shake'), 650);
+    };
+
     document.addEventListener('pointermove', onPointerMove, { passive: true });
     document.addEventListener('pointerdown', onPointerDown, { passive: true });
+    document.addEventListener('invalid', onInvalidField, true);
 
     return () => {
       observer.disconnect();
@@ -281,6 +332,7 @@ export function LiquidGlassInteractionEngine() {
       if (rafId !== null) window.cancelAnimationFrame(rafId);
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('invalid', onInvalidField, true);
     };
   }, []);
 

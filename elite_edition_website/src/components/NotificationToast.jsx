@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X, Bell, Trash2, CheckCheck, BellRing, ExternalLink } from 'lucide-react';
 import { webPushClient } from '../services/webPushClient';
+import { soundEffects } from '../services/soundEffects';
 
 export const triggerGlobalDataRefresh = (detail = 'all') => {
   const payload = typeof detail === 'string'
@@ -27,42 +28,25 @@ export const saveNotificationHistory = (history) => {
   }
 };
 
-// ── Audio Chime Synthesizer (Works 100% on HTTP & HTTPS without external files) ──
-const playNotificationSound = (type = 'info') => {
+// ── Audio Chime Synthesizer & Subtle Haptic Feedback ──
+const playNotificationSound = (type = 'info', title = '', message = '') => {
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    
-    if (type === 'success') {
-      // High double chime (C5 -> E5 -> G5)
-      osc.frequency.setValueAtTime(523.25, now);
-      osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
-      osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2);
-    } else if (type === 'warning' || type === 'error') {
-      // Gentle warning double beep
-      osc.frequency.setValueAtTime(440, now);
-      osc.frequency.setValueAtTime(349.23, now + 0.12);
+    const combined = `${title} ${message}`.toLowerCase();
+    if (type === 'warning' || type === 'error' || type === 'danger') {
+      soundEffects.playWarning();
+    } else if (/payment|invoice|voucher|paid|receipt/i.test(combined)) {
+      soundEffects.playPaymentSuccess();
+    } else if (/completed|done|finished|delivered/i.test(combined)) {
+      soundEffects.playMilestone();
+    } else if (/deleted|removed/i.test(combined)) {
+      soundEffects.playDelete();
+    } else if (/message|chat|mentioned|replied/i.test(combined)) {
+      soundEffects.playChatReceive();
+    } else if (type === 'success') {
+      soundEffects.playSuccess();
     } else {
-      // Soft gentle chime (E5 -> A5)
-      osc.frequency.setValueAtTime(659.25, now);
-      osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.15);
+      soundEffects.playClick();
     }
-
-    gain.gain.setValueAtTime(0.12, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.35);
   } catch (e) {
     // Audio Context un-muted on user interaction
   }
@@ -116,8 +100,8 @@ export const triggerPushNotification = (title, message, type = 'info', actionTab
   const history = getNotificationHistory();
   saveNotificationHistory([item, ...history]);
 
-  // 2. Play audio sound alert (HTTP & HTTPS supported)
-  playNotificationSound(type);
+  // 2. Play context-aware audio sound alert (HTTP & HTTPS supported)
+  playNotificationSound(type, title, message);
 
   // 3. Flash browser tab title if window/tab is in background
   flashBrowserTabTitle(title);
@@ -220,6 +204,17 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
         return (
           <div
             key={toast.id}
+            className="liquid-glass-toast-card"
+            onTouchStart={(e) => {
+              e.currentTarget.dataset.swipeStartX = String(e.touches[0]?.clientX || 0);
+            }}
+            onTouchEnd={(e) => {
+              const startX = Number(e.currentTarget.dataset.swipeStartX || 0);
+              const endX = e.changedTouches[0]?.clientX || 0;
+              if (endX - startX > 55) {
+                setToasts(prev => prev.filter(t => t.id !== toast.id));
+              }
+            }}
             onClick={() => {
               if (toast.actionTab || toast.meta?.roomId) {
                 const tab = toast.actionTab || 'communication';
@@ -239,6 +234,8 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
               ...styles.toastCard,
               borderLeft: `4px solid ${borderColor}`,
               cursor: (toast.actionTab || toast.meta?.roomId) ? 'pointer' : 'default',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
@@ -258,7 +255,10 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
                 <X size={14} />
               </button>
             </div>
-            <div className="toast-progress-bar" style={{ background: borderColor }} />
+            <div
+              className="liquid-toast-countdown"
+              style={{ background: borderColor }}
+            />
           </div>
         );
       })}
@@ -357,6 +357,19 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     return groups;
   }, [history, filterTab, isOpen]);
 
+  const visibleNotifIds = useMemo(() => {
+    return groupedNotifications.flatMap(g => g.ids || []);
+  }, [groupedNotifications]);
+
+  const visibleSelectedIds = useMemo(() => {
+    const visibleSet = new Set(visibleNotifIds);
+    return selectedNotifIds.filter(id => visibleSet.has(id));
+  }, [selectedNotifIds, visibleNotifIds]);
+
+  useEffect(() => {
+    setSelectedNotifIds([]);
+  }, [filterTab, isOpen]);
+
   const toggleSelectGroup = (itemIds, e) => {
     if (e) e.stopPropagation();
     const allSelected = itemIds.every(id => selectedNotifIds.includes(id));
@@ -368,24 +381,29 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   };
 
   const handleSelectAllNotifs = () => {
-    if (selectedNotifIds.length === history.length) {
+    if (visibleNotifIds.length === 0) {
+      setSelectedNotifIds([]);
+      return;
+    }
+    const allVisibleSelected = visibleNotifIds.every(id => selectedNotifIds.includes(id));
+    if (allVisibleSelected) {
       setSelectedNotifIds([]);
     } else {
-      setSelectedNotifIds(history.map(h => h.id));
+      setSelectedNotifIds([...visibleNotifIds]);
     }
   };
 
   const markSelectedRead = () => {
-    if (selectedNotifIds.length === 0) return;
-    const updated = history.map(h => selectedNotifIds.includes(h.id) ? { ...h, read: true } : h);
+    if (visibleSelectedIds.length === 0) return;
+    const updated = history.map(h => visibleSelectedIds.includes(h.id) ? { ...h, read: true } : h);
     saveNotificationHistory(updated);
     setHistory(updated);
     setSelectedNotifIds([]);
   };
 
   const deleteSelectedNotifs = () => {
-    if (selectedNotifIds.length === 0) return;
-    const updated = history.filter(h => !selectedNotifIds.includes(h.id));
+    if (visibleSelectedIds.length === 0) return;
+    const updated = history.filter(h => !visibleSelectedIds.includes(h.id));
     saveNotificationHistory(updated);
     setHistory(updated);
     setSelectedNotifIds([]);
@@ -567,12 +585,12 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
         ) : null}
 
         {/* Toolbar & Multi-Select Action Bar */}
-        <div style={{ padding: '0.65rem 1.25rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: selectedNotifIds.length > 0 ? 'rgba(56,189,248,0.1)' : 'rgba(0,0,0,0.1)', flexWrap: 'wrap', gap: '0.5rem' }}>
-          {history.length > 0 && (
+        <div style={{ padding: '0.65rem 1.25rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: visibleSelectedIds.length > 0 ? 'rgba(56,189,248,0.1)' : 'rgba(0,0,0,0.1)', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {visibleNotifIds.length > 0 && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.74rem', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>
               <input
                 type="checkbox"
-                checked={history.length > 0 && selectedNotifIds.length === history.length}
+                checked={visibleNotifIds.length > 0 && visibleNotifIds.every(id => selectedNotifIds.includes(id))}
                 onChange={handleSelectAllNotifs}
                 style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
               />
@@ -580,19 +598,19 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
             </label>
           )}
 
-          {selectedNotifIds.length > 0 ? (
+          {visibleSelectedIds.length > 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <button
                 onClick={markSelectedRead}
                 style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 700 }}
               >
-                <CheckCheck size={14} /> Read ({selectedNotifIds.length})
+                <CheckCheck size={14} /> Read ({visibleSelectedIds.length})
               </button>
               <button
                 onClick={deleteSelectedNotifs}
                 style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 700 }}
               >
-                <Trash2 size={14} /> Delete ({selectedNotifIds.length})
+                <Trash2 size={14} /> Delete ({visibleSelectedIds.length})
               </button>
             </div>
           ) : (
@@ -647,6 +665,9 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                         };
                         window.__elitePendingChatJump = jumpDetail;
                         window.dispatchEvent(new CustomEvent('elite-open-chat-room', { detail: jumpDetail }));
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('elite-open-chat-room', { detail: jumpDetail }));
+                        }, 120);
                       }
                       if (resolvedTab) {
                         onClose();

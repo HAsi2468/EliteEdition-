@@ -47,6 +47,21 @@ const getOnlineUserIds = () => {
   return Array.from(new Set(activeUsers.values()));
 };
 
+// Cluster-wide online user IDs across all PM2 workers via Socket.IO Redis adapter
+const getClusterOnlineUserIds = async (io) => {
+  try {
+    const sockets = await io.fetchSockets();
+    const ids = new Set(activeUsers.values());
+    for (const s of sockets) {
+      const uid = s.data?.userId || s.userId;
+      if (uid) ids.add(String(uid));
+    }
+    return Array.from(ids);
+  } catch (_) {
+    return getOnlineUserIds();
+  }
+};
+
 // Fast in-memory cache for socket user verification (60s TTL) to prevent connection storms
 const socketUserCache = new Map();
 const SOCKET_CACHE_TTL_MS = 60000;
@@ -442,14 +457,19 @@ const setupSockets = (io) => {
     });
 
     // Register user to personal channel
-    socket.on('register-user', (userId) => {
-      socket.join(`user_${userId}`);
-      socket.join(`user:${userId}`);
-      activeUsers.set(socket.id, userId);
-      socket.userId = userId;
+    socket.on('register-user', async (userId) => {
+      if (!userId) return;
+      const uidStr = String(userId);
+      socket.join(`user_${uidStr}`);
+      socket.join(`user:${uidStr}`);
+      activeUsers.set(socket.id, uidStr);
+      socket.userId = uidStr;
+      socket.data = socket.data || {};
+      socket.data.userId = uidStr;
       if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
+        const onlineIds = await getClusterOnlineUserIds(io);
         socket.authorizedCompanies.forEach((cid) => {
-          io.to(`company:${cid}`).emit('presence-sync', getOnlineUserIds());
+          io.to(`company:${cid}`).emit('presence-sync', onlineIds);
         });
       }
     });
@@ -1393,11 +1413,17 @@ const setupSockets = (io) => {
         const roomId = String(data.roomId);
         socket.join(roomId);
 
-        // Check if recipient is specified and whether they are currently connected
+        // Check if recipient is specified and whether they are currently connected (cluster-wide across all PM2 workers)
         if (data.recipientId && String(data.recipientId) !== String(data.caller)) {
           const recipientChannel = `user_${data.recipientId}`;
-          const recipientRoom = io.sockets.adapter.rooms.get(recipientChannel);
-          const isRecipientOnline = recipientRoom && recipientRoom.size > 0;
+          let isRecipientOnline = false;
+          try {
+            const recipientSockets = await io.in(recipientChannel).fetchSockets();
+            isRecipientOnline = recipientSockets.length > 0;
+          } catch (_) {
+            const recipientRoom = io.sockets.adapter.rooms.get(recipientChannel);
+            isRecipientOnline = Boolean(recipientRoom && recipientRoom.size > 0);
+          }
           if (!isRecipientOnline) {
             socket.emit('call-failed', {
               roomId,
@@ -1543,12 +1569,13 @@ const setupSockets = (io) => {
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`User disconnected from socket: ${socket.id}`);
       const disconnectedUid = socket.userId || activeUsers.get(socket.id);
       activeUsers.delete(socket.id);
 
-      const stillOnline = disconnectedUid && Array.from(activeUsers.values()).includes(disconnectedUid);
+      const clusterOnlineIds = await getClusterOnlineUserIds(io);
+      const stillOnline = disconnectedUid && clusterOnlineIds.includes(String(disconnectedUid));
       if (disconnectedUid && !stillOnline) {
         if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
           socket.authorizedCompanies.forEach((cid) => {
@@ -1557,7 +1584,7 @@ const setupSockets = (io) => {
           });
         }
         io.emit('presence-change', { userId: disconnectedUid, isOnline: false });
-        io.emit('presence-sync', getOnlineUserIds());
+        io.emit('presence-sync', clusterOnlineIds);
       }
 
       // Clean up collaborative document presence for this socket

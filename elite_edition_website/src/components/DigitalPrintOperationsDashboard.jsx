@@ -903,12 +903,23 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         <div className="glass-card" style={{ minWidth: '220px', flex: '0 0 auto', padding: '0.9rem 1.15rem', borderRadius: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase' }}>Ink Stock Health</span>
-            <Droplets size={16} color={lowInks.length > 0 ? '#f87171' : '#38bdf8'} />
+            <span className={lowInks.length > 0 ? 'erp-status-halo-live' : ''} style={{ display: 'inline-flex', borderRadius: '999px', color: lowInks.length > 0 ? '#f87171' : '#38bdf8' }}>
+              <Droplets size={16} color={lowInks.length > 0 ? '#f87171' : '#38bdf8'} />
+            </span>
           </div>
           <div style={{ fontSize: '1.45rem', fontWeight: 900, color: lowInks.length > 0 ? '#f87171' : '#34d399', marginTop: '4px' }}>
             {lowInks.length === 0 ? 'Optimal (100%)' : `${lowInks.length} Inks Low`}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+          <div className="liquid-wave-gauge" style={{ height: '5px', marginTop: '6px' }}>
+            <div
+              className="liquid-wave-fill"
+              style={{
+                width: `${Math.max(18, 100 - lowInks.length * 22)}%`,
+                background: lowInks.length > 0 ? 'linear-gradient(90deg, #ef4444, #fb923c)' : 'linear-gradient(90deg, #10b981, #38bdf8)'
+              }}
+            />
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '4px' }}>
             {lowInks.length > 0 ? 'Refill safety threshold active' : 'All colors above 3.0L'}
           </div>
         </div>
@@ -922,7 +933,13 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>
             98.4%
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '2px' }}>
+          <div className="liquid-wave-gauge" style={{ height: '5px', marginTop: '6px' }}>
+            <div
+              className="liquid-wave-fill"
+              style={{ width: '98.4%', background: 'linear-gradient(90deg, #8b5cf6, #c084fc, #38bdf8)' }}
+            />
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginTop: '4px' }}>
             Wastage &lt; 1.6% across runs
           </div>
         </div>

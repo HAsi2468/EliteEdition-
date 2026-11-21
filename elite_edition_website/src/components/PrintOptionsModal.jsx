@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ToggleSwitch from './common/ToggleSwitch';
 import { 
   Printer, 
   X, 
@@ -335,11 +336,13 @@ export default function PrintOptionsModal() {
                   color: '#475569'
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={showHeaders}
-                  onChange={(e) => setShowHeaders(e.target.checked)}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                <ToggleSwitch
+                  checked={Boolean(showHeaders)}
+                  onChange={(next) => setShowHeaders(next)}
+                  size="sm"
+                  accent="blue"
+                  showLabel={false}
+                  ariaLabel="Toggle Show Headers"
                 />
                 Include date & URL
               </label>

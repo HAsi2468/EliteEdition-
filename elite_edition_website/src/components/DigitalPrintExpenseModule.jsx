@@ -1222,7 +1222,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
         paymentMode: effectivePaymentMode,
         dateStart,
         dateEnd,
-        limit: 500
+        limit: 5000
       };
       const res = await api.getExpenses(params);
       if (res && res.data) {

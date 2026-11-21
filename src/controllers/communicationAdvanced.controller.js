@@ -3,8 +3,22 @@ const axios = require('axios');
 const { ChatRoom, ChatMessage } = require('../db/models/chat.model');
 const { User } = require('../db/models');
 const logger = require('../config/logger');
+const { sanitizeChatMessage } = require('../utils/sanitizeChat');
 
 const getUserId = (req) => String(req.user?._id || req.user?.id || '');
+const isAdminUser = (req) => {
+  const r = String(req.user?.role || '').toLowerCase();
+  return r === 'admin' || r === 'super_admin' || req.user?.isAdmin === true || req.user?.isMainAdmin === true;
+};
+const canAccessRoom = async (req, roomId) => {
+  if (isAdminUser(req)) return true;
+  const userId = getUserId(req);
+  if (!userId || !roomId || !mongoose.Types.ObjectId.isValid(roomId)) return false;
+  const room = await ChatRoom.findById(roomId).select('members isSystemGroup').lean();
+  if (!room) return false;
+  if (!Array.isArray(room.members) || room.members.length === 0) return Boolean(room.isSystemGroup);
+  return room.members.some((m) => String(m?._id || m) === userId);
+};
 
 /**
  * 1. Per-Chat Mute / Unmute (durationMinutes = 0 -> unmute, null -> mute forever, >0 -> mute for N minutes)
@@ -89,6 +103,7 @@ const updateDisappearTimer = async (req, res) => {
     if (io) {
       io.to(String(groupId)).emit('room-disappear-updated', { groupId, disappearAfterSec });
     }
+    try { require('./communication.controller').invalidateGroupsCache(); } catch (_) {}
 
     return res.json({ success: true, disappearAfterSec: room?.disappearAfterSec || 0 });
   } catch (err) {
@@ -108,8 +123,11 @@ const toggleStarMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid message ID' });
     }
 
-    const msg = await ChatMessage.findById(messageId).select('starredBy').lean();
+    const msg = await ChatMessage.findById(messageId).select('roomId starredBy').lean();
     if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
+    if (!(await canAccessRoom(req, msg.roomId))) {
+      return res.status(403).json({ success: false, message: 'Access denied to this room' });
+    }
 
     const alreadyStarred = Array.isArray(msg.starredBy) && msg.starredBy.some(id => String(id) === userId);
     const op = alreadyStarred
@@ -172,6 +190,9 @@ const getThreadMessages = async (req, res) => {
     ]);
 
     if (!parent) return res.status(404).json({ success: false, message: 'Parent message not found' });
+    if (!(await canAccessRoom(req, parent.roomId))) {
+      return res.status(403).json({ success: false, message: 'Access denied to this room' });
+    }
     return res.json({ success: true, parent, replies });
   } catch (err) {
     logger.error('getThreadMessages error: %o', err);
@@ -196,6 +217,9 @@ const getMessageInfo = async (req, res) => {
       .lean();
 
     if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
+    if (!(await canAccessRoom(req, msg.roomId))) {
+      return res.status(403).json({ success: false, message: 'Access denied to this room' });
+    }
     return res.json({
       success: true,
       data: {
@@ -230,7 +254,7 @@ const bulkMessageAction = async (req, res) => {
     const io = global.io || req.app?.get('io');
 
     if (action === 'delete') {
-      const isAdmin = req.user?.role === 'Admin' || req.user?.isMainAdmin;
+      const isAdmin = isAdminUser(req);
       const filter = isAdmin
         ? { _id: { $in: validIds } }
         : { _id: { $in: validIds }, senderId: new mongoose.Types.ObjectId(userId) };
@@ -252,6 +276,9 @@ const bulkMessageAction = async (req, res) => {
       if (!targetRoomId || !mongoose.Types.ObjectId.isValid(targetRoomId)) {
         return res.status(400).json({ success: false, message: 'Target room ID is required' });
       }
+      if (!(await canAccessRoom(req, targetRoomId))) {
+        return res.status(403).json({ success: false, message: 'Access denied to target room' });
+      }
       const originals = await ChatMessage.find({ _id: { $in: validIds }, isDeleted: { $ne: true } })
         .sort({ createdAt: 1 })
         .populate('roomId', 'name')
@@ -260,6 +287,8 @@ const bulkMessageAction = async (req, res) => {
       const senderName = req.user?.name || 'User';
       const created = [];
       for (const orig of originals) {
+        const origRoomId = orig.roomId?._id || orig.roomId;
+        if (!(await canAccessRoom(req, origRoomId))) continue;
         const doc = await ChatMessage.create({
           roomId: new mongoose.Types.ObjectId(targetRoomId),
           senderId: new mongoose.Types.ObjectId(userId),
@@ -304,16 +333,19 @@ const scheduleMessage = async (req, res) => {
     if (!scheduledAt || isNaN(sendDate.getTime()) || sendDate.getTime() <= Date.now()) {
       return res.status(400).json({ success: false, message: 'Scheduled time must be in the future' });
     }
-    if (!String(content).trim()) {
+    const cleanContent = sanitizeChatMessage(String(content).trim(), 5000);
+    if (!cleanContent) {
       return res.status(400).json({ success: false, message: 'Message content cannot be empty' });
     }
+    const allowedTypes = ['text', 'image', 'file', 'audio', 'video'];
+    const safeType = allowedTypes.includes(type) ? type : 'text';
 
     const msg = await ChatMessage.create({
       roomId: new mongoose.Types.ObjectId(groupId),
       senderId: new mongoose.Types.ObjectId(userId),
       senderName: req.user?.name || 'User',
-      content: String(content).trim(),
-      type,
+      content: cleanContent,
+      type: safeType,
       isScheduled: true,
       scheduledAt: sendDate,
       readBy: [new mongoose.Types.ObjectId(userId)],
@@ -335,7 +367,10 @@ const getScheduledMessages = async (req, res) => {
       isScheduled: true,
       isDeleted: { $ne: true },
     };
-    if (groupId && mongoose.Types.ObjectId.isValid(groupId)) {
+    if (groupId) {
+      if (!mongoose.Types.ObjectId.isValid(groupId)) {
+        return res.status(400).json({ success: false, message: 'Invalid room ID' });
+      }
       filter.roomId = new mongoose.Types.ObjectId(groupId);
     }
 
@@ -438,42 +473,123 @@ const startChatBackgroundWorkers = (io) => {
   if (schedulerStarted) return;
   schedulerStarted = true;
 
+  let webPushService = null;
+  try { webPushService = require('../services/webPushService'); } catch (_) { }
+  const { ChatMessageReminder } = require('../db/models/chat.model');
+
   setInterval(async () => {
     try {
       const now = new Date();
-      // Dispatch due scheduled messages
-      const due = await ChatMessage.find({
+      // 1. Dispatch due scheduled messages (atomic claim prevents duplicate sends across PM2 cluster workers)
+      const dueCandidates = await ChatMessage.find({
         isScheduled: true,
         isDeleted: { $ne: true },
         scheduledAt: { $lte: now },
-      }).limit(25);
+      }).select('_id roomId').limit(25).lean();
 
-      for (const msg of due) {
-        const room = await ChatRoom.findById(msg.roomId).select('disappearAfterSec').lean();
-        msg.isScheduled = false;
-        msg.scheduledAt = null;
-        if (room?.disappearAfterSec > 0) {
-          msg.expiresAt = new Date(Date.now() + room.disappearAfterSec * 1000);
-        }
-        await msg.save();
+      for (const candidate of dueCandidates) {
+        const room = await ChatRoom.findById(candidate.roomId).select('name members disappearAfterSec').lean();
+        const expiresAt = room?.disappearAfterSec > 0
+          ? new Date(Date.now() + room.disappearAfterSec * 1000)
+          : null;
 
-        await ChatRoom.findByIdAndUpdate(msg.roomId, {
-          $set: {
-            lastMessage: {
-              content: msg.content,
-              senderName: msg.senderName,
-              createdAt: new Date(),
-              type: msg.type,
+        const claimed = await ChatMessage.findOneAndUpdate(
+          { _id: candidate._id, isScheduled: true, isDeleted: { $ne: true } },
+          {
+            $set: {
+              isScheduled: false,
+              scheduledAt: null,
+              ...(expiresAt ? { expiresAt } : {}),
             }
-          }
-        });
+          },
+          { returnDocument: 'after' }
+        );
+        if (!claimed) continue; // Already claimed by another PM2 worker
+
+        const updatedRoom = await ChatRoom.findByIdAndUpdate(
+          claimed.roomId,
+          {
+            $inc: { lastSeq: 1 },
+            $set: {
+              lastMessage: {
+                content: claimed.content,
+                senderName: claimed.senderName,
+                createdAt: new Date(),
+                type: claimed.type,
+              }
+            }
+          },
+          { returnDocument: 'after' }
+        ).lean();
+        if (updatedRoom?.lastSeq) {
+          claimed.roomSeq = updatedRoom.lastSeq;
+          await ChatMessage.updateOne({ _id: claimed._id }, { $set: { roomSeq: updatedRoom.lastSeq } });
+        }
+        try {
+          const cc = require('./communication.controller');
+          cc.invalidateGroupsCache();
+          cc.invalidateGroupMessagesCache(String(claimed.roomId));
+        } catch (_) {}
 
         if (io) {
-          io.to(String(msg.roomId)).emit('receive-message', msg.toObject());
+          io.to(String(claimed.roomId)).emit('receive-message', claimed.toObject());
+        }
+
+        // Send high-urgency Web Push to room members when scheduled message fires
+        if (webPushService && typeof webPushService.sendPushToUsers === 'function' && room?.members?.length) {
+          const senderStr = String(claimed.senderId || '');
+          const recipientIds = room.members
+            .map((m) => String(m?._id || m))
+            .filter((id) => id && id !== senderStr);
+          if (recipientIds.length > 0) {
+            webPushService.sendPushToUsers(recipientIds, {
+              title: `${claimed.senderName || 'Team Member'} (${room.name || 'Chat'})`,
+              body: String(claimed.content || 'New scheduled message').slice(0, 140),
+              tag: `chat-${claimed.roomId}`,
+              data: {
+                url: `/communication?room=${claimed.roomId}`,
+                roomId: String(claimed.roomId),
+                messageId: String(claimed._id),
+              }
+            }, { urgency: 'high', TTL: 86400 }).catch(() => { });
+          }
         }
       }
 
-      // Soft-delete expired disappearing messages
+      // 2. Dispatch due Message Reminders via Web Push + Socket (works even when app is in background)
+      if (ChatMessageReminder) {
+        const dueReminders = await ChatMessageReminder.find({
+          fired: false,
+          remindAt: { $lte: now },
+        }).select('_id').limit(25).lean();
+
+        for (const cand of dueReminders) {
+          const rem = await ChatMessageReminder.findOneAndUpdate(
+            { _id: cand._id, fired: false },
+            { $set: { fired: true } },
+            { returnDocument: 'after' }
+          ).lean();
+          if (!rem) continue;
+
+          if (io) {
+            io.to(`user_${rem.userId}`).emit('message-reminder-due', rem);
+          }
+          if (webPushService && typeof webPushService.sendPushToUsers === 'function') {
+            webPushService.sendPushToUsers([String(rem.userId)], {
+              title: `⏰ Message Reminder — ${rem.roomName || 'Chat'}`,
+              body: String(rem.snippet || 'You have a scheduled message reminder.').slice(0, 140),
+              tag: `reminder-${rem._id}`,
+              data: {
+                url: `/communication?room=${rem.roomId}`,
+                roomId: String(rem.roomId),
+                messageId: String(rem.messageId),
+              }
+            }, { urgency: 'high', TTL: 86400 }).catch(() => { });
+          }
+        }
+      }
+
+      // 3. Soft-delete expired disappearing messages
       const expired = await ChatMessage.find({
         expiresAt: { $ne: null, $lte: now },
         isDeleted: { $ne: true },
@@ -492,7 +608,7 @@ const startChatBackgroundWorkers = (io) => {
         }
       }
     } catch (e) {
-      // Non-fatal background tick
+      console.error('[ChatBackgroundWorker] Tick error:', e?.message || e);
     }
   }, 15000);
 };

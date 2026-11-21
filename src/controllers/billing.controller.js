@@ -1070,35 +1070,41 @@ const createInvoice = async (req, res) => {
 
     for (const it of items) {
       const qty = parseFloat(it.qty) || 0;
-      const rate = parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0;
+      const baseRate = parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0;
+      const hasButter = Boolean(it.butterPaper);
+      const effectiveRate = baseRate + (hasButter ? 3 : 0);
       const disc = parseFloat(it.discountPct) || 0;
 
       // Commercial Bounds Guard: max qty 1,000,000; max unit price 10,000,000 (BUG-060)
       if (qty <= 0 || qty > 1000000) {
         return res.status(400).json({ success: false, error: `Invalid item quantity (${qty}). Must be between 0.001 and 1,000,000.` });
       }
-      if (rate < 0 || rate > 10000000) {
-        return res.status(400).json({ success: false, error: `Invalid item unit price (${rate}). Must be between 0 and 10,000,000.` });
+      if (baseRate < 0 || baseRate > 10000000) {
+        return res.status(400).json({ success: false, error: `Invalid item unit price (${baseRate}). Must be between 0 and 10,000,000.` });
       }
       if (disc < 0 || disc > 100) {
         return res.status(400).json({ success: false, error: `Invalid discount percentage (${disc}%). Must be between 0 and 100%.` });
       }
 
-      const lineGross = Math.round((qty * rate) * 100) / 100;
+      const lineGross = Math.round((qty * effectiveRate) * 100) / 100;
       const lineDisc = Math.round(((lineGross * disc) / 100) * 100) / 100;
       const lineTaxable = Math.round((lineGross - lineDisc) * 100) / 100;
       const gstRate = parseFloat(it.taxRate != null ? it.taxRate : it.gstRate) || 0;
       const lineTax = Math.round(((lineTaxable * gstRate) / 100) * 100) / 100;
 
       it.qty = qty;
-      it.unitPrice = rate;
+      it.unitPrice = baseRate;
+      it.effectivePrice = effectiveRate;
+      it.butterPaper = hasButter;
       it.discountPct = disc;
+      it.discountAmt = lineDisc;
       it.discountAmount = lineDisc;
       it.taxableAmount = lineTaxable;
       it.taxRate = gstRate;
       it.gstRate = gstRate;
       it.taxAmount = lineTax; // BUG-057 fix: ensure line item taxAmount is never 0 when taxable
-      it.totalAmount = Math.round((lineTaxable + lineTax) * 100) / 100;
+      // Keep totalAmount as pre-tax line taxable amount so PDF & UI never double-count GST
+      it.totalAmount = lineTaxable;
 
       computedTaxable += lineTaxable;
       const isIgst = invoiceData.taxType === 'IGST' || invoiceData.isInterState;
@@ -1127,9 +1133,18 @@ const createInvoice = async (req, res) => {
     invoiceData.igstAmount = computedIgst;
     invoiceData.totalTax = computedTotalTax; // BUG-057: guarantee totalTax === cgst + sgst
 
-    const rawTotal = computedTaxable + computedTotalTax;
-    const grandRounded = Math.round(rawTotal);
-    const roundOff = Math.round((grandRounded - rawTotal) * 100) / 100;
+    // Mandatory Half-Up Rupee Rounding: decimal >= .50 -> +1, decimal < .50 -> drop decimal
+    const roundHalfUpRupee = (val) => {
+      const totalPaise = Math.round((Number(val) || 0) * 100);
+      const whole = Math.floor(totalPaise / 100);
+      const paise = totalPaise - whole * 100;
+      return paise >= 50 ? whole + 1 : whole;
+    };
+
+    const rawTotal = parseFloat((computedTaxable + computedTotalTax).toFixed(2));
+    const grandRounded = roundHalfUpRupee(rawTotal);
+    const roundOff = parseFloat((grandRounded - rawTotal).toFixed(2));
+    invoiceData.enableRoundOff = true;
     invoiceData.roundOff = roundOff;
     invoiceData.grandTotal = grandRounded;
 
@@ -1158,10 +1173,15 @@ const createInvoice = async (req, res) => {
     invoiceData.createdBy = activeUserName;
     invoiceData.createdByName = activeUserName;
 
-    // Auto-calculate balance due (deducting TDS if enabled)
+    // Auto-calculate balance due (deducting mandatory Half-Up rounded TDS if enabled)
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const tdsAmount = invoiceData.enableTds ? parseFloat((parseFloat(invoiceData.tdsAmount) || 0).toFixed(2)) : 0;
+    const rawTdsVal = invoiceData.enableTds
+      ? ((invoiceData.tdsAmount != null && Number(invoiceData.tdsAmount) > 0)
+        ? Number(invoiceData.tdsAmount)
+        : ((computedTaxable * (parseFloat(invoiceData.tdsRate) || 0)) / 100))
+      : 0;
+    const tdsAmount = invoiceData.enableTds ? roundHalfUpRupee(rawTdsVal) : 0;
     invoiceData.tdsAmount = tdsAmount;
     const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
@@ -1568,9 +1588,79 @@ const updateInvoice = async (req, res) => {
       invoiceData.ourChallanNo = validChallanNos.join(', ');
     }
 
+    const roundHalfUpRupeeUpd = (val) => {
+      const totalPaise = Math.round((Number(val) || 0) * 100);
+      const whole = Math.floor(totalPaise / 100);
+      const paise = totalPaise - whole * 100;
+      return paise >= 50 ? whole + 1 : whole;
+    };
+
+    if (Array.isArray(invoiceData.items) && invoiceData.items.length > 0) {
+      let updTaxable = 0;
+      let updCgst = 0;
+      let updSgst = 0;
+      let updIgst = 0;
+      const isIgstUpd = invoiceData.taxType === 'IGST' || invoiceData.isInterState;
+      for (const it of invoiceData.items) {
+        const qty = parseFloat(it.qty) || 0;
+        const baseRate = parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0;
+        const hasButter = Boolean(it.butterPaper);
+        const effRate = baseRate + (hasButter ? 3 : 0);
+        const disc = parseFloat(it.discountPct) || 0;
+        const lineGross = Math.round((qty * effRate) * 100) / 100;
+        const lineDisc = Math.round(((lineGross * disc) / 100) * 100) / 100;
+        const lineTaxable = Math.round((lineGross - lineDisc) * 100) / 100;
+        const gstRate = parseFloat(it.taxRate != null ? it.taxRate : it.gstRate) || 0;
+        const lineTax = Math.round(((lineTaxable * gstRate) / 100) * 100) / 100;
+        it.qty = qty;
+        it.unitPrice = baseRate;
+        it.effectivePrice = effRate;
+        it.butterPaper = hasButter;
+        it.discountPct = disc;
+        it.discountAmt = lineDisc;
+        it.taxableAmount = lineTaxable;
+        it.taxRate = gstRate;
+        it.taxAmount = lineTax;
+        it.totalAmount = lineTaxable;
+        updTaxable += lineTaxable;
+        if (isIgstUpd) {
+          updIgst += lineTax;
+        } else {
+          const half = Math.round(((lineTaxable * (gstRate / 2)) / 100) * 100) / 100;
+          updCgst += half;
+          updSgst += half;
+        }
+      }
+      updTaxable = Math.round(updTaxable * 100) / 100;
+      updCgst = Math.round(updCgst * 100) / 100;
+      updSgst = Math.round(updSgst * 100) / 100;
+      updIgst = Math.round(updIgst * 100) / 100;
+      const updTotalTax = isIgstUpd ? updIgst : Math.round((updCgst + updSgst) * 100) / 100;
+      const updDiscTotal = Math.max(0, parseFloat(invoiceData.discountTotal) || 0);
+      const updNetSub = Math.max(0, parseFloat((updTaxable - updDiscTotal).toFixed(2)));
+      const updRawGrand = parseFloat((updNetSub + updTotalTax).toFixed(2));
+      const updGrand = roundHalfUpRupeeUpd(updRawGrand);
+      const updRoundOff = parseFloat((updGrand - updRawGrand).toFixed(2));
+      invoiceData.subtotal = updTaxable;
+      invoiceData.taxableAmount = updTaxable;
+      invoiceData.cgstAmount = updCgst;
+      invoiceData.sgstAmount = updSgst;
+      invoiceData.igstAmount = updIgst;
+      invoiceData.totalTax = updTotalTax;
+      invoiceData.enableRoundOff = true;
+      invoiceData.roundOff = updRoundOff;
+      invoiceData.grandTotal = updGrand;
+    }
+
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const tdsAmount = invoiceData.enableTds ? parseFloat((parseFloat(invoiceData.tdsAmount) || 0).toFixed(2)) : 0;
+    const updBaseForTds = parseFloat(invoiceData.subtotal) || 0;
+    const rawTdsUpd = invoiceData.enableTds
+      ? ((invoiceData.tdsAmount != null && Number(invoiceData.tdsAmount) > 0)
+        ? Number(invoiceData.tdsAmount)
+        : ((updBaseForTds * (parseFloat(invoiceData.tdsRate) || 0)) / 100))
+      : 0;
+    const tdsAmount = invoiceData.enableTds ? roundHalfUpRupeeUpd(rawTdsUpd) : 0;
     invoiceData.tdsAmount = tdsAmount;
     const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
@@ -2460,17 +2550,34 @@ const downloadInvoicePdf = async (req, res) => {
     const taxType = invoice.taxType || (invoice.customer && invoice.customer.stateCode && String(invoice.customer.stateCode).trim() !== '24' ? 'IGST' : 'CGST_SGST');
     const isIgst = taxType === 'IGST';
 
+    const getItemEffectiveRate = (it) => {
+      const eff = Number(it.effectivePrice || 0);
+      if (eff > 0) return eff;
+      const base = Number(it.unitPrice != null ? it.unitPrice : (it.rate || 0));
+      return base + (it.butterPaper ? 3 : 0);
+    };
+    const getItemTaxableAmount = (it) => {
+      if (it.taxableAmount != null && Number(it.taxableAmount) > 0) {
+        return Number(Number(it.taxableAmount).toFixed(2));
+      }
+      const q = Number(it.qty || 0);
+      const r = getItemEffectiveRate(it);
+      if (q > 0 && r > 0) {
+        const discPct = Math.min(100, Math.max(0, Number(it.discountPct || 0)));
+        const gross = q * r;
+        const disc = (gross * discPct) / 100;
+        return Number(Math.max(0, gross - disc).toFixed(2));
+      }
+      return Number(it.totalAmount || 0);
+    };
+
     const hsnMap = {};
     items.forEach(it => {
       const hsn  = isMeaningfulValue(it.hsnCode || it.hsn) ? String(it.hsnCode || it.hsn).trim() : '';
       const rate = Number(it.taxRate !== undefined && it.taxRate !== null ? it.taxRate : (invoice.taxRate !== undefined ? invoice.taxRate : 5));
       const key  = `${hsn || 'DEFAULT'}_${rate}`;
       if (!hsnMap[key]) hsnMap[key] = { hsn, rate, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
-      const taxable = it.taxableAmount != null
-        ? Number(it.taxableAmount)
-        : (Number(it.qty || 0) > 0 && Number(it.unitPrice != null ? it.unitPrice : it.rate || 0) > 0
-          ? Number((Number(it.qty) * Number(it.unitPrice != null ? it.unitPrice : it.rate)).toFixed(2))
-          : Number(it.totalAmount || 0));
+      const taxable = getItemTaxableAmount(it);
       hsnMap[key].taxable += taxable;
       if (isIgst) {
         hsnMap[key].igst += Math.round((taxable * (rate / 100)) * 100) / 100;
@@ -2828,9 +2935,11 @@ const downloadInvoicePdf = async (req, res) => {
           if (taxRate > 0) {
             doc.text(`${taxRate}%`, colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
           }
+          const pdfItemRate = getItemEffectiveRate(item);
+          const pdfItemTaxable = getItemTaxableAmount(item);
           doc.fillColor(S900).font('Helvetica').fontSize(10)
             .text(`${Number(item.qty||0).toFixed(2)} ${u}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
-            .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
+            .text(pdfItemRate.toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
           const discText = hasDiscount
             ? (Number(item.discountPct || 0) > 0 ? `${Number(item.discountPct).toFixed(1)}%` : (Number(item.discountAmount || 0) > 0 ? `Rs.${Number(item.discountAmount).toFixed(0)}` : ''))
             : u;
@@ -2839,7 +2948,7 @@ const downloadInvoicePdf = async (req, res) => {
               .text(discText, colX[7]+2, numY, { width: COL[7]-4, align:'center' });
           }
           doc.fillColor(S900).font('Helvetica').fontSize(10.5)
-            .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
+            .text(pdfItemTaxable.toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
           Y += rowH;
         });
 
@@ -2869,7 +2978,7 @@ const downloadInvoicePdf = async (req, res) => {
           const pageQty = (itemsToRender || []).reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
           let qtyUnit = (items && items[0] && (items[0].unit || items[0].qtyUnit)) || 'MTR';
           if (/meter|mtr/i.test(qtyUnit)) qtyUnit = 'MTR';
-          const pageAmt = (itemsToRender || []).reduce((s, i) => s + (parseFloat(i.totalAmount) || 0), 0);
+          const pageAmt = (itemsToRender || []).reduce((s, i) => s + getItemTaxableAmount(i), 0);
           const subRowH = 18;
           doc.rect(PAD, Y, CW, subRowH).fill(PRPL).stroke(S200);
           drawColSeps(Y, subRowH);
@@ -2982,6 +3091,9 @@ const downloadInvoicePdf = async (req, res) => {
         Y += totH;
 
         if (invoice.enableTds && Number(invoice.tdsAmount) > 0) {
+          const pdfTdsPaise = Math.round(Number(invoice.tdsAmount || 0) * 100);
+          const pdfTdsWhole = Math.floor(pdfTdsPaise / 100);
+          const pdfTdsRounded = (pdfTdsPaise - pdfTdsWhole * 100) >= 50 ? pdfTdsWhole + 1 : pdfTdsWhole;
           const tdsH = 16;
           const tdsSec = invoice.tdsSection ? ` (${invoice.tdsSection})` : '';
           const tdsRate = invoice.tdsRate ? ` @ ${invoice.tdsRate}%` : '';
@@ -2989,11 +3101,11 @@ const downloadInvoicePdf = async (req, res) => {
           doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
             .text(`Less: TDS${tdsSec}${tdsRate}`, colX[6] - 40, Y + 4, { width: COL[6] + COL[7] + 36, align: 'right' });
           doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
-            .text(`- ${Number(invoice.tdsAmount || 0).toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            .text(`- ${pdfTdsRounded.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
           Y += tdsH;
 
           const netH = 20;
-          const netPayable = Math.max(0, Number(invoice.grandTotal || 0) - Number(invoice.tdsAmount || 0));
+          const netPayable = Math.max(0, Number(invoice.grandTotal || 0) - pdfTdsRounded);
           doc.rect(PAD, Y, CW, netH).fill(PRP);
           doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
             .text('Net Receivable', colX[6] - 20, Y + 5, { width: COL[6] + COL[7] + 16, align: 'right' })

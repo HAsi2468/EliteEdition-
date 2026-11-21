@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ToggleSwitch from './common/ToggleSwitch';
 import {
   X, Lock, Unlock, MapPin, UserPlus, Share2, Copy, Check, RefreshCw,
   Image as ImageIcon, Shield, HardDrive, Download, Radio, Eye, EyeOff,
@@ -604,10 +605,17 @@ export const LocationShareModal = ({ onSendLocation, onClose }) => {
 
           {/* Live Location Toggle + Duration Pills */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.5rem 0.65rem', borderRadius: '10px', background: 'rgba(148, 163, 184, 0.1)', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
-              <input type="checkbox" checked={isLive} onChange={(e) => setIsLive(e.target.checked)} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.82rem', fontWeight: 600 }}>
+              <ToggleSwitch
+                checked={isLive}
+                onChange={(next) => setIsLive(next)}
+                size="sm"
+                accent="emerald"
+                showLabel={false}
+                ariaLabel="Toggle Share Live Location"
+              />
               <span>Share Live Location</span>
-            </label>
+            </div>
             {isLive && (
               <div style={{ display: 'flex', gap: '4px' }}>
                 {[
@@ -812,10 +820,17 @@ export const GroupInviteModal = ({ group, onJoined, onClose }) => {
               </button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.83rem', cursor: 'pointer' }}>
-                <input type="checkbox" checked={Boolean(info.requireJoinApproval)} onChange={handleToggleApproval} />
-                Require Admin Approval to Join
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.83rem' }}>
+                <ToggleSwitch
+                  checked={Boolean(info.requireJoinApproval)}
+                  onChange={() => handleToggleApproval()}
+                  size="sm"
+                  accent="blue"
+                  showLabel={false}
+                  ariaLabel="Toggle Require Admin Approval to Join"
+                />
+                <span>Require Admin Approval to Join</span>
+              </div>
               <button type="button" onClick={handleReset} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                 <RefreshCw size={13} /> Reset Link
               </button>
@@ -931,9 +946,13 @@ export const ChatSettingsModal = ({ prefs, onUpdatePrefs, onClose }) => {
 
   useEffect(() => {
     if (tab === 'storage' && !storage) {
-      api.getChatStorageUsage().then((res) => {
-        if (res?.success) setStorage(res.data);
-      });
+      api.getChatStorageUsage()
+        .then((res) => {
+          if (res?.success) setStorage(res.data);
+        })
+        .catch(() => {
+          setStorage({ totalBytes: 0, fileCount: 0, byType: {} });
+        });
     }
   }, [tab]);
 
@@ -991,28 +1010,30 @@ export const ChatSettingsModal = ({ prefs, onUpdatePrefs, onClose }) => {
                 <option value="nobody">Nobody</option>
               </select>
             </div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Read Receipts (Blue Ticks)</div>
                 <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>If turned off, you won't send read receipts</div>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={privacy.readReceipts !== false}
-                onChange={(e) => onUpdatePrefs({ privacy: { ...privacy, readReceipts: e.target.checked } })}
+                onChange={(next) => onUpdatePrefs({ privacy: { ...privacy, readReceipts: next } })}
+                accent="emerald"
+                ariaLabel="Toggle Read Receipts"
               />
-            </label>
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Show Online Status</div>
                 <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Display green dot when you are active</div>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={privacy.onlineVisible !== false}
-                onChange={(e) => onUpdatePrefs({ privacy: { ...privacy, onlineVisible: e.target.checked } })}
+                onChange={(next) => onUpdatePrefs({ privacy: { ...privacy, onlineVisible: next } })}
+                accent="emerald"
+                ariaLabel="Toggle Online Status"
               />
-            </label>
+            </div>
           </div>
         )}
 
@@ -1024,14 +1045,15 @@ export const ChatSettingsModal = ({ prefs, onUpdatePrefs, onClose }) => {
               { key: 'documents', label: 'Documents & PDFs' },
               { key: 'videos', label: 'Videos & Video Notes' },
             ].map((item) => (
-              <label key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '0.4rem 0' }}>
+              <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{item.label}</span>
-                <input
-                  type="checkbox"
+                <ToggleSwitch
                   checked={Boolean(autoDl[item.key])}
-                  onChange={(e) => onUpdatePrefs({ mediaAutoDownload: { ...autoDl, [item.key]: e.target.checked } })}
+                  onChange={(next) => onUpdatePrefs({ mediaAutoDownload: { ...autoDl, [item.key]: next } })}
+                  accent="sky"
+                  ariaLabel={`Toggle auto download ${item.label}`}
                 />
-              </label>
+              </div>
             ))}
           </div>
         )}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
+import { soundEffects } from '../services/soundEffects';
+import { celebration } from '../services/celebrationEffects';
 import { useSocket } from '../contexts/SocketContext';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
@@ -887,6 +889,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         setTasks((prev) => prev.map((t) => (getTaskId(t) === upId ? updated : t)));
         if (selectedTask && getTaskId(selectedTask) === upId) {
           setSelectedTask(updated);
+        }
+        if (newStatusVal === 'Done' || (newStatusVal || '').toLowerCase() === 'done') {
+          soundEffects.playTaskDone();
+          celebration.trigger();
         }
       }
     } catch (err) {
@@ -3070,7 +3076,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                                 setDragOverColId(null);
                               }}
                               onClick={() => setSelectedTask(t)}
-                              className={`task-card ${isOverdue ? 'overdue' : ''}`}
+                              className={`task-card ${isOverdue ? 'overdue' : ''} ${draggingTaskId === taskId ? 'kanban-card-dragging' : ''}`}
                               style={{
                                 cursor: 'grab',
                                 flexShrink: 0,

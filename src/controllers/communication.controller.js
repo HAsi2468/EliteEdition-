@@ -417,6 +417,15 @@ const votePollMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Poll message not found' });
     }
 
+    const pollRoom = await ChatRoom.findById(message.roomId).select('members type').lean();
+    const isAdminUser = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (pollRoom && !isAdminUser && Array.isArray(pollRoom.members) && pollRoom.members.length > 0) {
+      const isMember = pollRoom.members.some((m) => String(m?._id || m) === String(rawUserId));
+      if (!isMember) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this room' });
+      }
+    }
+
     if (message.pollMeta.isClosed) {
       return res.status(400).json({ success: false, message: 'This poll is closed' });
     }
@@ -985,6 +994,14 @@ const acknowledgeMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
+    const ackRoom = await ChatRoom.findById(message.roomId).select('members').lean();
+    const isAdminAck = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (ackRoom && !isAdminAck && Array.isArray(ackRoom.members) && ackRoom.members.length > 0) {
+      if (!ackRoom.members.some((m) => String(m?._id || m) === String(req.user?._id || req.body?.userId || req.headers["x-user-id"]))) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this room' });
+      }
+    }
+
     // Initialize acknowledgments array if missing
     if (!message.acknowledgments) message.acknowledgments = [];
 
@@ -1318,6 +1335,14 @@ const toggleReaction = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
+    const ackRoom = await ChatRoom.findById(message.roomId).select('members').lean();
+    const isAdminAck = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (ackRoom && !isAdminAck && Array.isArray(ackRoom.members) && ackRoom.members.length > 0) {
+      if (!ackRoom.members.some((m) => String(m?._id || m) === String(req.user?._id || req.body?.userId || req.headers["x-user-id"]))) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this room' });
+      }
+    }
+
     message.reactions = message.reactions || [];
     const existingIndex = message.reactions.findIndex(
       (r) => r.emoji === emoji && String(r.user?._id || r.user) === userIdStr
@@ -1386,6 +1411,14 @@ const togglePinMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
+    const ackRoom = await ChatRoom.findById(message.roomId).select('members').lean();
+    const isAdminAck = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (ackRoom && !isAdminAck && Array.isArray(ackRoom.members) && ackRoom.members.length > 0) {
+      if (!ackRoom.members.some((m) => String(m?._id || m) === String(req.user?._id || req.body?.userId || req.headers["x-user-id"]))) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this room' });
+      }
+    }
+
     const newPinnedState = !message.isPinned;
     message.isPinned = newPinnedState;
     message.pinnedBy = newPinnedState ? (mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : rawUserId) : null;
@@ -1400,13 +1433,15 @@ const togglePinMessage = async (req, res) => {
 
     const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io && message.roomId) {
-      io.to(String(message.roomId)).emit('message-pinned-updated', {
+      const pinPayload = {
         messageId: String(message._id),
         roomId: String(message.roomId),
         isPinned: newPinnedState,
         pinnedBy: message.pinnedBy,
         pinnedAt: message.pinnedAt
-      });
+      };
+      io.to(String(message.roomId)).emit('message-pin-updated', pinPayload);
+      io.to(String(message.roomId)).emit('message-pinned-updated', pinPayload);
     }
 
     invalidateGroupMessagesCache(message.roomId);
@@ -1558,6 +1593,10 @@ const updateGroupMembers = async (req, res) => {
       });
     }
 
+    if (!Array.isArray(memberIds) || memberIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ success: false, message: 'memberIds must be an array of valid user IDs' });
+    }
+
     room.members = memberIds.map((id) => new mongoose.Types.ObjectId(id));
     await room.save();
     invalidateGroupsCache();
@@ -1641,12 +1680,12 @@ const clearGroupMessages = async (req, res) => {
       req.user.isMainAdmin === true
     );
     const isCreator = req.user && room.createdBy && String(room.createdBy) === String(req.user._id);
-    const isMember = req.user && room.members?.some(m => String(m) === String(req.user._id));
+    const isDirectMember = room.type === 'direct' && req.user && room.members?.some(m => String(m) === String(req.user._id));
 
-    if (!isSuperOrAdmin && !isCreator && !isMember) {
+    if (!isSuperOrAdmin && !isCreator && !isDirectMember) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to clear messages in this chat'
+        message: 'Only group creators or administrators can clear messages in this group'
       });
     }
 
@@ -1825,6 +1864,14 @@ const deleteMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
+    const ackRoom = await ChatRoom.findById(message.roomId).select('members').lean();
+    const isAdminAck = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (ackRoom && !isAdminAck && Array.isArray(ackRoom.members) && ackRoom.members.length > 0) {
+      if (!ackRoom.members.some((m) => String(m?._id || m) === String(req.user?._id || req.body?.userId || req.headers["x-user-id"]))) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this room' });
+      }
+    }
+
     const isSender = String(message.senderId) === String(userId);
     const messageAgeHours = (Date.now() - new Date(message.createdAt).getTime()) / (1000 * 60 * 60);
 
@@ -1925,6 +1972,14 @@ const editMessage = async (req, res) => {
     const message = await ChatMessage.findById(messageId);
     if (!message) {
       return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const ackRoom = await ChatRoom.findById(message.roomId).select('members').lean();
+    const isAdminAck = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (ackRoom && !isAdminAck && Array.isArray(ackRoom.members) && ackRoom.members.length > 0) {
+      if (!ackRoom.members.some((m) => String(m?._id || m) === String(req.user?._id || req.body?.userId || req.headers["x-user-id"]))) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this room' });
+      }
     }
 
     if (message.isDeleted) {

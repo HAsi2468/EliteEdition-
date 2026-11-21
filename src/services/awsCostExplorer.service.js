@@ -2,6 +2,13 @@ const { CostExplorerClient, GetCostAndUsageCommand } = require('@aws-sdk/client-
 const logger = require('../config/logger');
 
 const DEFAULT_USD_TO_INR = 86.5;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // Strict 24-Hour Cache Lock (max 1 query / 24 hours)
+
+// In-memory cache fallback
+let memoryCache = {
+  timestamp: 0,
+  data: null,
+};
 
 /**
  * Creates and returns an AWS Cost Explorer client.
@@ -51,6 +58,73 @@ function formatMonthName(yearMonthStr) {
  */
 async function fetchAwsMonthlyCosts(options = {}) {
   const exchangeRate = Number(options.exchangeRate) || DEFAULT_USD_TO_INR;
+  const nowMs = Date.now();
+
+  // 1. Check in-memory 24-hour cache lock
+  if (memoryCache.data && (nowMs - memoryCache.timestamp) < CACHE_TTL_MS && !options.bypassCache) {
+    const hoursRemaining = Math.max(0, ((CACHE_TTL_MS - (nowMs - memoryCache.timestamp)) / 3600000).toFixed(1));
+    logger.info(`[AWS Cost Explorer] 24-HOUR CACHE LOCK HIT. Skipped paid AWS API call ($0.00). Next live fetch allowed in ${hoursRemaining} hours.`);
+    return {
+      ...memoryCache.data,
+      cached: true,
+      nextRefreshInHours: hoursRemaining,
+      lockExpiresAt: new Date(memoryCache.timestamp + CACHE_TTL_MS).toISOString(),
+    };
+  }
+
+  // 2. Check persistent MongoDB cache lock (across server/PM2 restarts)
+  if (!options.bypassCache) {
+    try {
+      const InfrastructureBill = require('../db/models/infrastructureBill.model');
+      const recentSync = await InfrastructureBill.findOne({
+        isAutoSynced: true,
+        syncedAt: { $gte: new Date(nowMs - CACHE_TTL_MS) },
+      }).sort({ syncedAt: -1 });
+
+      if (recentSync && recentSync.awsBreakdown && recentSync.awsBreakdown.length > 0) {
+        const syncTimestamp = new Date(recentSync.syncedAt).getTime();
+        const hoursRemaining = Math.max(0, ((CACHE_TTL_MS - (nowMs - syncTimestamp)) / 3600000).toFixed(1));
+        logger.info(`[AWS Cost Explorer] 24-HOUR DB CACHE LOCK HIT. Skipped paid AWS API call ($0.00). Next live fetch allowed in ${hoursRemaining} hours.`);
+
+        const allRecentBills = await InfrastructureBill.find({ isAutoSynced: true }).sort({ createdAt: -1 }).limit(6);
+        const mappedResults = allRecentBills.map((b) => ({
+          month: b.month,
+          monthKey: b.month,
+          totalUsd: b.awsUsdAmount || Number((b.awsAmount / exchangeRate).toFixed(2)),
+          totalInr: b.awsAmount,
+          exchangeRate,
+          services: b.awsBreakdown || [],
+        }));
+
+        const cachedPayload = {
+          success: true,
+          cached: true,
+          nextRefreshInHours: hoursRemaining,
+          lockExpiresAt: new Date(syncTimestamp + CACHE_TTL_MS).toISOString(),
+          exchangeRate,
+          results: mappedResults.length > 0 ? mappedResults : [
+            {
+              month: recentSync.month,
+              monthKey: recentSync.month,
+              totalUsd: recentSync.awsUsdAmount || Number((recentSync.awsAmount / exchangeRate).toFixed(2)),
+              totalInr: recentSync.awsAmount,
+              exchangeRate,
+              services: recentSync.awsBreakdown || [],
+            }
+          ],
+        };
+
+        memoryCache = {
+          timestamp: syncTimestamp,
+          data: cachedPayload,
+        };
+
+        return cachedPayload;
+      }
+    } catch (dbErr) {
+      logger.warn(`[AWS Cost Explorer] DB cache lookup notice: ${dbErr.message}`);
+    }
+  }
 
   // Default to past 6 months up to next month 1st
   const now = new Date();
@@ -113,11 +187,23 @@ async function fetchAwsMonthlyCosts(options = {}) {
       };
     });
 
-    return {
+    const payload = {
       success: true,
+      cached: false,
+      nextRefreshInHours: '24.0',
+      lockExpiresAt: new Date(Date.now() + CACHE_TTL_MS).toISOString(),
       exchangeRate,
       results: monthlyResults,
     };
+
+    // Arm the 24-hour cache lock
+    memoryCache = {
+      timestamp: Date.now(),
+      data: payload,
+    };
+    logger.info(`[AWS Cost Explorer] Live query executed ($0.01). 24-Hour Cache Lock ARMED until ${payload.lockExpiresAt}.`);
+
+    return payload;
   } catch (error) {
     logger.error('[AWS Cost Explorer] Error fetching cost and usage: %o', error);
     

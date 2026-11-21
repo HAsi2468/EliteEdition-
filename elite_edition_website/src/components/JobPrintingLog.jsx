@@ -176,6 +176,14 @@ export default function JobPrintingLog() {
 
   // Dedicated Raw Material Usage Form Modal State
   const [showRawMaterialModal, setShowRawMaterialModal] = useState(false);
+  const showRawMaterialModalRef = useRef(false);
+  const rawMaterialDirtyRef = useRef(false);
+  useEffect(() => {
+    showRawMaterialModalRef.current = showRawMaterialModal;
+    if (!showRawMaterialModal) {
+      rawMaterialDirtyRef.current = false;
+    }
+  }, [showRawMaterialModal]);
   const [rawMaterialSubmitting, setRawMaterialSubmitting] = useState(false);
   const [rawEntryType, setRawEntryType] = useState('OUTWARD');
 
@@ -250,6 +258,7 @@ export default function JobPrintingLog() {
 
   // Safe decimal and numeric input handlers for Raw Material inputs (prevents React HTML5 type="number" decimal swallow bugs)
   const handleRawDecimalChange = (setter) => (e) => {
+    rawMaterialDirtyRef.current = true;
     let val = e.target.value.replace(/,/g, '.');
     if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
       setter(val);
@@ -257,6 +266,7 @@ export default function JobPrintingLog() {
   };
 
   const handleRawPaperFieldChange = (id, field, isDecimal = false, isInward = true) => (e) => {
+    rawMaterialDirtyRef.current = true;
     let val = e.target.value.replace(/,/g, '.');
     if (isDecimal) {
       if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
@@ -355,7 +365,8 @@ export default function JobPrintingLog() {
     };
   };
 
-  const fetchRawMaterialSummary = async (overrideStart, overrideEnd) => {
+  const fetchRawMaterialSummary = async (overrideStart, overrideEnd, options = {}) => {
+    const forcePopulateInputs = Boolean(options?.forcePopulateInputs);
     try {
       const activeStart = overrideStart !== undefined ? overrideStart : (dateStart || rawDate);
       const activeEnd = overrideEnd !== undefined ? overrideEnd : (dateEnd || rawDate);
@@ -367,40 +378,44 @@ export default function JobPrintingLog() {
       if (res && res.data && Array.isArray(res.data)) {
         const parsed = parseRawTransactionsForSummary(res.data, activeStart, activeEnd);
 
-        if (parsed.foundStart) setRawStartTime(parsed.foundStart);
-        if (parsed.foundStop) setRawStopTime(parsed.foundStop);
-        if (parsed.foundShift) setRawShift(parsed.foundShift);
-        if (parsed.foundOperator) setRawOperator(parsed.foundOperator);
+        // STRICT GUARD: Never overwrite live modal inputs while the user has the Stock Manage modal open or has unsaved edits!
+        const shouldOverwriteInputs = forcePopulateInputs || (!showRawMaterialModalRef.current && !rawMaterialDirtyRef.current);
+        if (shouldOverwriteInputs) {
+          if (parsed.foundStart) setRawStartTime(parsed.foundStart);
+          if (parsed.foundStop) setRawStopTime(parsed.foundStop);
+          if (parsed.foundShift) setRawShift(parsed.foundShift);
+          if (parsed.foundOperator) setRawOperator(parsed.foundOperator);
 
-        // Populate Inward Inputs
-        setGrandoInC(parsed.inward.grando.C > 0 ? parsed.inward.grando.C.toString() : '');
-        setGrandoInM(parsed.inward.grando.M > 0 ? parsed.inward.grando.M.toString() : '');
-        setGrandoInY(parsed.inward.grando.Y > 0 ? parsed.inward.grando.Y.toString() : '');
-        setGrandoInK(parsed.inward.grando.K > 0 ? parsed.inward.grando.K.toString() : '');
+          // Populate Inward Inputs
+          setGrandoInC(parsed.inward.grando.C > 0 ? parsed.inward.grando.C.toString() : '');
+          setGrandoInM(parsed.inward.grando.M > 0 ? parsed.inward.grando.M.toString() : '');
+          setGrandoInY(parsed.inward.grando.Y > 0 ? parsed.inward.grando.Y.toString() : '');
+          setGrandoInK(parsed.inward.grando.K > 0 ? parsed.inward.grando.K.toString() : '');
 
-        setPrintdotInC(parsed.inward.printdot.C > 0 ? parsed.inward.printdot.C.toString() : '');
-        setPrintdotInM(parsed.inward.printdot.M > 0 ? parsed.inward.printdot.M.toString() : '');
-        setPrintdotInY(parsed.inward.printdot.Y > 0 ? parsed.inward.printdot.Y.toString() : '');
-        setPrintdotInK(parsed.inward.printdot.K > 0 ? parsed.inward.printdot.K.toString() : '');
+          setPrintdotInC(parsed.inward.printdot.C > 0 ? parsed.inward.printdot.C.toString() : '');
+          setPrintdotInM(parsed.inward.printdot.M > 0 ? parsed.inward.printdot.M.toString() : '');
+          setPrintdotInY(parsed.inward.printdot.Y > 0 ? parsed.inward.printdot.Y.toString() : '');
+          setPrintdotInK(parsed.inward.printdot.K > 0 ? parsed.inward.printdot.K.toString() : '');
 
-        setInwardPaperEntries(parsed.inward.paper.length > 0 ? parsed.inward.paper : [
-          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
-        ]);
+          setInwardPaperEntries(parsed.inward.paper.length > 0 ? parsed.inward.paper : [
+            { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
+          ]);
 
-        // Populate Outward Inputs
-        setGrandoOutC(parsed.outward.grando.C > 0 ? parsed.outward.grando.C.toString() : '');
-        setGrandoOutM(parsed.outward.grando.M > 0 ? parsed.outward.grando.M.toString() : '');
-        setGrandoOutY(parsed.outward.grando.Y > 0 ? parsed.outward.grando.Y.toString() : '');
-        setGrandoOutK(parsed.outward.grando.K > 0 ? parsed.outward.grando.K.toString() : '');
+          // Populate Outward Inputs
+          setGrandoOutC(parsed.outward.grando.C > 0 ? parsed.outward.grando.C.toString() : '');
+          setGrandoOutM(parsed.outward.grando.M > 0 ? parsed.outward.grando.M.toString() : '');
+          setGrandoOutY(parsed.outward.grando.Y > 0 ? parsed.outward.grando.Y.toString() : '');
+          setGrandoOutK(parsed.outward.grando.K > 0 ? parsed.outward.grando.K.toString() : '');
 
-        setPrintdotOutC(parsed.outward.printdot.C > 0 ? parsed.outward.printdot.C.toString() : '');
-        setPrintdotOutM(parsed.outward.printdot.M > 0 ? parsed.outward.printdot.M.toString() : '');
-        setPrintdotOutY(parsed.outward.printdot.Y > 0 ? parsed.outward.printdot.Y.toString() : '');
-        setPrintdotOutK(parsed.outward.printdot.K > 0 ? parsed.outward.printdot.K.toString() : '');
+          setPrintdotOutC(parsed.outward.printdot.C > 0 ? parsed.outward.printdot.C.toString() : '');
+          setPrintdotOutM(parsed.outward.printdot.M > 0 ? parsed.outward.printdot.M.toString() : '');
+          setPrintdotOutY(parsed.outward.printdot.Y > 0 ? parsed.outward.printdot.Y.toString() : '');
+          setPrintdotOutK(parsed.outward.printdot.K > 0 ? parsed.outward.printdot.K.toString() : '');
 
-        setOutwardPaperEntries(parsed.outward.paper.length > 0 ? parsed.outward.paper : [
-          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
-        ]);
+          setOutwardPaperEntries(parsed.outward.paper.length > 0 ? parsed.outward.paper : [
+            { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
+          ]);
+        }
 
         setRawMaterialSummary({
           inward: parsed.inward,
@@ -500,7 +515,8 @@ export default function JobPrintingLog() {
       }
 
       triggerPushNotification('📦 Raw Material Logs Saved', `Successfully updated raw material entries for ${rawDate}!`, 'success');
-      await fetchRawMaterialSummary();
+      rawMaterialDirtyRef.current = false;
+      await fetchRawMaterialSummary(undefined, undefined, { forcePopulateInputs: true });
 
       setShowRawMaterialModal(false);
     } catch (err) {
@@ -4566,7 +4582,6 @@ export default function JobPrintingLog() {
       {/* ── 6. RAW MATERIAL FORM MODAL — PREMIUM REDESIGN (50% INWARD | 50% OUTWARD SPLIT VIEW) ── */}
       {showRawMaterialModal && (
         <div
-          onClick={() => setShowRawMaterialModal(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             background: 'rgba(15, 23, 42, 0.55)',

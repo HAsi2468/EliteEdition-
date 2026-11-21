@@ -435,7 +435,7 @@ const getAll = async (req, res) => {
       startDate = '',
       endDate = '',
       page = 1,
-      limit = 500,
+      limit = 5000,
       companyEntity,
       businessUnit
     } = req.query;
@@ -514,7 +514,7 @@ const getAll = async (req, res) => {
     const filter = conditions.length > 0 ? { $and: conditions } : {};
 
     const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 500;
+    const limitNum = parseInt(limit, 10) || 5000;
     const skip = (pageNum - 1) * limitNum;
 
     const [data, total, ledgerSummary] = await Promise.all([

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ToggleSwitch from './common/ToggleSwitch';
 import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import { triggerPushNotification } from './NotificationToast';
@@ -388,24 +389,15 @@ export default function AdminChangeApprovalQueue({ onCountChange, companyEntity 
               {approvalSettings.enabled ? 'ACTIVE (User edits held for review)' : 'DISABLED (User edits apply immediately)'}
             </div>
           </div>
-          <button
-            type="button"
+          <ToggleSwitch
+            checked={Boolean(approvalSettings.enabled)}
             disabled={updatingSettings}
-            onClick={handleToggleMasterApproval}
-            style={{
-              padding: '0.35rem 0.8rem',
-              borderRadius: '6px',
-              border: approvalSettings.enabled ? '1px solid #2563eb' : '1px solid #cbd5e1',
-              background: approvalSettings.enabled ? '#2563eb' : '#ffffff',
-              color: approvalSettings.enabled ? '#ffffff' : '#64748b',
-              fontWeight: 800,
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              boxShadow: approvalSettings.enabled ? '0 1px 3px rgba(37,99,235,0.2)' : 'none'
-            }}
-          >
-            {updatingSettings ? 'Saving...' : approvalSettings.enabled ? 'Enabled' : 'Disabled'}
-          </button>
+            onChange={() => handleToggleMasterApproval()}
+            accent="blue"
+            onLabel={updatingSettings ? '...' : 'ON'}
+            offLabel={updatingSettings ? '...' : 'OFF'}
+            ariaLabel="Toggle Master Approval Workflow"
+          />
         </div>
       </div>
 

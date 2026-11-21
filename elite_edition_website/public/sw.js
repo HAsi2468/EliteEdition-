@@ -1,6 +1,6 @@
 // Service Worker for Elite Edition Enterprise ERP
 // High performance, offline-capable PWA with strict company data isolation
-const CACHE_VERSION = 'v3.0.0';
+const CACHE_VERSION = 'v3.0.1';
 const STATIC_CACHE = `elite-erp-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `elite-erp-runtime-${CACHE_VERSION}`;
 
@@ -199,8 +199,9 @@ self.addEventListener('push', (event) => {
     ],
   };
 
-  // Smart Focus & In-Tab Suppression:
-  // If the user already has an active, focused tab viewing this room, broadcast in-tab alert without external OS modal
+  // Smart Focus Check:
+  // Only suppress OS notification if a visible, focused window is actively viewing this exact room.
+  // Never suppress when app is backgrounded/hidden so Android Doze & iOS APNs always show alerts reliably.
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       const targetRoomId = payloadData.roomId;
@@ -208,7 +209,7 @@ self.addEventListener('push', (event) => {
       const isRoomFocused = clientList.some((client) => {
         return (
           client.visibilityState === 'visible' &&
-          client.focused &&
+          client.focused === true &&
           targetRoomId &&
           client.url.includes(`room=${targetRoomId}`)
         );
@@ -240,24 +241,24 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  const destinationUrl = event.notification.data?.url || '/communication';
+  const notifData = event.notification.data || {};
+  const roomQuery = notifData.roomId
+    ? `/communication?room=${encodeURIComponent(String(notifData.roomId))}${notifData.messageId ? `&msg=${encodeURIComponent(String(notifData.messageId))}` : ''}`
+    : null;
+  const destinationUrl = notifData.url && notifData.url.includes('room=') ? notifData.url : (roomQuery || notifData.url || '/communication');
   const targetUrl = new URL(destinationUrl, self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // 2. Query existing clients: if matching window exists, focus and postMessage to route
+      // 2. Query existing clients: focus existing PWA/tab and route in-place without full reload
       for (const client of clientList) {
         if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-          client.focus();
           client.postMessage({
             type: 'NAVIGATE_TO_ROUTE',
             url: destinationUrl,
-            data: event.notification.data,
+            data: notifData,
           });
-          if ('navigate' in client && client.url !== targetUrl) {
-            client.navigate(targetUrl);
-          }
-          return;
+          return client.focus();
         }
       }
 

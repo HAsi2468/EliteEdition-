@@ -163,6 +163,9 @@ const getInviteLink = async (req, res) => {
 const resetInviteLink = async (req, res) => {
   try {
     const { groupId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid group ID' });
+    }
     const token = crypto.randomBytes(12).toString('hex');
     const updated = await ChatRoom.findByIdAndUpdate(
       groupId,
@@ -179,6 +182,9 @@ const resetInviteLink = async (req, res) => {
 const toggleJoinApproval = async (req, res) => {
   try {
     const { groupId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid group ID' });
+    }
     const { requireJoinApproval } = req.body || {};
     const updated = await ChatRoom.findByIdAndUpdate(
       groupId,
@@ -360,8 +366,15 @@ const markViewOnceOpened = async (req, res) => {
     if (!userId || !mongoose.Types.ObjectId.isValid(messageId)) {
       return res.status(400).json({ success: false, message: 'Invalid message or user ID' });
     }
-    const msg = await ChatMessage.findById(messageId).select('viewOnce viewedBy senderId attachment');
+    const msg = await ChatMessage.findById(messageId).select('roomId viewOnce viewedBy senderId attachment');
     if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
+    const isAdm = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase()) || req.user?.isAdmin || req.user?.isMainAdmin;
+    if (!isAdm && msg.roomId) {
+      const rm = await ChatRoom.findById(msg.roomId).select('members').lean();
+      if (rm && Array.isArray(rm.members) && rm.members.length > 0 && !rm.members.some((m) => String(m?._id || m) === String(userId))) {
+        return res.status(403).json({ success: false, message: 'Access denied to this room' });
+      }
+    }
 
     const alreadyViewed = (msg.viewedBy || []).some((v) => String(v.userId) === String(userId));
     if (!alreadyViewed) {
@@ -385,6 +398,16 @@ const saveVoiceTranscript = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(messageId)) {
       return res.status(400).json({ success: false, message: 'Invalid message ID' });
     }
+    const userId = getUid(req);
+    const msg = await ChatMessage.findById(messageId).select('roomId').lean();
+    if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
+    const isAdm = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase()) || req.user?.isAdmin || req.user?.isMainAdmin;
+    if (!isAdm && msg.roomId) {
+      const rm = await ChatRoom.findById(msg.roomId).select('members').lean();
+      if (rm && Array.isArray(rm.members) && rm.members.length > 0 && !rm.members.some((m) => String(m?._id || m) === String(userId))) {
+        return res.status(403).json({ success: false, message: 'Access denied to this room' });
+      }
+    }
     const clean = sanitizeChatMessage(String(transcript || ''), 5000);
     await ChatMessage.updateOne({ _id: messageId }, { $set: { transcript: clean } });
     return res.json({ success: true, transcript: clean });
@@ -404,6 +427,14 @@ const transcribeVoiceMessage = async (req, res) => {
     const msg = await ChatMessage.findById(messageId).select('roomId attachment transcript').lean();
     if (!msg || !msg.attachment?.fileUrl) {
       return res.status(404).json({ success: false, message: 'Voice attachment not found' });
+    }
+    const uid = getUid(req);
+    const isAdm = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (!isAdm && msg.roomId) {
+      const rm = await ChatRoom.findById(msg.roomId).select('members').lean();
+      if (rm && Array.isArray(rm.members) && rm.members.length > 0 && !rm.members.some((m) => String(m?._id || m) === String(uid))) {
+        return res.status(403).json({ success: false, message: 'Access denied to this room' });
+      }
     }
 
     const openAiKey = process.env.OPENAI_API_KEY;
@@ -540,9 +571,17 @@ const translateChatMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid message ID' });
     }
 
-    const msg = await ChatMessage.findById(messageId).select('content transcript').lean();
+    const msg = await ChatMessage.findById(messageId).select('roomId content transcript').lean();
     if (!msg) {
       return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+    const uid = getUid(req);
+    const isAdm = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (!isAdm && msg.roomId) {
+      const rm = await ChatRoom.findById(msg.roomId).select('members').lean();
+      if (rm && Array.isArray(rm.members) && rm.members.length > 0 && !rm.members.some((m) => String(m?._id || m) === String(uid))) {
+        return res.status(403).json({ success: false, message: 'Access denied to this room' });
+      }
     }
 
     const sourceText = String(
@@ -772,6 +811,15 @@ const rsvpGroupEvent = async (req, res) => {
     if (!userId || !mongoose.Types.ObjectId.isValid(messageId)) {
       return res.status(400).json({ success: false, message: 'Invalid message or user ID' });
     }
+    const msgCheck = await ChatMessage.findById(messageId).select('roomId').lean();
+    if (!msgCheck) return res.status(404).json({ success: false, message: 'Event message not found' });
+    const isAdm = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase()) || req.user?.isAdmin || req.user?.isMainAdmin;
+    if (!isAdm && msgCheck.roomId) {
+      const rm = await ChatRoom.findById(msgCheck.roomId).select('members').lean();
+      if (rm && Array.isArray(rm.members) && rm.members.length > 0 && !rm.members.some((m) => String(m?._id || m) === String(userId))) {
+        return res.status(403).json({ success: false, message: 'Access denied to this room' });
+      }
+    }
     const validStatus = ['going', 'maybe', 'not_going'].includes(status) ? status : 'going';
     const userObjId = new mongoose.Types.ObjectId(userId);
     await ChatMessage.updateOne({ _id: messageId }, { $pull: { 'eventMeta.rsvps': { userId: userObjId } } });
@@ -958,14 +1006,26 @@ const createMessageReminder = async (req, res) => {
     }
     const msg = await ChatMessage.findById(messageId).select('roomId content').lean();
     if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
+    const isAdm = ['admin', 'super_admin'].includes(String(req.user?.role || '').toLowerCase());
+    if (!isAdm && msg.roomId) {
+      const rm = await ChatRoom.findById(msg.roomId).select('members').lean();
+      if (rm && Array.isArray(rm.members) && rm.members.length > 0 && !rm.members.some((m) => String(m?._id || m) === String(userId))) {
+        return res.status(403).json({ success: false, message: 'Access denied to this room' });
+      }
+    }
+
+    const remindDate = new Date(remindAt);
+    if (Number.isNaN(remindDate.getTime()) || remindDate.getTime() <= Date.now()) {
+      return res.status(400).json({ success: false, message: 'Reminder time must be a valid future date' });
+    }
 
     const created = await ChatMessageReminder.create({
       userId: new mongoose.Types.ObjectId(userId),
       messageId: msg._id,
       roomId: msg.roomId,
-      roomName: roomName || 'Chat',
-      snippet: snippet || String(msg.content || '').slice(0, 140),
-      remindAt: new Date(remindAt),
+      roomName: sanitizeChatMessage(String(roomName || 'Chat'), 120),
+      snippet: sanitizeChatMessage(String(snippet || msg.content || ''), 140),
+      remindAt: remindDate,
       fired: false,
     });
     return res.json({ success: true, data: created });
@@ -991,7 +1051,10 @@ const deleteReminder = async (req, res) => {
   try {
     const { reminderId } = req.params;
     const userId = getUid(req);
-    await ChatMessageReminder.deleteOne({ _id: reminderId, userId: new mongoose.Types.ObjectId(userId) });
+    if (!userId || !mongoose.Types.ObjectId.isValid(reminderId)) {
+      return res.status(400).json({ success: false, message: 'Invalid reminder ID' });
+    }
+    await ChatMessageReminder.deleteOne({ _id: new mongoose.Types.ObjectId(reminderId), userId: new mongoose.Types.ObjectId(userId) });
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to delete reminder', error: err.message });

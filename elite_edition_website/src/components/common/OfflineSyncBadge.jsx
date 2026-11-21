@@ -55,14 +55,17 @@ export default function OfflineSyncBadge() {
 
   return (
     <div
+      className="offline-sync-badge-pill"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '6px',
-        padding: '3px 10px',
+        gap: '4px',
+        padding: '3px 8px',
         borderRadius: '999px',
         fontSize: '0.72rem',
         fontWeight: 600,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
         background: !isOnline
           ? 'rgba(239, 68, 68, 0.15)'
           : isSyncing
@@ -86,7 +89,7 @@ export default function OfflineSyncBadge() {
           : showRecentSync
           ? '#10b981'
           : '#f59e0b',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         animation: 'fadeIn 0.2s ease',
         cursor: isOnline && pendingCount > 0 ? 'pointer' : 'default'
       }}
@@ -95,27 +98,36 @@ export default function OfflineSyncBadge() {
           syncPendingMutations(api);
         }
       }}
-      title={isOnline && pendingCount > 0 ? 'Click to sync queued actions now' : ''}
+      title={
+        !isOnline
+          ? `Offline Mode (${pendingCount} queued)`
+          : isOnline && pendingCount > 0
+          ? 'Click to sync queued actions now'
+          : 'Sync status'
+      }
     >
       {!isOnline ? (
         <>
-          <WifiOff size={12} style={{ animation: 'pulse 1.5s infinite' }} />
-          <span>Offline Mode ({pendingCount} queued)</span>
+          <WifiOff size={13} style={{ animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+          <span className="hidden sm:inline">Offline</span>
+          {pendingCount > 0 && <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>({pendingCount})</span>}
         </>
       ) : isSyncing ? (
         <>
-          <RefreshCw size={12} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
-          <span>Syncing ({pendingCount})...</span>
+          <RefreshCw size={13} className="spin" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+          <span className="hidden sm:inline">Syncing</span>
+          <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>({pendingCount})</span>
         </>
       ) : showRecentSync ? (
         <>
-          <CheckCircle2 size={12} />
-          <span>Synced Successfully!</span>
+          <CheckCircle2 size={13} style={{ flexShrink: 0 }} />
+          <span className="hidden sm:inline">Synced</span>
         </>
       ) : (
         <>
-          <Wifi size={12} />
-          <span>{pendingCount} offline action(s) — Sync Now</span>
+          <Wifi size={13} style={{ flexShrink: 0 }} />
+          <span className="hidden sm:inline">Queued</span>
+          <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>({pendingCount})</span>
         </>
       )}
     </div>
