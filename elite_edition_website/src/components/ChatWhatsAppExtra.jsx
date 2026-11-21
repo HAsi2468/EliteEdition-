@@ -723,7 +723,7 @@ export const MessageReminderModal = ({ message, existingReminders = [], onClose,
 
   return (
     <div style={backdrop} onClick={onClose}>
-      <div style={{ ...card, width: 'min(430px, 95vw)' }} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Remind Me About Message" style={{ ...card, width: 'min(430px, 95vw)' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1rem' }}>
             <Bell size={18} color="#f59e0b" /> Remind Me About Message
@@ -778,6 +778,7 @@ export const MessageReminderModal = ({ message, existingReminders = [], onClose,
         <div style={{ display: 'flex', gap: '0.45rem', marginBottom: existingReminders.length ? '0.9rem' : 0 }}>
           <input
             type="datetime-local"
+            min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
             value={customDateTime}
             onChange={(e) => setCustomDateTime(e.target.value)}
             style={{ ...inp, flex: 1 }}

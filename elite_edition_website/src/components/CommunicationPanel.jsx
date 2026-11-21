@@ -12000,6 +12000,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       onClick={() => setShowRemindersModal(false)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Scheduled Reminders"
         className="glass-panel"
         style={{ width: '100%', maxWidth: 460, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
         onClick={(e) => e.stopPropagation()}
@@ -13509,8 +13512,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     </div>
                     <ToggleSwitch
                       checked={isPushGranted}
-                      onChange={async () => {
+                      onChange={async (next) => {
                         try {
+                          if (!next) {
+                            if (typeof webPushClient.unsubscribeFromPush === 'function') {
+                              await webPushClient.unsubscribeFromPush(currentUser?._id || currentUser?.id);
+                            } else if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+                              const reg = await navigator.serviceWorker.ready;
+                              const sub = await reg.pushManager?.getSubscription?.();
+                              if (sub) await sub.unsubscribe();
+                            }
+                            showToast('Push Notifications Disabled', 'Background push alerts paused for this device.', 'info');
+                            return;
+                          }
                           const res = await webPushClient.subscribeToPush(currentUser?._id || currentUser?.id);
                           if (res?.success) {
                             soundEffects.playMilestone?.();
@@ -13519,7 +13533,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             showToast('Push Setup Notice', res?.message || 'Could not enable push notifications.', 'warning');
                           }
                         } catch (err) {
-                          showToast('Push Error', err?.message || 'Failed to register device for push.', 'error');
+                          showToast('Push Error', err?.message || 'Failed to update push notification setting.', 'error');
                         }
                       }}
                       accent="emerald"

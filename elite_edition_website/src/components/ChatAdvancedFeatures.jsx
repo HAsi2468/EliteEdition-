@@ -211,7 +211,7 @@ export function MessageInfoModal({ message, onClose }) {
 
   return (
     <div style={glassModalOverlay} onClick={onClose}>
-      <div style={glassModalCard} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Schedule Message" style={glassModalCard} onClick={(e) => e.stopPropagation()}>
         <div style={modalHeaderStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
             <CheckCheck size={17} color="#38bdf8" />
@@ -327,7 +327,7 @@ export function ScheduleMessageModal({ roomId, initialText = '', onClose, onSche
 
   return (
     <div style={glassModalOverlay} onClick={onClose}>
-      <div style={glassModalCard} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Schedule Message" style={glassModalCard} onClick={(e) => e.stopPropagation()}>
         <div style={modalHeaderStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
             <Clock size={17} color="#38bdf8" />
@@ -390,6 +390,7 @@ export function ScheduleMessageModal({ roomId, initialText = '', onClose, onSche
           </div>
           <input
             type="datetime-local"
+            min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
             value={scheduledAt}
             onChange={(e) => setScheduledAt(e.target.value)}
             style={{
@@ -461,7 +462,7 @@ export function StarredMessagesModal({ onClose, onJumpToRoom }) {
 
   return (
     <div style={glassModalOverlay} onClick={onClose}>
-      <div style={glassModalCard} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Schedule Message" style={glassModalCard} onClick={(e) => e.stopPropagation()}>
         <div style={modalHeaderStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
             <Star size={17} color="#fbbf24" />
