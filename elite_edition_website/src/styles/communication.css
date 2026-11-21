@@ -1032,7 +1032,9 @@ body.glass-theme-active .wa-bubble-trigger:hover {
   }
 
   .phoenix-search-input,
-  .phoenix-chat-textarea {
+  .phoenix-chat-textarea,
+  body.glass-theme-active .phoenix-search-input,
+  body.glass-theme-active .phoenix-chat-textarea {
     font-size: 16px !important;
   }
 }
