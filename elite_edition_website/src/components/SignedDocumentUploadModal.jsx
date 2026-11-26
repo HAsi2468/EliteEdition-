@@ -59,28 +59,30 @@ export default function SignedDocumentUploadModal({
     const validFiles = filesArray.filter((f) => {
       return (
         (f.type && f.type.startsWith('image/') && f.type !== 'image/svg+xml') ||
-        /\.(jpe?g|png|webp|heic|bmp)$/i.test(f.name || '')
+        f.type === 'application/pdf' ||
+        /\.(jpe?g|png|webp|heic|bmp|pdf)$/i.test(f.name || '')
       );
     });
 
     if (validFiles.length === 0) {
-      setError('Please select or paste valid signed document image files (JPG, PNG, WEBP).');
+      setError('Please select or paste valid photo or PDF files (JPG, PNG, WEBP, PDF).');
       return;
     }
 
     setImages((prev) => {
       const availableSlots = 2 - prev.length;
       if (availableSlots <= 0) {
-        setError('Maximum 2 images allowed for signed document copy. Remove an image first to replace it.');
+        setError('Maximum 2 files allowed. Remove a file first to replace it.');
         return prev;
       }
 
       const filesToAdd = validFiles.slice(0, availableSlots);
       const newEntries = filesToAdd.map((file) => ({
         file,
+        isPdf: file.type === 'application/pdf' || /\.pdf$/i.test(file.name || ''),
         previewUrl: URL.createObjectURL(file),
         remoteUrl: null,
-        name: file.name || 'signed-invoice-copy.png'
+        name: file.name || (docType === 'purchase' ? 'purchase-soft-copy.pdf' : 'signed-invoice-copy.png')
       }));
 
       return [...prev, ...newEntries];
@@ -88,7 +90,16 @@ export default function SignedDocumentUploadModal({
 
     // Reset native input so the same file can be re-selected if removed
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, []);
+  }, [docType]);
+
+  // Reset modal state cleanly when switching target document
+  useEffect(() => {
+    if (isOpen) {
+      setImages([]);
+      setError('');
+      setPasteNotice('');
+    }
+  }, [isOpen, docId, docType]);
 
   // ── Clipboard Paste (Ctrl+V / Cmd+V) Listener ──
   useEffect(() => {
@@ -248,8 +259,8 @@ export default function SignedDocumentUploadModal({
       });
 
       triggerPushNotification(
-        'Signed Copy Uploaded 🎉',
-        `Signed ${docType === 'challan' ? 'Challan' : 'Invoice'} submitted successfully for Admin approval.`,
+        docType === 'purchase' ? 'Soft Copy Uploaded 🎉' : 'Signed Copy Uploaded 🎉',
+        `${docType === 'challan' ? 'Signed Challan' : docType === 'purchase' ? 'Purchase Soft Copy' : 'Signed Invoice'} submitted successfully for Admin approval.`,
         'success'
       );
 
@@ -484,18 +495,30 @@ export default function SignedDocumentUploadModal({
                 >
                   {img ? (
                     <>
-                      <img
-                        src={img.previewUrl}
-                        alt={`Signed Copy ${index + 1}`}
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          width: 'auto',
-                          height: 'auto',
-                          objectFit: 'contain',
-                          borderRadius: '4px'
-                        }}
-                      />
+                      {img.isPdf || /\.pdf(\?|$)/i.test(img.previewUrl || img.name || '') ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', textAlign: 'center' }}>
+                          <FileCheck2 size={42} color="#2563eb" />
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a', wordBreak: 'break-all' }}>
+                            {img.name || `Document ${index + 1}.pdf`}
+                          </span>
+                          <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '999px', background: '#dbeafe', color: '#1d4ed8', fontWeight: 700 }}>
+                            PDF READY
+                          </span>
+                        </div>
+                      ) : (
+                        <img
+                          src={img.previewUrl}
+                          alt={`Document Copy ${index + 1}`}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            width: 'auto',
+                            height: 'auto',
+                            objectFit: 'contain',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      )}
                       <div
                         style={{
                           position: 'absolute',
@@ -627,9 +650,8 @@ export default function SignedDocumentUploadModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic"
+            accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,.pdf"
             multiple
-            capture="environment"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
           />

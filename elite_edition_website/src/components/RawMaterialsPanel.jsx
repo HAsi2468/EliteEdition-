@@ -584,7 +584,13 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
 
 
+  const activeCompanyRef = useRef(companyEntity);
+  useEffect(() => {
+    activeCompanyRef.current = companyEntity;
+  }, [companyEntity]);
+
   const fetchData = async () => {
+    const requestedCompany = companyEntity;
     setLoading(true);
     setError('');
     try {
@@ -592,6 +598,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       if (isDigitalPrint) {
         try {
           const cfg = await api.getPrintConfig();
+          if (activeCompanyRef.current !== requestedCompany) return;
           if (cfg) {
             setPrintConfig(cfg);
             if (Array.isArray(cfg.rawMaterials) && cfg.rawMaterials.length > 0) {
@@ -607,13 +614,15 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       // 2. Fetch vendors list
       try {
         const vRes = await api.getFabricVendors();
+        if (activeCompanyRef.current !== requestedCompany) return;
         if (vRes) setVendorsList(vRes);
       } catch (e) {
         console.warn('Failed to fetch vendors:', e);
       }
 
       // 3. Fetch Stock Overview
-      const stockRes = await api.getRawMaterialStock({ companyEntity });
+      const stockRes = await api.getRawMaterialStock({ companyEntity: requestedCompany });
+      if (activeCompanyRef.current !== requestedCompany) return;
       if (stockRes.success && Array.isArray(stockRes.data)) {
         setStock(stockRes.data);
         if (!isDigitalPrint) {
@@ -626,13 +635,17 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       }
 
       // 4. Fetch Transactions
-      const transRes = await api.getRawMaterialTransactions({ companyEntity });
+      const transRes = await api.getRawMaterialTransactions({ companyEntity: requestedCompany });
+      if (activeCompanyRef.current !== requestedCompany) return;
       if (transRes.success) setTransactions(transRes.data);
 
     } catch (err) {
+      if (activeCompanyRef.current !== requestedCompany) return;
       setError(err.message || 'Failed to load raw materials inventory.');
     } finally {
-      setLoading(false);
+      if (activeCompanyRef.current === requestedCompany) {
+        setLoading(false);
+      }
     }
   };
 
@@ -733,9 +746,11 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   }, [companyEntity]);
 
   useEffect(() => {
+    let cancelled = false;
+    const requestedCompany = companyEntity;
     const fetchStock = async () => {
       try {
-        const stockParams = { companyEntity };
+        const stockParams = { companyEntity: requestedCompany };
         if (stockPreset && stockPreset !== 'all') {
           const range = getDatePresetRange(stockPreset, customStockStart, customStockEnd);
           if (range.dateStart) stockParams.dateStart = range.dateStart;
@@ -745,12 +760,15 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
           if (stockDateEnd) stockParams.dateEnd = stockDateEnd;
         }
         const stockRes = await api.getRawMaterialStock(stockParams);
-        if (stockRes && stockRes.success) setStock(stockRes.data);
+        if (!cancelled && activeCompanyRef.current === requestedCompany && stockRes && stockRes.success) {
+          setStock(stockRes.data);
+        }
       } catch (e) {
         console.warn('Failed to fetch stock for date range:', e);
       }
     };
     fetchStock();
+    return () => { cancelled = true; };
   }, [stockPreset, stockDateStart, stockDateEnd, customStockStart, customStockEnd, companyEntity]);
 
   const isSublimationTab = (tab) => {

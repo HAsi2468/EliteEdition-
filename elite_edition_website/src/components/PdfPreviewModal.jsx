@@ -90,6 +90,25 @@ export default function PdfPreviewModal() {
     setBlob(null);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+    const onHashChange = () => {
+      handleClose();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('hashchange', onHashChange);
+    };
+  }, [isOpen, previewUrl]);
+
   const handleDownload = () => {
     if (blob) {
       triggerDirectDownload(blob, fileName);

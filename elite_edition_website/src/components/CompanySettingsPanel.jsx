@@ -163,13 +163,14 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition', 
   useEffect(() => {
     setForm(getInitialFormForCompany(companyEntity));
     loadSettings();
+    fetchCompanyUsers();
   }, [companyEntity]);
 
   useEffect(() => {
-    if (activeTab === 'users') {
+    if (activeTab === 'users' && users.length === 0) {
       fetchCompanyUsers();
     }
-  }, [activeTab, companyEntity]);
+  }, [activeTab]);
 
   const handleCreateStaffUser = () => {
     setEditingUser(null);

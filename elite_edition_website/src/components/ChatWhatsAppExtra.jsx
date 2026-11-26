@@ -540,6 +540,7 @@ export const CustomToneModal = ({ roomName, currentTone = 'default', onSelectTon
 /* 6. Built-in Image Markup, Rotate & HD/Standard Quality Modal */
 export const ImageMarkupModal = ({ file, isHdInitial = false, onConfirm, onClose }) => {
   const canvasRef = useRef(null);
+  const hasEditedRef = useRef(false);
   const [drawColor, setDrawColor] = useState('#ef4444');
   const [drawing, setDrawing] = useState(false);
   const [isHd, setIsHd] = useState(isHdInitial);
@@ -600,15 +601,23 @@ export const ImageMarkupModal = ({ file, isHdInitial = false, onConfirm, onClose
     ctx.lineWidth = 4;
     ctx.strokeText(textNote.trim(), 24, 48);
     ctx.fillText(textNote.trim(), 24, 48);
+    hasEditedRef.current = true;
     setTextNote('');
   };
 
   const handleSave = () => {
     if (!canvasRef.current) return;
+    // If untouched PNG/GIF/WebP in HD/original mode or no markup/rotation applied, keep original bytes/extension
+    if (!hasEditedRef.current && rotation === 0 && isHd === isHdInitial && file) {
+      onConfirm(file, isHd);
+      return;
+    }
+    const baseName = (file?.name || `markup_${Date.now()}`).replace(/\.[a-z0-9]+$/i, '');
     canvasRef.current.toBlob(
       (blob) => {
         if (!blob) return;
-        const outFile = new File([blob], file.name || `markup_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        // Extension must match the encoded JPEG magic bytes (FF D8 FF)
+        const outFile = new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
         onConfirm(outFile, isHd);
       },
       'image/jpeg',
@@ -657,6 +666,7 @@ export const ImageMarkupModal = ({ file, isHdInitial = false, onConfirm, onClose
             ref={canvasRef}
             onMouseDown={(e) => {
               setDrawing(true);
+              hasEditedRef.current = true;
               const ctx = canvasRef.current.getContext('2d');
               const p = getPos(e);
               ctx.beginPath();

@@ -93,6 +93,12 @@ const billingPurchaseSchema = new mongoose.Schema(
     totalAmount: { type: Number, default: 0 },
     grandTotal: { type: Number, default: 0 },
 
+    // Optional TDS Deduction (OFF by default)
+    enableTds: { type: Boolean, default: false },
+    tdsSection: { type: String, default: '194C', trim: true },
+    tdsRate: { type: Number, default: 2 },
+    tdsAmount: { type: Number, default: 0 },
+
     paidAmount: { type: Number, default: 0 },
     balanceDue: { type: Number, default: 0 },
     paymentStatus: {
@@ -102,7 +108,28 @@ const billingPurchaseSchema = new mongoose.Schema(
     },
 
     notes: { type: String, default: '' },
-    terms: { type: String, default: '' }
+    terms: { type: String, default: '' },
+
+    // Soft copy (photo or PDF) upload & Admin approval (max 2 files in R2)
+    signedCopy: {
+      images: {
+        type: [{ type: String }],
+        validate: [arr => !arr || arr.length <= 2, 'Maximum 2 files allowed for soft copy'],
+        default: []
+      },
+      status: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED'],
+        default: 'NONE'
+      },
+      uploadedAt: { type: Date },
+      uploadedBy: { type: String, default: '' },
+      uploadedByName: { type: String, default: '' },
+      approvedAt: { type: Date },
+      approvedBy: { type: String, default: '' },
+      approvedByName: { type: String, default: '' },
+      rejectionReason: { type: String, default: '' }
+    }
   },
   {
     timestamps: true
@@ -111,6 +138,7 @@ const billingPurchaseSchema = new mongoose.Schema(
 
 // Index for query optimization
 billingPurchaseSchema.index({ companyEntity: 1, date: -1 });
+billingPurchaseSchema.index({ 'signedCopy.status': 1 });
 
 // BUG-064 DB Schema Guard: Prevent paidAmount/advance exceeding grandTotal
 billingPurchaseSchema.pre('validate', function() {

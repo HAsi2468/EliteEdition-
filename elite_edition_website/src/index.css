@@ -1648,8 +1648,17 @@ tr:hover td {
   .content-area-wrap {
     height: 100% !important;
     max-height: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
+  }
+  .table-responsive-wrapper,
+  .table-responsive,
+  .table-container {
+    max-width: 100% !important;
+    overflow-x: auto !important;
   }
 }
 
@@ -1992,15 +2001,20 @@ tr:hover td {
 .pwa-update-bar {
   background: #0f172a;
   color: #ffffff;
-  border-bottom: 1px solid #334155;
-  padding: 8px 16px;
-  display: flex;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 8px 14px;
+  display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  position: sticky;
-  top: 0;
-  z-index: 10002;
+  gap: 12px;
+  width: auto;
+  max-width: calc(100vw - 32px);
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 16px;
+  z-index: 8500;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   font-size: var(--font-size-meta);
 }
 .pwa-update-bar button {

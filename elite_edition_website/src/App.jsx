@@ -654,7 +654,7 @@ export default function App() {
   const [activeDepartment, setActiveDepartment] = useState(initialNav.dept);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCompanyQuickSheet, setShowCompanyQuickSheet] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 850);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showSpotlightSearch, setShowSpotlightSearch] = useState(false);
   const [adminBroadcastBanner, setAdminBroadcastBanner] = useState(null);
@@ -1234,7 +1234,7 @@ export default function App() {
   }, [activeTab, activeDepartment]);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -1767,6 +1767,11 @@ export default function App() {
       'designer_screen', 'designer_module', 'designer', 'reconciliation', 'ledger-reconciliation', 'voucher', 'voucher_entry', 'jobcards_complaints'
     ];
 
+    if (!isSuperOrAdmin && activeTab === 'admin') {
+      setActiveTab('no-access');
+      return;
+    }
+
     if (isSuperOrAdmin) {
       // Admins and Super Admins have access to all system tabs
       if (!ALL_SYSTEM_TABS.includes(activeTab) && !activeTab.startsWith('yj_') && !activeTab.startsWith('ew_') && !activeTab.startsWith('so_') && !activeTab.startsWith('ef_') && !activeTab.startsWith('ee_') && !activeTab.startsWith('es_') && !activeTab.startsWith('eo_') && !activeTab.startsWith('jobcards')) {
@@ -1889,53 +1894,33 @@ export default function App() {
 
   const [notificationPerm, setNotificationPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
 
+  const computeCombinedNotifCount = (chatCount = 0) => {
+    const list = getNotificationHistory();
+    const totalUnread = list.filter(h => !h.read).length;
+    const nonChatUnread = list.filter(h => !h.read && !h?.meta?.roomId).length;
+    return Math.max(totalUnread, nonChatUnread + (Number(chatCount) || 0));
+  };
+
   useEffect(() => {
     const handleNotifUpdate = () => {
-      setUnreadNotifCount(getNotificationHistory().filter(h => !h.read).length);
+      setUnreadNotifCount(computeCombinedNotifCount(chatUnreadCount));
     };
+    handleNotifUpdate();
     window.addEventListener('elite-notification-history-update', handleNotifUpdate);
     return () => window.removeEventListener('elite-notification-history-update', handleNotifUpdate);
-  }, []);
+  }, [chatUnreadCount]);
 
-  // Auto-request push notification permission as soon as user logs in or reloads page
+  // Only sync permission state passively on auth; request permission explicitly on user action (no unsolicited popups on load)
   useEffect(() => {
-    if (!isAuthenticated) return;
-
-    if ('Notification' in window && Notification.permission === 'default') {
-      const askPerm = async () => {
-        try {
-          const res = await requestNotificationPermission();
-          setNotificationPerm(res);
-          if (res === 'denied') {
-            setShowPermHelpModal(true);
-          }
-        } catch (e) {
-          console.warn('Deferred notification prompt:', e);
-        }
-      };
-
-      const handleUserInteraction = () => {
-        askPerm();
-        window.removeEventListener('click', handleUserInteraction);
-        window.removeEventListener('keydown', handleUserInteraction);
-      };
-
-      window.addEventListener('click', handleUserInteraction);
-      window.addEventListener('keydown', handleUserInteraction);
-
-      const timer = setTimeout(() => {
-        if (Notification.permission === 'default') {
-          askPerm();
-        }
-      }, 1500);
-
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('click', handleUserInteraction);
-        window.removeEventListener('keydown', handleUserInteraction);
-      };
-    }
-  }, [isAuthenticated, permSnoozedSession]);
+    if (!isAuthenticated || typeof window === 'undefined' || !('Notification' in window)) return;
+    setNotificationPerm(Notification.permission);
+    const onPermChange = (e) => {
+      if (e?.detail) setNotificationPerm(e.detail);
+      else if ('Notification' in window) setNotificationPerm(Notification.permission);
+    };
+    window.addEventListener('elite-permission-change', onPermChange);
+    return () => window.removeEventListener('elite-permission-change', onPermChange);
+  }, [isAuthenticated]);
 
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
 
@@ -2341,14 +2326,25 @@ export default function App() {
     setServerEndpoint(getBaseUrl());
   };
 
-  const handleLogout = () => {
+  const handleLogout = async (requireConfirm = false) => {
+    if (requireConfirm === true) {
+      const ok = await triggerEliteConfirm(
+        'Sign Out',
+        'Are you sure you want to sign out of Elite Edition?'
+      );
+      if (!ok) return;
+    }
     socketManager.disconnect();
     api.logout();
     setIsAuthenticated(false);
     setCurrentUser(null);
     setItems([]);
     setSales([]);
+    setActiveTab('dashboard');
     try {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
       if ('caches' in window) {
         caches.keys().then((keys) => {
           keys.forEach((key) => {
@@ -2768,44 +2764,50 @@ export default function App() {
       {updateWaitingWorker && (
         <div className="pwa-update-bar">
           <span>Update available</span>
-          <button onClick={handleApplyUpdate}>Reload</button>
+          <button type="button" onClick={handleApplyUpdate}>Reload</button>
         </div>
       )}
 
       {/* Apple iOS PWA Installation Prompt (iOS 16.4+ Web Push Support) */}
       <IosInstallPrompt />
 
-      {/* Notifications permission bar - minimal, positioned at top-right so it never overlaps bottom composer */}
+      {/* Notifications permission banner - anchored at bottom-left so it never overlaps header controls */}
       {isAuthenticated && notificationPerm === 'denied' && !permSnoozedSession && (
-        <div style={{
-          position: 'fixed',
-          top: 'calc(env(safe-area-inset-top, 0px) + 64px)',
-          right: '12px',
-          maxWidth: 'min(420px, calc(100vw - 24px))',
-          background: 'var(--danger-bg, #fef2f2)',
-          border: '1px solid var(--danger-border, #fecaca)',
-          borderRadius: '10px',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-          color: 'var(--danger-text, #991b1b)',
-          padding: '8px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 'var(--font-size-meta, 0.75rem)',
-          gap: '10px',
-          flexWrap: 'wrap',
-          zIndex: 1100
-        }}>
-          <span>Notifications are blocked. Please enable them in browser settings for alerts.</span>
+        <div
+          role="region"
+          aria-label="Notification permission notice"
+          style={{
+            position: 'fixed',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+            left: '16px',
+            maxWidth: 'min(400px, calc(100vw - 32px))',
+            background: 'var(--danger-bg, #fef2f2)',
+            border: '1px solid var(--danger-border, #fecaca)',
+            borderRadius: '10px',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+            color: 'var(--danger-text, #991b1b)',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: 'var(--font-size-meta, 0.75rem)',
+            gap: '10px',
+            flexWrap: 'wrap',
+            zIndex: 8400
+          }}
+        >
+          <span>Notifications are blocked. Enable in browser settings for alerts.</span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
+              type="button"
               onClick={() => setShowPermHelpModal(true)}
               className="btn-secondary"
-              style={{ minHeight: '32px', padding: '4px 10px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+              style={{ minHeight: '30px', padding: '3px 10px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
             >
               Settings
             </button>
             <button
+              type="button"
               onClick={() => {
                 try {
                   sessionStorage.setItem('elite_perm_snoozed_session', 'true');
@@ -2813,7 +2815,7 @@ export default function App() {
                 } catch (e) { }
                 setPermSnoozedSession(true);
               }}
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted, #64748b)', cursor: 'pointer', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted, #64748b)', cursor: 'pointer', fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 700 }}
             >
               Dismiss
             </button>
@@ -3065,6 +3067,81 @@ export default function App() {
           {isMobile ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', position: 'relative', flexShrink: 0 }}>
               <OfflineSyncBadge />
+              {hasCommunicationAccess && (
+                <button
+                  type="button"
+                  onClick={() => runViewTransition(() => { setActiveTab('communication'); setMobileMenuOpen(false); })}
+                  className="btn-icon"
+                  title="Team Chat"
+                  aria-label="Team Chat"
+                  style={{
+                    minWidth: '34px',
+                    minHeight: '34px',
+                    width: '34px',
+                    height: '34px',
+                    padding: '6px',
+                    borderRadius: '8px',
+                    border: (activeTab === 'communication' || activeTab === 'workspace') ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                    background: (activeTab === 'communication' || activeTab === 'workspace') ? '#eff6ff' : 'var(--bg-card, #ffffff)',
+                    color: (activeTab === 'communication' || activeTab === 'workspace') ? '#2563eb' : 'var(--text-secondary, #475569)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <MessageSquare size={16} />
+                  {chatUnreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '2px',
+                      right: '2px',
+                      minWidth: '14px',
+                      height: '14px',
+                      padding: '0 3px',
+                      borderRadius: '99px',
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      fontSize: '0.6rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
+              {hasTaskAccess && (
+                <button
+                  type="button"
+                  onClick={() => runViewTransition(() => { setActiveTab('task_management'); setMobileMenuOpen(false); })}
+                  className="btn-icon"
+                  title="Task Manager"
+                  aria-label="Task Manager"
+                  style={{
+                    minWidth: '34px',
+                    minHeight: '34px',
+                    width: '34px',
+                    height: '34px',
+                    padding: '6px',
+                    borderRadius: '8px',
+                    border: activeTab === 'task_management' ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                    background: activeTab === 'task_management' ? '#eff6ff' : 'var(--bg-card, #ffffff)',
+                    color: activeTab === 'task_management' ? '#2563eb' : 'var(--text-secondary, #475569)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <CheckSquare size={16} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowQuickActions((prev) => !prev)}
@@ -3385,7 +3462,7 @@ export default function App() {
                           type="button"
                           onClick={() => {
                             setMobileHeaderMoreOpen(false);
-                            handleLogout();
+                            handleLogout(true);
                           }}
                           style={{
                             display: 'flex',
@@ -3567,16 +3644,16 @@ export default function App() {
                       alignItems: 'center',
                       gap: '3px'
                     }}>
-                      {(currentUser.isMainAdmin || currentUser.role === 'admin' || currentUser.isAdmin) && <span>👑</span>}
+                      {isMasterOrMainAdmin ? <span>👑</span> : (currentUser.role === 'admin' || currentUser.isAdmin) ? <span>🛡️</span> : null}
                       {currentUser.name}
                     </span>
                     <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                      {(currentUser.isMainAdmin || currentUser.role === 'admin' || currentUser.isAdmin) ? 'Main Admin' : (currentUser.role || 'user')}
+                      {isMasterOrMainAdmin ? 'Main Admin' : (currentUser.role === 'admin' || currentUser.isAdmin) ? 'Company Admin' : (currentUser.role || 'user')}
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={() => handleLogout(true)}
                     className="btn-secondary"
                     title="Sign Out"
                     aria-label="Sign Out"
@@ -4604,11 +4681,11 @@ export default function App() {
                   ) : activeTab === 'ee_settings' ? (
                     <CompanySettingsPanel companyEntity="Elite Edition" currentUser={currentUser} />
                   ) : activeTab === 'ee_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Elite Edition" />
+                    <DigitalPrintComplainModule key="Elite Edition" companyEntity="Elite Edition" />
                   ) : activeTab === 'ee_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Elite Edition" />
                   ) : activeTab === 'ee_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Elite Edition" />
+                    <RawMaterialsPanel key="Elite Edition" companyEntity="Elite Edition" />
                   ) : activeTab === 'ee_invoices' ? (
                     <EliteBillingDepartment companyEntity="Elite Edition" />
                   ) : activeTab === 'ef_dashboard' ? (
@@ -4618,11 +4695,11 @@ export default function App() {
                   ) : activeTab === 'ef_settings' ? (
                     <CompanySettingsPanel companyEntity="Elite Fabtex" currentUser={currentUser} />
                   ) : activeTab === 'ef_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Elite Fabtex" />
+                    <DigitalPrintComplainModule key="Elite Fabtex" companyEntity="Elite Fabtex" />
                   ) : activeTab === 'ef_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Elite Fabtex" />
                   ) : activeTab === 'ef_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Elite Fabtex" />
+                    <RawMaterialsPanel key="Elite Fabtex" companyEntity="Elite Fabtex" />
                   ) : activeTab === 'ef_invoices' ? (
                     <EliteBillingDepartment companyEntity="Elite Fabtex" department="elite_fabtex" />
                   ) : activeTab === 'so_dashboard' ? (
@@ -4632,11 +4709,11 @@ export default function App() {
                   ) : activeTab === 'so_settings' ? (
                     <CompanySettingsPanel companyEntity="Sobise" currentUser={currentUser} />
                   ) : activeTab === 'so_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Sobise" />
+                    <DigitalPrintComplainModule key="Sobise" companyEntity="Sobise" />
                   ) : activeTab === 'so_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Sobise" />
                   ) : activeTab === 'so_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Sobise" />
+                    <RawMaterialsPanel key="Sobise" companyEntity="Sobise" />
                   ) : activeTab === 'so_invoices' ? (
                     <EliteBillingDepartment companyEntity="Sobise" />
                   ) : activeTab === 'ew_dashboard' ? (
@@ -4652,11 +4729,11 @@ export default function App() {
                   ) : activeTab === 'ew_settings' ? (
                     <CompanySettingsPanel companyEntity="Ethno wear" currentUser={currentUser} />
                   ) : activeTab === 'ew_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Ethno wear" />
+                    <DigitalPrintComplainModule key="Ethno wear" companyEntity="Ethno wear" />
                   ) : activeTab === 'ew_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Ethno wear" />
                   ) : activeTab === 'ew_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Ethno wear" />
+                    <RawMaterialsPanel key="Ethno wear" companyEntity="Ethno wear" />
                   ) : activeTab === 'ew_invoices' ? (
                     <EliteBillingDepartment companyEntity="Ethno wear" department="ethno_wear" />
                   ) : activeTab === 'yj_dashboard' ? (
@@ -4666,11 +4743,11 @@ export default function App() {
                   ) : activeTab === 'yj_settings' ? (
                     <CompanySettingsPanel companyEntity="Yamunaji" currentUser={currentUser} />
                   ) : activeTab === 'yj_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Yamunaji" />
+                    <DigitalPrintComplainModule key="Yamunaji" companyEntity="Yamunaji" />
                   ) : activeTab === 'yj_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Yamunaji" />
                   ) : activeTab === 'yj_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Yamunaji" />
+                    <RawMaterialsPanel key="Yamunaji" companyEntity="Yamunaji" />
                   ) : activeTab === 'yj_invoices' ? (
                     <EliteBillingDepartment companyEntity="Yamunaji" department="yamunaji" />
                   ) : activeTab === 'es_dashboard' ? (
@@ -4681,23 +4758,25 @@ export default function App() {
                       <StitchingSettings />
                     </div>
                   ) : activeTab === 'es_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Elite Stitching" />
+                    <DigitalPrintComplainModule key="Elite Stitching" companyEntity="Elite Stitching" />
                   ) : activeTab === 'es_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Elite Stitching" />
                   ) : activeTab === 'es_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Elite Stitching" />
+                    <RawMaterialsPanel key="Elite Stitching" companyEntity="Elite Stitching" />
                   ) : (activeTab === 'es_invoices' || activeTab === 'stitching_invoices' || activeTab === 'es_finance') ? (
                     <EliteBillingDepartment companyEntity="Elite Stitching" department="stitching" />
                   ) : activeTab === 'eo_complaints' ? (
-                    <DigitalPrintComplainModule companyEntity="Elite Online" />
+                    <DigitalPrintComplainModule key="Elite Online" companyEntity="Elite Online" />
                   ) : activeTab === 'eo_expenses' ? (
                     <DigitalPrintExpenseModule companyEntity="Elite Online" />
                   ) : activeTab === 'eo_raw_materials' ? (
-                    <RawMaterialsPanel companyEntity="Elite Online" />
+                    <RawMaterialsPanel key="Elite Online" companyEntity="Elite Online" />
                   ) : activeTab === 'eo_invoices' ? (
                     <EliteBillingDepartment companyEntity="Elite Online" department="elite_online" />
                   ) : activeTab === 'raw_materials' ? (
-                    <RawMaterialsPanel companyEntity={
+                    <RawMaterialsPanel
+                      key={`raw_${activeDepartment}`}
+                      companyEntity={
                       activeDepartment === 'elite_online' ? 'Elite Online' :
                         activeDepartment === 'elite_edition' ? 'Elite Edition' :
                           activeDepartment === 'elite_fabtex' ? 'Elite Fabtex' :
@@ -4721,7 +4800,7 @@ export default function App() {
                     <MyntraHub />
                   ) : activeTab === 'designer_screen' || activeTab === 'designer_module' || activeTab === 'designer' ? (
                     <DesignerScreen currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
-                  ) : activeTab === 'admin' ? (
+                  ) : activeTab === 'admin' && isSuperOrAdmin ? (
                     <AdminPanel
                       companyEntity={
                         activeDepartment === 'elite_online' ? 'Elite Online' :
@@ -4738,6 +4817,21 @@ export default function App() {
                       activeDepartment={activeDepartment}
                       onNavigate={(t) => setActiveTab(t)}
                     />
+                  ) : activeTab === 'admin' ? (
+                    <div style={styles.noAccessContainer}>
+                      <ShieldAlert size={48} color="var(--primary)" />
+                      <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Access Restricted</h3>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>
+                        Administrator privileges are required to view the Admin Panel.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab('dashboard'); if (typeof window !== 'undefined') window.location.hash = '#dashboard'; }}
+                        style={{ marginTop: '1.25rem', padding: '8px 20px', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        Go to Dashboard
+                      </button>
+                    </div>
                   ) : activeTab === 'not-found' ? (
                     <div style={styles.noAccessContainer}>
                       <HelpCircle size={48} color="var(--primary)" />
@@ -4976,6 +5070,7 @@ export default function App() {
       <NotificationHistoryDrawer
         isOpen={showNotificationDrawer}
         onClose={() => setShowNotificationDrawer(false)}
+        chatUnreadCount={chatUnreadCount}
         onSelectTab={(tab) => {
           setActiveTab(tab);
           setMobileMenuOpen(false);

@@ -28,6 +28,8 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [lastScannedItem, setLastScannedItem] = useState(null);
   const scannedTimeoutRef = useRef(null);
   const scanDebounceRef = useRef(null);
+  const lastScanKeyTimeRef = useRef(0);
+  const lastScanValLenRef = useRef(0);
   const lastScanTimestampRef = useRef({ code: '', time: 0 });
 
   // Scroll preservation reference
@@ -135,6 +137,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     if (scanData && scanData.code) {
       if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
       setScanInput('');
+      lastScanValLenRef.current = 0;
       processBarcodeScan(scanData.code);
       setTimeout(() => {
         if (scanInputRef.current) {
@@ -369,8 +372,42 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
 
   const handleScanInputChange = (e) => {
     const val = e.target.value;
+    const now = performance.now();
+    const prevLen = lastScanValLenRef.current || 0;
+    const delta = lastScanKeyTimeRef.current > 0 ? (now - lastScanKeyTimeRef.current) : 999;
+    lastScanKeyTimeRef.current = now;
+    lastScanValLenRef.current = val.length;
+
     setScanInput(val);
     if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+
+    const trimmed = val.trim();
+    if (!trimmed) return;
+
+    // Works for ANY SKU length (including < 7 chars like 254 or 323_M):
+    // 1. Hardware scanner burst or paste (>= 2 chars) -> 200ms
+    // 2. Exact match in Inventory / Catalog SKU or Brand Barcode -> 350ms after pause (prevents firing mid-suffix like 254 -> 254_M)
+    const isBurstOrPaste = (val.length - prevLen >= 2) || (delta <= 90 && trimmed.length >= 2);
+    const isExactKnownCode = !isBurstOrPaste && (
+      (facilityFilteredItems || []).some(it => matchSkuOrBrandCode(it, trimmed)) ||
+      (catalogItems || []).some(cat => matchSkuOrBrandCode(cat, trimmed)) ||
+      (items || []).some(it => matchSkuOrBrandCode(it, trimmed))
+    );
+
+    if (isBurstOrPaste || isExactKnownCode) {
+      scanDebounceRef.current = setTimeout(() => {
+        const finalCode = (scanInputRef.current?.value || trimmed).trim();
+        setScanInput('');
+        lastScanValLenRef.current = 0;
+        if (scanInputRef.current) scanInputRef.current.value = '';
+        if (finalCode) {
+          processBarcodeScan(finalCode);
+        }
+        setTimeout(() => {
+          if (scanInputRef.current) scanInputRef.current.focus();
+        }, 30);
+      }, isBurstOrPaste ? 200 : 350);
+    }
   };
 
   const handleScanInputKeyDown = (e) => {
@@ -641,8 +678,9 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   <QrCode size={18} color="#64748b" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
                     ref={scanInputRef}
+                    data-barcode-scanner="true"
                     type="text"
-                    placeholder="Scan SKU or Brand Barcode (Auto-adds on scan)..."
+                    placeholder="Scan SKU or Brand Barcode..."
                     value={scanInput}
                     onChange={handleScanInputChange}
                     onKeyDown={handleScanInputKeyDown}
@@ -660,13 +698,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   />
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', width: isMobile ? '100%' : 'auto' }}>
-                  <button type="submit" style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 1.1rem', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', boxShadow: '0 2px 6px rgba(37,99,235,0.3)' }}>
-                    <span>⚡ Auto-Add</span>
-                  </button>
                   <button
                     type="button"
                     onClick={() => setShowCameraScanner(prev => !prev)}
-                    style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 0.85rem', background: showCameraScanner ? '#ef4444' : '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
+                    style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 0.95rem', background: showCameraScanner ? '#ef4444' : '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
                   >
                     <Camera size={16} />
                     <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>

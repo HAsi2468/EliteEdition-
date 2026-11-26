@@ -159,6 +159,27 @@ taskSchema.index({ status: 1, priority: 1, department: 1 });
 taskSchema.index({ assignees: 1 });
 taskSchema.index({ createdBy: 1 });
 
+taskSchema.pre('validate', function (next) {
+  if (Array.isArray(this.tags)) {
+    this.tags = this.tags
+      .filter((t) => t !== null && t !== undefined && String(t).trim() !== '')
+      .map((t) => {
+        if (typeof t === 'string') {
+          return { text: t.trim(), color: '#2563eb' };
+        }
+        if (t && typeof t === 'object') {
+          return {
+            text: String(t.text || t.label || t.name || 'Tag').trim(),
+            color: t.color || '#2563eb',
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+  if (typeof next === 'function') next();
+});
+
 const Task = mongoose.model('Task', taskSchema);
 
 module.exports = {

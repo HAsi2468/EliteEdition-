@@ -128,10 +128,7 @@ export function useFileUpload(defaultOptions = {}) {
         formData.append('file', fileToUpload, originalInputFileName || fileToUpload.name);
         formData.append('folder', folder);
 
-        res = await api.request('/workspace/upload', {
-          method: 'POST',
-          body: formData
-        }).catch(async (err) => {
+        res = await api.post('/workspace/upload', formData).catch(async () => {
           // Fallback to /upload
           return await api.uploadImage(fileToUpload, folder);
         });

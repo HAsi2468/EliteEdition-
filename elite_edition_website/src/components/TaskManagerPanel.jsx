@@ -305,6 +305,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
   // Selected Task Detail Drawer State
   const [selectedTask, setSelectedTask] = useState(null);
+  const [createFormError, setCreateFormError] = useState('');
+  const [statusUndoToast, setStatusUndoToast] = useState(null);
+  const statusUndoTimerRef = useRef(null);
   const [newChecklistText, setNewChecklistText] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
   const [timerLogDesc, setTimerLogDesc] = useState('');
@@ -312,23 +315,49 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
   // Active Timer Live Counter
   const [timerTick, setTimerTick] = useState(0);
 
-  // Keyboard shortcut listener for modal dismissals
+  // Keyboard shortcut listener for modal dismissals (capture phase so nested components do not swallow Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (showCreateModal) setShowCreateModal(false);
-        else if (showEditModal) setShowEditModal(false);
-        else if (showLogWorkModal) setShowLogWorkModal(false);
-        else if (showExportModal) setShowExportModal(false);
-        else if (selectedTask) setSelectedTask(null);
-        else if (showMobileViewMenu) setShowMobileViewMenu(false);
+        if (editingCommentId) {
+          e.preventDefault();
+          e.stopPropagation();
+          setEditingCommentId(null);
+          setEditingCommentText('');
+          return;
+        }
+        if (dayTasksModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setDayTasksModal(null);
+        } else if (showCreateModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowCreateModal(false);
+        } else if (showEditModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowEditModal(false);
+        } else if (showLogWorkModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowLogWorkModal(false);
+        } else if (showExportModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowExportModal(false);
+        } else if (selectedTask) {
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedTask(null);
+        } else if (showMobileViewMenu) setShowMobileViewMenu(false);
         else if (showMobileScopeMenu) setShowMobileScopeMenu(false);
         else if (showMobileFilterMenu) setShowMobileFilterMenu(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCreateModal, showEditModal, showLogWorkModal, showExportModal, selectedTask, showMobileViewMenu, showMobileScopeMenu, showMobileFilterMenu]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [editingCommentId, dayTasksModal, showCreateModal, showEditModal, showLogWorkModal, showExportModal, selectedTask, showMobileViewMenu, showMobileScopeMenu, showMobileFilterMenu]);
 
   const KANBAN_COLUMNS = [
     { id: 'To Do', label: 'To Do', color: '#2563eb', bg: '#eff6ff' },
@@ -399,6 +428,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     };
 
     const handleTaskUpdated = (updatedTask) => {
+      // Guard against bare event-bus metadata payloads ({ entity: 'task', id, action, payload: null })
+      if (!updatedTask || typeof updatedTask !== 'object' || (!('title' in updatedTask) && !('status' in updatedTask))) {
+        return;
+      }
       const uId = getTaskId(updatedTask);
       if (!uId) return;
       setTasks((prev) => {
@@ -566,6 +599,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
   };
 
   const handleOpenCreateModal = () => {
+    setCreateFormError('');
     setShowCreateModal(true);
     setStaffSearch('');
     setSelectedAssigneeIds([]);
@@ -783,16 +817,19 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
   };
 
   const handleCreateTaskSubmit = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (creating || isCreatingRef.current) return; // Prevent concurrent submissions
     if (!newTitle.trim()) {
+      setCreateFormError('Title is required');
       triggerEliteAlert('Validation', 'Please enter a task title.', 'warning');
       return;
     }
     if (newTitle.trim().length > 200) {
+      setCreateFormError('Task title cannot exceed 200 characters.');
       triggerEliteAlert('Validation', 'Task title cannot exceed 200 characters.', 'warning');
       return;
     }
+    setCreateFormError('');
     const numEstHours = parseFloat(newEstHours) || 0;
     if (numEstHours < 0 || numEstHours > 1000) {
       triggerEliteAlert('Validation', 'Estimated hours must be between 0 and 1,000.', 'warning');
@@ -873,9 +910,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     setNewAttachments([]);
   };
 
-  const handleStatusChange = async (task, newStatusVal) => {
+  const handleStatusChange = async (task, newStatusVal, { isUndo = false } = {}) => {
     const tId = getTaskId(task);
     if (!tId) return;
+    const prevStatus = task.status || 'To Do';
     try {
       const res = await api.updateTask(tId, {
         status: newStatusVal,
@@ -893,6 +931,18 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
         if (newStatusVal === 'Done' || (newStatusVal || '').toLowerCase() === 'done') {
           soundEffects.playTaskDone();
           celebration.trigger();
+        }
+        if (!isUndo && prevStatus !== updated.status) {
+          if (statusUndoTimerRef.current) clearTimeout(statusUndoTimerRef.current);
+          setStatusUndoToast({
+            task: updated,
+            prevStatus,
+            newStatus: updated.status,
+            title: updated.title || task.title || 'Task',
+          });
+          statusUndoTimerRef.current = setTimeout(() => {
+            setStatusUndoToast(null);
+          }, 7000);
         }
       }
     } catch (err) {
@@ -1066,6 +1116,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
   const handleDeleteComment = async (commentId) => {
     if (!selectedTask || !commentId) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Comment',
+      message: 'Are you sure you want to delete this comment?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!confirmed) return;
     try {
       const res = await api.deleteTaskComment(getTaskId(selectedTask), commentId);
       if (res?.success && res?.data) {
@@ -1122,7 +1180,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
 
   // TaskOPad Scope Badge Counters
   const allCount = visibleTasks.length;
-  const myTasksCount = visibleTasks.filter((t) => isTaskAssignedToMe(t)).length;
+  const myTasksCount = visibleTasks.filter((t) => isTaskAssignedToMe(t) || isTaskCreatedByMe(t)).length;
   const delegatedCount = visibleTasks.filter((t) => {
     const cId = String(typeof t.createdBy === 'object' ? (t.createdBy?._id || t.createdBy?.id) : (t.createdBy || ''));
     if (cId !== String(myId)) return false;
@@ -1191,7 +1249,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
     }
 
     if (taskScope === 'my_tasks') {
-      if (!isTaskAssignedToMe(t)) return false;
+      if (!isTaskAssignedToMe(t) && !isTaskCreatedByMe(t)) return false;
     } else if (taskScope === 'delegated') {
       const cId = getNormalizedId(t.createdBy);
       if (cId !== String(myId)) return false;
@@ -3224,9 +3282,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: 'vertical',
                                   overflow: 'hidden',
+                                  overflowWrap: 'anywhere',
                                   wordBreak: 'break-word',
+                                  maxWidth: '100%',
                                   letterSpacing: '-0.01em'
-                                }}>
+                                }} title={t.title || ''}>
                                   {t.title}
                                 </h5>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -4552,21 +4612,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                   Create &amp; Assign New Task
                 </h3>
               </div>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <button type="button" tabIndex={-1} aria-label="Close Create Task Modal" onClick={() => setShowCreateModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateTaskSubmit} style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            <form id="create-task-form" onSubmit={handleCreateTaskSubmit} noValidate style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               
               {/* Task Title & Feature 5: Voice-to-Task */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <label htmlFor="create-task-title-input" style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     Task Title *
                   </label>
                   <button
                     type="button"
+                    tabIndex={-1}
                     onClick={() => startVoiceInput('title')}
                     style={{
                       background: isListening && voiceTarget === 'title' ? '#fee2e2' : '#eff6ff',
@@ -4587,23 +4648,32 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                   </button>
                 </div>
                 <input
+                  id="create-task-title-input"
                   type="text"
                   placeholder="e.g. Prepare Fabric Printing Output Batch #102"
                   value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
+                  onChange={(e) => {
+                    setNewTitle(e.target.value);
+                    if (createFormError && e.target.value.trim()) setCreateFormError('');
+                  }}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.82rem', borderRadius: '6px', border: createFormError ? '1.5px solid #ef4444' : '1px solid var(--border-light)', background: 'var(--bg-input)' }}
                 />
+                {createFormError && (
+                  <div role="alert" style={{ color: '#ef4444', fontSize: '0.74rem', fontWeight: 600, marginTop: '4px' }}>
+                    {createFormError}
+                  </div>
+                )}
               </div>
 
               {/* Description & Voice Input */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <label htmlFor="create-task-desc-input" style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     Description &amp; Work Instructions
                   </label>
                   <button
                     type="button"
+                    tabIndex={-1}
                     onClick={() => startVoiceInput('desc')}
                     style={{
                       background: isListening && voiceTarget === 'desc' ? '#fee2e2' : '#eff6ff',
@@ -4624,6 +4694,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                   </button>
                 </div>
                 <textarea
+                  id="create-task-desc-input"
                   rows={3}
                   placeholder="Enter detailed task instructions or dictate using voice input..."
                   value={newDesc}
@@ -5185,8 +5256,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleCreateTaskSubmit}
+                type="submit"
+                form="create-task-form"
                 disabled={creating}
                 className="btn-primary"
                 style={{
@@ -5853,7 +5924,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                 <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#2563eb', color: '#fff', whiteSpace: 'nowrap' }}>
                   {selectedTask.status}
                 </span>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', overflowWrap: 'anywhere', wordBreak: 'break-word' }} title={selectedTask.title || ''}>
                   {selectedTask.title}
                 </h3>
               </div>
@@ -6231,16 +6302,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
                     {(selectedTask.auditLogs || []).length > 0 && (
                       <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed var(--border-light)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Activity Log</div>
-                        {(selectedTask.auditLogs || []).slice(-10).reverse().map((log, lIdx) => (
-                          <div key={log?._id || `log_${lIdx}`} style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
-                            <span>• <strong>{log?.actorName || log?.userName || 'System'}</strong>: {log?.action || log?.details || 'Updated task'}</span>
-                            {(log?.timestamp || log?.createdAt) && (
-                              <span style={{ whiteSpace: 'nowrap', color: '#94a3b8' }}>
-                                {new Date(log.timestamp || log.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                        {(selectedTask.auditLogs || []).slice(-10).reverse().map((log, lIdx) => {
+                          const changeSummary = log?.fieldChanged
+                            ? `${log.fieldChanged}${log.oldValue || log.newValue ? `: ${log.oldValue ? `${log.oldValue} → ` : ''}${log.newValue || ''}` : ''}`
+                            : (log?.action || log?.details || 'Updated task');
+                          return (
+                            <div key={log?._id || `log_${lIdx}`} style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+                              <span>• <strong>{log?.actorName || log?.userName || 'System'}</strong>: {changeSummary}</span>
+                              {(log?.timestamp || log?.createdAt) && (
+                                <span style={{ whiteSpace: 'nowrap', color: '#94a3b8' }}>
+                                  {new Date(log.timestamp || log.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -6546,6 +6622,63 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab, groupFilt
             </div>
 
           </div>
+        </div>
+      )}
+
+      {statusUndoToast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10050,
+            background: '#0f172a',
+            color: '#f8fafc',
+            border: '1px solid rgba(56, 189, 248, 0.45)',
+            borderRadius: '10px',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 12px 30px rgba(0,0,0,0.35)',
+            fontSize: '0.82rem',
+            maxWidth: '92vw'
+          }}
+        >
+          <span>
+            Moved <strong>{statusUndoToast.title}</strong> to <strong>{statusUndoToast.newStatus}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const target = statusUndoToast;
+              setStatusUndoToast(null);
+              if (statusUndoTimerRef.current) clearTimeout(statusUndoTimerRef.current);
+              handleStatusChange(target.task, target.prevStatus, { isUndo: true });
+            }}
+            style={{
+              background: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.78rem'
+            }}
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusUndoToast(null)}
+            aria-label="Dismiss status toast"
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px', display: 'flex' }}
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 

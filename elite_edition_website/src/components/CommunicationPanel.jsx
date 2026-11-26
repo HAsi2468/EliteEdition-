@@ -1051,8 +1051,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     // Instant local matches from loaded active room messages
     const lowerQ = q.toLowerCase();
     const localMatches = (messages || []).filter((m) => {
-      if (m.isDeleted) return false;
-      const textMatch = (m.content || '').toLowerCase().includes(lowerQ);
+      if (m.isDeleted || m.content === 'This message was deleted') return false;
+      const text = (m.isEncrypted && decryptedMap[m._id]) ? decryptedMap[m._id] : (m.content || '');
+      const textMatch = text.toLowerCase().includes(lowerQ);
       const fileMatch = m.attachment && (
         (m.attachment.fileName || '').toLowerCase().includes(lowerQ) ||
         (m.attachment.originalName || '').toLowerCase().includes(lowerQ) ||
@@ -1066,6 +1067,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     if (localMatches.length > 0) {
       setMessageSearchResults(localMatches);
+    } else {
+      setMessageSearchResults([]);
     }
 
     const timer = setTimeout(async () => {
@@ -1079,11 +1082,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           serverMatches = res.data;
         }
 
-        // Merge local and server matches, deduplicating by _id
-        const isSuperAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin' || currentUser?.isAdmin;
+        // Merge local and server matches, deduplicating by _id and skipping deleted messages
         const combinedMap = new Map();
         localMatches.forEach((m) => combinedMap.set(String(m._id), m));
         serverMatches.forEach((m) => {
+          if (m.isDeleted || m.content === 'This message was deleted') return;
           const rawRoomId = typeof m.roomId === 'object' ? (m.roomId?._id || m.roomId?.id) : (m.roomId || m.conversationId);
           const hasRoomAccess = (groups || []).some((g) => String(g._id) === String(rawRoomId));
           if (hasRoomAccess) {
@@ -2268,72 +2271,103 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  const handleDeleteMessage = (msgOrId) => {
+  const handleDeleteMessage = (msgOrId, canDeleteForEveryoneOverride = null) => {
     if (!msgOrId) return;
-    if (typeof msgOrId === 'object') {
-      const rawText = (msgOrId.isEncrypted && decryptedMap[msgOrId._id]) ? decryptedMap[msgOrId._id] : msgOrId.content;
-      const text = decodeHtmlEntities(rawText) || (msgOrId.attachment?.fileName ? `Attachment: ${msgOrId.attachment.fileName}` : 'Message');
-      setDeleteTargetMsg({
-        id: String(msgOrId._id || msgOrId.id),
-        text: text,
-        senderName: msgOrId.senderName || msgOrId.senderId?.name || ''
-      });
-    } else {
-      const found = messages.find((m) => String(m._id) === String(msgOrId));
-      const rawText = (found?.isEncrypted && decryptedMap[found?._id]) ? decryptedMap[found._id] : found?.content;
-      const text = decodeHtmlEntities(rawText) || (found?.attachment?.fileName ? `Attachment: ${found.attachment.fileName}` : 'Message');
-      setDeleteTargetMsg({
-        id: String(msgOrId),
-        text: text,
-        senderName: found?.senderName || found?.senderId?.name || ''
-      });
-    }
+    const myIdStr = String(currentUser?._id || currentUser?.id || '');
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin' || currentUser?.isAdmin || currentUser?.isMainAdmin;
+    const found = typeof msgOrId === 'object' ? msgOrId : messages.find((m) => String(m._id) === String(msgOrId));
+    if (found?.isDeleted) return;
+
+    const targetId = typeof msgOrId === 'object' ? String(msgOrId._id || msgOrId.id) : String(msgOrId);
+    const rawText = (found?.isEncrypted && decryptedMap[found?._id]) ? decryptedMap[found._id] : found?.content;
+    const text = decodeHtmlEntities(rawText) || (found?.attachment?.fileName ? `Attachment: ${found.attachment.fileName}` : 'Message');
+    const senderIdStr = String(typeof found?.senderId === 'object' ? (found.senderId?._id || found.senderId?.id) : (found?.senderId || ''));
+    const isSender = Boolean(myIdStr && senderIdStr === myIdStr);
+    const isWithin24h = (Date.now() - new Date(found?.createdAt || Date.now()).getTime()) < 24 * 60 * 60 * 1000;
+    const canDeleteForEveryone = canDeleteForEveryoneOverride !== null
+      ? Boolean(canDeleteForEveryoneOverride)
+      : Boolean(isAdmin || (isSender && isWithin24h));
+
+    setDeleteTargetMsg({
+      id: targetId,
+      text,
+      senderName: found?.senderName || found?.senderId?.name || '',
+      canDeleteForEveryone,
+    });
   };
 
-  const confirmDeleteMessage = async (messageId) => {
+  const confirmDeleteMessage = async (messageId, scope = 'everyone') => {
     if (!messageId) return;
+    setDeleteTargetMsg(null);
+
     if (String(messageId).startsWith('temp_')) {
       setMessages((prev) => prev.filter((m) => String(m._id) !== String(messageId) && m.clientMsgId !== messageId));
-      setDeleteTargetMsg(null);
       return;
     }
-    try {
-      const res = await api.deleteCommunicationMessage(messageId);
-      if (res.success) {
-        setMessages((prev) =>
-          prev.map((m) =>
+
+    // Clear any cached plaintext for deleted message so search & quotes never leak old content
+    setDecryptedMap((prev) => {
+      if (!prev[messageId]) return prev;
+      const next = { ...prev };
+      delete next[messageId];
+      return next;
+    });
+
+    const prevMessagesSnapshot = messages;
+    const prevGroupsSnapshot = groups;
+
+    // Optimistic UI update immediately on confirmation
+    setMessages((prev) => {
+      const next = scope === 'me'
+        ? prev.filter((m) => String(m._id) !== String(messageId))
+        : prev.map((m) =>
             String(m._id) === String(messageId)
               ? { ...m, content: 'This message was deleted', isDeleted: true, attachment: null }
               : m
-          )
-        );
-        setGroups((prevGroups) =>
-          prevGroups.map((g) => {
-            if (String(g._id) === String(activeGroup?._id)) {
-              if (g.lastMessage && String(g.lastMessage._id || g.lastMessage) === String(messageId)) {
-                return {
-                  ...g,
-                  lastMessage: {
-                    ...(typeof g.lastMessage === 'object' ? g.lastMessage : {}),
-                    content: 'This message was deleted',
-                    isDeleted: true
-                  }
-                };
-              }
+          );
+      if (activeGroup?._id) {
+        messagesCacheRef.current[activeGroup._id] = next;
+      }
+      return next;
+    });
+
+    if (scope !== 'me') {
+      setGroups((prevGroups) =>
+        prevGroups.map((g) => {
+          if (String(g._id) === String(activeGroup?._id)) {
+            if (g.lastMessage && String(g.lastMessage._id || g.lastMessage) === String(messageId)) {
+              return {
+                ...g,
+                lastMessage: {
+                  ...(typeof g.lastMessage === 'object' ? g.lastMessage : {}),
+                  content: 'This message was deleted',
+                  isDeleted: true
+                }
+              };
             }
-            return g;
-          })
-        );
-        if (socket) {
+          }
+          return g;
+        })
+      );
+    }
+
+    try {
+      const res = await api.deleteCommunicationMessage(messageId, scope);
+      if (res && res.success) {
+        if (scope !== 'me' && socket) {
           socket.emit('delete-message', { messageId, roomId: activeGroup?._id });
         }
       } else {
-        alert(res.message || 'Failed to delete message');
+        setMessages(prevMessagesSnapshot);
+        setGroups(prevGroupsSnapshot);
+        if (activeGroup?._id) messagesCacheRef.current[activeGroup._id] = prevMessagesSnapshot;
+        alert(res?.message || 'Failed to delete message');
       }
     } catch (err) {
+      setMessages(prevMessagesSnapshot);
+      setGroups(prevGroupsSnapshot);
+      if (activeGroup?._id) messagesCacheRef.current[activeGroup._id] = prevMessagesSnapshot;
       alert(err.message || 'Failed to delete message');
-    } finally {
-      setDeleteTargetMsg(null);
     }
   };
 
@@ -2517,6 +2551,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const handleDeleted = (data) => {
       if (data && data.messageId) {
+        setDecryptedMap((prev) => {
+          if (!prev[data.messageId]) return prev;
+          const next = { ...prev };
+          delete next[data.messageId];
+          return next;
+        });
         setMessages((prev) =>
           prev.map((m) =>
             String(m._id) === String(data.messageId)
@@ -3331,6 +3371,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       setLoadingGroups(false);
     }
   };
+
+  useEffect(() => {
+    const handleRefreshRooms = () => fetchGroups(false);
+    window.addEventListener('elite-chat-rooms-refresh', handleRefreshRooms);
+    return () => window.removeEventListener('elite-chat-rooms-refresh', handleRefreshRooms);
+  }, []);
 
   const fetchGroupMessages = async (groupId, filter, showLoader = false) => {
     if (!groupId) return;
@@ -4599,6 +4645,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (inRoomQuery && inRoomQuery.trim()) {
       const q = inRoomQuery.toLowerCase();
       filteredList = filteredList.filter((m) => {
+        if (m.isDeleted || m.content === 'This message was deleted') return false;
         const readableText = (m.isEncrypted && decryptedMap[m._id]) ? decryptedMap[m._id] : (m.content || '');
         return (
           readableText.toLowerCase().includes(q) ||
@@ -4626,7 +4673,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     });
 
     return { chatDayGroups: groups, chatFilteredCount: filteredList.length };
-  }, [messages, showPinnedOnly, msgFilter, inRoomQuery]);
+  }, [messages, showPinnedOnly, msgFilter, inRoomQuery, decryptedMap]);
 
   // Clipboard Paste Handler (Supports Ctrl+V / Cmd+V for PDFs, Documents, Screenshots & Images)
   const handlePasteClipboard = async (e) => {
@@ -6229,6 +6276,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   placeholder="People, Groups and Messages"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setSearchQuery('');
+                      e.currentTarget.blur();
+                    }
+                  }}
                 />
                 {searchQuery && (
                   <button
@@ -7110,6 +7163,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       placeholder="Search keywords, record references, or staff names in this chat..."
                       value={inRoomQuery}
                       onChange={(e) => setInRoomQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setInRoomQuery('');
+                          setShowInRoomSearch(false);
+                        }
+                      }}
                       style={{ flex: 1, border: '1px solid var(--border-light)', borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}
                       autoFocus
                     />
@@ -7118,11 +7179,28 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                           {chatFilteredCount} {chatFilteredCount === 1 ? 'match' : 'matches'}
                         </span>
-                        <button onClick={() => setInRoomQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Clear search">
-                          <X size={14} />
+                        <button
+                          type="button"
+                          onClick={() => setInRoomQuery('')}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.72rem', fontWeight: 600 }}
+                          title="Clear search text"
+                        >
+                          Clear
                         </button>
                       </>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInRoomQuery('');
+                        setShowInRoomSearch(false);
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                      title="Close search (Esc)"
+                      aria-label="Close in-room search"
+                    >
+                      <X size={15} />
+                    </button>
                   </div>
                 )}
 
@@ -7917,14 +7995,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                                           </button>
                                                         )}
 
-                                                        {canDelete && (
+                                                        {!msg.isDeleted && (
                                                           <button
                                                             type="button"
                                                             onClick={(e) => {
                                                               if (e) e.stopPropagation();
                                                               handleCancelMsgHold();
                                                               setActiveMsgMenuId(null);
-                                                              handleDeleteMessage(msg);
+                                                              handleDeleteMessage(msg, canDelete);
                                                             }}
                                                             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', borderTop: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.8rem', color: '#f87171', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
                                                           >
@@ -12215,16 +12293,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             >
               <option value="">-- Choose Channel or DM Room --</option>
               <optgroup label="Saved Messages &amp; Direct Messages">
-                {groups.filter((g) => g.type === 'direct').map((g) => (
+                {groups.filter((g) => !g.isArchived && g.type === 'direct').map((g) => {
+                  const dmPeer = getDMColleague(g);
+                  const dmLabel = dmPeer ? (dmPeer.name || dmPeer.username || dmPeer.email || g.name) : g.name;
+                  return (
+                    <option key={g._id} value={g._id}>
+                      {`💬 DM: ${dmLabel}`}
+                    </option>
+                  );
+                })}
+              </optgroup>
+              <optgroup label="Group Channels (Multi-Member)">
+                {groups.filter((g) => !g.isArchived && g.type !== 'direct' && !/report|myntra|webhook|bot|alert|system/i.test(g.name || '') && g.type !== 'broadcast').map((g) => (
                   <option key={g._id} value={g._id}>
-                    {`💬 DM: ${g.name}`}
+                    {`🏢 Group: ${g.name}${g.department ? ` (${g.department})` : ''}${g.members?.length ? ` · ${g.members.length} members` : ''}`}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="Group Channels (Multi-Member)">
-                {groups.filter((g) => g.type !== 'direct').map((g) => (
+              <optgroup label="⚠️ Report &amp; Broadcast Channels (Confirm Carefully)">
+                {groups.filter((g) => !g.isArchived && g.type !== 'direct' && (/report|myntra|webhook|bot|alert|system/i.test(g.name || '') || g.type === 'broadcast')).map((g) => (
                   <option key={g._id} value={g._id}>
-                    {`🏢 Group: ${g.name}${g.department ? ` (${g.department})` : ''}`}
+                    {`⚠️ Report/Broadcast: ${g.name}${g.members?.length ? ` · ${g.members.length} members` : ''}`}
                   </option>
                 ))}
               </optgroup>
@@ -12234,8 +12323,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           {(() => {
             const selectedTarget = groups.find((g) => String(g._id) === String(forwardTargetRoomId));
             if (!selectedTarget || selectedTarget.type === 'direct') return null;
+            const isSensitiveChannel = /report|myntra|webhook|bot|alert|system/i.test(selectedTarget.name || '') || selectedTarget.type === 'broadcast';
             return (
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '0.6rem 0.75rem', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', fontSize: '0.76rem', color: '#f59e0b', cursor: 'pointer' }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                padding: '0.65rem 0.75rem',
+                borderRadius: '8px',
+                background: isSensitiveChannel ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                border: `1px solid ${isSensitiveChannel ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.35)'}`,
+                fontSize: '0.76rem',
+                color: isSensitiveChannel ? '#dc2626' : '#f59e0b',
+                cursor: 'pointer'
+              }}>
                 <input
                   type="checkbox"
                   checked={forwardGroupConfirmed}
@@ -12243,7 +12344,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   style={{ marginTop: '2px' }}
                 />
                 <span>
-                  <strong>Multi-member group:</strong> Confirm forwarding this message into <strong>{selectedTarget.name}</strong>.
+                  {isSensitiveChannel ? (
+                    <><strong>⚠️ Report / Automated Channel Warning:</strong> <strong>{selectedTarget.name}</strong> is a reporting or broadcast channel. Tick to confirm you intentionally want to forward this message here.</>
+                  ) : (
+                    <><strong>Multi-member group:</strong> Confirm forwarding this message into <strong>{selectedTarget.name}</strong>{selectedTarget.members?.length ? ` (${selectedTarget.members.length} members)` : ''}.</>
+                  )}
                 </span>
               </label>
             );
@@ -12982,7 +13087,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Delete Message?</h4>
         </div>
         <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
-          Are you sure you want to delete this message? It will be removed for everyone in this chat.
+          {deleteTargetMsg.canDeleteForEveryone !== false
+            ? 'Choose whether to remove this message only from your screen or delete it for everyone in this chat.'
+            : 'This message will be hidden only for you. Other participants will still see it.'}
         </p>
         {deleteTargetMsg.text && (
           <div
@@ -13003,7 +13110,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             "{deleteTargetMsg.text.length > 90 ? deleteTargetMsg.text.slice(0, 90) + '…' : deleteTargetMsg.text}"
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setDeleteTargetMsg(null)}
@@ -13024,25 +13131,47 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             type="button"
             onClick={() => {
               const target = deleteTargetMsg;
-              setDeleteTargetMsg(null);
               if (target?.id) {
-                confirmDeleteMessage(target.id);
+                confirmDeleteMessage(target.id, 'me');
               }
             }}
             style={{
-              padding: '7px 16px',
+              padding: '7px 14px',
               borderRadius: '7px',
-              border: 'none',
-              background: '#dc2626',
-              color: '#ffffff',
+              border: '1px solid #fecaca',
+              background: '#fef2f2',
+              color: '#b91c1c',
               fontSize: '0.82rem',
               fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)'
+              cursor: 'pointer'
             }}
           >
-            Delete
+            Delete for Me
           </button>
+          {deleteTargetMsg.canDeleteForEveryone !== false && (
+            <button
+              type="button"
+              onClick={() => {
+                const target = deleteTargetMsg;
+                if (target?.id) {
+                  confirmDeleteMessage(target.id, 'everyone');
+                }
+              }}
+              style={{
+                padding: '7px 16px',
+                borderRadius: '7px',
+                border: 'none',
+                background: '#dc2626',
+                color: '#ffffff',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)'
+              }}
+            >
+              Delete for Everyone
+            </button>
+          )}
         </div>
       </div>
     </div>

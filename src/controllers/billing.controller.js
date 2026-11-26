@@ -4709,10 +4709,26 @@ const updateCompanySettings = async (req, res) => {
     }
 
     const PrintConfig = require('../db/models/printConfig.model');
+    // Strict Server-Side Anti-Wipe Guard: prevent stale browser tabs from overwriting populated Yamunaji lots/challans with empty or truncated arrays
+    const existingCfg = await PrintConfig.findOne({ companyEntity }).select('grayLots millChallans rfdLots').lean();
+    if (existingCfg) {
+      for (const arrKey of ['grayLots', 'millChallans', 'rfdLots']) {
+        const prevLen = Array.isArray(existingCfg[arrKey]) ? existingCfg[arrKey].length : 0;
+        if (Array.isArray(otherFields[arrKey]) && prevLen >= 2) {
+          const nextLen = otherFields[arrKey].length;
+          // Normal user delete removes at most 1 item at a time; reject bulk drops (e.g. 6->0 or 8->3) from stale tabs
+          if (nextLen === 0 || (prevLen - nextLen) > 1) {
+            logger.warn(`[AntiWipeGuard] Blocked stale overwrite of ${companyEntity}.${arrKey} (${prevLen} -> ${nextLen})`);
+            delete otherFields[arrKey];
+          }
+        }
+      }
+    }
+
     const updated = await PrintConfig.findOneAndUpdate(
       { companyEntity },
       { $set: { ...otherFields, companyEntity } },
-      { new: true, upsert: true, returnDocument: 'after' }
+      { upsert: true, returnDocument: 'after' }
     );
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -5472,7 +5488,9 @@ const updatePurchase = async (req, res) => {
       });
     }
 
-    const purchase = await BillingPurchase.findByIdAndUpdate(req.params.id, purchaseData, { new: true });
+    // Strict protection: never allow general purchase edit form to wipe/overwrite signedCopy approval state
+    delete purchaseData.signedCopy;
+    const purchase = await BillingPurchase.findByIdAndUpdate(req.params.id, purchaseData, { returnDocument: 'after' });
     if (!purchase) {
       return res.status(404).json({ success: false, error: 'Purchase record not found' });
     }

@@ -75,6 +75,8 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const [scanSkuInput, setScanSkuInput] = useState('');
   const scanInputRef = useRef(null);
   const scanDebounceRef = useRef(null);
+  const lastScanKeyTimeRef = useRef(0);
+  const lastScanValLenRef = useRef(0);
   const lastScanTimestampRef = useRef({ code: '', time: 0 });
 
   useEffect(() => {
@@ -88,6 +90,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     if (scanData && scanData.code) {
       if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
       setScanSkuInput('');
+      lastScanValLenRef.current = 0;
       processScannedSku(scanData.code);
       setTimeout(() => {
         if (scanInputRef.current) {
@@ -405,8 +408,41 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   // Barcode / SKU Form Handlers
   const handleScanInputChange = (e) => {
     const val = e.target.value;
+    const now = performance.now();
+    const prevLen = lastScanValLenRef.current || 0;
+    const delta = lastScanKeyTimeRef.current > 0 ? (now - lastScanKeyTimeRef.current) : 999;
+    lastScanKeyTimeRef.current = now;
+    lastScanValLenRef.current = val.length;
+
     setScanSkuInput(val);
     if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+
+    const trimmed = val.trim();
+    if (!trimmed) return;
+
+    // Works for ANY SKU length (including < 7 chars like 254 or 323_M):
+    // 1. Hardware scanner burst or paste (>= 2 chars) -> 200ms
+    // 2. Exact match in Inventory / Catalog SKU or Brand Barcode -> 350ms after pause
+    const isBurstOrPaste = (val.length - prevLen >= 2) || (delta <= 90 && trimmed.length >= 2);
+    const isExactKnownCode = !isBurstOrPaste && (
+      (storeInventory || []).some(it => matchSkuOrBrandCode(it, trimmed)) ||
+      (catalogItems || []).some(cat => matchSkuOrBrandCode(cat, trimmed))
+    );
+
+    if (isBurstOrPaste || isExactKnownCode) {
+      scanDebounceRef.current = setTimeout(() => {
+        const finalCode = (scanInputRef.current?.value || trimmed).trim();
+        setScanSkuInput('');
+        lastScanValLenRef.current = 0;
+        if (scanInputRef.current) scanInputRef.current.value = '';
+        if (finalCode) {
+          processScannedSku(finalCode);
+        }
+        setTimeout(() => {
+          if (scanInputRef.current) scanInputRef.current.focus();
+        }, 30);
+      }, isBurstOrPaste ? 200 : 350);
+    }
   };
 
   const handleScanInputKeyDown = (e) => {
@@ -569,18 +605,18 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 <Scan size={15} color="#475569" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   ref={scanInputRef}
+                  data-barcode-scanner="true"
                   type="text"
                   value={scanSkuInput}
                   onChange={handleScanInputChange}
                   onKeyDown={handleScanInputKeyDown}
-                  placeholder="Scan SKU barcode (Auto-adds)..."
+                  placeholder="Scan SKU or Brand Barcode..."
                   style={{
                     ...styles.scannerInput,
                     fontSize: isMobile ? '16px' : '0.82rem'
                   }}
                 />
               </div>
-              <button type="submit" style={styles.scanBtn}>⚡ Auto-Add</button>
             </form>
             
             <button onClick={onClose} style={styles.closeBtn} title="Close Modal">

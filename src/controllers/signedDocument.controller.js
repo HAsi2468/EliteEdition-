@@ -1,18 +1,19 @@
 const FabricChallan = require('../db/models/fabricChallan.model');
 const BillingInvoice = require('../db/models/billingInvoice.model');
+const BillingPurchase = require('../db/models/billingPurchase.model');
 const logger = require('../config/logger');
 const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 /**
- * 1. Upload signed copy (Regular staff / delivery users can upload up to 2 images)
+ * 1. Upload signed copy / purchase soft copy (photo or PDF, up to 2 files)
  * Automatically sets status to 'PENDING'
  */
 const uploadSignedCopy = async (req, res) => {
   try {
     const { docType, docId, images } = req.body;
 
-    if (!docType || !['challan', 'invoice'].includes(docType)) {
-      return res.status(400).json({ error: "Invalid docType. Must be 'challan' or 'invoice'" });
+    if (!docType || !['challan', 'invoice', 'purchase'].includes(docType)) {
+      return res.status(400).json({ error: "Invalid docType. Must be 'challan', 'invoice', or 'purchase'" });
     }
 
     if (!docId) {
@@ -20,11 +21,11 @@ const uploadSignedCopy = async (req, res) => {
     }
 
     if (!Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({ error: 'Please provide at least 1 image' });
+      return res.status(400).json({ error: 'Please provide at least 1 photo or PDF' });
     }
 
     if (images.length > 2) {
-      return res.status(400).json({ error: 'Maximum 2 images allowed for signed copy' });
+      return res.status(400).json({ error: 'Maximum 2 files allowed' });
     }
 
     const uploaderName = req.user?.name || req.headers['x-user-name'] || 'Staff User';
@@ -33,12 +34,14 @@ const uploadSignedCopy = async (req, res) => {
     let doc = null;
     if (docType === 'challan') {
       doc = await FabricChallan.findById(docId);
+    } else if (docType === 'purchase') {
+      doc = await BillingPurchase.findById(docId);
     } else {
       doc = await BillingInvoice.findById(docId);
     }
 
     if (!doc) {
-      return res.status(404).json({ error: `${docType === 'challan' ? 'Challan' : 'Invoice'} not found` });
+      return res.status(404).json({ error: `${docType === 'challan' ? 'Challan' : docType === 'purchase' ? 'Purchase' : 'Invoice'} not found` });
     }
 
     doc.signedCopy = {
@@ -88,6 +91,7 @@ const getSignedDocuments = async (req, res) => {
     // Queries
     const challanFilter = { 'signedCopy.status': statusFilter };
     const invoiceFilter = { 'signedCopy.status': statusFilter };
+    const purchaseFilter = { 'signedCopy.status': statusFilter };
 
     if (search && search.trim()) {
       const sRegex = new RegExp(search.trim(), 'i');
@@ -102,10 +106,18 @@ const getSignedDocuments = async (req, res) => {
         { ourChallanNo: sRegex },
         { 'signedCopy.uploadedByName': sRegex }
       ];
+      purchaseFilter.$or = [
+        { purchaseNo: sRegex },
+        { billNo: sRegex },
+        { vendorName: sRegex },
+        { 'vendor.businessName': sRegex },
+        { 'signedCopy.uploadedByName': sRegex }
+      ];
     }
 
     let challans = [];
     let invoices = [];
+    let purchases = [];
 
     if (docType === 'all' || docType === 'challan') {
       challans = await FabricChallan.find(challanFilter)
@@ -117,6 +129,13 @@ const getSignedDocuments = async (req, res) => {
     if (docType === 'all' || docType === 'invoice') {
       invoices = await BillingInvoice.find(invoiceFilter)
         .select('_id invoiceNo invoiceDate customer grandTotal ourChallanNo signedCopy created_at')
+        .sort({ 'signedCopy.uploadedAt': -1 })
+        .lean();
+    }
+
+    if (docType === 'all' || docType === 'purchase') {
+      purchases = await BillingPurchase.find(purchaseFilter)
+        .select('_id purchaseNo billNo date vendor vendorName grandTotal totalAmount signedCopy createdAt')
         .sort({ 'signedCopy.uploadedAt': -1 })
         .lean();
     }
@@ -144,6 +163,17 @@ const getSignedDocuments = async (req, res) => {
         amountOrMtr: `₹${(i.grandTotal || 0).toLocaleString('en-IN')}`,
         signedCopy: i.signedCopy,
         createdAt: i.created_at
+      })),
+      ...purchases.map(p => ({
+        _id: p._id,
+        docType: 'purchase',
+        docNumber: p.purchaseNo || p.billNo || 'Purchase',
+        partyName: p.vendor?.businessName || p.vendorName || '—',
+        jobNo: p.billNo ? `Bill: ${p.billNo}` : '',
+        date: p.date,
+        amountOrMtr: `₹${(p.grandTotal || p.totalAmount || 0).toLocaleString('en-IN')}`,
+        signedCopy: p.signedCopy,
+        createdAt: p.createdAt
       }))
     ];
 
@@ -155,20 +185,27 @@ const getSignedDocuments = async (req, res) => {
     });
 
     // Counts for tabs/badges
-    const [pendingChallans, pendingInvoices, approvedChallans, approvedInvoices, rejectedChallans, rejectedInvoices] = await Promise.all([
+    const [
+      pendingChallans, pendingInvoices, pendingPurchases,
+      approvedChallans, approvedInvoices, approvedPurchases,
+      rejectedChallans, rejectedInvoices, rejectedPurchases
+    ] = await Promise.all([
       FabricChallan.countDocuments({ 'signedCopy.status': 'PENDING' }),
       BillingInvoice.countDocuments({ 'signedCopy.status': 'PENDING' }),
+      BillingPurchase.countDocuments({ 'signedCopy.status': 'PENDING' }),
       FabricChallan.countDocuments({ 'signedCopy.status': 'APPROVED' }),
       BillingInvoice.countDocuments({ 'signedCopy.status': 'APPROVED' }),
+      BillingPurchase.countDocuments({ 'signedCopy.status': 'APPROVED' }),
       FabricChallan.countDocuments({ 'signedCopy.status': 'REJECTED' }),
-      BillingInvoice.countDocuments({ 'signedCopy.status': 'REJECTED' })
+      BillingInvoice.countDocuments({ 'signedCopy.status': 'REJECTED' }),
+      BillingPurchase.countDocuments({ 'signedCopy.status': 'REJECTED' })
     ]);
 
     const stats = {
-      pending: pendingChallans + pendingInvoices,
-      approved: approvedChallans + approvedInvoices,
-      rejected: rejectedChallans + rejectedInvoices,
-      total: (pendingChallans + pendingInvoices) + (approvedChallans + approvedInvoices) + (rejectedChallans + rejectedInvoices)
+      pending: pendingChallans + pendingInvoices + pendingPurchases,
+      approved: approvedChallans + approvedInvoices + approvedPurchases,
+      rejected: rejectedChallans + rejectedInvoices + rejectedPurchases,
+      total: (pendingChallans + pendingInvoices + pendingPurchases) + (approvedChallans + approvedInvoices + approvedPurchases) + (rejectedChallans + rejectedInvoices + rejectedPurchases)
     };
 
     return res.json({
@@ -208,8 +245,10 @@ const updateApprovalStatus = async (req, res) => {
       doc = await FabricChallan.findById(id);
     } else if (docType === 'invoice') {
       doc = await BillingInvoice.findById(id);
+    } else if (docType === 'purchase') {
+      doc = await BillingPurchase.findById(id);
     } else {
-      return res.status(400).json({ error: "Invalid docType. Must be 'challan' or 'invoice'" });
+      return res.status(400).json({ error: "Invalid docType. Must be 'challan', 'invoice', or 'purchase'" });
     }
 
     if (!doc) {
@@ -284,6 +323,7 @@ const bulkUpdateApprovalStatus = async (req, res) => {
 
     const challanIds = items.filter(i => i.docType === 'challan').map(i => i.id);
     const invoiceIds = items.filter(i => i.docType === 'invoice').map(i => i.id);
+    const purchaseIds = items.filter(i => i.docType === 'purchase').map(i => i.id);
 
     const updateFields = action === 'APPROVED' ? {
       'signedCopy.status': 'APPROVED',
@@ -309,6 +349,13 @@ const bulkUpdateApprovalStatus = async (req, res) => {
     if (invoiceIds.length > 0) {
       await BillingInvoice.updateMany(
         { _id: { $in: invoiceIds }, 'signedCopy.images.0': { $exists: true } },
+        { $set: updateFields }
+      );
+    }
+
+    if (purchaseIds.length > 0) {
+      await BillingPurchase.updateMany(
+        { _id: { $in: purchaseIds }, 'signedCopy.images.0': { $exists: true } },
         { $set: updateFields }
       );
     }

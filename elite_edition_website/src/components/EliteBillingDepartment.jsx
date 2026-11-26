@@ -441,6 +441,9 @@ export default function EliteBillingDepartment({
     items: [createEmptyPurchaseItem()],
     enableRoundOff: true,
     manualRoundOff: undefined,
+    enableTds: false,
+    tdsSection: '194C',
+    tdsRate: 2,
     discountType: 'flat',
     discountValue: 0,
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
@@ -573,8 +576,12 @@ export default function EliteBillingDepartment({
       roundOff = 0;
     }
 
+    const tdsEnabled = Boolean(purchaseForm.enableTds);
+    const tdsRateNum = parseFloat(purchaseForm.tdsRate) || 0;
+    const tdsAmount = tdsEnabled && tdsRateNum > 0 ? Math.round((netSubtotal * tdsRateNum) / 100) : 0;
+    const netPayable = Math.max(0, parseFloat((grandTotal - tdsAmount).toFixed(2)));
     const paid = parseFloat(purchaseForm.paidAmount) || 0;
-    const balanceDue = Math.max(0, grandTotal - paid);
+    const balanceDue = Math.max(0, netPayable - paid);
 
     return {
       items: updatedItems,
@@ -588,9 +595,11 @@ export default function EliteBillingDepartment({
       roundOff,
       rawGrandTotal: parseFloat(rawGrandTotal.toFixed(2)),
       grandTotal,
+      tdsAmount,
+      netPayable,
       balanceDue: parseFloat(balanceDue.toFixed(2))
     };
-  }, [purchaseForm.items, purchaseForm.enableRoundOff, purchaseForm.manualRoundOff, purchaseForm.discountType, purchaseForm.discountValue, purchaseForm.taxType, purchaseForm.gstRate, purchaseForm.paidAmount]);
+  }, [purchaseForm.items, purchaseForm.enableRoundOff, purchaseForm.manualRoundOff, purchaseForm.enableTds, purchaseForm.tdsRate, purchaseForm.discountType, purchaseForm.discountValue, purchaseForm.taxType, purchaseForm.gstRate, purchaseForm.paidAmount]);
 
   // Real-time Duplicate Purchase Entry Guard (Vendor + Bill No, or complete details)
   const duplicatePurchaseMatch = useMemo(() => {
@@ -958,6 +967,9 @@ export default function EliteBillingDepartment({
       items: pItems,
       enableRoundOff: p.enableRoundOff !== false,
       manualRoundOff: undefined,
+      enableTds: Boolean(p.enableTds),
+      tdsSection: p.tdsSection || '194C',
+      tdsRate: p.tdsRate !== undefined && p.tdsRate !== null ? p.tdsRate : 2,
       discountType: p.discountType || 'flat',
       discountValue: p.discountValue || 0,
       taxType: p.taxType || p.gstType || 'CGST_SGST',
@@ -1528,9 +1540,13 @@ export default function EliteBillingDepartment({
       roundOff: calculatedPurchase.roundOff,
       totalAmount: calculatedPurchase.grandTotal,
       grandTotal: calculatedPurchase.grandTotal,
+      enableTds: Boolean(purchaseForm.enableTds),
+      tdsSection: purchaseForm.tdsSection || '194C',
+      tdsRate: parseFloat(purchaseForm.tdsRate) || 0,
+      tdsAmount: calculatedPurchase.tdsAmount || 0,
       paidAmount: parseFloat(purchaseForm.paidAmount) || 0,
       balanceDue: calculatedPurchase.balanceDue,
-      paymentStatus: (parseFloat(purchaseForm.paidAmount) || 0) >= calculatedPurchase.grandTotal && calculatedPurchase.grandTotal > 0
+      paymentStatus: (parseFloat(purchaseForm.paidAmount) || 0) >= calculatedPurchase.netPayable && calculatedPurchase.netPayable > 0
         ? 'PAID'
         : (parseFloat(purchaseForm.paidAmount) || 0) > 0
           ? 'PARTIALLY_PAID'
@@ -7746,7 +7762,68 @@ export default function EliteBillingDepartment({
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'top' }}>
                           {(() => {
+                            const sc = p.signedCopy;
+                            const scStatus = sc?.status;
+                            const isScApproved = scStatus === 'APPROVED';
+                            const isScPending = scStatus === 'PENDING' || scStatus === 'IN_PROCESS' || scStatus === 'UPLOADED';
+                            const isScRejected = scStatus === 'REJECTED';
+
+                            let scColor = '#94a3b8';
+                            let scBg = 'rgba(148, 163, 184, 0.12)';
+                            let scBorder = 'rgba(148, 163, 184, 0.3)';
+                            let scTitle = 'Soft Copy (Photo / PDF): Not Uploaded — Click to upload';
+                            let ScIcon = FileText;
+
+                            if (isScApproved) {
+                              scColor = '#10b981';
+                              scBg = 'rgba(16, 185, 129, 0.14)';
+                              scBorder = 'rgba(16, 185, 129, 0.35)';
+                              scTitle = `Soft Copy: Approved by Admin (${sc?.images?.length || 1} file). Click to view.`;
+                              ScIcon = CheckCircle;
+                            } else if (isScRejected) {
+                              scColor = '#ef4444';
+                              scBg = 'rgba(239, 68, 68, 0.14)';
+                              scBorder = 'rgba(239, 68, 68, 0.35)';
+                              scTitle = `Soft Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
+                              ScIcon = AlertCircle;
+                            } else if (isScPending) {
+                              scColor = '#f59e0b';
+                              scBg = 'rgba(245, 158, 11, 0.14)';
+                              scBorder = 'rgba(245, 158, 11, 0.35)';
+                              scTitle = `Soft Copy: Pending Admin Approval (${sc?.images?.length || 1} file). Click to view.`;
+                              ScIcon = Clock;
+                            }
+
                             const purchaseActions = [
+                              {
+                                id: 'soft_copy',
+                                icon: ScIcon,
+                                label: 'Soft Copy',
+                                tooltip: scTitle,
+                                color: scColor,
+                                bgColor: scBg,
+                                borderColor: scBorder,
+                                onClick: () => {
+                                  if (isScApproved || isScPending) {
+                                    setSignedPreviewTarget({
+                                      _id: p._id || p.id,
+                                      docType: 'purchase',
+                                      docNumber: p.purchaseNo || p.billNo || 'Purchase',
+                                      partyName: p.vendor?.businessName || p.vendorName,
+                                      signedCopy: p.signedCopy
+                                    });
+                                  } else {
+                                    setSignedUploadTarget({
+                                      id: p._id || p.id,
+                                      docType: 'purchase',
+                                      docNumber: p.purchaseNo || p.billNo || 'Purchase',
+                                      partyName: p.vendor?.businessName || p.vendorName,
+                                      existingSignedCopy: isScRejected ? p.signedCopy : null
+                                    });
+                                  }
+                                },
+                                isPrimary: true
+                              },
                               {
                                 id: 'print-purchase',
                                 icon: Printer,
@@ -9003,6 +9080,60 @@ export default function EliteBillingDepartment({
                   <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.14)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 900, color: '#60a5fa' }}>
                     <span>Grand Total:</span>
                     <span>₹ {calculatedPurchase.grandTotal.toFixed(2)}</span>
+                  </div>
+
+                  {/* Optional TDS Deduction (NOT selected by default) */}
+                  <div style={{ marginTop: '0.4rem', paddingTop: '0.45rem', borderTop: '1px dashed rgba(255, 255, 255, 0.14)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: purchaseForm.enableTds ? '#fbbf24' : '#cbd5e1' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(purchaseForm.enableTds)}
+                          onChange={e => setPurchaseForm(f => ({ ...f, enableTds: e.target.checked }))}
+                        />
+                        Apply TDS Deduction
+                      </label>
+                      {purchaseForm.enableTds && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <select
+                            value={purchaseForm.tdsSection || '194C'}
+                            onChange={e => {
+                              const sec = e.target.value;
+                              const defRate = sec === '194C (Ind)' ? 1 : sec === '194J' ? 10 : sec === '194Q' ? 0.1 : 2;
+                              setPurchaseForm(f => ({ ...f, tdsSection: sec, tdsRate: defRate }));
+                            }}
+                            style={{ padding: '0.22rem 0.4rem', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(11, 17, 32, 0.9)', border: '1px solid rgba(251, 191, 36, 0.4)', borderRadius: '5px', color: '#fbbf24' }}
+                          >
+                            <option value="194C">194C (2%)</option>
+                            <option value="194C (Ind)">194C Ind (1%)</option>
+                            <option value="194J">194J (10%)</option>
+                            <option value="194Q">194Q (0.1%)</option>
+                          </select>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="30"
+                            value={purchaseForm.tdsRate ?? 2}
+                            onChange={e => setPurchaseForm(f => ({ ...f, tdsRate: e.target.value }))}
+                            style={{ width: '58px', padding: '0.22rem 0.4rem', fontSize: '0.8rem', fontWeight: 700, background: 'rgba(11, 17, 32, 0.9)', border: '1px solid rgba(251, 191, 36, 0.4)', borderRadius: '5px', color: '#ffffff', textAlign: 'right' }}
+                          />
+                          <span style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: 700 }}>%</span>
+                        </div>
+                      )}
+                    </div>
+                    {purchaseForm.enableTds && calculatedPurchase.tdsAmount > 0 && (
+                      <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#fbbf24', fontWeight: 700 }}>
+                          <span>TDS ({purchaseForm.tdsSection || '194C'} @ {purchaseForm.tdsRate}%):</span>
+                          <span>- ₹ {calculatedPurchase.tdsAmount.toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: '#34d399', fontWeight: 800 }}>
+                          <span>Net Payable (After TDS):</span>
+                          <span>₹ {calculatedPurchase.netPayable.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.1rem' }}>
@@ -10610,7 +10741,7 @@ export default function EliteBillingDepartment({
           docNumber={signedUploadTarget.docNumber}
           partyName={signedUploadTarget.partyName}
           existingSignedCopy={signedUploadTarget.existingSignedCopy}
-          onSuccess={() => { loadData(); fetchDigitalChallans(); }}
+          onSuccess={() => { loadData(); fetchDigitalChallans(); fetchPurchases(); }}
         />
       )}
 
@@ -10620,7 +10751,7 @@ export default function EliteBillingDepartment({
           onClose={() => setSignedPreviewTarget(null)}
           documentData={signedPreviewTarget}
           isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
-          onStatusUpdated={() => { loadData(); fetchDigitalChallans(); }}
+          onStatusUpdated={() => { loadData(); fetchDigitalChallans(); fetchPurchases(); }}
           onReupload={(docData) => {
             setSignedPreviewTarget(null);
             setSignedUploadTarget({

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { CheckCircle2, AlertTriangle, XCircle, Info, X, Bell, Trash2, CheckCheck, BellRing, ExternalLink } from 'lucide-react';
 import { webPushClient } from '../services/webPushClient';
 import { soundEffects } from '../services/soundEffects';
+import { api } from '../services/api';
 
 export const triggerGlobalDataRefresh = (detail = 'all') => {
   const payload = typeof detail === 'string'
@@ -125,15 +126,35 @@ export const triggerPushNotification = (title, message, type = 'info', actionTab
   }
 };
 
+const showNonBlockingToast = (title, message, type = 'warning') => {
+  try {
+    window.dispatchEvent(new CustomEvent('elite-toast', {
+      detail: {
+        id: Date.now() + Math.random().toString(36).substring(2, 7),
+        title,
+        message,
+        type,
+        timestamp: new Date().toISOString(),
+      }
+    }));
+  } catch (e) {
+    // ignore
+  }
+};
+
 export const requestNotificationPermission = async () => {
   // 1. Strict iOS Standalone Guard: Apple Safari only supports Push API inside standalone Home Screen PWAs
   if (webPushClient.isIOS() && !webPushClient.isStandalone()) {
-    alert('On iPhone and iPad, notifications require adding Elite Edition to your Home Screen first.\n\n1. Tap the Share button (⬆️) at the bottom of Safari.\n2. Tap "Add to Home Screen".\n3. Open the installed Elite Edition icon on your Home Screen to enable notifications.');
+    showNonBlockingToast(
+      'Home Screen Required on iOS',
+      'Tap Share -> Add to Home Screen, then open Elite Edition from your Home Screen to enable push notifications.',
+      'warning'
+    );
     return 'ios_not_standalone';
   }
 
   if (!('Notification' in window)) {
-    alert('This browser does not support desktop/mobile push notifications.');
+    showNonBlockingToast('Unsupported Browser', 'This browser does not support desktop/mobile push notifications.', 'warning');
     return 'unsupported';
   }
 
@@ -141,15 +162,20 @@ export const requestNotificationPermission = async () => {
     const res = await webPushClient.subscribeToPush();
     if (res.success) {
       window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: 'granted' }));
-      triggerPushNotification('Push Notifications Enabled! 🎉', 'You will now receive real-time alerts for Chat, Tasks, and Operations even when closed.', 'success');
+      triggerPushNotification('Push Notifications Enabled!', 'You will now receive real-time alerts for Chat, Tasks, and Operations even when closed.', 'success');
       return 'granted';
     } else {
       if (res.error === 'IOS_NOT_STANDALONE') {
-        alert(res.message);
+        showNonBlockingToast('Home Screen Required', res.message || 'Add this app to Home Screen to enable notifications.', 'warning');
         return 'ios_not_standalone';
       }
       if (Notification.permission === 'denied') {
-        alert('Notification permission is currently BLOCKED in your phone/browser settings.\n\nTo enable notifications:\n1. Open phone Settings > Apps > Elite Edition (or Chrome/Safari)\n2. Tap Notifications > Allow\n3. Return to the app and refresh.');
+        window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: 'denied' }));
+        showNonBlockingToast(
+          'Notifications Blocked',
+          'Allow notifications in your browser site settings, then click Refresh or Enable Push.',
+          'warning'
+        );
         return 'denied';
       }
       return Notification.permission;
@@ -267,16 +293,41 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
 }
 
 // ── Notification History Drawer / Modal ──────────────────────────────────────
-export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
+export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab, chatUnreadCount = 0 }) {
   const [history, setHistory] = useState(getNotificationHistory());
+  const [unreadChatRooms, setUnreadChatRooms] = useState([]);
+  const [dismissedChatKeys, setDismissedChatKeys] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('elite_dismissed_chat_notifs');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
   const [permStatus, setPermStatus] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
   const [selectedNotifIds, setSelectedNotifIds] = useState([]);
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'unread' | 'alerts'
 
   const refreshHistory = () => setHistory(getNotificationHistory());
 
+  const refreshUnreadChats = useCallback(async () => {
+    try {
+      const res = await api.getCommunicationGroups();
+      const list = res?.data || (Array.isArray(res) ? res : []);
+      const unread = list.filter((g) => (Number(g.unreadCount) || 0) > 0);
+      setUnreadChatRooms(unread);
+      const total = unread.reduce((acc, g) => acc + (Number(g.unreadCount) || 0), 0);
+      window.dispatchEvent(new CustomEvent('chat-unread-count-change', { detail: { count: total } }));
+    } catch (e) {
+      // ignore if unauthenticated or offline
+    }
+  }, []);
+
   useEffect(() => {
-    if (isOpen) refreshHistory();
+    if (isOpen) {
+      refreshHistory();
+      refreshUnreadChats();
+    }
     const handleUpdate = () => refreshHistory();
     window.addEventListener('elite-notification-history-update', handleUpdate);
     window.addEventListener('storage', handleUpdate);
@@ -313,15 +364,55 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
       window.removeEventListener('focus', updatePerm);
       window.removeEventListener('elite-permission-change', updatePerm);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, refreshUnreadChats]);
 
-  const unreadCount = history.filter(h => !h.read).length;
-  const alertCount = history.filter(h => h.type === 'danger' || h.type === 'warning' || (h.title && (h.title.toLowerCase().includes('alert') || h.title.toLowerCase().includes('error')))).length;
+  const syncedChatItems = useMemo(() => {
+    return unreadChatRooms
+      .map((room) => {
+        const roomId = String(room._id);
+        const snapKey = `${room.unreadCount}_${room.lastMessage?._id || room.updatedAt || ''}`;
+        if (dismissedChatKeys[roomId] === snapKey) return null;
+        // Skip if local history already has an unread entry for this room with recent timestamp
+        const hasLocalUnread = history.some((h) => !h.read && String(h?.meta?.roomId || '') === roomId);
+        if (hasLocalUnread) return null;
+        const preview = room.lastMessage?.content
+          ? (room.lastMessage.isDeleted ? 'Message deleted' : room.lastMessage.content)
+          : `${room.unreadCount} unread message${room.unreadCount !== 1 ? 's' : ''}`;
+        return {
+          id: `chat_unread_${roomId}`,
+          title: `💬 ${room.name || 'Chat Conversation'} (${room.unreadCount} unread)`,
+          message: preview,
+          type: 'info',
+          actionTab: 'communication',
+          timestamp: room.lastMessage?.createdAt || room.updatedAt || new Date().toISOString(),
+          read: false,
+          meta: {
+            roomId,
+            messageId: room.lastMessage?._id || null,
+            isSyncedChatRoom: true,
+            snapKey,
+            unreadCount: room.unreadCount,
+          },
+        };
+      })
+      .filter(Boolean);
+  }, [unreadChatRooms, history, dismissedChatKeys]);
+
+  const combinedHistory = useMemo(() => {
+    return [...syncedChatItems, ...history];
+  }, [syncedChatItems, history]);
+
+  const historyUnreadCount = history.filter(h => !h.read).length;
+  const unreadCount = Math.max(
+    historyUnreadCount + syncedChatItems.reduce((sum, item) => sum + (Number(item?.meta?.unreadCount) || 1), 0),
+    Number(chatUnreadCount) || 0
+  );
+  const alertCount = combinedHistory.filter(h => h.type === 'danger' || h.type === 'warning' || (h.title && (h.title.toLowerCase().includes('alert') || h.title.toLowerCase().includes('error')))).length;
 
   // Smart deduplication & grouping of identical notifications
   const groupedNotifications = useMemo(() => {
     if (!isOpen) return [];
-    let list = history;
+    let list = combinedHistory;
     if (filterTab === 'unread') {
       list = list.filter(h => !h.read);
     } else if (filterTab === 'alerts') {
@@ -345,7 +436,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
       } else {
         const entry = {
           ...item,
-          count: 1,
+          count: item?.meta?.unreadCount > 1 ? item.meta.unreadCount : 1,
           ids: [item.id],
           hasUnread: !item.read
         };
@@ -355,10 +446,10 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     });
 
     return groups;
-  }, [history, filterTab, isOpen]);
+  }, [combinedHistory, filterTab, isOpen]);
 
   const visibleNotifIds = useMemo(() => {
-    return groupedNotifications.flatMap(g => g.ids || []);
+    return groupedNotifications.flatMap(g => g.ids || []).filter(id => !String(id).startsWith('chat_unread_'));
   }, [groupedNotifications]);
 
   const visibleSelectedIds = useMemo(() => {
@@ -409,16 +500,36 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     setSelectedNotifIds([]);
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     const updated = history.map(h => ({ ...h, read: true }));
     saveNotificationHistory(updated);
     setHistory(updated);
+    if (unreadChatRooms.length > 0) {
+      try {
+        await Promise.allSettled(unreadChatRooms.map(r => api.toggleMarkChatUnread(r._id, false)));
+        setUnreadChatRooms([]);
+        window.dispatchEvent(new CustomEvent('chat-unread-count-change', { detail: { count: 0 } }));
+        window.dispatchEvent(new CustomEvent('elite-chat-rooms-refresh'));
+      } catch (e) {
+        // ignore
+      }
+    }
   };
 
   const clearHistory = () => {
     saveNotificationHistory([]);
     setHistory([]);
     setSelectedNotifIds([]);
+    if (unreadChatRooms.length > 0) {
+      const nextDismissed = { ...dismissedChatKeys };
+      unreadChatRooms.forEach((r) => {
+        nextDismissed[String(r._id)] = `${r.unreadCount}_${r.lastMessage?._id || r.updatedAt || ''}`;
+      });
+      setDismissedChatKeys(nextDismissed);
+      try {
+        sessionStorage.setItem('elite_dismissed_chat_notifs', JSON.stringify(nextDismissed));
+      } catch {}
+    }
   };
 
   const markGroupRead = (itemIds) => {
@@ -515,7 +626,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
               gap: 4
             }}
           >
-            All <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: '0.65rem', background: filterTab === 'all' ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.06)' }}>{history.length}</span>
+            All <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: '0.65rem', background: filterTab === 'all' ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.06)' }}>{combinedHistory.length}</span>
           </button>
 
           <button
@@ -615,10 +726,10 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
-              <button onClick={markAllAsRead} disabled={unreadCount === 0} style={{ background: 'none', border: 'none', color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: unreadCount > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+              <button onClick={markAllAsRead} disabled={unreadCount === 0 && unreadChatRooms.length === 0} style={{ background: 'none', border: 'none', color: (unreadCount > 0 || unreadChatRooms.length > 0) ? 'var(--primary)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: (unreadCount > 0 || unreadChatRooms.length > 0) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
                 <CheckCheck size={14} /> Mark all read
               </button>
-              <button onClick={clearHistory} disabled={history.length === 0} style={{ background: 'none', border: 'none', color: history.length > 0 ? 'var(--danger)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: history.length > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+              <button onClick={clearHistory} disabled={combinedHistory.length === 0} style={{ background: 'none', border: 'none', color: combinedHistory.length > 0 ? 'var(--danger)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: combinedHistory.length > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
                 <Trash2 size={14} /> Clear all
               </button>
             </div>

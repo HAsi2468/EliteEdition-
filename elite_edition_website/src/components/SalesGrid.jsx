@@ -23,8 +23,10 @@ import { extractApiProductImage } from '../utils/imageUrlHelper';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
+  const [serverSummary, setServerSummary] = useState(null);
+  const [tabCounts, setTabCounts] = useState(null);
   const [selectedOrderMap, setSelectedOrderMap] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [syncingOrderId, setSyncingOrderId] = useState('');
   const [error, setError] = useState('');
@@ -135,26 +137,35 @@ export default function SalesGrid() {
     fetchOrders(false, 1);
     const interval = setInterval(() => fetchOrders(true, pageRef.current), 30000);
     return () => clearInterval(interval);
-  }, [sortField, sortOrder, activeFilters, dateStart, dateEnd, searchQuery]);
+  }, [sortField, sortOrder, activeFilters, dateStart, dateEnd, searchQuery, activeStatusTab]);
+
+  const resolveStatusParam = () => {
+    const statuses = activeFilters.status || [];
+    if (statuses.length > 0) return statuses.join(',');
+    if (activeStatusTab === 'DELIVERED') return 'DELIVERED,COMPLETE';
+    if (activeStatusTab === 'IN_TRANSIT') return 'SHIPPED,IN_TRANSIT,PROCESSING';
+    if (activeStatusTab === 'CANCELLED') return 'CANCELLED,RETURNED';
+    return undefined;
+  };
 
   const fetchOrders = async (isSilent = false, targetPage = 1) => {
-    if (!isSilent && orders.length === 0) setLoading(true);
+    if (!isSilent) setLoading(true);
     setError('');
     try {
       const effectivePage = targetPage;
-      const statuses = activeFilters.status || [];
       const cities = activeFilters.city || [];
       const categories = activeFilters.category || [];
 
       const params = {
         page: effectivePage,
         limit: 25,
-        sortField,
+        groupBy: 'order',
+        sortField: sortField === 'itemSKUCodeCount' ? 'saleCount' : sortField,
         sortOrder,
         itemSKUCode: searchQuery.trim() || undefined,
         shippingAddressCity: cities.length > 0 ? cities.join(',') : undefined,
         category: categories.length > 0 ? categories.join(',') : undefined,
-        saleOrderStatus: statuses.length > 0 ? statuses.join(',') : undefined,
+        saleOrderStatus: resolveStatusParam(),
         dateStart: dateStart || undefined,
         endDate: dateEnd || undefined
       };
@@ -162,9 +173,21 @@ export default function SalesGrid() {
       const res = await api.getSales(params);
       if (res && res.data) {
         setOrders(res.data);
-        if (res.meta) {
-          setTotalPages(res.meta.totalPages || 1);
-          setTotal(res.meta.totalRecords ?? res.totalRecords ?? res.data.length ?? 0);
+        const resTotalPages = res.meta?.totalPages ?? res.totalPages ?? 1;
+        const resTotal = res.meta?.totalRecords ?? res.totalRecords ?? res.data.length ?? 0;
+        const resSummary = res.meta?.summary ?? res.summary ?? null;
+        setTotalPages(resTotalPages);
+        setTotal(resTotal);
+        if (resSummary) {
+          setServerSummary(resSummary);
+          if (activeStatusTab === 'ALL') {
+            setTabCounts({
+              all: resTotal,
+              delivered: resSummary.deliveredCount ?? 0,
+              transit: resSummary.transitCount ?? 0,
+              cancelled: resSummary.cancelledCount ?? 0
+            });
+          }
         }
         setPage(targetPage);
         pageRef.current = targetPage;
@@ -182,19 +205,19 @@ export default function SalesGrid() {
     setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
-      const statuses = activeFilters.status || [];
       const cities = activeFilters.city || [];
       const categories = activeFilters.category || [];
 
       const params = {
         page: nextPage,
         limit: 25,
-        sortField,
+        groupBy: 'order',
+        sortField: sortField === 'itemSKUCodeCount' ? 'saleCount' : sortField,
         sortOrder,
         itemSKUCode: searchQuery.trim() || undefined,
         shippingAddressCity: cities.length > 0 ? cities.join(',') : undefined,
         category: categories.length > 0 ? categories.join(',') : undefined,
-        saleOrderStatus: statuses.length > 0 ? statuses.join(',') : undefined,
+        saleOrderStatus: resolveStatusParam(),
         dateStart: dateStart || undefined,
         endDate: dateEnd || undefined
       };
@@ -254,12 +277,22 @@ export default function SalesGrid() {
   }, [orders, searchQuery, activeStatusTab]);
 
   const calcStats = useMemo(() => {
-    const totalRevenue = filteredOrders.reduce((s, o) => s + (parseFloat(o.totalPrice) || 0), 0);
-    const totalUnits = filteredOrders.reduce((s, o) => s + (parseInt(o.itemSKUCodeCount, 10) || 1), 0);
-    const deliveredCount = filteredOrders.filter(o => ['DELIVERED', 'COMPLETE'].includes((o.saleOrderStatus || '').toUpperCase())).length;
-    const transitCount = filteredOrders.filter(o => ['SHIPPED', 'IN_TRANSIT', 'PROCESSING'].includes((o.saleOrderStatus || '').toUpperCase())).length;
-    return { totalRevenue, totalUnits, deliveredCount, transitCount };
-  }, [filteredOrders]);
+    const localRevenue = filteredOrders.reduce((s, o) => s + (parseFloat(o.totalPrice) || 0), 0);
+    const localUnits = filteredOrders.reduce((s, o) => s + (parseInt(o.itemSKUCodeCount, 10) || 1), 0);
+    const localDelivered = filteredOrders.filter(o => ['DELIVERED', 'COMPLETE'].includes((o.saleOrderStatus || '').toUpperCase())).length;
+    const localTransit = filteredOrders.filter(o => ['SHIPPED', 'IN_TRANSIT', 'PROCESSING'].includes((o.saleOrderStatus || '').toUpperCase())).length;
+
+    return {
+      totalOrders: total || serverSummary?.totalOrders || filteredOrders.length,
+      totalRevenue: serverSummary ? Number(serverSummary.totalRevenue || 0) : localRevenue,
+      totalUnits: serverSummary ? Number(serverSummary.totalUnits || 0) : localUnits,
+      deliveredCount: serverSummary ? Number(serverSummary.deliveredCount || 0) : localDelivered,
+      transitCount: serverSummary ? Number(serverSummary.transitCount || 0) : localTransit,
+      cancelledCount: serverSummary ? Number(serverSummary.cancelledCount || 0) : 0
+    };
+  }, [filteredOrders, serverSummary, total]);
+
+  const isInitialLoading = loading && orders.length === 0;
 
   return (
     <div style={styles.panel}>
@@ -283,15 +316,15 @@ export default function SalesGrid() {
       {/* TIER 2: SUB-SCREEN BUTTONS */}
       <div className="glass-subtabs-bar" data-screen-subtabs="primary" role="tablist">
         {[
-          { id: 'ALL', label: `All Orders (${total || orders.length})` },
-          { id: 'DELIVERED', label: `Delivered & Complete (${calcStats.deliveredCount})` },
-          { id: 'IN_TRANSIT', label: `Shipped & In Transit (${calcStats.transitCount})` },
-          { id: 'CANCELLED', label: 'Cancelled / Returned' },
+          { id: 'ALL', label: `All Orders (${isInitialLoading ? '...' : (tabCounts?.all ?? calcStats.totalOrders)})` },
+          { id: 'DELIVERED', label: `Delivered & Complete (${isInitialLoading ? '...' : (tabCounts?.delivered ?? calcStats.deliveredCount)})` },
+          { id: 'IN_TRANSIT', label: `Shipped & In Transit (${isInitialLoading ? '...' : (tabCounts?.transit ?? calcStats.transitCount)})` },
+          { id: 'CANCELLED', label: `Cancelled / Returned${!isInitialLoading && (tabCounts?.cancelled ?? calcStats.cancelledCount) ? ` (${tabCounts?.cancelled ?? calcStats.cancelledCount})` : ''}` },
         ].map(tab => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveStatusTab(tab.id)}
+            onClick={() => { setActiveStatusTab(tab.id); setPage(1); }}
             className={`glass-subtab-btn ${activeStatusTab === tab.id ? 'active' : ''}`}
           >
             {tab.label}
@@ -303,24 +336,24 @@ export default function SalesGrid() {
       <div className="glass-scroll-track">
         <div className="glass-calc-card">
           <span className="glass-calc-title">TOTAL ORDERS</span>
-          <span className="glass-calc-value">{total || filteredOrders.length}</span>
-          <span className="glass-calc-sub">{filteredOrders.length} loaded in view</span>
+          <span className="glass-calc-value">{isInitialLoading ? '...' : calcStats.totalOrders.toLocaleString('en-IN')}</span>
+          <span className="glass-calc-sub">{isInitialLoading ? 'Loading orders...' : `${filteredOrders.length} shown on page`}</span>
         </div>
         <div className="glass-calc-card">
           <span className="glass-calc-title">GROSS ORDER VALUE</span>
           <span className="glass-calc-value" style={{ color: '#34d399' }}>
-            ₹{calcStats.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            {isInitialLoading ? '...' : `₹${calcStats.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
           </span>
-          <span className="glass-calc-sub">{calcStats.totalUnits} total units</span>
+          <span className="glass-calc-sub">{isInitialLoading ? 'Calculating...' : `${calcStats.totalUnits.toLocaleString('en-IN')} total units`}</span>
         </div>
         <div className="glass-calc-card">
           <span className="glass-calc-title">DELIVERED ORDERS</span>
-          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{calcStats.deliveredCount}</span>
+          <span className="glass-calc-value" style={{ color: '#38bdf8' }}>{isInitialLoading ? '...' : calcStats.deliveredCount.toLocaleString('en-IN')}</span>
           <span className="glass-calc-sub">Completed fulfillment</span>
         </div>
         <div className="glass-calc-card">
           <span className="glass-calc-title">IN TRANSIT / SHIPPED</span>
-          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{calcStats.transitCount}</span>
+          <span className="glass-calc-value" style={{ color: '#fbbf24' }}>{isInitialLoading ? '...' : calcStats.transitCount.toLocaleString('en-IN')}</span>
           <span className="glass-calc-sub">Active logistics dispatch</span>
         </div>
       </div>
@@ -393,6 +426,12 @@ export default function SalesGrid() {
 
       {/* TIER 5: DUAL-MODE CONTENT (CARDS OR TABLE) */}
       {viewMode === 'card' ? (
+        loading && orders.length === 0 ? (
+          <div style={styles.loadingBox}>
+            <RefreshCw size={28} className="spin-loader" color="#38bdf8" />
+            <p style={{ marginTop: '0.75rem', color: 'rgba(255,255,255,0.72)' }}>Loading sales orders...</p>
+          </div>
+        ) : (
         <div className="glass-cards-grid">
           {filteredOrders.map((order, idx) => {
             const orderKey = order.id || order._id || order.saleOrderItemCode || idx;
@@ -440,6 +479,7 @@ export default function SalesGrid() {
             );
           })}
         </div>
+        )
       ) : (
         <div className="table-responsive-wrapper" style={styles.tableWrap}>
           <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>

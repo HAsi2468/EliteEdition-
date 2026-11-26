@@ -1564,6 +1564,114 @@ const resetAllChallans = async (req, res) => {
   }
 };
 
+// ── Discreet Internal Turnaround Code Helper (DD:HH:MM in Challan JobCard order, no Job No) ──
+const buildDiscreetTurnaroundCode = async (challan, preloadedJobCards = null) => {
+  try {
+    if (!challan) return '';
+
+    // Collect unique Job No tokens in the exact order they appear on the Challan
+    const orderedTokens = [];
+    const seenTokens = new Set();
+    const pushTokens = (val) => {
+      if (!val) return;
+      String(val).split(/[,/&]+/).forEach((part) => {
+        const clean = part.trim();
+        const key = clean.replace(/^job\s*no\.?\s*[-:]?\s*/i, '').trim().toLowerCase();
+        if (clean && key && !seenTokens.has(key)) {
+          seenTokens.add(key);
+          orderedTokens.push({ raw: clean, key, digits: clean.replace(/[^0-9]/g, '') });
+        }
+      });
+    };
+    pushTokens(challan.jobNo);
+    if (Array.isArray(challan.tpDetails)) challan.tpDetails.forEach((tp) => pushTokens(tp?.jobNo));
+    if (Array.isArray(challan.tpEntries)) challan.tpEntries.forEach((tp) => pushTokens(tp?.jobNo));
+    if (Array.isArray(challan.items)) challan.items.forEach((it) => pushTokens(it?.jobNo));
+
+    let matchedJobs = Array.isArray(preloadedJobCards) && preloadedJobCards.length > 0 ? preloadedJobCards : null;
+
+    if (!matchedJobs) {
+      if (orderedTokens.length === 0) return '';
+      const orConds = [];
+      for (const tok of orderedTokens) {
+        orConds.push({ jobNo: tok.raw });
+        if (tok.digits && tok.digits.length >= 2) {
+          orConds.push({ jobNo: { $regex: new RegExp(`(^|[^0-9])${tok.digits}$`, 'i') } });
+        }
+      }
+      if (orConds.length === 0) return '';
+      matchedJobs = await JobCard.find({ $or: orConds })
+        .select('_id jobNo created_date_time createdAt date')
+        .lean();
+    }
+
+    if (!matchedJobs || matchedJobs.length === 0) return '';
+
+    // Order matched JobCards strictly according to the Challan's JobCard order
+    const orderedJobs = [];
+    const usedIds = new Set();
+    for (const tok of orderedTokens) {
+      const found = matchedJobs.find((jc) => {
+        const idStr = String(jc._id || jc.jobNo);
+        if (usedIds.has(idStr)) return false;
+        const jClean = String(jc.jobNo || '').replace(/^job\s*no\.?\s*[-:]?\s*/i, '').trim().toLowerCase();
+        const jDigits = String(jc.jobNo || '').replace(/[^0-9]/g, '');
+        return jClean === tok.key || (tok.digits && jDigits === tok.digits);
+      });
+      if (found) {
+        usedIds.add(String(found._id || found.jobNo));
+        orderedJobs.push(found);
+      }
+    }
+    // Append any remaining preloaded job cards if not already included
+    for (const jc of matchedJobs) {
+      const idStr = String(jc._id || jc.jobNo);
+      if (!usedIds.has(idStr)) {
+        usedIds.add(idStr);
+        orderedJobs.push(jc);
+      }
+    }
+
+    // Resolve challan timestamp (prefer exact createdAt, fallback to ObjectId timestamp or date)
+    const challanEndMs = (() => {
+      const candidates = [
+        challan.createdAt,
+        challan.created_date_time,
+        challan._id && typeof challan._id.getTimestamp === 'function' ? challan._id.getTimestamp() : null,
+        challan.date
+      ];
+      for (const c of candidates) {
+        if (!c) continue;
+        const t = new Date(c).getTime();
+        if (Number.isFinite(t) && t > 0) return t;
+      }
+      return Date.now();
+    })();
+
+    const segments = [];
+    const pad2 = (n) => String(n).padStart(2, '0');
+
+    for (const jc of orderedJobs) {
+      const startRaw = jc.created_date_time || jc.createdAt || (jc._id && typeof jc._id.getTimestamp === 'function' ? jc._id.getTimestamp() : null) || jc.date;
+      const startMs = startRaw ? new Date(startRaw).getTime() : NaN;
+      if (!Number.isFinite(startMs) || startMs <= 0) continue;
+
+      const diffMs = Math.max(0, challanEndMs - startMs);
+      const totalMins = Math.floor(diffMs / 60000);
+      const days = Math.floor(totalMins / (24 * 60));
+      const hours = Math.floor((totalMins % (24 * 60)) / 60);
+      const mins = totalMins % 60;
+      segments.push(`${pad2(days)}:${pad2(hours)}:${pad2(mins)}`);
+    }
+
+    if (segments.length === 0) return '';
+    return `REF: ${segments.slice(0, 6).join(' | ')}`;
+  } catch (err) {
+    console.warn('[ChallanTurnaroundCode] non-fatal error:', err.message);
+    return '';
+  }
+};
+
 // ── GET /fabric-challan/:id/pdf ───────────────────────────────────────────
 const downloadChallanPdf = async (req, res) => {
   try {
@@ -1588,6 +1696,8 @@ const downloadChallanPdf = async (req, res) => {
 
     const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
     res.setHeader('Content-Disposition', `attachment; filename="EDP-${challan.challanNo || 'preview'}.pdf"`);
     doc.pipe(res);
 
@@ -1811,6 +1921,7 @@ const downloadChallanPdf = async (req, res) => {
 
     const hasNotes = !!(challan.notes && challan.notes.trim());
     const hasPcs = !!(challan.pcs);
+    const discreetRefCode = await buildDiscreetTurnaroundCode(challan, foundJobCards);
 
     // ── Resolve Creator Name for Authorized Signature ──
     let creatorName = (challan.createdByName || challan.createdBy || '').trim();
@@ -2191,105 +2302,20 @@ const downloadChallanPdf = async (req, res) => {
       doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
         .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
+
+      // Discreet internal footer code (DD:HH:MM from JobCard creation to Challan) — placed cleanly below outer border with bottom margin guard
+      if (discreetRefCode) {
+        const prevBottomMargin = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
+        doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold')
+          .text(discreetRefCode, ML, PH - MR + 5, { width: contentWidth, align: 'right', lineBreak: false });
+        doc.page.margins.bottom = prevBottomMargin;
+      }
     };
 
     renderPage(true);  // Page 1: Original Copy (100% Department Color)
     doc.addPage();
     renderPage(false); // Page 2: Duplicate Copy (50% Lighter Department Color)
-
-    // ── PAGE 3+ : DESIGN IMAGES ANNEXURE (IF MULTIPLE IMAGES EXIST) ──
-    if (allDesignImages.length > 1) {
-      const itemsPerPage = 12; // 3 columns x 4 rows = 12 images per page
-      const totalAnnexurePages = Math.ceil(allDesignImages.length / itemsPerPage);
-
-      for (let pIdx = 0; pIdx < totalAnnexurePages; pIdx++) {
-        doc.addPage();
-        
-        // Draw Outer Border
-        doc.strokeColor(companyBrandColor).lineWidth(1)
-           .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
-
-        // Top Header
-        doc.fillColor(companyBrandColor).fontSize(10.5).font('Helvetica-Bold')
-           .text(compGstin ? `GST : ${compGstin}` : '', ML + 12, MR + 4, { lineBreak: false });
-        doc.fillColor(companyBrandColor).fontSize(10.5).font('Helvetica-Bold')
-           .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
-        doc.fillColor(companyBrandColor).fontSize(10.5).font('Helvetica')
-           .text(`Mo. ${compPhone}`, ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
-
-        doc.strokeColor(companyBrandColor).lineWidth(0.5)
-           .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
-
-        // Annexure Title Banner
-        doc.fillColor(companyBrandColor).fontSize(13).font('Helvetica-Bold')
-           .text(`${resolvedCompany.toUpperCase()} — DESIGN IMAGES ANNEXURE`, ML, MR + 20, { width: contentWidth, align: 'center' });
-
-        // Metadata Strip
-        const metaY = MR + 38;
-        doc.rect(ML + 8, metaY, contentWidth - 16, 22).fill('#f8fafc');
-        doc.strokeColor(companyBrandColor).lineWidth(0.5).rect(ML + 8, metaY, contentWidth - 16, 22).stroke();
-
-        doc.fillColor(companyBrandColor).fontSize(9.5).font('Helvetica-Bold')
-           .text(`CHALLAN #: ${challanValue}`, ML + 14, metaY + 6);
-        doc.text(`DATE: ${formattedDate}`, ML + 150, metaY + 6);
-        doc.text(`PARTY: ${challan.partyName || '—'}`, ML + 270, metaY + 6, { width: 150, lineBreak: false });
-        doc.text(`PAGE: ${3 + pIdx}`, PW - MR - 75, metaY + 6, { width: 60, align: 'right' });
-
-        // 3 columns x 4 rows = 12 images grid
-        const gridStartY = metaY + 28;
-        const pageImages = allDesignImages.slice(pIdx * itemsPerPage, (pIdx + 1) * itemsPerPage);
-
-        const gridCols = 3;
-        const colGap = 8;
-        const rowGap = 7;
-        const cardW = (contentWidth - 16 - (gridCols - 1) * colGap) / gridCols; // ~164px
-        const cardH = 164; // 164px height per card
-
-        pageImages.forEach((img, idx) => {
-          const col = idx % gridCols;
-          const row = Math.floor(idx / gridCols);
-
-          const cardX = ML + 8 + col * (cardW + colGap);
-          const cardY = gridStartY + row * (cardH + rowGap);
-
-          // Card Outer Border
-          doc.strokeColor(companyBrandColor).lineWidth(0.6)
-             .rect(cardX, cardY, cardW, cardH).stroke();
-
-          // Image Box Container (128px high)
-          const imgContainerH = 128;
-          doc.strokeColor('#cbd5e1').lineWidth(0.4)
-             .rect(cardX + 4, cardY + 4, cardW - 8, imgContainerH).stroke();
-
-          try {
-            doc.image(img.path, cardX + 6, cardY + 6, {
-              fit: [cardW - 12, imgContainerH - 4],
-              align: 'center',
-              valign: 'center'
-            });
-          } catch (e) {
-            console.warn('Failed to embed annexure design image:', e.message);
-            doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
-               .text('Preview N/A', cardX, cardY + 55, { width: cardW, align: 'center' });
-          }
-
-          // Footer Label Area below image container
-          const labelY = cardY + imgContainerH + 5;
-
-          // Line 1: Design Name / Number in Bold Red
-          doc.fillColor('#dc2626').fontSize(8.5).font('Helvetica-Bold')
-             .text(`Design: ${img.designNo}`, cardX + 5, labelY, { width: cardW - 10, lineBreak: false });
-
-          // Line 2: Job No & Color Info
-          doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-             .text(`${img.jobNo} | ${img.color}`, cardX + 5, labelY + 12, { width: cardW - 10, lineBreak: false });
-        });
-
-        // Bottom Footer Notice
-        doc.fillColor(companyBrandColor).fontSize(8.5).font('Helvetica-Bold')
-           .text(`Delivery Challan Annexure — Page ${3 + pIdx} of ${2 + totalAnnexurePages}`, ML, PH - MR - 16, { width: contentWidth, align: 'center' });
-      }
-    }
 
     doc.end();
   } catch (err) {
@@ -2574,8 +2600,13 @@ const downloadBulkChallansPdf = async (req, res) => {
         doc.fillColor(BRAND).fontSize(8.5).font('Helvetica-Bold').text(`For ${resolvedCompany.toUpperCase()}`, signX, signY, { width: signW, align: 'center' });
         doc.strokeColor(BORDER_COL).lineWidth(0.6).moveTo(signX, signY + 36).lineTo(signX + signW, signY + 36).stroke();
         doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('Authorised Signatory', signX, signY + 40, { width: signW, align: 'center' });
+        if (bulkDiscreetRefCode) {
+          doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
+            .text(bulkDiscreetRefCode, MR, PH - MR - 12, { width: contentWidth, align: 'center', lineBreak: false });
+        }
       };
 
+      const bulkDiscreetRefCode = await buildDiscreetTurnaroundCode(challan);
       renderBulkCopy(false);
       if (req.query?.duplicate !== 'false') {
         doc.addPage({ margin: 28, size: 'A4' });

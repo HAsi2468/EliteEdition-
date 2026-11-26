@@ -1011,15 +1011,30 @@ const addComment = async (req, res) => {
     }
 
     if (!task.comments) task.comments = [];
+    const trimmedComment = text.trim();
     task.comments.push({
       sender: userId,
       senderName: resolvedSenderName,
-      text: text.trim(),
+      text: trimmedComment,
       createdAt: new Date()
+    });
+
+    if (!task.auditLogs) task.auditLogs = [];
+    task.auditLogs.push({
+      user: userId || undefined,
+      userName: resolvedSenderName,
+      fieldChanged: 'Comment Added',
+      oldValue: '',
+      newValue: trimmedComment.slice(0, 120),
+      timestamp: new Date()
     });
 
     await task.save();
     const populated = await populateTaskById(id);
+    const io = req.app && typeof req.app.get === 'function' ? req.app.get('socketio') : null;
+    if (io && populated) {
+      io.emit('task-updated', populated);
+    }
     res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error adding task comment:', error);
@@ -1185,11 +1200,29 @@ const editComment = async (req, res) => {
       });
     }
 
-    comment.text = text.trim();
+    const oldCommentText = comment.text || '';
+    const trimmedText = text.trim();
+    const actorName = (req.user && (req.user.name || req.user.username)) || 'Staff';
+    comment.text = trimmedText;
     comment.editedAt = new Date();
+
+    if (!task.auditLogs) task.auditLogs = [];
+    task.auditLogs.push({
+      user: req.user ? req.user._id : undefined,
+      userName: actorName,
+      fieldChanged: 'Comment Edited',
+      oldValue: String(oldCommentText).slice(0, 80),
+      newValue: trimmedText.slice(0, 80),
+      timestamp: new Date()
+    });
+
     await task.save();
 
     const populated = await populateTaskById(id);
+    const io = req.app && typeof req.app.get === 'function' ? req.app.get('socketio') : null;
+    if (io && populated) {
+      io.emit('task-updated', populated);
+    }
     res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error editing comment:', error);
@@ -1228,10 +1261,27 @@ const deleteComment = async (req, res) => {
       });
     }
 
+    const deletedCommentText = comment.text || '';
+    const actorName = (req.user && (req.user.name || req.user.username)) || 'Staff';
     task.comments = (task.comments || []).filter(c => String(c._id) !== String(commentId));
+
+    if (!task.auditLogs) task.auditLogs = [];
+    task.auditLogs.push({
+      user: req.user ? req.user._id : undefined,
+      userName: actorName,
+      fieldChanged: 'Comment Deleted',
+      oldValue: String(deletedCommentText).slice(0, 80),
+      newValue: '',
+      timestamp: new Date()
+    });
+
     await task.save();
 
     const populated = await populateTaskById(id);
+    const io = req.app && typeof req.app.get === 'function' ? req.app.get('socketio') : null;
+    if (io && populated) {
+      io.emit('task-updated', populated);
+    }
     res.json({ success: true, data: populated });
   } catch (error) {
     console.error('Error deleting comment:', error);
@@ -1265,38 +1315,41 @@ const checkOverdueTasks = async (io) => {
     const { publishActivity } = require('../utils/activityEvent');
 
     for (const task of overdueTasks) {
-      task.overdueNotified = true;
-      await task.save();
+      try {
+        await Task.updateOne({ _id: task._id }, { $set: { overdueNotified: true } });
 
-      const dueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }) : 'due date';
-      const desc = `🚨 **OVERDUE TASK ALERT**: Task "${task.title}" was due on ${dueDateStr} and is NOT finished!`;
+        const dueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }) : 'due date';
+        const desc = `🚨 **OVERDUE TASK ALERT**: Task "${task.title}" was due on ${dueDateStr} and is NOT finished!`;
 
-      await publishActivity({
-        actorId: task.createdBy ? (task.createdBy._id || task.createdBy) : null,
-        actorName: 'System Alert',
-        action: 'OVERDUE_ALERT',
-        module: 'Task Management',
-        recordRef: task.projectRef || task.title,
-        recordId: String(task._id),
-        permissionScope: 'jobcards',
-        department: task.department || 'General',
-        description: desc
-      });
-
-      if (io) {
-        const recipientIds = new Set([
-          ...(task.assignees || []).map(a => String(a._id || a)),
-          task.createdBy ? String(task.createdBy._id || task.createdBy) : null
-        ].filter(Boolean));
-
-        recipientIds.forEach(uId => {
-          io.to(`user_${uId}`).emit('overdue-task-alert', {
-            taskId: task._id,
-            title: task.title,
-            dueDate: task.dueDate,
-            message: `🚨 Task "${task.title}" is OVERDUE! It was due on ${dueDateStr} and is not finished yet.`
-          });
+        await publishActivity({
+          actorId: task.createdBy ? (task.createdBy._id || task.createdBy) : null,
+          actorName: 'System Alert',
+          action: 'OVERDUE_ALERT',
+          module: 'Task Management',
+          recordRef: task.projectRef || task.title,
+          recordId: String(task._id),
+          permissionScope: 'jobcards',
+          department: task.department || 'General',
+          description: desc
         });
+
+        if (io) {
+          const recipientIds = new Set([
+            ...(task.assignees || []).map(a => String(a._id || a)),
+            task.createdBy ? String(task.createdBy._id || task.createdBy) : null
+          ].filter(Boolean));
+
+          recipientIds.forEach(uId => {
+            io.to(`user_${uId}`).emit('overdue-task-alert', {
+              taskId: task._id,
+              title: task.title,
+              dueDate: task.dueDate,
+              message: `🚨 Task "${task.title}" is OVERDUE! It was due on ${dueDateStr} and is not finished yet.`
+            });
+          });
+        }
+      } catch (perTaskErr) {
+        console.warn('[checkOverdueTasks] Skipping malformed task %s:', task?._id, perTaskErr.message);
       }
     }
   } catch (err) {

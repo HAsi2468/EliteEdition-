@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
+import { toLocalYMD } from '../utils/dateUtils';
 import EntityBrandBadge from './common/EntityBrandBadge';
 import QuickActionMenu from './common/QuickActionMenu';
 
@@ -85,7 +86,7 @@ export default function ReportsCenter({ department }) {
     if (department === 'elite-online') return 'sales';
     return 'pending-status';
   }); 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = toLocalYMD(new Date());
   const [datePreset, setDatePreset] = useState('today');
   const [dateStart, setDateStart] = useState(todayStr);
   const [dateEnd, setDateEnd] = useState(todayStr);
@@ -212,6 +213,7 @@ export default function ReportsCenter({ department }) {
       setLoading(false);
       return;
     }
+    setReportData(null);
     setLoading(true);
     setError('');
     try {
@@ -543,6 +545,9 @@ export default function ReportsCenter({ department }) {
                   title="Report End Time"
                 />
               </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(148, 163, 184, 0.1)' }}>
+                IST (Asia/Kolkata){dateStart ? ` · ${dateStart}${dateEnd && dateEnd !== dateStart ? ` → ${dateEnd}` : ''}` : ''}
+              </span>
             </div>
           )}
 

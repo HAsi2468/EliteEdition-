@@ -228,7 +228,7 @@ export default function AdminSignedDocumentsApproval() {
                 Signed Documents Approval Queue
               </h2>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
-                Review and approve physical signed copies of Challans and Invoices.
+                Review and approve Signed Copies (Challans & Invoices) and Purchase Soft Copies (Photo / PDF).
               </p>
             </div>
           </div>
@@ -323,6 +323,7 @@ export default function AdminSignedDocumentsApproval() {
             <option value="all">All Documents</option>
             <option value="challan">Challans Only</option>
             <option value="invoice">Invoices Only</option>
+            <option value="purchase">Purchases (Soft Copy)</option>
           </select>
 
           {/* Search Bar */}
@@ -340,7 +341,7 @@ export default function AdminSignedDocumentsApproval() {
             <Search size={15} color="#94a3b8" />
             <input
               type="text"
-              placeholder="Search challan #, invoice #, party..."
+              placeholder="Search challan #, invoice #, purchase #, party..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
@@ -549,12 +550,12 @@ export default function AdminSignedDocumentsApproval() {
                             textTransform: 'uppercase',
                             padding: '2px 7px',
                             borderRadius: '4px',
-                            background: doc.docType === 'challan' ? '#f3e8ff' : '#e0f2fe',
-                            color: doc.docType === 'challan' ? '#7e22ce' : '#0369a1',
-                            border: `1px solid ${doc.docType === 'challan' ? '#d8b4fe' : '#bae6fd'}`
+                            background: doc.docType === 'challan' ? '#f3e8ff' : doc.docType === 'purchase' ? '#ccfbf1' : '#e0f2fe',
+                            color: doc.docType === 'challan' ? '#7e22ce' : doc.docType === 'purchase' ? '#0f766e' : '#0369a1',
+                            border: `1px solid ${doc.docType === 'challan' ? '#d8b4fe' : doc.docType === 'purchase' ? '#5eead4' : '#bae6fd'}`
                           }}
                         >
-                          {doc.docType}
+                          {doc.docType === 'purchase' ? 'Soft Copy (Purchase)' : doc.docType}
                         </span>
                         <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
                           {doc.docNumber}
@@ -632,19 +633,27 @@ export default function AdminSignedDocumentsApproval() {
                           background: '#020617'
                         }}
                       >
-                        <img
-                          src={imgUrl}
-                          alt={`Signed copy ${idx + 1}`}
-                          style={{
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                            width: 'auto',
-                            height: 'auto',
-                            objectFit: 'contain',
-                            borderRadius: '4px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
-                          }}
-                        />
+                        {/\.pdf(\?|$)/i.test(imgUrl || '') || String(imgUrl || '').startsWith('data:application/pdf') ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#38bdf8', padding: '0.75rem' }}>
+                            <FileCheck size={34} color="#38bdf8" />
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.04em' }}>PDF DOCUMENT</span>
+                            <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Click to preview</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={imgUrl}
+                            alt={`Document copy ${idx + 1}`}
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                              width: 'auto',
+                              height: 'auto',
+                              objectFit: 'contain',
+                              borderRadius: '4px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                            }}
+                          />
+                        )}
                         <span
                           style={{
                             position: 'absolute',

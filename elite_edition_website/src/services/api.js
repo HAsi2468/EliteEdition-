@@ -1209,6 +1209,12 @@ export const api = {
     if (!originalName || originalName.toLowerCase() === 'blob' || originalName.toLowerCase() === 'blob.blob') {
       const ext = file?.type ? file.type.split('/')[1] || 'png' : 'png';
       originalName = `upload-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
+    } else if (file?.type === 'image/jpeg' && !/\.(jpe?g|jfif)$/i.test(originalName)) {
+      originalName = originalName.replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+    } else if (file?.type === 'image/png' && !/\.png$/i.test(originalName)) {
+      originalName = originalName.replace(/\.[a-z0-9]+$/i, '') + '.png';
+    } else if (file?.type === 'image/webp' && !/\.webp$/i.test(originalName)) {
+      originalName = originalName.replace(/\.[a-z0-9]+$/i, '') + '.webp';
     }
 
     const formData = new FormData();
@@ -3145,9 +3151,10 @@ export const api = {
       return { success: true, filename };
     },
 
-  async deleteCommunicationMessage(messageId) {
+  async deleteCommunicationMessage(messageId, scope = 'everyone') {
       return request(`/communication/messages/${messageId}`, {
         method: 'DELETE',
+        body: JSON.stringify({ scope }),
       });
     },
 

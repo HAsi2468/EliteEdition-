@@ -159,9 +159,11 @@ class EventBusService {
       const room = `company:${data.companyId}`;
       io.to(room).emit('data-changed', eventObject);
       io.to(room).emit('data-change', eventObject);
-      // Legacy compatibility events within company room
-      io.to(room).emit(`${data.entity}-${data.action}`, eventObject);
-      io.to(room).emit(`${data.entity}-updated`, eventObject);
+      // Legacy compatibility events within company room (skip 'task' so metadata does not overwrite full Task documents in client listeners)
+      if (data.entity !== 'task') {
+        io.to(room).emit(`${data.entity}-${data.action}`, eventObject);
+        io.to(room).emit(`${data.entity}-updated`, eventObject);
+      }
       this.metrics.delivered++;
     } else {
       // Broadcast only to authenticated company rooms (never unauthenticated sockets)
@@ -171,7 +173,9 @@ class EventBusService {
       companyRooms.forEach((cid) => {
         io.to(`company:${cid}`).emit('data-changed', eventObject);
         io.to(`company:${cid}`).emit('data-change', eventObject);
-        io.to(`company:${cid}`).emit(`${data.entity}-${data.action}`, eventObject);
+        if (data.entity !== 'task') {
+          io.to(`company:${cid}`).emit(`${data.entity}-${data.action}`, eventObject);
+        }
       });
       this.metrics.delivered++;
     }

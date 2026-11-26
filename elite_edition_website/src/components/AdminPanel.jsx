@@ -192,6 +192,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
   }, [initialCompanyEntity]);
 
   const [users, setUsers] = useState([]);
+  const [totalUsersCount, setTotalUsersCount] = useState(null);
   const [userSearch, setUserSearch] = useState('');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('All');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('All');
@@ -266,7 +267,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
       if (isMounted && res) {
         setIsSystemLocked(Boolean(res.isSystemLocked));
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     const handleLockStatus = (e) => {
       if (isMounted && e.detail) {
@@ -432,7 +433,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
       if (res?.data?.pending !== undefined) {
         setPendingApprovalsCount(res.data.pending);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [activeSubTab]);
 
   const handleBillSubmit = async (e) => {
@@ -724,13 +725,15 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
     setLoading(true);
     setError('');
     try {
-      const params = { limit: 150 };
+      const params = { limit: 500 };
       if (selectedCompany && selectedCompany !== 'All') {
         params.companyEntity = selectedCompany;
       }
       const res = await api.getUsers(params);
       if (res && res.users) {
-        setUsers(res.users.rows || []);
+        const rows = res.users.rows || [];
+        setUsers(rows);
+        setTotalUsersCount(typeof res.users.count === 'number' ? res.users.count : rows.length);
       }
     } catch (err) {
       setError(err.message || 'Failed to fetch users list.');
@@ -748,7 +751,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
       if (cfg && Array.isArray(cfg.designers)) {
         setAvailableDesigners(cfg.designers);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   const handleInputChange = (e) => {
@@ -1589,12 +1592,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
       <div className="glass-scroll-track" style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
         <div className="glass-calc-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px', padding: '0.85rem 1.15rem', borderRadius: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="glass-calc-title" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Registered Users</span>
+            <span className="glass-calc-title" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Active Staff</span>
             <Users size={16} style={{ color: '#38bdf8', opacity: 0.9 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
-            <span className="glass-calc-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#f8fafc' }}>{users.length || 0}</span>
-            <span className="glass-calc-sub" style={{ fontSize: '0.72rem', color: '#94a3b8' }}>active ERP staff</span>
+            <span className="glass-calc-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#f8fafc' }}>{users.filter(u => u.status !== 'Inactive').length}</span>
+            <span className="glass-calc-sub" style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+              active of {totalUsersCount ?? users.length} {selectedCompany && selectedCompany !== 'All' ? `(${selectedCompany})` : 'total'}
+            </span>
           </div>
         </div>
 
@@ -2511,7 +2516,7 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                     flexDirection: 'column',
                     gap: '1.25rem'
                   }}>
-                    
+
                     {/* Error Banner */}
                     {modalError && (
                       <div
@@ -2772,6 +2777,22 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                               </div>
                             )}
                           </div>
+
+                          {formData.isMainAdmin && (
+                            <div style={{
+                              marginTop: '0.5rem',
+                              marginBottom: '0.25rem',
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: '8px',
+                              background: 'rgba(16, 185, 129, 0.14)',
+                              border: '1px solid rgba(16, 185, 129, 0.35)',
+                              fontSize: '0.74rem',
+                              color: '#6ee7b7',
+                              fontWeight: 600
+                            }}>
+                              👑 Main Admin accounts automatically have access to all companies. Change Account Role to Company Admin or Standard User to customize individual companies.
+                            </div>
+                          )}
 
                           <div style={{
                             display: 'grid',
@@ -3160,11 +3181,11 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                           const term = permissionSearchTerm.trim().toLowerCase();
                           const matchingScreens = term
                             ? AVAILABLE_SCREENS.filter(s =>
-                                s.label.toLowerCase().includes(term) ||
-                                s.id.toLowerCase().includes(term) ||
-                                s.category.toLowerCase().includes(term) ||
-                                (s.id === 'jobcards_sample' && 'new sample design'.includes(term))
-                              )
+                              s.label.toLowerCase().includes(term) ||
+                              s.id.toLowerCase().includes(term) ||
+                              s.category.toLowerCase().includes(term) ||
+                              (s.id === 'jobcards_sample' && 'new sample design'.includes(term))
+                            )
                             : AVAILABLE_SCREENS;
 
                           const categories = Array.from(new Set(matchingScreens.map(s => s.category)));
@@ -3181,14 +3202,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                             const catScreens = matchingScreens.filter(s => s.category === cat);
                             const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
                             const catTitle = cat === 'General' ? '⚙️ Core & General' :
-                                             cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
-                                             cat === 'Elite Edition' ? '🏢 Elite Edition' :
-                                             cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
-                                             cat === 'Sobise' ? '👗 Sobise' :
-                                             cat === 'Ethno wear' ? '🥻 Ethno wear' :
-                                             cat === 'Yamunaji' ? '🧵 Yamunaji' :
-                                             cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
-                                             cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+                              cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
+                                cat === 'Elite Edition' ? '🏢 Elite Edition' :
+                                  cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
+                                    cat === 'Sobise' ? '👗 Sobise' :
+                                      cat === 'Ethno wear' ? '🥻 Ethno wear' :
+                                        cat === 'Yamunaji' ? '🧵 Yamunaji' :
+                                          cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
+                                            cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
 
                             return (
                               <div key={cat} style={{ background: 'rgba(30, 41, 59, 0.48)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
@@ -3583,14 +3604,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         .map((backup, idx) => {
                           const dateFormatted = backup.createdAt || backup.modifiedAt
                             ? new Date(backup.createdAt || backup.modifiedAt).toLocaleString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: true
-                              })
+                              timeZone: 'Asia/Kolkata',
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })
                             : 'Recent';
 
                           const isDownloading = downloadingArchive === backup.fileName;
@@ -3717,14 +3738,14 @@ export default function AdminPanel({ companyEntity: initialCompanyEntity, curren
                         .map((backup, idx) => {
                           const dateFormatted = backup.createdAt || backup.modifiedAt
                             ? new Date(backup.createdAt || backup.modifiedAt).toLocaleString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: true
-                              })
+                              timeZone: 'Asia/Kolkata',
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })
                             : 'Recent';
 
                           const isDownloading = downloadingImagesArchive === backup.fileName;

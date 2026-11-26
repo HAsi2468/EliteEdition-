@@ -575,6 +575,45 @@ export default function MyntraIntegration() {
           </div>
         </div>
 
+        {/* Sandbox / Environment Banner */}
+        {envMode === 'sandbox' && (
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.65rem 1rem',
+            borderRadius: '10px',
+            background: '#fff1f2',
+            border: '1px solid #fecdd3',
+            color: '#9f1239',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.6rem',
+            fontSize: '0.8rem',
+            fontWeight: 600
+          }}>
+            <span>
+              <strong>🧪 Sandbox Simulation Mode (Neo-Mockify):</strong> Data and dispatches shown here are test/simulated records, not Live Production.
+            </span>
+            <button
+              type="button"
+              onClick={() => setEnvMode('production')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: '1px solid #e11d48',
+                background: '#ffffff',
+                color: '#be123c',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Switch to Live Production
+            </button>
+          </div>
+        )}
+
         {/* Tab Navigation Bar (Pixel-Perfect Match with 6 Tabs) */}
         <div className="myntra-nav-tabs">
           <button

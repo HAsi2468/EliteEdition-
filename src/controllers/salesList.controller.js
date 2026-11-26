@@ -99,10 +99,11 @@ const getSalseList = async (req, res) => {
       limit = defaultLimit,
       sortField,
       sortOrder,
+      groupBy = 'order',
     } = req.query;
 
     const cappedLimit = Math.min(parseInt(limit, 10) || 50, 100);
-    const cacheKey = JSON.stringify({ ...req.query, limit: cappedLimit, page });
+    const cacheKey = JSON.stringify({ ...req.query, limit: cappedLimit, page, groupBy });
     const cached = salesListCache.get(cacheKey);
     if (cached && (Date.now() - cached.time < SALES_LIST_CACHE_TTL)) {
       return res.send(cached.data);
@@ -115,7 +116,8 @@ const getSalseList = async (req, res) => {
       cappedLimit,
       sortField,
       sortOrder,
-      whereClause
+      whereClause,
+      groupBy
     );
 
     salesListCache.set(cacheKey, { data, time: Date.now() });

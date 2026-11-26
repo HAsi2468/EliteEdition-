@@ -317,6 +317,9 @@ const Workspace = ({ currentUser }) => {
     };
 
     const handleTaskUpdated = (updatedTask) => {
+      if (!updatedTask || typeof updatedTask !== 'object' || (!('title' in updatedTask) && !('status' in updatedTask))) {
+        return;
+      }
       // Update in chat if visible
       setMessages((prev) => prev.map(msg => {
         if (msg.taskId && msg.taskId._id === updatedTask._id) {

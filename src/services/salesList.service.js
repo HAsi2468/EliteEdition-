@@ -6,15 +6,52 @@ const getSalseListFromDB = async (
   pageSize,
   sortField,
   sortOrder,
-  whereClause
+  whereClause,
+  groupBy = 'order'
 ) => {
   try {
     const pageNum = parseInt(page, 10) || 1;
     const limitNum = parseInt(pageSize, 10) || 10;
     const offset = (pageNum - 1) * limitNum;
+    const isSkuGroup = groupBy === 'sku';
+
+    const ALLOWED_SORT_FIELDS = new Set([
+      'orderDate', 'itemSKUCode', 'category', 'shippingAddressCity',
+      'totalPrice', 'discount', 'saleCount', 'saleOrderStatus', 'mrp'
+    ]);
+    const validSortField = ALLOWED_SORT_FIELDS.has(sortField) ? sortField : 'orderDate';
+    const sortDir = String(sortOrder || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+
+    // Aggregate order-level summary metrics for filtered dataset so KPI cards match full query
+    const summaryPromise = db.SalesList.aggregate([
+      { $match: whereClause },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: { $ifNull: ['$totalPrice', 0] } },
+          totalUnits: { $sum: { $ifNull: ['$saleCount', 1] } },
+          deliveredCount: {
+            $sum: {
+              $cond: [{ $in: [{ $toUpper: { $ifNull: ['$saleOrderStatus', ''] } }, ['DELIVERED', 'COMPLETE']] }, 1, 0]
+            }
+          },
+          transitCount: {
+            $sum: {
+              $cond: [{ $in: [{ $toUpper: { $ifNull: ['$saleOrderStatus', ''] } }, ['SHIPPED', 'IN_TRANSIT', 'PROCESSING']] }, 1, 0]
+            }
+          },
+          cancelledCount: {
+            $sum: {
+              $cond: [{ $in: [{ $toUpper: { $ifNull: ['$saleOrderStatus', ''] } }, ['CANCELLED', 'RETURNED']] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]);
 
     let totalRecords;
-    if (sortField && sortOrder) {
+    if (isSkuGroup) {
       const countResult = await db.SalesList.aggregate([
         { $match: whereClause },
         { $group: { _id: '$itemSKUCode' } },
@@ -24,14 +61,16 @@ const getSalseListFromDB = async (
     } else {
       totalRecords = await db.SalesList.countDocuments(whereClause);
     }
-    
-    const totalPages = Math.ceil(totalRecords / limitNum);
 
+    const totalPages = Math.ceil(totalRecords / limitNum) || 1;
     let salesList;
 
-    if (!sortField || !sortOrder) {
+    if (!isSkuGroup) {
+      const sortObj = validSortField === 'orderDate'
+        ? { orderDate: sortDir, _id: sortDir }
+        : { [validSortField]: sortDir, orderDate: -1 };
       const list = await db.SalesList.find(whereClause)
-        .sort({ orderDate: -1 })
+        .sort(sortObj)
         .skip(offset)
         .limit(limitNum)
         .lean();
@@ -42,12 +81,7 @@ const getSalseListFromDB = async (
         itemSKUCodeCount: (item.saleCount || 1).toString(),
       }));
     } else {
-      if (sortField === 'itemSKUCode') {
-        sortField = 'itemSKUCodeCount';
-      }
-      
-      const sortDirection = sortOrder.toLowerCase() === 'desc' ? -1 : 1;
-
+      const aggSortField = validSortField === 'saleCount' ? 'itemSKUCodeCount' : validSortField;
       const pipeline = [
         { $match: whereClause },
         {
@@ -60,15 +94,15 @@ const getSalseListFromDB = async (
             itemTypeBrand: { $max: '$itemTypeBrand' },
             itemTypeSize: { $max: '$itemTypeSize' },
             mrp: { $max: '$mrp' },
-            totalPrice: { $max: '$totalPrice' },
-            discount: { $max: '$discount' },
+            totalPrice: { $sum: { $ifNull: ['$totalPrice', 0] } },
+            discount: { $sum: { $ifNull: ['$discount', 0] } },
             shippingAddressCity: { $max: '$shippingAddressCity' },
             shippingAddressState: { $max: '$shippingAddressState' },
             shippingAddressPincode: { $max: '$shippingAddressPincode' },
             saleOrderStatus: { $max: '$saleOrderStatus' },
             orderDate: { $max: '$orderDate' },
             skuName: { $max: '$skuName' },
-            itemSKUCodeCount: { $sum: '$saleCount' },
+            itemSKUCodeCount: { $sum: { $ifNull: ['$saleCount', 1] } },
           },
         },
         {
@@ -93,7 +127,7 @@ const getSalseListFromDB = async (
             itemSKUCodeCount: 1,
           },
         },
-        { $sort: { [sortField]: sortDirection } },
+        { $sort: { [aggSortField]: sortDir } },
         { $skip: offset },
         { $limit: limitNum },
       ];
@@ -107,7 +141,18 @@ const getSalseListFromDB = async (
     }
 
     const skuCodes = salesList.map((order) => order.itemSKUCode);
-    const productMap = await fetchProductImages(skuCodes);
+    const [productMap, summaryRows] = await Promise.all([
+      fetchProductImages(skuCodes),
+      summaryPromise
+    ]);
+    const summary = summaryRows[0] || {
+      totalOrders: totalRecords,
+      totalRevenue: 0,
+      totalUnits: 0,
+      deliveredCount: 0,
+      transitCount: 0,
+      cancelledCount: 0
+    };
 
     const salesListWithCounts = salesList.map((sale) => ({
       ...sale,
@@ -118,6 +163,13 @@ const getSalseListFromDB = async (
       data: salesListWithCounts,
       totalPages,
       totalRecords,
+      summary,
+      meta: {
+        totalPages,
+        totalRecords,
+        currentPage: pageNum,
+        summary
+      }
       meta: {
         currentPage: pageNum,
         pageSize: limitNum,

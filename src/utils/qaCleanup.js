@@ -106,12 +106,22 @@ const purgeAllQaTestArtifacts = async () => {
         ]
       }),
 
-      // 8. QA Test Users & Facilities
+      // 8. Legacy QA Viewer & Stale Automated Test Bots (preserve active <24h QA accounts created manually)
       db.User?.deleteMany({
         $or: [
           { email: /qa-test-viewer/i },
-          { email: qaRegex },
-          { username: qaRegex }
+          { email: /test-load|qa-bot|testbot/i },
+          {
+            $and: [
+              { $or: [{ email: qaRegex }, { username: qaRegex }] },
+              {
+                $or: [
+                  { created_date_time: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+                  { createdAt: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+                ],
+              },
+            ],
+          },
         ]
       }),
       db.Facility?.deleteMany({

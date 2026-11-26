@@ -203,6 +203,8 @@ export default function FusingDepartment() {
 
   // Top Form Job Search & Eligibility State
   const [jobSearchText, setJobSearchText] = useState('');
+  const [serverSearching, setServerSearching] = useState(false);
+  const [serverMatchedCards, setServerMatchedCards] = useState([]);
   const [showJobDropdown, setShowJobDropdown] = useState(false);
   const [showAllCardsFilter, setShowAllCardsFilter] = useState(false);
   const jobDropdownRef = React.useRef(null);
@@ -582,7 +584,7 @@ export default function FusingDepartment() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.getJobCards({ limit: 100, department: 'digital_print' });
+      const res = await api.getJobCards({ limit: 2000, department: 'digital_print' });
       const allCards = res?.data || (Array.isArray(res) ? res : []);
       setCards(allCards);
 
@@ -608,6 +610,47 @@ export default function FusingDepartment() {
     }
   };
 
+  // Dynamic Server-Side Search Lookup for Job Cards (covers historic/backlog jobs)
+  useEffect(() => {
+    if (!jobSearchText || !jobSearchText.trim()) {
+      setServerMatchedCards([]);
+      setServerSearching(false);
+      return;
+    }
+    const q = jobSearchText.trim();
+    // If user already selected a full label (contains em-dash), do not re-query
+    if (q.includes('—')) return;
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      setServerSearching(true);
+      try {
+        const res = await api.getJobCards({ search: q, limit: 30, department: 'digital_print' });
+        const remoteCards = res?.data || (Array.isArray(res) ? res : []);
+        if (isMounted) {
+          setServerMatchedCards(remoteCards);
+          // Merge newly found remote cards into local cards state so selection and calculations work smoothly
+          if (remoteCards.length > 0) {
+            setCards(prev => {
+              const existingIds = new Set(prev.map(item => String(item._id || item.id)));
+              const toAdd = remoteCards.filter(item => !existingIds.has(String(item._id || item.id)));
+              return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Server-side job card search error:', err);
+      } finally {
+        if (isMounted) setServerSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [jobSearchText]);
+
   // Filter only cards that are Done for Printing and Pending for Fusing
   const eligibleFusingCards = useMemo(() => {
     return cards.filter(c => {
@@ -624,7 +667,25 @@ export default function FusingDepartment() {
   }, [cards, topForm.jobCardId, showAllCardsFilter]);
 
   const searchMatchingCards = useMemo(() => {
-    const list = eligibleFusingCards;
+    const map = new Map();
+    // 1. Add eligible local cards
+    eligibleFusingCards.forEach(c => map.set(String(c._id || c.id), c));
+    // 2. Add server matched cards
+    serverMatchedCards.forEach(c => {
+      if (showAllCardsFilter) {
+        map.set(String(c._id || c.id), c);
+      } else {
+        const pStatus = String(c.printStatus || c.status || '').toLowerCase();
+        const isPrintDone = pStatus === 'printing done' || pStatus === 'printed' || (pStatus.includes('done') && !pStatus.includes('pending')) || parseFloat(c.printMtr || 0) > 0;
+        const fStatus = String(c.fusingStatus || 'fusing pending').toLowerCase();
+        const isFusingPending = fStatus !== 'fusing done' && fStatus !== 'fused' && fStatus !== 'done';
+        if (isPrintDone && isFusingPending) {
+          map.set(String(c._id || c.id), c);
+        }
+      }
+    });
+
+    const list = Array.from(map.values());
     if (!jobSearchText || !jobSearchText.trim()) return list;
     const q = jobSearchText.toLowerCase().trim();
     const cleanNum = q.replace(/[^0-9]/g, '');
@@ -641,7 +702,7 @@ export default function FusingDepartment() {
         fabric.includes(q)
       );
     });
-  }, [eligibleFusingCards, jobSearchText]);
+  }, [eligibleFusingCards, serverMatchedCards, jobSearchText, showAllCardsFilter]);
 
   // Active card selected in top form
   const activeSelectedCard = useMemo(() => {
@@ -2201,8 +2262,8 @@ export default function FusingDepartment() {
                         <span>
                           {showAllCardsFilter ? 'ALL JOBCARDS' : 'PRINTING DONE & FUSING PENDING'} ({searchMatchingCards.length})
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: '#38bdf8' }}>
-                          Click card to select
+                        <span style={{ fontSize: '0.68rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {serverSearching ? <span style={{ color: '#facc15' }}>⚡ Searching server...</span> : 'Click card to select'}
                         </span>
                       </div>
 

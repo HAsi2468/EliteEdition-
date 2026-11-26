@@ -329,8 +329,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     return null;
   });
 
-  // When companyEntity changes, reload local cache for that company
+  // When companyEntity changes, lock background sync until fresh backend fetch succeeds
   useEffect(() => {
+    isInitialSyncDone.current = false;
     try {
       const savedG = localStorage.getItem(STORAGE_GRAY_KEY);
       const parsedG = savedG ? JSON.parse(savedG) : [];
@@ -377,7 +378,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         ? purchasesRes.value.data
         : (purchasesRes.status === 'fulfilled' && Array.isArray(purchasesRes.value) ? purchasesRes.value : []);
 
-      const backendSettings = (settingsRes.status === 'fulfilled' && settingsRes.value?.data) ? settingsRes.value.data : {};
+      // Strict Safety Guard: if backend settings request failed/timed out, NEVER overwrite local or DB data with empty arrays!
+      if (settingsRes.status !== 'fulfilled' || !settingsRes.value?.data) {
+        console.warn('[YamunajiRfdPanel] Skipping sync overwrite because getCompanySettings did not return valid data.');
+        setIsSyncing(false);
+        return;
+      }
+
+      const backendSettings = settingsRes.value.data;
 
       if (backendSettings && (backendSettings.companyName || backendSettings.companyGstin)) {
         setCompanySettings(backendSettings);
@@ -841,19 +849,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(rfdLots)); } catch (e) {}
   }, [rfdLots]);
 
-  // Strict Background Synchronization to MongoDB Atlas
-  useEffect(() => {
-    if (!isInitialSyncDone.current) return;
-    const timer = setTimeout(() => {
-      api.updateCompanySettings({
-        companyEntity,
-        grayLots,
-        millChallans,
-        rfdLots
-      }).catch(err => console.warn('Background sync lots to MongoDB Atlas:', err));
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [grayLots, millChallans, rfdLots, companyEntity]);
+  // Background auto-sync removed as a blind overwrite risk:
+  // Every create/edit/delete action explicitly calls api.updateCompanySettings(...) with validated arrays,
+  // preventing transient network errors or empty initial state from ever wiping MongoDB.
 
   // Aggregate Metrics
   const grayStats = useMemo(() => {
@@ -3077,10 +3075,70 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           terms: term
         };
 
-        const purRes = await api.createBillingPurchase(purPayload);
-        const savedPur = (purRes && purRes.data) ? purRes.data : { ...purPayload, id: `pur_${Date.now()}` };
-        createdPurchaseNo = savedPur.purchaseNo || nextPurNo;
-        createdPurchaseId = savedPur._id || savedPur.id || '';
+        // Auto-Merge Check: if a Purchase Bill already exists for the SAME Vendor + SAME Mill Invoice No.,
+        // append this RFD delivery lot as the next item row (Item #2, #3...) and recalculate totals!
+        let existingSameBill = null;
+        const targetBillNo = String(purPayload.billNo || '').trim().toLowerCase();
+        const targetVendor = String(purPayload.vendorName || '').trim().toLowerCase();
+        if (targetBillNo && targetVendor) {
+          try {
+            const pListRes = await api.getBillingPurchases(companyEntity);
+            const pList = (pListRes && Array.isArray(pListRes.data)) ? pListRes.data : (Array.isArray(pListRes) ? pListRes : []);
+            existingSameBill = pList.find((ep) => {
+              const epBill = String(ep.billNo || '').trim().toLowerCase();
+              const epVen = String(ep.vendorName || ep.vendor?.businessName || ep.vendor?.name || '').trim().toLowerCase();
+              return epBill === targetBillNo && epVen === targetVendor;
+            }) || null;
+          } catch (_) {}
+        }
+
+        let purRes = null;
+        if (existingSameBill && (existingSameBill._id || existingSameBill.id)) {
+          const existingItems = Array.isArray(existingSameBill.items) ? existingSameBill.items : [];
+          const mergedItems = [...existingItems, ...purPayload.items];
+          const mergedSubtotal = parseFloat(mergedItems.reduce((s, it) => s + (parseFloat(it.amount ?? ((parseFloat(it.qty || it.quantity) || 0) * (parseFloat(it.unitPrice || it.rate) || 0))) || 0), 0).toFixed(2));
+          const mergedTax = parseFloat(mergedItems.reduce((s, it) => s + (parseFloat(it.taxAmount) || 0), 0).toFixed(2));
+          const mergedRawGrand = mergedSubtotal + mergedTax;
+          const mergedGrand = existingSameBill.enableRoundOff !== false ? Math.round(mergedRawGrand) : parseFloat(mergedRawGrand.toFixed(2));
+          const mergedRoundOff = parseFloat((mergedGrand - mergedRawGrand).toFixed(2));
+          const mergedTds = existingSameBill.enableTds ? Math.round((mergedSubtotal * (parseFloat(existingSameBill.tdsRate) || 0)) / 100) : 0;
+          const mergedNetPayable = Math.max(0, mergedGrand - mergedTds);
+          const alreadyPaid = parseFloat(existingSameBill.paidAmount) || 0;
+          const mergedBalance = Math.max(0, parseFloat((mergedNetPayable - alreadyPaid).toFixed(2)));
+          const isIgst = existingSameBill.taxType === 'IGST' || isInterStateMill;
+
+          const mergedPayload = {
+            ...existingSameBill,
+            items: mergedItems,
+            itemName: mergedItems.map((i) => i.itemName).filter(Boolean).join(', '),
+            quantity: mergedItems.reduce((s, i) => s + (parseFloat(i.qty || i.quantity) || 0), 0),
+            subtotal: mergedSubtotal,
+            subtotalAmount: mergedSubtotal,
+            taxableAmount: mergedSubtotal,
+            taxType: isIgst ? 'IGST' : 'CGST_SGST',
+            cgstAmount: isIgst ? 0 : parseFloat((mergedTax / 2).toFixed(2)),
+            sgstAmount: isIgst ? 0 : parseFloat((mergedTax / 2).toFixed(2)),
+            igstAmount: isIgst ? mergedTax : 0,
+            totalTax: mergedTax,
+            gstAmount: mergedTax,
+            roundOff: mergedRoundOff,
+            grandTotal: mergedGrand,
+            totalAmount: mergedGrand,
+            tdsAmount: mergedTds,
+            balanceDue: mergedBalance,
+            paymentStatus: alreadyPaid >= mergedNetPayable && mergedNetPayable > 0 ? 'PAID' : (alreadyPaid > 0 ? 'PARTIALLY_PAID' : 'UNPAID'),
+            notes: `${existingSameBill.notes ? existingSameBill.notes + ' | ' : ''}Added RFD Lot ${lotNumber} (${receivedRfd} Mtr)`
+          };
+          delete mergedPayload._id;
+          delete mergedPayload.signedCopy;
+          purRes = await api.updateBillingPurchase(existingSameBill._id || existingSameBill.id, mergedPayload);
+        } else {
+          purRes = await api.createBillingPurchase(purPayload);
+        }
+
+        const savedPur = (purRes && purRes.data) ? purRes.data : (existingSameBill || { ...purPayload, id: `pur_${Date.now()}` });
+        createdPurchaseNo = savedPur.purchaseNo || existingSameBill?.purchaseNo || nextPurNo;
+        createdPurchaseId = savedPur._id || savedPur.id || existingSameBill?._id || '';
 
         try {
           const cacheKey = `elite_purchases_${companyEntity}`;

@@ -140,7 +140,7 @@ export default function SignedDocumentPreviewModal({
                   color: '#ffffff'
                 }}
               >
-                {docType === 'challan' ? 'Challan' : 'Invoice'}
+                {docType === 'challan' ? 'Challan' : docType === 'purchase' ? 'Purchase • Soft Copy' : 'Invoice'}
               </span>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
                 {docNumber}
@@ -454,6 +454,21 @@ export default function SignedDocumentPreviewModal({
           }}
         >
           {images[activeImageIdx] ? (
+            /\.pdf(\?|$)/i.test(images[activeImageIdx]) || String(images[activeImageIdx]).startsWith('data:application/pdf') ? (
+              <iframe
+                src={images[activeImageIdx]}
+                title={`Document PDF ${activeImageIdx + 1}`}
+                style={{
+                  width: '100%',
+                  height: '66vh',
+                  minHeight: '460px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: '#ffffff',
+                  boxShadow: '0 10px 35px rgba(0,0,0,0.5)'
+                }}
+              />
+            ) : (
             <div
               style={{
                 display: 'flex',
@@ -488,6 +503,7 @@ export default function SignedDocumentPreviewModal({
                 }}
               />
             </div>
+            )
           ) : (
             <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
               No image available

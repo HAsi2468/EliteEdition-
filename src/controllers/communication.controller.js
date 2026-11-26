@@ -281,8 +281,15 @@ const getGroupMessages = async (req, res) => {
     }
 
 
+    const rawReqUserId = req.user ? (req.user._id || req.user.id) : (req.headers['x-user-id'] || req.query.userId);
+    const reqUserObjId = rawReqUserId && mongoose.Types.ObjectId.isValid(rawReqUserId) ? new mongoose.Types.ObjectId(rawReqUserId) : null;
+    const reqUserMembers = [reqUserObjId, rawReqUserId ? String(rawReqUserId) : null].filter(Boolean);
+
     const roomObjId = mongoose.Types.ObjectId.isValid(groupId) ? new mongoose.Types.ObjectId(groupId) : groupId;
     const query = { roomId: roomObjId };
+    if (reqUserMembers.length > 0) {
+      query.deletedFor = { $nin: reqUserMembers };
+    }
 
     // Cursor-based pagination filtering (older messages: before / beforeSeq; newer messages: after / afterSeq)
     if (before && mongoose.Types.ObjectId.isValid(before)) {
@@ -304,6 +311,7 @@ const getGroupMessages = async (req, res) => {
     // Filter by search query if provided (supports ?search=, ?q=, or ?query=)
     const searchTerm = (req.query.search || req.query.q || req.query.query || '').trim();
     if (searchTerm) {
+      query.isDeleted = { $ne: true };
       const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchCondition = [
         { content: { $regex: escaped, $options: 'i' } },
@@ -317,7 +325,7 @@ const getGroupMessages = async (req, res) => {
       }
     }
 
-    const isDefaultFirstPage = pageNum === 1 && !searchTerm && !before && !beforeSeq && !after && !afterSeq && !msgType;
+    const isDefaultFirstPage = pageNum === 1 && !searchTerm && !before && !beforeSeq && !after && !afterSeq && !msgType && reqUserMembers.length === 0;
     const cacheKey = `${String(groupId)}_${limitNum}`;
 
     if (isDefaultFirstPage) {
@@ -1256,7 +1264,8 @@ const searchMessages = async (req, res) => {
 
     const query = {
       roomId: { $in: accessibleRoomIds },
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
+      ...(userMembers.length > 0 ? { deletedFor: { $nin: userMembers } } : {})
     };
 
     if (rawSearch) {
@@ -1872,15 +1881,33 @@ const deleteMessage = async (req, res) => {
       }
     }
 
+    const scope = String(req.body?.scope || req.query?.scope || 'everyone').toLowerCase();
     const isSender = String(message.senderId) === String(userId);
     const messageAgeHours = (Date.now() - new Date(message.createdAt).getTime()) / (1000 * 60 * 60);
+
+    if (scope === 'me') {
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'User context required to hide message' });
+      }
+      await ChatMessage.updateOne(
+        { _id: message._id },
+        { $addToSet: { deletedFor: userId } }
+      );
+      invalidateGroupMessagesCache(message.roomId);
+      return res.json({
+        success: true,
+        scope: 'me',
+        message: 'Message removed from your view',
+        data: { messageId: message._id, roomId: message.roomId, scope: 'me' }
+      });
+    }
 
     if (!isMasterAdmin && (!isSender || messageAgeHours > 24)) {
       return res.status(403).json({
         success: false,
         message: isSender
-          ? 'You can only delete messages within 24 hours of sending.'
-          : 'You do not have permission to delete this message.'
+          ? 'You can only delete messages for everyone within 24 hours of sending. Use Delete for Me instead.'
+          : 'You do not have permission to delete this message for everyone.'
       });
     }
 

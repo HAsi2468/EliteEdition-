@@ -107,7 +107,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
   // Form State
   const [formVal, setFormVal] = useState({
     complaintNo: '',
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalYMD(new Date()),
     partyName: '',
     assignedTo: '',
     responsiblePerson: '',
@@ -337,7 +337,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
     setFormVal({
       companyEntity,
       complaintNo: 'Loading...',
-      date: new Date().toISOString().split('T')[0],
+      date: toLocalYMD(new Date()),
       partyName: '',
       assignedTo: currentUserName,
       responsiblePerson: '',
@@ -382,7 +382,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
 
     setFormVal({
       complaintNo: item.complaintNo || '',
-      date: item.date || new Date().toISOString().split('T')[0],
+      date: item.date || toLocalYMD(new Date()),
       partyName: item.partyName || '',
       assignedTo: item.assignedTo || '',
       responsiblePerson: item.responsiblePerson || respList.join(', '),
@@ -736,9 +736,9 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
         <div className="glass-title-capsule">
           <AlertTriangle size={20} color="#f43f5e" />
           <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-            Quality Complaints
+            {companyEntity ? `${companyEntity} — Quality Complaints` : 'Quality Complaints'}
           </span>
-          <EntityBrandBadge />
+          <EntityBrandBadge entity={companyEntity} />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
