@@ -55,6 +55,7 @@ router.use('/jobPrintLogs', require('./jobPrintLog.route'));
 router.use('/jobFusingLogs', require('./jobFusingLog.route'));
 router.use('/garment-jobcards', require('./garmentJobCard.route'));
 router.use('/stitching-challan', require('./stitchingChallan.route'));
+router.use('/job-challans', require('./jobChallan.route'));
 router.use('/stitching-config', require('./stitchingConfig.route'));
 router.use('/complaints', require('./complaint.route'));
 router.use('/expenses', require('./expense.route'));

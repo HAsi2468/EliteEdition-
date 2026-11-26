@@ -48,6 +48,7 @@ const db = {
   JobCard: require('./jobCard.model'),
   GarmentJobCard: require('./garmentJobCard.model'),
   StitchingChallan: require('./stitchingChallan.model'),
+  JobChallan: require('./jobChallan.model'),
   JobPrintLog: require('./jobPrintLog.model'),
   JobFusingLog: require('./jobFusingLog.model'),
   Design: require('./design.model'),
