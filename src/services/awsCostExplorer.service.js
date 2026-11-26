@@ -49,81 +49,127 @@ function formatMonthName(yearMonthStr) {
 }
 
 /**
+ * Formats remaining milliseconds into human-readable "Xh Ym" (e.g. "14h 25m")
+ */
+function formatRemainingTime(ms) {
+  const safeMs = Math.max(0, Number(ms) || 0);
+  if (safeMs <= 0) return 'Ready now';
+  const totalMinutes = Math.ceil(safeMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h 0m`;
+  return `${minutes}m`;
+}
+
+/**
  * Fetches AWS monthly cost breakdown from AWS Cost Explorer.
+ *
+ * COST PROTECTION POLICY:
+ * - Paid AWS Cost Explorer API ($0.01/request) NEVER fires automatically on page load or cron.
+ * - It ONLY fires when `options.manualTrigger === true` (explicit user button click)
+ *   AND at least 24 hours have elapsed since the last live sync.
+ * - All non-manual calls return cached DB/memory data ($0.00) with exact cooldown timing metadata.
  *
  * @param {Object} options
  * @param {string} [options.startDate] - e.g. '2026-05-01'
  * @param {string} [options.endDate]   - e.g. '2026-11-01'
  * @param {number} [options.exchangeRate=86.5] - USD to INR exchange rate
+ * @param {boolean} [options.manualTrigger=false] - Must be true (user button click) to hit AWS API
  */
 async function fetchAwsMonthlyCosts(options = {}) {
   const exchangeRate = Number(options.exchangeRate) || DEFAULT_USD_TO_INR;
+  const manualTrigger = Boolean(options.manualTrigger);
   const nowMs = Date.now();
 
-  // 1. Check in-memory 24-hour cache lock
-  if (memoryCache.data && (nowMs - memoryCache.timestamp) < CACHE_TTL_MS && !options.bypassCache) {
-    const hoursRemaining = Math.max(0, ((CACHE_TTL_MS - (nowMs - memoryCache.timestamp)) / 3600000).toFixed(1));
-    logger.info(`[AWS Cost Explorer] 24-HOUR CACHE LOCK HIT. Skipped paid AWS API call ($0.00). Next live fetch allowed in ${hoursRemaining} hours.`);
+  // Helper to build consistent cached response payload with countdown metadata
+  const buildCachedResponse = (results, syncTimestamp) => {
+    const hasSynced = Boolean(syncTimestamp && syncTimestamp > 0);
+    const lockExpiresMs = hasSynced ? syncTimestamp + CACHE_TTL_MS : 0;
+    const remainingMs = hasSynced ? Math.max(0, lockExpiresMs - nowMs) : 0;
+    const canSyncNow = !hasSynced || remainingMs <= 0;
+    const hoursRemaining = (remainingMs / 3600000).toFixed(1);
+
     return {
-      ...memoryCache.data,
+      success: true,
       cached: true,
+      canSyncNow,
+      lastSyncedAt: hasSynced ? new Date(syncTimestamp).toISOString() : null,
+      lockExpiresAt: hasSynced ? new Date(lockExpiresMs).toISOString() : null,
+      remainingMs,
       nextRefreshInHours: hoursRemaining,
-      lockExpiresAt: new Date(memoryCache.timestamp + CACHE_TTL_MS).toISOString(),
+      nextRefreshFormatted: formatRemainingTime(remainingMs),
+      exchangeRate,
+      results: results || [],
     };
+  };
+
+  // 1. Check in-memory cache first
+  if (memoryCache.data && memoryCache.timestamp > 0) {
+    const elapsed = nowMs - memoryCache.timestamp;
+    const isLocked = elapsed < CACHE_TTL_MS;
+    if (!manualTrigger || isLocked) {
+      const payload = buildCachedResponse(memoryCache.data.results, memoryCache.timestamp);
+      logger.info(
+        `[AWS Cost Explorer] Served from memory cache ($0.00). manualTrigger=${manualTrigger}, canSyncNow=${payload.canSyncNow}, remaining=${payload.nextRefreshFormatted}.`
+      );
+      return payload;
+    }
   }
 
-  // 2. Check persistent MongoDB cache lock (across server/PM2 restarts)
-  if (!options.bypassCache) {
-    try {
-      const InfrastructureBill = require('../db/models/infrastructureBill.model');
-      const recentSync = await InfrastructureBill.findOne({
-        isAutoSynced: true,
-        syncedAt: { $gte: new Date(nowMs - CACHE_TTL_MS) },
-      }).sort({ syncedAt: -1 });
+  // 2. Check persistent MongoDB cache (survives server/PM2 restarts)
+  let latestDbSyncTimestamp = 0;
+  let dbMappedResults = [];
+  try {
+    const InfrastructureBill = require('../db/models/infrastructureBill.model');
+    const recentSync = await InfrastructureBill.findOne({
+      isAutoSynced: true,
+      syncedAt: { $ne: null },
+    }).sort({ syncedAt: -1 });
 
-      if (recentSync && recentSync.awsBreakdown && recentSync.awsBreakdown.length > 0) {
-        const syncTimestamp = new Date(recentSync.syncedAt).getTime();
-        const hoursRemaining = Math.max(0, ((CACHE_TTL_MS - (nowMs - syncTimestamp)) / 3600000).toFixed(1));
-        logger.info(`[AWS Cost Explorer] 24-HOUR DB CACHE LOCK HIT. Skipped paid AWS API call ($0.00). Next live fetch allowed in ${hoursRemaining} hours.`);
-
-        const allRecentBills = await InfrastructureBill.find({ isAutoSynced: true }).sort({ createdAt: -1 }).limit(6);
-        const mappedResults = allRecentBills.map((b) => ({
-          month: b.month,
-          monthKey: b.month,
-          totalUsd: b.awsUsdAmount || Number((b.awsAmount / exchangeRate).toFixed(2)),
-          totalInr: b.awsAmount,
-          exchangeRate,
-          services: b.awsBreakdown || [],
-        }));
-
-        const cachedPayload = {
-          success: true,
-          cached: true,
-          nextRefreshInHours: hoursRemaining,
-          lockExpiresAt: new Date(syncTimestamp + CACHE_TTL_MS).toISOString(),
-          exchangeRate,
-          results: mappedResults.length > 0 ? mappedResults : [
-            {
-              month: recentSync.month,
-              monthKey: recentSync.month,
-              totalUsd: recentSync.awsUsdAmount || Number((recentSync.awsAmount / exchangeRate).toFixed(2)),
-              totalInr: recentSync.awsAmount,
-              exchangeRate,
-              services: recentSync.awsBreakdown || [],
-            }
-          ],
-        };
-
-        memoryCache = {
-          timestamp: syncTimestamp,
-          data: cachedPayload,
-        };
-
-        return cachedPayload;
+    if (recentSync) {
+      latestDbSyncTimestamp = new Date(recentSync.syncedAt).getTime();
+      const allRecentBills = await InfrastructureBill.find({ isAutoSynced: true }).sort({ createdAt: -1 }).limit(6);
+      dbMappedResults = allRecentBills.map((b) => ({
+        month: b.month,
+        monthKey: b.month,
+        totalUsd: b.awsUsdAmount || Number(((b.awsAmount || 0) / exchangeRate).toFixed(2)),
+        totalInr: b.awsAmount || 0,
+        exchangeRate,
+        services: b.awsBreakdown || [],
+      }));
+      if (dbMappedResults.length === 0) {
+        dbMappedResults = [
+          {
+            month: recentSync.month,
+            monthKey: recentSync.month,
+            totalUsd: recentSync.awsUsdAmount || Number(((recentSync.awsAmount || 0) / exchangeRate).toFixed(2)),
+            totalInr: recentSync.awsAmount || 0,
+            exchangeRate,
+            services: recentSync.awsBreakdown || [],
+          },
+        ];
       }
-    } catch (dbErr) {
-      logger.warn(`[AWS Cost Explorer] DB cache lookup notice: ${dbErr.message}`);
     }
+  } catch (dbErr) {
+    logger.warn(`[AWS Cost Explorer] DB cache lookup notice: ${dbErr.message}`);
+  }
+
+  const dbIsLocked = latestDbSyncTimestamp > 0 && (nowMs - latestDbSyncTimestamp) < CACHE_TTL_MS;
+
+  // If NOT a manual button press, NEVER hit paid AWS API — return DB snapshot (or empty ready state)
+  if (!manualTrigger || dbIsLocked) {
+    const cachedPayload = buildCachedResponse(dbMappedResults, latestDbSyncTimestamp);
+    if (latestDbSyncTimestamp > 0) {
+      memoryCache = {
+        timestamp: latestDbSyncTimestamp,
+        data: cachedPayload,
+      };
+    }
+    logger.info(
+      `[AWS Cost Explorer] Served from DB cache ($0.00). manualTrigger=${manualTrigger}, canSyncNow=${cachedPayload.canSyncNow}, remaining=${cachedPayload.nextRefreshFormatted}.`
+    );
+    return cachedPayload;
   }
 
   // Default to past 6 months up to next month 1st
@@ -187,18 +233,23 @@ async function fetchAwsMonthlyCosts(options = {}) {
       };
     });
 
+    const syncedNowMs = Date.now();
     const payload = {
       success: true,
       cached: false,
+      canSyncNow: false,
+      lastSyncedAt: new Date(syncedNowMs).toISOString(),
+      lockExpiresAt: new Date(syncedNowMs + CACHE_TTL_MS).toISOString(),
+      remainingMs: CACHE_TTL_MS,
       nextRefreshInHours: '24.0',
-      lockExpiresAt: new Date(Date.now() + CACHE_TTL_MS).toISOString(),
+      nextRefreshFormatted: '24h 0m',
       exchangeRate,
       results: monthlyResults,
     };
 
     // Arm the 24-hour cache lock
     memoryCache = {
-      timestamp: Date.now(),
+      timestamp: syncedNowMs,
       data: payload,
     };
     logger.info(`[AWS Cost Explorer] Live query executed ($0.01). 24-Hour Cache Lock ARMED until ${payload.lockExpiresAt}.`);

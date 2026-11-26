@@ -334,6 +334,7 @@ const getAwsLiveCost = async (req, res) => {
       startDate,
       endDate,
       exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
+      manualTrigger: false,
     });
 
     res.status(httpStatus.OK).json(costData);
@@ -345,6 +346,7 @@ const getAwsLiveCost = async (req, res) => {
 
 /**
  * Sync AWS costs directly into InfrastructureBill records in MongoDB.
+ * Only fires paid AWS Cost Explorer API when user clicks Sync AND 24 hours have passed.
  */
 const syncAwsCosts = async (req, res) => {
   try {
@@ -353,6 +355,7 @@ const syncAwsCosts = async (req, res) => {
       startDate,
       endDate,
       exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
+      manualTrigger: true,
     });
 
     if (!costData.success) {
@@ -387,7 +390,9 @@ const syncAwsCosts = async (req, res) => {
         bill.exchangeRate = item.exchangeRate;
         bill.awsBreakdown = item.services;
         bill.isAutoSynced = true;
-        bill.syncedAt = new Date();
+        if (!costData.cached) {
+          bill.syncedAt = new Date();
+        }
 
         // If it is a past completed month and never recorded as PAID, auto-mark as PAID
         if (isPast && (!bill.paymentStatus || bill.paymentStatus === 'UNPAID')) {
@@ -428,11 +433,15 @@ const syncAwsCosts = async (req, res) => {
     res.status(httpStatus.OK).json({
       success: true,
       message: costData.cached
-        ? `Served from 24-Hour Cache Lock (Zero AWS API Fee). Next live query allowed in ${costData.nextRefreshInHours} hours.`
-        : `Successfully synced ${syncedBills.length} monthly bill(s) from live AWS Cost Explorer ($0.01). 24-hour cache lock armed.`,
+        ? `Served from 24-Hour Cache Lock ($0.00 AWS fee). Next live sync allowed in ${costData.nextRefreshFormatted || `${costData.nextRefreshInHours}h`}.`
+        : `Successfully synced ${syncedBills.length} monthly bill(s) from live AWS Cost Explorer ($0.01). Next sync allowed in 24h 0m.`,
       cached: costData.cached || false,
+      canSyncNow: Boolean(costData.canSyncNow),
+      lastSyncedAt: costData.lastSyncedAt || null,
+      lockExpiresAt: costData.lockExpiresAt || null,
+      remainingMs: costData.remainingMs || 0,
       nextRefreshInHours: costData.nextRefreshInHours,
-      lockExpiresAt: costData.lockExpiresAt,
+      nextRefreshFormatted: costData.nextRefreshFormatted,
       bills: syncedBills,
     });
   } catch (error) {

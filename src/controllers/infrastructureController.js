@@ -59,17 +59,24 @@ const getAwsMetrics = async (req, res) => {
       services: [],
     };
 
-    // 1. Query AWS Cost Explorer via 24-Hour Locked Cache Service
+    // 1. Read AWS Cost Explorer from cache ONLY (Zero AWS API fee on page load)
     try {
-      const costRes = await awsCostExplorerService.fetchAwsMonthlyCosts({ exchangeRate });
-      if (costRes && costRes.success && costRes.results && costRes.results.length > 0) {
-        const currentMonthData = costRes.results[costRes.results.length - 1];
+      const costRes = await awsCostExplorerService.fetchAwsMonthlyCosts({ exchangeRate, manualTrigger: false });
+      if (costRes && costRes.success) {
+        const currentMonthData = (costRes.results && costRes.results.length > 0)
+          ? costRes.results[costRes.results.length - 1]
+          : null;
         costData = {
-          totalUsd: currentMonthData.totalUsd,
-          totalInr: currentMonthData.totalInr,
-          services: currentMonthData.services,
-          cached: costRes.cached || false,
-          nextRefreshInHours: costRes.nextRefreshInHours,
+          totalUsd: currentMonthData ? currentMonthData.totalUsd : 0,
+          totalInr: currentMonthData ? currentMonthData.totalInr : 0,
+          services: currentMonthData ? currentMonthData.services : [],
+          cached: costRes.cached !== false,
+          canSyncNow: Boolean(costRes.canSyncNow),
+          lastSyncedAt: costRes.lastSyncedAt || null,
+          lockExpiresAt: costRes.lockExpiresAt || null,
+          remainingMs: costRes.remainingMs || 0,
+          nextRefreshInHours: costRes.nextRefreshInHours || '0.0',
+          nextRefreshFormatted: costRes.nextRefreshFormatted || 'Ready now',
         };
       }
     } catch (ceErr) {
@@ -942,22 +949,41 @@ const downloadTaxInvoice = async (req, res) => {
 // 7. AUTO-SYNC ALL PROVIDERS (AWS + Atlas + Cloudflare R2)
 // ==============================================================================
 
-const performAllProvidersSync = async (exchangeRate = DEFAULT_USD_TO_INR) => {
+const performAllProvidersSync = async (exchangeRate = DEFAULT_USD_TO_INR, options = {}) => {
+  const manualTrigger = Boolean(options.manualTrigger);
   const now = new Date();
   const monthDisplayName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' }); // e.g. "October 2026"
-  const startOfMonth = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  const tomorrow = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
 
   let awsAmountUsd = 5.04;
   let awsBreakdown = [];
+  let awsSyncMeta = {
+    cached: true,
+    canSyncNow: false,
+    lastSyncedAt: null,
+    lockExpiresAt: null,
+    remainingMs: 0,
+    nextRefreshInHours: '0.0',
+    nextRefreshFormatted: 'Ready now',
+  };
 
-  // 1. Fetch AWS via 24-Hour Locked Cache Service
+  // 1. Fetch AWS Cost Explorer (ONLY fires paid AWS API when manualTrigger=true AND 24h elapsed)
   try {
-    const costRes = await awsCostExplorerService.fetchAwsMonthlyCosts({ exchangeRate });
-    if (costRes && costRes.success && costRes.results && costRes.results.length > 0) {
-      const currentMonthData = costRes.results[costRes.results.length - 1];
-      if (currentMonthData.totalUsd > 0) awsAmountUsd = currentMonthData.totalUsd;
-      awsBreakdown = currentMonthData.services || [];
+    const costRes = await awsCostExplorerService.fetchAwsMonthlyCosts({ exchangeRate, manualTrigger });
+    if (costRes && costRes.success) {
+      awsSyncMeta = {
+        cached: costRes.cached !== false,
+        canSyncNow: Boolean(costRes.canSyncNow),
+        lastSyncedAt: costRes.lastSyncedAt || null,
+        lockExpiresAt: costRes.lockExpiresAt || null,
+        remainingMs: costRes.remainingMs || 0,
+        nextRefreshInHours: costRes.nextRefreshInHours || '0.0',
+        nextRefreshFormatted: costRes.nextRefreshFormatted || 'Ready now',
+      };
+      if (costRes.results && costRes.results.length > 0) {
+        const currentMonthData = costRes.results[costRes.results.length - 1];
+        if (currentMonthData.totalUsd > 0) awsAmountUsd = currentMonthData.totalUsd;
+        awsBreakdown = currentMonthData.services || [];
+      }
     }
   } catch (e) {
     logger.warn(`SyncAllProviders AWS notice: ${e.message}`);
@@ -979,7 +1005,7 @@ const performAllProvidersSync = async (exchangeRate = DEFAULT_USD_TO_INR) => {
       exchangeRate,
       awsBreakdown,
       isAutoSynced: true,
-      syncedAt: new Date(),
+      syncedAt: !awsSyncMeta.cached ? new Date() : (awsSyncMeta.lastSyncedAt ? new Date(awsSyncMeta.lastSyncedAt) : undefined),
       paymentStatus: 'UNPAID',
       platformPayments: {
         aws: { status: 'UNPAID' },
@@ -995,21 +1021,35 @@ const performAllProvidersSync = async (exchangeRate = DEFAULT_USD_TO_INR) => {
     bill.exchangeRate = exchangeRate;
     if (awsBreakdown.length > 0) bill.awsBreakdown = awsBreakdown;
     bill.isAutoSynced = true;
-    bill.syncedAt = new Date();
+    // Only advance syncedAt when an actual live AWS Cost Explorer call happened
+    if (!awsSyncMeta.cached) {
+      bill.syncedAt = new Date();
+    }
   }
 
   await bill.save();
+  bill._awsSyncMeta = awsSyncMeta;
   return bill;
 };
 
 const syncAllProviders = async (req, res) => {
   try {
     const exchangeRate = Number(req.body?.exchangeRate) || DEFAULT_USD_TO_INR;
-    const bill = await performAllProvidersSync(exchangeRate);
+    const bill = await performAllProvidersSync(exchangeRate, { manualTrigger: true });
+    const meta = bill._awsSyncMeta || {};
 
     res.json({
       success: true,
-      message: `Successfully synchronized all cloud providers for ${bill.month}.`,
+      cached: meta.cached !== false,
+      canSyncNow: Boolean(meta.canSyncNow),
+      lastSyncedAt: meta.lastSyncedAt || null,
+      lockExpiresAt: meta.lockExpiresAt || null,
+      remainingMs: meta.remainingMs || 0,
+      nextRefreshInHours: meta.nextRefreshInHours || '0.0',
+      nextRefreshFormatted: meta.nextRefreshFormatted || 'Ready now',
+      message: meta.cached
+        ? `Served from 24h cache ($0.00 AWS fee). Next live AWS sync allowed in ${meta.nextRefreshFormatted || '24h'}.`
+        : `Live AWS Cost Explorer synced for ${bill.month}! Next sync allowed in 24h 0m.`,
       bill,
     });
   } catch (error) {
