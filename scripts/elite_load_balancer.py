@@ -22,16 +22,16 @@ import subprocess
 import logging
 from datetime import datetime
 
-# Configuration Thresholds (Optimized for 1GB RAM / 2-vCPU EC2)
+# Configuration Thresholds (Calibrated for 4GB RAM / 2-vCPU EC2 + ecosystem.config.cjs max_memory_restart 850M)
 PING_URL = "http://127.0.0.1:3001/api/v1/ping"
 APP_NAME = "elite-backend"
 CHECK_INTERVAL_SECONDS = 15
-MAX_WORKER_MEMORY_MB = 280          # Reload worker if individual RSS > 280 MB
-TOTAL_CLUSTER_MEMORY_MB = 550       # Reload heaviest worker if combined cluster > 550 MB
-MIN_SYSTEM_FREE_RAM_MB = 90         # Critical RAM threshold: trigger memory compaction
+MAX_WORKER_MEMORY_MB = 750          # Reload worker if individual RSS > 750 MB
+TOTAL_CLUSTER_MEMORY_MB = 1500      # Reload heaviest worker if combined cluster > 1500 MB
+MIN_SYSTEM_FREE_RAM_MB = 250        # Critical RAM threshold: trigger memory compaction
 MAX_LATENCY_SECONDS = 4.0           # Ping timeout threshold for lag
-CONSECUTIVE_LAG_LIMIT = 2           # Consecutive slow pings before cluster reload
-COOLDOWN_SECONDS_PER_WORKER = 180   # Minimum seconds between reloading same worker
+CONSECUTIVE_LAG_LIMIT = 3           # Consecutive slow pings before cluster reload
+COOLDOWN_SECONDS_PER_WORKER = 300   # Minimum seconds between reloading same worker
 LOG_FILE = "/var/log/elite_balancer.log" if os.access("/var/log", os.W_OK) else os.path.expanduser("~/.pm2/elite_balancer.log")
 
 # Setup Logging
@@ -146,11 +146,11 @@ def reload_pm2_worker(pm_id, reason):
         return False
 
     logging.warning(f"🚨 [LoadBalancer Action] Reloading worker {pm_id} (Reason: {reason})")
+    worker_last_reloaded[pm_id] = now
     try:
         cmd = ["pm2", "reload", str(pm_id)]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=35)
         if res.returncode == 0:
-            worker_last_reloaded[pm_id] = now
             logging.info(f"✅ [Success] Worker {pm_id} cleanly reloaded with zero downtime.")
             return True
         else:
