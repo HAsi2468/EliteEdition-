@@ -1,4 +1,3 @@
-const httpStatus = require('http-status');
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const sharp = require('sharp');
@@ -281,7 +280,7 @@ const getNextChallanNumber = async (req, res) => {
   try {
     const brand = resolveCompanyBrand(req.query.companyEntity);
     const nextChallanNo = await generateNextChallanNo(brand.id);
-    res.status(httpStatus.OK).json({
+    res.status(200).json({
       success: true,
       companyEntity: brand.id,
       companyName: brand.name,
@@ -290,7 +289,7 @@ const getNextChallanNumber = async (req, res) => {
     });
   } catch (error) {
     logger.error('getNextChallanNumber error: %o', error);
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -302,7 +301,7 @@ const lookupDesign = async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) {
-      return res.status(httpStatus.OK).json({ success: true, exact: null, suggestions: [] });
+      return res.status(200).json({ success: true, exact: null, suggestions: [] });
     }
 
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -326,14 +325,14 @@ const lookupDesign = async (req, res) => {
       category: d.category || '',
     }));
 
-    res.status(httpStatus.OK).json({
+    res.status(200).json({
       success: true,
       exact,
       suggestions,
     });
   } catch (error) {
     logger.error('lookupDesign error: %o', error);
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -379,7 +378,7 @@ const listJobChallans = async (req, res) => {
       { totalChallans: 0, activeCount: 0, completedCount: 0, totalQty: 0, totalDesigns: 0 }
     );
 
-    res.status(httpStatus.OK).json({
+    res.status(200).json({
       success: true,
       company: brand,
       stats,
@@ -387,7 +386,7 @@ const listJobChallans = async (req, res) => {
     });
   } catch (error) {
     logger.error('listJobChallans error: %o', error);
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -400,12 +399,12 @@ const createJobChallan = async (req, res) => {
     const brand = resolveCompanyBrand(body.companyEntity);
 
     if (!body.party || !String(body.party.name || '').trim()) {
-      return res.status(httpStatus.BAD_REQUEST).json({ success: false, message: 'Party / Karigar name is required.' });
+      return res.status(400).json({ success: false, message: 'Party / Karigar name is required.' });
     }
 
     const rawItems = Array.isArray(body.items) ? body.items.filter((i) => i && String(i.designNo || '').trim()) : [];
     if (rawItems.length === 0) {
-      return res.status(httpStatus.BAD_REQUEST).json({ success: false, message: 'At least one Design Number item row is required.' });
+      return res.status(400).json({ success: false, message: 'At least one Design Number item row is required.' });
     }
 
     // Auto-resolve missing design images from Design Master / Product Catalog
@@ -463,7 +462,7 @@ const createJobChallan = async (req, res) => {
       createdBy: req.user?.name || req.user?.email || body.createdBy || '',
     });
 
-    res.status(httpStatus.CREATED).json({
+    res.status(201).json({
       success: true,
       message: `Job Challan ${doc.challanNo} created successfully.`,
       data: doc,
@@ -471,12 +470,12 @@ const createJobChallan = async (req, res) => {
   } catch (error) {
     logger.error('createJobChallan error: %o', error);
     if (error.code === 11000) {
-      return res.status(httpStatus.CONFLICT).json({
+      return res.status(409).json({
         success: false,
         message: 'A Job Challan with this number already exists for this company.',
       });
     }
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -487,7 +486,7 @@ const updateJobChallan = async (req, res) => {
   try {
     const existing = await db.JobChallan.findById(req.params.id);
     if (!existing) {
-      return res.status(httpStatus.NOT_FOUND).json({ success: false, message: 'Job Challan not found.' });
+      return res.status(404).json({ success: false, message: 'Job Challan not found.' });
     }
 
     const body = req.body || {};
@@ -541,14 +540,14 @@ const updateJobChallan = async (req, res) => {
 
     await existing.save();
 
-    res.status(httpStatus.OK).json({
+    res.status(200).json({
       success: true,
       message: `Job Challan ${existing.challanNo} updated successfully.`,
       data: existing,
     });
   } catch (error) {
     logger.error('updateJobChallan error: %o', error);
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -560,7 +559,7 @@ const updateJobChallanStatus = async (req, res) => {
     const { status } = req.body || {};
     const allowed = ['DRAFT', 'ISSUED', 'PARTIAL_RECEIVED', 'COMPLETED', 'CANCELLED'];
     if (!allowed.includes(status)) {
-      return res.status(httpStatus.BAD_REQUEST).json({ success: false, message: 'Invalid status.' });
+      return res.status(400).json({ success: false, message: 'Invalid status.' });
     }
     const updated = await db.JobChallan.findByIdAndUpdate(
       req.params.id,
@@ -568,12 +567,12 @@ const updateJobChallanStatus = async (req, res) => {
       { returnDocument: 'after' }
     );
     if (!updated) {
-      return res.status(httpStatus.NOT_FOUND).json({ success: false, message: 'Job Challan not found.' });
+      return res.status(404).json({ success: false, message: 'Job Challan not found.' });
     }
-    res.status(httpStatus.OK).json({ success: true, data: updated });
+    res.status(200).json({ success: true, data: updated });
   } catch (error) {
     logger.error('updateJobChallanStatus error: %o', error);
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -584,12 +583,12 @@ const deleteJobChallan = async (req, res) => {
   try {
     const deleted = await db.JobChallan.findByIdAndDelete(req.params.id);
     if (!deleted) {
-      return res.status(httpStatus.NOT_FOUND).json({ success: false, message: 'Job Challan not found.' });
+      return res.status(404).json({ success: false, message: 'Job Challan not found.' });
     }
-    res.status(httpStatus.OK).json({ success: true, message: `Job Challan ${deleted.challanNo} deleted.` });
+    res.status(200).json({ success: true, message: `Job Challan ${deleted.challanNo} deleted.` });
   } catch (error) {
     logger.error('deleteJobChallan error: %o', error);
-    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -601,7 +600,7 @@ const downloadJobChallanPdf = async (req, res) => {
   try {
     const challan = await db.JobChallan.findById(req.params.id).lean();
     if (!challan) {
-      return res.status(httpStatus.NOT_FOUND).json({ success: false, message: 'Job Challan not found.' });
+      return res.status(404).json({ success: false, message: 'Job Challan not found.' });
     }
 
     const brand = resolveCompanyBrand(challan.companyEntity || challan.companyName);
@@ -864,7 +863,7 @@ const downloadJobChallanPdf = async (req, res) => {
   } catch (error) {
     logger.error('downloadJobChallanPdf error: %o', error);
     if (!res.headersSent) {
-      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 };
