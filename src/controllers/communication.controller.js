@@ -281,7 +281,6 @@ const getGroupMessages = async (req, res) => {
     }
 
 
-    const rawReqUserId = req.user ? (req.user._id || req.user.id) : (req.headers['x-user-id'] || req.query.userId);
     const reqUserObjId = rawReqUserId && mongoose.Types.ObjectId.isValid(rawReqUserId) ? new mongoose.Types.ObjectId(rawReqUserId) : null;
     const reqUserMembers = [reqUserObjId, rawReqUserId ? String(rawReqUserId) : null].filter(Boolean);
 

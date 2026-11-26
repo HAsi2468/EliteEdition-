@@ -148,13 +148,25 @@ const upload = multer({
 });
 
 /**
+ * Normalizes known HTTP image CDN URLs to HTTPS before validation and fetching.
+ */
+const normalizeRemoteImageUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (/^http:\/\/([^/]+\.)?(myntassets\.com|flixcart\.com|media-amazon\.com|unicommerce\.com|cloudfront\.net|r2\.dev|eliteedition\.in)(\/|$)/i.test(trimmed)) {
+    return trimmed.replace(/^http:\/\//i, 'https://');
+  }
+  return trimmed;
+};
+
+/**
  * Validates a target URL against SSRF attacks.
  * Strictly allowlists safe HTTPS image CDN hosts and blocks:
  * AWS/Cloud metadata (169.254.0.0/16), localhost, loopbacks, private RFC-1918 IPs, file://, and arbitrary external hosts.
  */
 function isSafeImageUrl(targetUrl) {
   if (!targetUrl || typeof targetUrl !== 'string') return false;
-  const trimmed = targetUrl.trim();
+  const trimmed = normalizeRemoteImageUrl(targetUrl);
 
   // Block null bytes, directory traversal, and dangerous characters
   if (trimmed.includes('\0') || trimmed.includes('..') || trimmed.includes('\\')) {
@@ -175,86 +187,75 @@ function isSafeImageUrl(targetUrl) {
     return false;
   }
 
-  const normalizeRemoteImageUrl = (rawUrl) => {
-    if (!rawUrl || typeof rawUrl !== 'string') return '';
-    const trimmed = rawUrl.trim();
-    if (/^http:\/\/([^/]+\.)?(myntassets\.com|flixcart\.com|media-amazon\.com|unicommerce\.com|cloudfront\.net|r2\.dev|eliteedition\.in)(\/|$)/i.test(trimmed)) {
-      return trimmed.replace(/^http:\/\//i, 'https://');
-    }
-    return trimmed;
-  };
-
-  const isSafeImageUrl = (rawUrl) => {
-    const normalized = normalizeRemoteImageUrl(rawUrl);
-    // Allow local relative uploads or R2 keys (no protocol)
-    if (!normalized || (!normalized.includes('://') && !normalized.startsWith('//'))) {
-      return /^[a-zA-Z0-9_\-\.\/]+$/.test(normalized.replace(/^\/+/, ''));
-    }
-
-    // If not a relative path, it MUST be a valid absolute HTTPS URL
-    let parsed;
-    try {
-      parsed = new URL(normalized);
-    } catch (e) {
-      return false;
-    }
-
-    // Strict HTTPS protocol enforcement (blocks http://, file://, etc.)
-    if (parsed.protocol !== 'https:') {
-      return false;
-    }
-
-    const hostname = parsed.hostname.toLowerCase();
-
-    // Block localhost, IP literals, AWS IMDS, private networks, and loopbacks
-    if (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '0.0.0.0' ||
-      hostname === '::1' ||
-      hostname.endsWith('.localhost') ||
-      hostname.endsWith('.local') ||
-      hostname.endsWith('.internal') ||
-      /^169\.254\./.test(hostname) || // AWS / Cloud IMDS Link-Local
-      /^10\./.test(hostname) ||        // RFC-1918 Private Class A
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) || // RFC-1918 Private Class B
-      /^192\.168\./.test(hostname) ||  // RFC-1918 Private Class C
-      /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(hostname) || // Carrier-Grade NAT (RFC-6598)
-      /^127\./.test(hostname) ||       // Loopbacks
-      /^0\./.test(hostname) ||
-      /^\d+$/.test(hostname) ||        // Decimal / DWORD IP (e.g. 2130706433)
-      /^0x[0-9a-f]+$/i.test(hostname) || // Hex IP
-      /^\d+\.\d+\.\d+\.\d+$/.test(hostname) || // All raw IPv4 addresses
-      hostname.startsWith('[') || hostname.endsWith(']') // IPv6 literals
-    ) {
-      return false;
-    }
-
-    // Allowlist of trusted image hosts only (Cloudflare R2, AWS S3, Elite Edition ERP domains, Google CDN, Giphy, Tenor)
-    const isAllowedDomain =
-      hostname.endsWith('.r2.dev') ||
-      hostname.endsWith('.r2.cloudflarestorage.com') ||
-      hostname.endsWith('.cloudflarestorage.com') ||
-      hostname === 'eliteedition.in' ||
-      hostname.endsWith('.eliteedition.in') ||
-      hostname.endsWith('.s3.amazonaws.com') ||
-      hostname.endsWith('.s3.ap-south-1.amazonaws.com') ||
-      hostname === 'lh3.googleusercontent.com' ||
-      hostname === 'drive.google.com' ||
-      hostname.endsWith('.giphy.com') ||
-      hostname === 'giphy.com' ||
-      hostname.endsWith('.gph.is') ||
-      hostname.endsWith('.tenor.com') ||
-      hostname === 'tenor.com' ||
-      hostname === 'myntassets.com' ||
-      hostname.endsWith('.myntassets.com') ||
-      hostname.endsWith('.flixcart.com') ||
-      hostname.endsWith('.media-amazon.com') ||
-      hostname.endsWith('.unicommerce.com') ||
-      hostname.endsWith('.cloudfront.net');
-
-    return isAllowedDomain;
+  // Allow local relative uploads or R2 keys (no protocol)
+  if (!trimmed || (!trimmed.includes('://') && !trimmed.startsWith('//'))) {
+    return /^[a-zA-Z0-9_\-\.\/]+$/.test(trimmed.replace(/^\/+/, ''));
   }
+
+  // If not a relative path, it MUST be a valid absolute HTTPS URL
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch (e) {
+    return false;
+  }
+
+  // Strict HTTPS protocol enforcement (blocks http://, file://, etc.)
+  if (parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block localhost, IP literals, AWS IMDS, private networks, and loopbacks
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    /^169\.254\./.test(hostname) || // AWS / Cloud IMDS Link-Local
+    /^10\./.test(hostname) ||        // RFC-1918 Private Class A
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) || // RFC-1918 Private Class B
+    /^192\.168\./.test(hostname) ||  // RFC-1918 Private Class C
+    /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(hostname) || // Carrier-Grade NAT (RFC-6598)
+    /^127\./.test(hostname) ||       // Loopbacks
+    /^0\./.test(hostname) ||
+    /^\d+$/.test(hostname) ||        // Decimal / DWORD IP (e.g. 2130706433)
+    /^0x[0-9a-f]+$/i.test(hostname) || // Hex IP
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname) || // All raw IPv4 addresses
+    hostname.startsWith('[') || hostname.endsWith(']') // IPv6 literals
+  ) {
+    return false;
+  }
+
+  // Allowlist of trusted image hosts only (Cloudflare R2, AWS S3, Elite Edition ERP domains, Google CDN, Giphy, Tenor)
+  const isAllowedDomain =
+    hostname.endsWith('.r2.dev') ||
+    hostname.endsWith('.r2.cloudflarestorage.com') ||
+    hostname.endsWith('.cloudflarestorage.com') ||
+    hostname === 'eliteedition.in' ||
+    hostname.endsWith('.eliteedition.in') ||
+    hostname.endsWith('.s3.amazonaws.com') ||
+    hostname.endsWith('.s3.ap-south-1.amazonaws.com') ||
+    hostname === 'lh3.googleusercontent.com' ||
+    hostname === 'drive.google.com' ||
+    hostname.endsWith('.giphy.com') ||
+    hostname === 'giphy.com' ||
+    hostname.endsWith('.gph.is') ||
+    hostname.endsWith('.tenor.com') ||
+    hostname === 'tenor.com' ||
+    hostname === 'myntassets.com' ||
+    hostname.endsWith('.myntassets.com') ||
+    hostname.endsWith('.flixcart.com') ||
+    hostname.endsWith('.media-amazon.com') ||
+    hostname.endsWith('.unicommerce.com') ||
+    hostname.endsWith('.cloudfront.net');
+
+  return isAllowedDomain;
+}
 
   /**
    * GET /v1/upload/preview

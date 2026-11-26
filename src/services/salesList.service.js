@@ -165,16 +165,11 @@ const getSalseListFromDB = async (
       totalRecords,
       summary,
       meta: {
-        totalPages,
-        totalRecords,
-        currentPage: pageNum,
-        summary
-      }
-      meta: {
         currentPage: pageNum,
         pageSize: limitNum,
         totalPages,
         totalRecords,
+        summary,
       },
     };
   } catch (error) {
