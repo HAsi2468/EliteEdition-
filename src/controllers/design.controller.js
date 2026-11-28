@@ -96,18 +96,28 @@ const getAll = async (req, res) => {
         filter.$and.push({ $or: searchOr });
       });
     }
-    const skip = (Number(page) - 1) * Number(limit);
-    let sort = { designName: -1 };
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(2000, Math.max(1, Number(limit) || 50));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Deterministic sorting with _id tiebreaker so infinite scroll never skips or repeats designs
+    let sort = { designName: -1, _id: -1 };
     if (sortBy) {
-      const order = sortOrder === 'desc' ? -1 : 1;
-      if (sortBy === 'createdAt') {
-        sort = { createdAt: order, _id: order };
+      const order = sortOrder === 'asc' ? 1 : -1;
+      if (sortBy === 'createdAt' || sortBy === 'created_date_time') {
+        sort = { created_date_time: order, _id: order };
       } else {
         sort = { [sortBy]: order, _id: order };
       }
     }
+
+    const findQuery = db.Design.find(filter);
+    if (!sortBy || sortBy === 'designName' || sortBy === 'category' || sortBy === 'fabricName' || sortBy === 'designerName') {
+      findQuery.collation({ locale: 'en_US', numericOrdering: true });
+    }
+
     const [docs, total] = await Promise.all([
-      db.Design.find(filter).collation({ locale: "en_US", numericOrdering: true }).sort(sort).skip(skip).limit(Number(limit)).lean(),
+      findQuery.sort(sort).skip(skip).limit(limitNum).lean(),
       db.Design.countDocuments(filter),
     ]);
 
@@ -117,7 +127,13 @@ const getAll = async (req, res) => {
       imageUrl2: normalizeImageUrl(d.imageUrl2, d.designName ? `${d.designName}-2` : ''),
     }));
 
-    res.json({ data: normalizedDocs, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    res.json({
+      data: normalizedDocs,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      pages: Math.max(1, Math.ceil(total / limitNum)),
+    });
   } catch (err) {
     logger.error('design.getAll error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });
